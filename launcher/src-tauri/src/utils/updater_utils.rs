@@ -59,6 +59,15 @@ pub fn is_flatpak() -> bool {
     is_flatpak
 }
 
+/// Update-Basis-URL für den Kanal aus `branding.rs` (`None` = Updater deaktiviert).
+fn configured_update_base(is_beta_channel: bool) -> Option<&'static str> {
+    if is_beta_channel {
+        crate::branding::UPDATE_BASE_URL_BETA
+    } else {
+        crate::branding::UPDATE_BASE_URL
+    }
+}
+
 /// Checks if an update is available and returns detailed information including the updater instance.
 /// This version provides all necessary information to proceed with download/installation without redundancy.
 ///
@@ -82,11 +91,13 @@ pub async fn check_update_available_detailed(
         current_version, channel
     );
 
-    // Determine the base part of the URL and the platform-specific segment template
-    let base_repo_url = if is_beta_channel {
-        "https://api-staging.norisk.gg/api/v1/launcher/releases-v2"
-    } else {
-        "https://api.norisk.gg/api/v1/launcher/releases-v2"
+    // Salami: Update-Endpoint kommt aus branding.rs; ohne Endpoint ist der Updater aus.
+    let base_repo_url = match configured_update_base(is_beta_channel) {
+        Some(url) => url,
+        None => {
+            debug!("Updater disabled: no update endpoint configured in branding.rs");
+            return Ok(None);
+        }
     };
 
     let mut platform_specific_target = "{{target}}".to_string(); // Default: Tauri replaces {{target}}
@@ -478,11 +489,15 @@ pub async fn check_for_updates(
         None,
     );
 
-    // Determine the base part of the URL and the platform-specific segment template
-    let base_repo_url = if is_beta_channel {
-        "https://api-staging.norisk.gg/api/v1/launcher/releases-v2"
-    } else {
-        "https://api.norisk.gg/api/v1/launcher/releases-v2"
+    // Salami: Update-Endpoint kommt aus branding.rs; ohne Endpoint ist der Updater aus.
+    let base_repo_url = match configured_update_base(is_beta_channel) {
+        Some(url) => url,
+        None => {
+            info!("Updater disabled: no update endpoint configured in branding.rs");
+            emit_status(&app_handle, "uptodate", "Application is up to date.".to_string(), None);
+            emit_status(&app_handle, "close", "Application is up to date.".to_string(), None);
+            return;
+        }
     };
 
     let mut platform_specific_target = "{{target}}".to_string(); // Default: Tauri replaces {{target}}

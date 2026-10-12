@@ -7,7 +7,11 @@ use std::time::Duration;
 
 pub static LAUNCHER_DIRECTORY: Lazy<ProjectDirs> =
     Lazy::new(
-        || match ProjectDirs::from("gg", "norisk", "NoRiskClientV3") {
+        || match ProjectDirs::from(
+            crate::branding::DIRS_QUALIFIER,
+            crate::branding::DIRS_ORGANIZATION,
+            crate::branding::DIRS_APPLICATION,
+        ) {
             Some(proj_dirs) => proj_dirs,
             None => panic!("Failed to get application directory"),
         },
@@ -16,7 +20,7 @@ pub static LAUNCHER_DIRECTORY: Lazy<ProjectDirs> =
 pub static CUSTOM_GAME_DIR_CACHE: Lazy<RwLock<Option<Option<PathBuf>>>> = 
     Lazy::new(|| RwLock::new(None));
 
-static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"), " (support@norisk.gg)");
+static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
 pub const HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 

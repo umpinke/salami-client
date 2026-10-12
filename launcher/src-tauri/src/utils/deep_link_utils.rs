@@ -22,7 +22,7 @@ pub async fn handle_deep_link(app_handle: &AppHandle, urls: Vec<Url>) {
     for url in urls {
         info!("[DeepLink] Received URL: {}", url);
 
-        if url.scheme() != "norisk" {
+        if url.scheme() != crate::branding::DEEP_LINK_SCHEME {
             warn!("[DeepLink] Ignoring URL with unknown scheme: {}", url.scheme());
             continue;
         }

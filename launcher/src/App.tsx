@@ -23,6 +23,7 @@ import { GlobalCrashReportModal } from "./components/modals/GlobalCrashReportMod
 import { ImportPackConfirmModal } from "./components/modals/ImportPackConfirmModal";
 import { DragDropOverlay } from "./components/ui/DragDropOverlay";
 import { TermsOfServiceModal, AnalyticsConsentBanner } from "./components/modals/TermsOfServiceModal";
+import { FEATURES } from "./config/salami";
 import { MacCapturePermissionMonitor } from "./components/clips/MacCapturePermissionMonitor";
 import { GlobalModalPortal } from "./components/ui/GlobalModalPortal";
 import { useCrashModalStore } from "./store/crash-modal-store";
@@ -99,8 +100,9 @@ export function App() {
 
   const welcomeSkipped = useWelcomeStore((s) => s.skipped);
   // Terms come first: stacking the welcome screen over that modal would hide it.
+  const termsAccepted = !FEATURES.termsOfService || hasAcceptedTermsOfService;
   const showWelcome =
-    hasAcceptedTermsOfService && accountsLoaded && !activeAccount && !welcomeSkipped;
+    termsAccepted && accountsLoaded && !activeAccount && !welcomeSkipped;
 
   const activeTab = location.pathname.substring(1) || "play";
 
@@ -583,7 +585,7 @@ export function App() {
         <GlobalCrashReportModal />
         <ImportPackConfirmModal />
         <DragDropOverlay />
-        <TermsOfServiceModal isOpen={!hasAcceptedTermsOfService} />
+        <TermsOfServiceModal isOpen={!termsAccepted} />
         {showWelcome && <WelcomeScreen />}
         <GlobalModalPortal />
         <MacCapturePermissionMonitor />
@@ -592,7 +594,7 @@ export function App() {
         <AppLayout activeTab={activeTab} onNavChange={handleNavChange}>
           <Outlet context={profilesTabContext} />
         </AppLayout>
-        {shouldShowAnalyticsBanner() && (
+        {FEATURES.analyticsBanner && shouldShowAnalyticsBanner() && (
           <AnalyticsConsentBanner
             onAccept={handleAnalyticsAccept}
             onDecline={handleAnalyticsDecline}

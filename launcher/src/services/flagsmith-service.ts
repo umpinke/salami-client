@@ -1,4 +1,5 @@
 import flagsmith from 'flagsmith';
+import { FEATURES } from "../config/salami";
 import { invoke } from '@tauri-apps/api/core';
 import { log } from '../utils/logging-utils';
 import { getOrCreateInstallId } from './install-id-service';
@@ -40,7 +41,7 @@ const initializeFlagsmith = async () => {
 };
 
 // Initialize flagsmith when the module is loaded
-const initPromise = initializeFlagsmith();
+const initPromise = FEATURES.flagsmith ? initializeFlagsmith() : Promise.resolve();
 
 export interface PackRolloutConfig {
   aliases: Record<string, string>;

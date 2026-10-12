@@ -268,6 +268,11 @@ impl NoRiskApi {
         force: bool,
         is_experimental: bool,
     ) -> Result<NoRiskToken> {
+        // Salami: Kein NoRisk-Login – es werden keine Minecraft-Sessiondaten an NoRisk gemeldet.
+        // Der Aufrufer behandelt den Fehler als "kein Token" und startet normal weiter.
+        if !crate::branding::NORISK_SERVICES_ENABLED {
+            return Err(AppError::Other("NoRisk services are disabled in Salami Client".into()));
+        }
         info!("[NoRisk API] Refreshing NoRisk token v3 with SystemID: {}", system_id);
         debug!("[NoRisk API] Username: {}", username);
         debug!("[NoRisk API] Force refresh: {}", force);
@@ -410,6 +415,9 @@ impl NoRiskApi {
         norisk_token: &str,
         is_experimental: bool,
     ) -> Result<NoriskModpacksConfig> {
+        if !crate::branding::NORISK_SERVICES_ENABLED {
+            return crate::integrations::salami_packs::load_packs().await;
+        }
         trace!(
             "[NoRisk API] Fetching modpack configuration from v3 endpoint. Experimental: {}",
             is_experimental
@@ -423,6 +431,9 @@ impl NoRiskApi {
         norisk_token: &str,
         is_experimental: bool,
     ) -> Result<NoriskVersionsConfig> {
+        if !crate::branding::NORISK_SERVICES_ENABLED {
+            return crate::integrations::salami_packs::load_versions().await;
+        }
         trace!(
             "[NoRisk API] Fetching standard version profiles. Experimental: {}",
             is_experimental

@@ -15,6 +15,7 @@ import { StaticTooltip } from '../ui/Tooltip';
 import { toast } from 'sonner';
 import { isWorldCupEventActive } from '../../data/worldcup-event';
 import type { LaunchOverrides } from '../../services/process-service';
+import { BRAND } from "../../config/salami";
 
 // Featured server configuration
 // Option A: profileId = null → uses currently selected profile from MainLaunchButton
@@ -131,11 +132,10 @@ export function PlayerActionsDisplay({
 
       {displayMode === 'logo' ? (
         <img
-          src="norisk_logo_color.png"
-          alt="NoRisk Logo"
-          className="h-48 sm:h-56 md:h-64 mb-[-80px] sm:mb-[-100px] md:mb-[-120px] relative z-0"
+          src={BRAND.logo}
+          alt={`${BRAND.name} Logo`}
+          className="h-28 sm:h-32 md:h-36 mb-[-12px] relative z-0"
           style={{
-            imageRendering: "pixelated",
             filter: commonDropShadowStyle
           }}
         />

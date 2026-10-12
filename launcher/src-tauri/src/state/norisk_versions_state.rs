@@ -193,6 +193,17 @@ impl NoriskVersionManager {
 impl PostInitializationHandler for NoriskVersionManager {
     async fn on_state_ready(&self, _app_handle: Arc<tauri::AppHandle>) -> Result<()> {
         trace!("NoriskVersionManager: on_state_ready called. Loading configuration...");
+        // Salami: Standardprofile sind eingebettet – direkt laden statt auf einen Cache zu warten.
+        if !crate::branding::NORISK_SERVICES_ENABLED {
+            let is_exp = match State::get().await {
+                Ok(state) => state.config_manager.is_experimental_mode().await,
+                Err(_) => false,
+            };
+            match self.fetch_and_update_config("", is_exp).await {
+                Ok(()) => return Ok(()),
+                Err(e) => log::warn!("NoriskVersionManager: Salami versions could not be loaded ({}), falling back to cache", e),
+            }
+        }
         // Load initial config. If loading fails critically (e.g., IO error other than NotFound), propagate the error.
         // If parsing fails or file not found, use default. This logic is now effectively in load_config_internal.
         let load_path = if let Ok(state) = State::get().await {

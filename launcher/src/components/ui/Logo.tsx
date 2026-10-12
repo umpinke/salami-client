@@ -1,4 +1,5 @@
 import { cn } from "../../lib/utils";
+import { BRAND } from "../../config/salami";
 
 interface LogoProps {
   size?: "sm" | "md" | "lg";
@@ -24,8 +25,8 @@ export function Logo({ size = "md", className, onClick }: LogoProps) {
       onClick={onClick}
     >
       <img
-        src="/logo.png"
-        alt="NoRisk Logo"
+        src={BRAND.logo}
+        alt={`${BRAND.name} Logo`}
         className="w-full h-full object-contain"
       />
     </div>

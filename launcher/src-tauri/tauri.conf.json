@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "NoRisk Launcher",
+  "productName": "Salami Client",
   "version": "0.6.28",
-  "identifier": "gg.norisk.NoRiskClientLauncherV3",
+  "identifier": "dev.salamiclient.launcher",
   "build": {
     "beforeDevCommand": "yarn native-deps && yarn stage-native --debug && yarn dev",
     "devUrl": "http://localhost:1430",
@@ -23,12 +23,12 @@
     "deep-link": {
       "desktop": {
         "schemes": [
-          "norisk"
+          "salami"
         ]
       }
     },
     "cli": {
-      "description": "NoRisk Launcher",
+      "description": "Salami Client",
       "subcommands": {
         "launch": {
           "description": "Launch a profile with runtime-only overrides (does not persist)",
@@ -58,7 +58,7 @@
             {
               "name": "pack",
               "takesValue": true,
-              "description": "Override NoRisk pack id"
+              "description": "Override pack id"
             },
             {
               "name": "world",
@@ -152,7 +152,7 @@
             {
               "name": "pack",
               "takesValue": true,
-              "description": "Optional NoRisk pack id"
+              "description": "Optional pack id"
             },
             {
               "name": "name",
@@ -193,7 +193,7 @@
       {
         "fullscreen": false,
         "resizable": true,
-        "title": "NoRiskClient",
+        "title": "Salami Client",
         "width": 1280,
         "height": 800,
         "minWidth": 1080,
@@ -219,8 +219,7 @@
           "data:",
           "https://api.iconify.design",
           "https://*.modrinth.com",
-          "https://sessionserver.mojang.com",
-          "https://*.norisk.gg"
+          "https://sessionserver.mojang.com"
         ],
         "img-src": [
           "'self'",
@@ -228,7 +227,6 @@
           "http://asset.localhost",
           "https://*.modrinth.com",
           "https://cdn.modrinth.com",
-          "https://*.norisk.gg",
           "https://textures.minecraft.net",
           "http://textures.minecraft.net",
           "https://crafatar.com",
@@ -262,9 +260,7 @@
           "'self'",
           "https://www.youtube.com",
           "https://www.youtube-nocookie.com",
-          "https://player.vimeo.com",
-          "https://api.norisk.gg",
-          "https://api-staging.norisk.gg"
+          "https://player.vimeo.com"
         ],
         "media-src": [
           "'self'",
@@ -338,8 +334,8 @@
         "ext": [
           "noriskpack"
         ],
-        "name": "NoriskPack File",
-        "description": "NoRiskClient Modpack File"
+        "name": "Salami Client Modpack",
+        "description": "Modpack file (.noriskpack format)"
       }
     ]
   }

@@ -31,6 +31,7 @@ import { useLauncherTheme } from "../../hooks/useLauncherTheme";
 import * as ConfigService from "../../services/launcher-config-service";
 import { SocialsModal } from "../modals/SocialsModal";
 import { FriendsSidebar } from "../friends/FriendsSidebar";
+import { FEATURES } from "../../config/salami";
 // TODO: Re-enable when WebSocket is stable
 // import { useFriendsWebSocket } from "../../hooks/useFriendsWebSocket";
 import { useFriendsStore } from "../../store/friends-store";
@@ -86,7 +87,7 @@ export function AppLayout({
     { id: "profiles", icon: "solar:user-id-bold", label: t("nav.profiles") },
     { id: "mods", icon: "solar:widget-bold", label: t("nav.mods") },
     { id: "skins", icon: "solar:emoji-funny-circle-bold", label: t("nav.skins") },
-    { id: "capes", icon: "solar:shop-bold", label: t("nav.capes") },
+    ...(FEATURES.capes ? [{ id: "capes", icon: "solar:shop-bold", label: t("nav.capes") }] : []),
     ...(clipsEnabled
       ? [{ id: "clips", icon: "solar:videocamera-record-bold", label: t("nav.clips") }]
       : []),
@@ -105,6 +106,7 @@ export function AppLayout({
   // useFriendsWebSocket();
 
   useEffect(() => {
+    if (!FEATURES.friends) return;
     const initFriends = async () => {
       try {
         await loadCurrentUser();
@@ -380,7 +382,7 @@ export function AppLayout({
       <ProfileSettingsModal />
       <SettingsModal />
       <ProfileDuplicateModal />
-      <FriendsSidebar />
+      {FEATURES.friends && <FriendsSidebar />}
     </div>
   );
 }

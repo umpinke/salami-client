@@ -601,7 +601,19 @@ pub async fn install_minecraft_version(
             "Fetching Norisk config because pack '{}' is selected. Attempting to refresh first.",
             pack_id
         );
-        if let Some(creds) = credentials.as_ref() {
+        if !crate::branding::NORISK_SERVICES_ENABLED {
+            // Salami: Packs kommen ohne Token aus integrations::salami_packs.
+            if let Err(update_err) = state
+                .norisk_pack_manager
+                .fetch_and_update_config("", is_experimental_mode)
+                .await
+            {
+                warn!(
+                    "Failed to load Salami pack configuration for '{}': {}. Using cached version.",
+                    pack_id, update_err
+                );
+            }
+        } else if let Some(creds) = credentials.as_ref() {
             match creds
                 .norisk_credentials
                 .get_token_for_mode(is_experimental_mode)

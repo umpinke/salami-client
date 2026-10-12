@@ -66,11 +66,19 @@ impl NrcRequest {
     /// Send the request, mapping transport failures to `AppError::RequestError`.
     /// The single place that error is built for this lane.
     async fn send_inner(self, ctx: &str) -> Result<reqwest::Response> {
-        let target = self
-            .builder
-            .try_clone()
-            .and_then(|b| b.build().ok())
-            .map(|req| format!("{} {}", req.method(), req.url().path()));
+        let request = self.builder.try_clone().and_then(|b| b.build().ok());
+        // Salami: zentraler Kill-Switch – keine Requests an NoRisk-Server (siehe branding.rs).
+        if let Some(req) = request.as_ref() {
+            if crate::branding::is_blocked_host(req.url().host_str()) {
+                debug!("[HTTP] {} blocked: NoRisk services disabled ({})", ctx, req.url());
+                return Err(AppError::RequestError(format!(
+                    "{} skipped: NoRisk online services are disabled in {}",
+                    ctx,
+                    crate::branding::PRODUCT_NAME
+                )));
+            }
+        }
+        let target = request.map(|req| format!("{} {}", req.method(), req.url().path()));
         let started = Instant::now();
         let response = self.builder.send().await.map_err(|e| {
             error!("[HTTP] {} request failed: {}", ctx, e);

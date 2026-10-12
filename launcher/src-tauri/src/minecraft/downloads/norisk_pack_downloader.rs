@@ -179,6 +179,26 @@ impl NoriskPackDownloadService {
                         Ok(())
                     }
                     NoriskModSourceDefinition::Url => {
+                        // Salami: "file:<pfad>" = lokale Datei (relativer Pfad = relativ zum
+                        // Launcher-Datenordner). Wird bei jedem Start neu kopiert, damit
+                        // frische Dev-Builds von salami-core sofort im Spiel sind.
+                        if let Some(local) = effective_identifier.strip_prefix("file:") {
+                            let source_path = {
+                                let p = PathBuf::from(local.trim_start_matches("//"));
+                                if p.is_absolute() { p } else { LAUNCHER_DIRECTORY.root_dir().join(p) }
+                            };
+                            info!("Copying local pack mod '{}' from {:?}", display_name, source_path);
+                            if let Some(parent) = target_path.parent() {
+                                fs::create_dir_all(parent).await?;
+                            }
+                            fs::copy(&source_path, &target_path).await.map_err(|e| {
+                                AppError::Download(format!(
+                                    "Local mod '{}' not found at {:?}: {} (build it with `gradlew installDev` in mod/)",
+                                    display_name, source_path, e
+                                ))
+                            })?;
+                            return Ok(());
+                        }
                         // For URL mods, use the identifier as direct URL
                         trace!(
                             "Downloading URL mod for cache: {} ({}) from {}",

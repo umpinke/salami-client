@@ -186,6 +186,17 @@ impl NoriskPackManager {
 impl PostInitializationHandler for NoriskPackManager {
     async fn on_state_ready(&self, _app_handle: Arc<tauri::AppHandle>) -> Result<()> {
         trace!("NoriskPackManager: on_state_ready called. Loading configuration...");
+        // Salami: Packs sind eingebettet – direkt laden statt auf einen Cache zu warten.
+        if !crate::branding::NORISK_SERVICES_ENABLED {
+            let is_exp = match crate::state::state_manager::State::get().await {
+                Ok(state) => state.config_manager.is_experimental_mode().await,
+                Err(_) => false,
+            };
+            match self.fetch_and_update_config("", is_exp).await {
+                Ok(()) => return Ok(()),
+                Err(e) => log::warn!("NoriskPackManager: Salami packs could not be loaded ({}), falling back to cache", e),
+            }
+        }
         // Select load path based on experimental mode if accessible
         let load_path = if let Ok(state) = crate::state::state_manager::State::get().await {
             let is_exp = state.config_manager.is_experimental_mode().await;
