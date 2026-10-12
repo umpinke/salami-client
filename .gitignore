@@ -17,3 +17,7 @@ mod/remappedSrc/
 # Secrets
 .env
 *.key
+mod/*.log
+
+# Generierte Logo-Ausgaben (Quelle: branding/generate_logo.py)
+branding/out/

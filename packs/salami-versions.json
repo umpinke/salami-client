@@ -1,0 +1,39 @@
+{
+  "profiles": [
+    {
+      "id": "5a1a3100-c0de-4b1d-9a1a-5a1a3100bee5",
+      "name": "Salami Client 1.21.11",
+      "path": "salamiclient/1.21.11",
+      "game_version": "1.21.11",
+      "loader": "fabric",
+      "loader_version": "0.19.5",
+      "created": "2026-10-12T00:00:00Z",
+      "last_played": null,
+      "settings": {
+        "java_path": null,
+        "use_custom_java_path": false,
+        "memory": { "min": 1024, "max": 4096 },
+        "resolution": null,
+        "fullscreen": false,
+        "extra_game_args": [],
+        "custom_jvm_args": null
+      },
+      "state": "not_installed",
+      "mods": [],
+      "selected_norisk_pack_id": "salami",
+      "disabled_norisk_mods_detailed": [],
+      "source_standard_profile_id": null,
+      "group": "SALAMI CLIENT",
+      "is_standard_version": true,
+      "description": "Salami Client 1.21.11 (Fabric)",
+      "banner": null,
+      "background": null,
+      "norisk_information": {
+        "keep_local_assets": false,
+        "is_experimental": false,
+        "copy_initial_mc_data": false,
+        "is_main_version": true
+      }
+    }
+  ]
+}

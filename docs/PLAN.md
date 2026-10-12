@@ -129,7 +129,7 @@ Aktuelle Fabric-Versionen (meta.fabricmc.net): stable 26.3, 26.2, 26.1.x, 1.21.1
 | Visuals | Overlay-/HUD-System, Custom Crosshair, Block-Outline |
 | Screen | PvP-Logo-Overlay |
 | Kits & Combos | Hotbar-/Inventar-Layouts pro Gamemode, Combo-Counter-HUD |
-| Client | Easy Leave (Disconnect-Hotkey) |
+| Client | Easy Leave: Taste, die alle Kampfmodule sofort abschaltet |
 | Client | **Safe Client Mode** (in meiner Auslegung): ein Schalter, der alle Utility-Module hart deaktiviert, global oder automatisch auf Servern einer editierbaren Liste. Er schützt vor versehentlichen Bans. |
 | Infrastruktur | Config-System, ClickGUI, DE/EN-Übersetzungen, GPL-3.0 |
 
@@ -296,10 +296,13 @@ salami-client/
 
 ---
 
-## 7. Offene Entscheidungen
+## 7. Entscheidungen (12.10.2026)
 
-1. **Ziel-Minecraft-Version:** Zum Start eine einzige Version. Spear-Features brauchen ≥ 1.21.11. Zur Wahl stehen 1.21.11 oder 26.x (neueste stable: 26.3). Entscheidend ist, was auf deinen Zielservern läuft.
-2. **Sprache der Mod:** Java (größte Fabric-Beispielbasis, *empfohlen*) oder Kotlin (wie NoRisk).
-3. **Speicherort:** Darf das Repo nach `C:\dev\salami-client` (außerhalb OneDrive)?
-4. **Live Tracker / Ghost Spear:** genaue Definition (siehe §2).
-5. **Hosting** für Pack-JSON und Updates: GitHub-Repo/Releases (*empfohlen*) oder eigener Server?
+| Frage | Entscheidung |
+|---|---|
+| Minecraft-Version | **1.21.11** (Fabric) |
+| Sprache der Mod | **Java 21**, Mojang-Mappings |
+| Speicherort | `C:\dev\salami-client` (außerhalb OneDrive), Git-Monorepo, Launcher als `git subtree` |
+| Easy Leave | Taste (Standard: Ende), die **alle Kampfmodule sofort abschaltet** und per Safe Mode gesperrt hält |
+| Hosting Packs/Updates | später GitHub Releases; bis dahin eingebettete Packs, Updater aus |
+| Live Tracker / Ghost Spear | noch offen – Definition fehlt |

@@ -1,0 +1,71 @@
+{
+  "packs": {
+    "salami": {
+      "displayName": "Salami Client",
+      "description": "salami-core + open-source performance mods (Sodium, Lithium, ImmediatelyFast, EntityCulling, FerriteCore).",
+      "inheritsFrom": null,
+      "excludeMods": null,
+      "mods": [
+        {
+          "id": "salami-core",
+          "displayName": "Salami Client Core",
+          "source": { "type": "url" },
+          "compatibility": {
+            "1.21.11": {
+              "fabric": {
+                "identifier": "file:dev/salami-core.jar",
+                "filename": "salami-core.jar",
+                "source": null
+              }
+            }
+          }
+        },
+        {
+          "id": "fabric-api",
+          "displayName": "Fabric API",
+          "source": { "type": "modrinth", "projectId": "P7dR8mSH", "projectSlug": "fabric-api" },
+          "compatibility": { "1.21.11": { "fabric": { "identifier": "6qAuTtLR", "filename": null, "source": null } } }
+        },
+        {
+          "id": "sodium",
+          "displayName": "Sodium",
+          "source": { "type": "modrinth", "projectId": "AANobbMI", "projectSlug": "sodium" },
+          "compatibility": { "1.21.11": { "fabric": { "identifier": "rkdTcxoT", "filename": null, "source": null } } }
+        },
+        {
+          "id": "lithium",
+          "displayName": "Lithium",
+          "source": { "type": "modrinth", "projectId": "gvQqBUqZ", "projectSlug": "lithium" },
+          "compatibility": { "1.21.11": { "fabric": { "identifier": "Ow7wA0kG", "filename": null, "source": null } } }
+        },
+        {
+          "id": "immediatelyfast",
+          "displayName": "ImmediatelyFast",
+          "source": { "type": "modrinth", "projectId": "5ZwdcRci", "projectSlug": "immediatelyfast" },
+          "compatibility": { "1.21.11": { "fabric": { "identifier": "4EwhsTu7", "filename": null, "source": null } } }
+        },
+        {
+          "id": "entityculling",
+          "displayName": "EntityCulling",
+          "source": { "type": "modrinth", "projectId": "NNAgCjsB", "projectSlug": "entityculling" },
+          "compatibility": { "1.21.11": { "fabric": { "identifier": "CTabrwB1", "filename": null, "source": null } } }
+        },
+        {
+          "id": "ferrite-core",
+          "displayName": "FerriteCore",
+          "source": { "type": "modrinth", "projectId": "uXXizFIs", "projectSlug": "ferrite-core" },
+          "compatibility": { "1.21.11": { "fabric": { "identifier": "Ii0gP3D8", "filename": null, "source": null } } }
+        }
+      ],
+      "assets": [],
+      "isExperimental": false,
+      "listing": { "category": "salami", "weight": 100, "hidden": false },
+      "loaderPolicy": {
+        "default": { "fabric": { "version": "0.19.5", "min": null, "strategy": null } },
+        "byMinecraft": {}
+      },
+      "startupHelper": null
+    }
+  },
+  "repositories": {}
+}
