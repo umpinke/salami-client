@@ -13,7 +13,22 @@ import dev.salamiclient.modules.utility.AutoTotemModule;
 import dev.salamiclient.modules.utility.DoubleHandTotemModule;
 import dev.salamiclient.modules.utility.GhostSpearModule;
 import dev.salamiclient.modules.utility.HoverTotemModule;
+import dev.salamiclient.modules.misc.KitsModule;
+import dev.salamiclient.modules.utility.AttributeSwapModule;
+import dev.salamiclient.modules.utility.AutoElytraModule;
+import dev.salamiclient.modules.utility.AutoMaceModule;
+import dev.salamiclient.modules.utility.BlockEspModule;
+import dev.salamiclient.modules.utility.BreachSwapModule;
+import dev.salamiclient.modules.utility.SpeedLungeModule;
+import dev.salamiclient.modules.visual.ArmorHudModule;
+import dev.salamiclient.modules.visual.BlockOutlineModule;
+import dev.salamiclient.modules.visual.ComboCounterModule;
+import dev.salamiclient.modules.visual.CrosshairModule;
+import dev.salamiclient.modules.visual.InfoHudModule;
+import dev.salamiclient.modules.visual.ItemCounterModule;
 import dev.salamiclient.modules.visual.LiveTrackerModule;
+import dev.salamiclient.modules.visual.LogoOverlayModule;
+import dev.salamiclient.render.WorldLines;
 import dev.salamiclient.modules.visual.WatermarkModule;
 import dev.salamiclient.theme.Theme;
 import net.fabricmc.api.ClientModInitializer;
@@ -22,6 +37,8 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
+import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenKeyboardEvents;
 import net.fabricmc.loader.api.FabricLoader;
@@ -90,9 +107,18 @@ public final class SalamiClient implements ClientModInitializer {
 		// Client
 		modules.register(new SalamiThemeModule());
 		modules.register(new SafeModeModule());
-		// Visual
+		// Visual (Overlay-System: alle HudModule sind im HUD-Editor verschiebbar)
 		modules.register(new WatermarkModule());
 		modules.register(new LiveTrackerModule());
+		modules.register(new CrosshairModule());
+		modules.register(new BlockOutlineModule());
+		modules.register(new ArmorHudModule());
+		modules.register(new ItemCounterModule());
+		modules.register(new InfoHudModule());
+		modules.register(new ComboCounterModule());
+		modules.register(new LogoOverlayModule());
+		// Misc
+		modules.register(new KitsModule());
 		// Utility (Kampf-Automatisierung – von Safe Mode / Easy Leave gesperrt)
 		modules.register(new AutoTotemModule());
 		modules.register(new HoverTotemModule());
@@ -100,6 +126,12 @@ public final class SalamiClient implements ClientModInitializer {
 		modules.register(new AutoCrystalModule());
 		modules.register(new AnchorMacroModule());
 		modules.register(new GhostSpearModule());
+		modules.register(new BreachSwapModule());
+		modules.register(new AttributeSwapModule());
+		modules.register(new AutoMaceModule());
+		modules.register(new AutoElytraModule());
+		modules.register(new SpeedLungeModule());
+		modules.register(new BlockEspModule());
 	}
 
 	private void registerKeybinds() {
@@ -113,6 +145,18 @@ public final class SalamiClient implements ClientModInitializer {
 	private void registerEvents() {
 		ClientTickEvents.END_CLIENT_TICK.register(this::onTick);
 		HudElementRegistry.addLast(Identifier.fromNamespaceAndPath(MOD_ID, "modules"), modules::renderHud);
+		// Custom Crosshair ersetzt das Vanilla-Fadenkreuz nur, solange das Modul aktiv ist
+		HudElementRegistry.replaceElement(VanillaHudElements.CROSSHAIR, vanilla -> (graphics, delta) -> {
+			CrosshairModule crosshair = modules.get(CrosshairModule.class);
+			if (crosshair.isEnabled() && Minecraft.getInstance().options.getCameraType().isFirstPerson()) {
+				crosshair.render(graphics);
+			} else {
+				vanilla.render(graphics, delta);
+			}
+		});
+		WorldRenderEvents.BEFORE_BLOCK_OUTLINE.register((context, state) -> modules.get(BlockOutlineModule.class).render(context, state));
+		WorldRenderEvents.END_MAIN.register(modules::renderWorld);
+		WorldLines.init();
 		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) ->
 			modules.get(SafeModeModule.class).onJoin(client.getCurrentServer()));
 		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> config.saveNow());

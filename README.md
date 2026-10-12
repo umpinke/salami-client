@@ -137,7 +137,8 @@ Der Test startet Minecraft mit einer Testwelt und prüft:
 - Klicks auf Module und Einstellungen,
 - Easy Leave und die Safe-Mode-Sperre,
 - den Salami-Look,
-- Auto Totem, Double Hand Totem, Auto Crystal, Anchor Macro (inkl. Safe Anchor), Ghost Spear und Live Tracker in echten Testszenen.
+- Auto Totem, Double Hand Totem, Auto Crystal, Anchor Macro (inkl. Safe Anchor), Ghost Spear, Live Tracker, Breach Swap, Auto Mace, Auto Elytra, Speed Lunge und Kits in echten Testszenen,
+- Screenshots aller Visuals und des HUD-Editors.
 
 Screenshots: `mod/build/run/clientGameTest/screenshots/`.
 
@@ -147,14 +148,18 @@ Screenshots: `mod/build/run/clientGameTest/screenshots/`.
 |---|---|---|
 | Client | Salami-Modus | kompletter Salami-Look (Launcher-Schalter wird übernommen) |
 | Client | Safe Mode | sperrt alle Utility-Module; automatisch auf Servern der Liste |
-| Visuals | Watermark | Logo + Name oben links |
+| Visuals | Watermark · Info HUD · Armor HUD · Item Counter · Combo Counter · PvP-Logo | **Overlay-System**: alle frei verschiebbar im HUD-Editor (ClickGUI → „HUD bearbeiten“) |
+| Visuals | Crosshair | eigenes Fadenkreuz: Kreuz, Punkt, Kreis, Salamischeibe; Farbe, Größe, Abstand, Dicke |
+| Visuals | Block Outline | farbiger Umriss für den anvisierten Block |
 | Visuals | Live Tracker | Rüstung (mit Haltbarkeit) und Hand-Items über dem Namen von Gegnern |
-| Utility | Auto Totem | Totem in die Offhand – immer oder nur bei offenem Inventar |
-| Utility | Hover Totem | im Inventar: Totem unter der Maus → Offhand (optional Hotbar) |
-| Utility | Double Hand Totem | zweiter Totem in festem Hotbar-Slot, Wechsel bei wenig Leben |
+| Sonstiges | Kits | Inventar-Layouts für Crystal, Anchor, Mace, Spear, Sword, Axe, SMP, NethPot, UHC und 3 eigene; Taste K sortiert das Inventar |
+| Utility | Auto Totem · Hover Totem · Double Hand Totem | Totems in Offhand/Hotbar |
 | Utility | Auto Crystal | Kristall setzen/zerstören am Fadenkreuz, Selbstschutz-Grenze |
 | Utility | Anchor Macro | Seelenanker laden/zünden; **Safe Anchor** setzt vorher Glowstone als Schutz |
-| Utility | Ghost Spear | Droppen → Offhand → Slotwechsel als Einmal-Makro (Speer in der Hand) |
+| Utility | Breach Swap · Attribute Swap | im Schlag-Tick auf Bresche-Streitkolben bzw. andere Waffe wechseln, danach zurück |
+| Utility | Auto Mace · Auto Elytra | Smash-Treffer im Fall; Elytra beim Fallen an, vor dem Boden/Treffer zurück zum Brustpanzer |
+| Utility | Speed Lunge · Ghost Spear | automatische Ausfall-Stöße mit dem Speer; Drop → Offhand → Slot-Makro |
+| Utility | Block ESP | Blöcke (CPvP, Kisten, Erze, Spawner) hervorheben, optional durch Wände |
 
 Easy Leave (Taste Ende) schaltet alle Utility-Module sofort aus.
 

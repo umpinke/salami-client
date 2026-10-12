@@ -6,6 +6,8 @@ import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.world.entity.Entity;
+import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -156,6 +158,32 @@ public final class ModuleManager {
 				module.onHud(graphics, delta);
 			} catch (Throwable t) {
 				crash(module, "hud", t);
+			}
+		}
+	}
+
+	/** Vor jedem Angriff (siehe {@link AttackListener}). */
+	public void beforeAttack(Entity target) {
+		for (Module module : active) {
+			if (module instanceof AttackListener listener) {
+				try {
+					listener.beforeAttack(target);
+				} catch (Throwable t) {
+					crash(module, "attack", t);
+				}
+			}
+		}
+	}
+
+	/** Weltrendering (siehe {@link WorldRenderListener}). */
+	public void renderWorld(WorldRenderContext context) {
+		for (Module module : active) {
+			if (module instanceof WorldRenderListener listener) {
+				try {
+					listener.renderWorld(context);
+				} catch (Throwable t) {
+					crash(module, "render", t);
+				}
 			}
 		}
 	}

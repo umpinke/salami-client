@@ -87,6 +87,46 @@ public final class InventoryUtil {
 		click(menuSlot, hotbarIndex);
 	}
 
+	/** Menü-Slots der Rüstung im InventoryMenu. */
+	public static final int ARMOR_HEAD = 5;
+	public static final int ARMOR_CHEST = 6;
+	public static final int ARMOR_LEGS = 7;
+	public static final int ARMOR_FEET = 8;
+
+	/**
+	 * Tauscht ein Inventar-Item mit einem Rüstungs-Slot (z. B. Elytra ↔ Brustpanzer).
+	 * Aus der Hotbar mit einem SWAP-Klick, sonst mit drei Pickup-Klicks.
+	 */
+	public static void swapWithArmor(int inventoryIndex, int armorMenuSlot) {
+		Minecraft mc = Minecraft.getInstance();
+		LocalPlayer player = mc.player;
+		if (mc.gameMode == null || player == null) {
+			return;
+		}
+		int container = player.inventoryMenu.containerId;
+		if (inventoryIndex < 9) {
+			mc.gameMode.handleInventoryMouseClick(container, armorMenuSlot, inventoryIndex, ClickType.SWAP, player);
+		} else {
+			int source = toMenuSlot(inventoryIndex);
+			mc.gameMode.handleInventoryMouseClick(container, source, 0, ClickType.PICKUP, player);
+			mc.gameMode.handleInventoryMouseClick(container, armorMenuSlot, 0, ClickType.PICKUP, player);
+			mc.gameMode.handleInventoryMouseClick(container, source, 0, ClickType.PICKUP, player);
+		}
+	}
+
+	/** Tauscht zwei beliebige Menü-Slots (3 Pickup-Klicks; funktioniert auch mit leeren Slots). */
+	public static void swapMenuSlots(int menuSlotA, int menuSlotB) {
+		Minecraft mc = Minecraft.getInstance();
+		LocalPlayer player = mc.player;
+		if (mc.gameMode == null || player == null) {
+			return;
+		}
+		int container = player.inventoryMenu.containerId;
+		mc.gameMode.handleInventoryMouseClick(container, menuSlotA, 0, ClickType.PICKUP, player);
+		mc.gameMode.handleInventoryMouseClick(container, menuSlotB, 0, ClickType.PICKUP, player);
+		mc.gameMode.handleInventoryMouseClick(container, menuSlotA, 0, ClickType.PICKUP, player);
+	}
+
 	public static void selectHotbar(int hotbarIndex) {
 		player().getInventory().setSelectedSlot(hotbarIndex);
 	}

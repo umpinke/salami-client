@@ -4,6 +4,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.config.ConfigManager;
+import dev.salamiclient.gui.HudEditorScreen;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.ModuleManager;
@@ -123,6 +124,7 @@ public final class ClickGuiScreen extends Screen {
 		}
 
 		graphics.drawCenteredString(font, I18n.get("salami.clickgui.hint"), width / 2, height - 12, theme.textDim());
+		renderHudButton(graphics, theme, mouseX, mouseY);
 
 		Component tooltip = tooltipFor(hover);
 		if (tooltip != null) {
@@ -160,6 +162,21 @@ public final class ClickGuiScreen extends Screen {
 		}
 
 		g.renderOutline(panel.x, panel.y, PANEL_WIDTH, bottom - panel.y, theme.outline());
+	}
+
+	// ------------------------------------------------------------------ HUD-Editor-Knopf
+
+	private int[] hudButton() {
+		int w = font.width(I18n.get("salami.clickgui.hud_editor")) + 12;
+		return new int[] {width - w - 6, 4, width - 6, 18};
+	}
+
+	private void renderHudButton(GuiGraphics g, Theme theme, int mouseX, int mouseY) {
+		int[] b = hudButton();
+		boolean hovered = mouseX >= b[0] && mouseX < b[2] && mouseY >= b[1] && mouseY < b[3];
+		g.fill(b[0], b[1], b[2], b[3], hovered ? theme.header() : theme.panel());
+		g.renderOutline(b[0], b[1], b[2] - b[0], b[3] - b[1], theme.outline());
+		g.drawString(font, I18n.get("salami.clickgui.hud_editor"), b[0] + 6, b[1] + 3, theme.headerText(), false);
 	}
 
 	private void renderModuleRow(GuiGraphics g, Panel panel, Row row, Theme theme, boolean hovered) {
@@ -282,6 +299,9 @@ public final class ClickGuiScreen extends Screen {
 			y += MODULE_HEIGHT;
 			if (EXPANDED.contains(module.id())) {
 				for (Setting<?> setting : module.settings()) {
+					if (setting.isHidden()) {
+						continue;
+					}
 					rows.add(new Row(module, setting, y, SETTING_HEIGHT));
 					y += SETTING_HEIGHT;
 				}
@@ -329,6 +349,11 @@ public final class ClickGuiScreen extends Screen {
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
 		listeningKeybind = null;
+		int[] b = hudButton();
+		if (event.x() >= b[0] && event.x() < b[2] && event.y() >= b[1] && event.y() < b[3]) {
+			minecraft.setScreen(new HudEditorScreen(this));
+			return true;
+		}
 		Hit hit = hitTest(event.x(), event.y());
 		if (hit == null) {
 			return super.mouseClicked(event, doubleClick);

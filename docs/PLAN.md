@@ -307,3 +307,4 @@ salami-client/
 | Hosting Packs/Updates | später GitHub Releases; bis dahin eingebettete Packs, Updater aus |
 | Live Tracker | Visual-Modul: Rüstung des Gegners über seinem Namen |
 | Ghost Spear | Utility-Makro: Droppen → Offhand → Slotwechsel automatisch (Desync-Trick) |
+| Auto Plug | gestrichen (Funktion unklar) |

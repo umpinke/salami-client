@@ -21,6 +21,7 @@ public abstract class Setting<T> {
 	private final List<Consumer<T>> listeners = new ArrayList<>(1);
 	private Runnable changeHook = () -> {};
 	private String translationPrefix = "salami.setting";
+	private boolean hidden;
 
 	protected Setting(String id, T defaultValue) {
 		this.id = id;
@@ -66,6 +67,16 @@ public abstract class Setting<T> {
 	public final void bind(String translationPrefix, Runnable changeHook) {
 		this.translationPrefix = translationPrefix;
 		this.changeHook = changeHook;
+	}
+
+	/** Nicht in der ClickGUI anzeigen (z. B. HUD-Positionen, die per Ziehen gesetzt werden). */
+	public final Setting<T> hide() {
+		hidden = true;
+		return this;
+	}
+
+	public final boolean isHidden() {
+		return hidden;
 	}
 
 	public final String translationKey() {

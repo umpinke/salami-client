@@ -7,7 +7,8 @@
 	"entrypoints": {
 		"fabric-client-gametest": [
 			"dev.salamiclient.gametest.SalamiClientGameTest",
-			"dev.salamiclient.gametest.SalamiModulesGameTest"
+			"dev.salamiclient.gametest.SalamiModulesGameTest",
+			"dev.salamiclient.gametest.SalamiCombatGameTest"
 		]
 	},
 	"depends": {
