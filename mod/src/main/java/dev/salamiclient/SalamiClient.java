@@ -7,6 +7,13 @@ import dev.salamiclient.module.Category;
 import dev.salamiclient.module.ModuleManager;
 import dev.salamiclient.modules.client.SafeModeModule;
 import dev.salamiclient.modules.client.SalamiThemeModule;
+import dev.salamiclient.modules.utility.AnchorMacroModule;
+import dev.salamiclient.modules.utility.AutoCrystalModule;
+import dev.salamiclient.modules.utility.AutoTotemModule;
+import dev.salamiclient.modules.utility.DoubleHandTotemModule;
+import dev.salamiclient.modules.utility.GhostSpearModule;
+import dev.salamiclient.modules.utility.HoverTotemModule;
+import dev.salamiclient.modules.visual.LiveTrackerModule;
 import dev.salamiclient.modules.visual.WatermarkModule;
 import dev.salamiclient.theme.Theme;
 import net.fabricmc.api.ClientModInitializer;
@@ -85,7 +92,14 @@ public final class SalamiClient implements ClientModInitializer {
 		modules.register(new SafeModeModule());
 		// Visual
 		modules.register(new WatermarkModule());
-		// Utility-Module (Auto Totem, Auto Crystal, Anchors …) folgen in Phase 3.
+		modules.register(new LiveTrackerModule());
+		// Utility (Kampf-Automatisierung – von Safe Mode / Easy Leave gesperrt)
+		modules.register(new AutoTotemModule());
+		modules.register(new HoverTotemModule());
+		modules.register(new DoubleHandTotemModule());
+		modules.register(new AutoCrystalModule());
+		modules.register(new AnchorMacroModule());
+		modules.register(new GhostSpearModule());
 	}
 
 	private void registerKeybinds() {

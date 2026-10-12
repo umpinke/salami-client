@@ -29,6 +29,19 @@ fabricApi {
 	}
 }
 
+loom {
+	runs {
+		configureEach {
+			// Utility-Module (Explosionen, Inventar-Klicks) bringen den deterministischen
+			// Netzwerk-Synchronizer der Gametests durcheinander; die Tests warten stattdessen
+			// mit Zeitfenstern auf das erwartete Ergebnis.
+			if (name == "clientGameTest") {
+				vmArg "-Dfabric.client.gametest.disableNetworkSynchronizer=true"
+			}
+		}
+	}
+}
+
 processResources {
 	def version = project.version
 	inputs.property "version", version

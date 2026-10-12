@@ -92,9 +92,27 @@ Der Test startet Minecraft mit einer Testwelt und prüft:
 - ClickGUI per Taste,
 - Klicks auf Module und Einstellungen,
 - Easy Leave und die Safe-Mode-Sperre,
-- den Salami-Look.
+- den Salami-Look,
+- Auto Totem, Double Hand Totem, Auto Crystal, Anchor Macro (inkl. Safe Anchor), Ghost Spear und Live Tracker in echten Testszenen.
 
 Screenshots: `mod/build/run/clientGameTest/screenshots/`.
+
+## Module (Stand)
+
+| Kategorie | Modul | Kurz |
+|---|---|---|
+| Client | Salami-Modus | kompletter Salami-Look (Launcher-Schalter wird übernommen) |
+| Client | Safe Mode | sperrt alle Utility-Module; automatisch auf Servern der Liste |
+| Visuals | Watermark | Logo + Name oben links |
+| Visuals | Live Tracker | Rüstung (mit Haltbarkeit) und Hand-Items über dem Namen von Gegnern |
+| Utility | Auto Totem | Totem in die Offhand – immer oder nur bei offenem Inventar |
+| Utility | Hover Totem | im Inventar: Totem unter der Maus → Offhand (optional Hotbar) |
+| Utility | Double Hand Totem | zweiter Totem in festem Hotbar-Slot, Wechsel bei wenig Leben |
+| Utility | Auto Crystal | Kristall setzen/zerstören am Fadenkreuz, Selbstschutz-Grenze |
+| Utility | Anchor Macro | Seelenanker laden/zünden; **Safe Anchor** setzt vorher Glowstone als Schutz |
+| Utility | Ghost Spear | Droppen → Offhand → Slotwechsel als Einmal-Makro (Speer in der Hand) |
+
+Easy Leave (Taste Ende) schaltet alle Utility-Module sofort aus.
 
 ## Hinweis zu Utility-Modulen
 

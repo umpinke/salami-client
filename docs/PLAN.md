@@ -305,4 +305,5 @@ salami-client/
 | Speicherort | `C:\dev\salami-client` (außerhalb OneDrive), Git-Monorepo, Launcher als `git subtree` |
 | Easy Leave | Taste (Standard: Ende), die **alle Kampfmodule sofort abschaltet** und per Safe Mode gesperrt hält |
 | Hosting Packs/Updates | später GitHub Releases; bis dahin eingebettete Packs, Updater aus |
-| Live Tracker / Ghost Spear | noch offen – Definition fehlt |
+| Live Tracker | Visual-Modul: Rüstung des Gegners über seinem Namen |
+| Ghost Spear | Utility-Makro: Droppen → Offhand → Slotwechsel automatisch (Desync-Trick) |

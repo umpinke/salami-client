@@ -5,7 +5,10 @@
 	"name": "Salami Client Gametests",
 	"environment": "client",
 	"entrypoints": {
-		"fabric-client-gametest": ["dev.salamiclient.gametest.SalamiClientGameTest"]
+		"fabric-client-gametest": [
+			"dev.salamiclient.gametest.SalamiClientGameTest",
+			"dev.salamiclient.gametest.SalamiModulesGameTest"
+		]
 	},
 	"depends": {
 		"salami": "*"

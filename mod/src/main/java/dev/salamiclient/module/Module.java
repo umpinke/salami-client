@@ -1,5 +1,6 @@
 package dev.salamiclient.module;
 
+import dev.salamiclient.SalamiClient;
 import dev.salamiclient.setting.KeybindSetting;
 import dev.salamiclient.setting.Setting;
 import net.minecraft.client.DeltaTracker;
@@ -48,6 +49,11 @@ public abstract class Module {
 
 	protected static Minecraft mc() {
 		return Minecraft.getInstance();
+	}
+
+	/** Schaltet das Modul regulär über den ModuleManager aus (z. B. wenn ein Makro fertig ist). */
+	protected final void disable() {
+		SalamiClient.get().modules().setEnabled(this, false);
 	}
 
 	// --- Lebenszyklus (von Unterklassen überschreibbar) ---

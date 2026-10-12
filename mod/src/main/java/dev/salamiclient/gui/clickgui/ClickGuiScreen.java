@@ -202,7 +202,7 @@ public final class ClickGuiScreen extends Screen {
 			g.fill(left, trackY, right, trackY + 1, theme.outline());
 			g.fill(left, trackY, left + (int) Math.round((right - left) * number.fraction()), trackY + 1, theme.accent());
 		} else if (setting instanceof ModeSetting<?> mode) {
-			value = I18n.get(mode.valueTranslationKey());
+			value = modeLabel(mode);
 		} else if (setting instanceof KeybindSetting keybind) {
 			value = listeningKeybind == keybind ? "..." : keybind.keyName();
 			if (listeningKeybind == keybind) {
@@ -247,6 +247,16 @@ public final class ClickGuiScreen extends Screen {
 			return Component.translatable(key);
 		}
 		return row.setting() instanceof StringListSetting ? Component.translatable("salami.clickgui.edit_in_config") : null;
+	}
+
+	/** Anzeigename des gewählten Modus: modulspezifisch, sonst generisch, sonst Enum-Name. */
+	private static String modeLabel(ModeSetting<?> mode) {
+		String specific = mode.valueTranslationKey();
+		if (I18n.exists(specific)) {
+			return I18n.get(specific);
+		}
+		String generic = "salami.setting." + mode.id() + "." + mode.get().name().toLowerCase(java.util.Locale.ROOT);
+		return I18n.exists(generic) ? I18n.get(generic) : mode.get().name();
 	}
 
 	/** Modulspezifischer Name, sonst generischer ("salami.setting.keybind"). */
