@@ -42,6 +42,14 @@ npx yarn@1.22.22 install
 npx yarn@1.22.22 tauri dev
 ```
 
+Die Clip-Aufnahme (`norisk-capture`, FFmpeg) braucht zusätzlich **LLVM/libclang** (`winget install LLVM.LLVM`). Ohne LLVM startest du den Launcher ohne Clip-Funktion:
+
+```bash
+npx yarn@1.22.22 tauri dev --config src-tauri/tauri.dev-noclips.json
+```
+
+Beim ersten Start legt der Launcher den Datenordner `%APPDATA%\salamiclient\SalamiClient` an. Das Standardprofil „Salami Client 1.21.11“ lädt `salami-core` aus `dev/salami-core.jar` (vorher in `mod/` `./gradlew installDev` ausführen) sowie die Performance-Mods von Modrinth. Importierte `.noriskpack`-Profile laufen automatisch mit dem Salami-Pack.
+
 ### CurseForge-API-Key
 
 CurseForge vergibt API-Keys pro Anwendung. Der Salami Client liefert deshalb keinen fremden Key mit. Den eigenen Key (kostenlos über die [CurseForge Console](https://console.curseforge.com)) beim Bauen als Umgebungsvariable setzen:
