@@ -119,6 +119,10 @@ impl NoRiskCredentials {
         token_option
             .map(|token| token.value.clone())
             .ok_or_else(|| {
+                // Salami: ohne NoRisk-Dienste ist ein fehlendes Token der Normalfall
+                if !crate::branding::NORISK_SERVICES_ENABLED {
+                    return AppError::NoCredentialsError;
+                }
                 error!(
                     "No NoRisk token found for {} mode.",
                     if is_experimental {
@@ -804,6 +808,12 @@ impl MinecraftAuthStore {
                 debug!("[Token Refresh] No token found for the selected mode");
                 maybe_update = true;
             }
+        }
+
+        // Salami: ohne NoRisk-Dienste gibt es kein NoRisk-Token – nicht erst versuchen
+        // (spart HWID-Hash, Request-Versuch und Fehlermeldungen im Log).
+        if !crate::branding::NORISK_SERVICES_ENABLED {
+            return Ok((creds.clone(), false));
         }
 
         if force_update || maybe_update {
