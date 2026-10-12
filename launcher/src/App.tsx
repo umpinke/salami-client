@@ -24,6 +24,7 @@ import { ImportPackConfirmModal } from "./components/modals/ImportPackConfirmMod
 import { DragDropOverlay } from "./components/ui/DragDropOverlay";
 import { TermsOfServiceModal, AnalyticsConsentBanner } from "./components/modals/TermsOfServiceModal";
 import { FEATURES } from "./config/salami";
+import { SalamiModeSync } from "./themes/salami/SalamiModeSync";
 import { MacCapturePermissionMonitor } from "./components/clips/MacCapturePermissionMonitor";
 import { GlobalModalPortal } from "./components/ui/GlobalModalPortal";
 import { useCrashModalStore } from "./store/crash-modal-store";
@@ -579,6 +580,7 @@ export function App() {
     <FlagsmithProvider flagsmith={flagsmith}>
       <div className="flex flex-col h-screen w-screen overflow-hidden">
         <ThemeInitializer />
+        <SalamiModeSync />
         <ScrollbarProvider />
         <GlobalToaster />
         <LauncherNoticeBanner />

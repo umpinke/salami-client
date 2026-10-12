@@ -85,8 +85,75 @@ def draw_slice(size: int, seed: int = 1337) -> Image.Image:
     return img.resize((size, size), Image.LANCZOS)
 
 
+def draw_board_background(width: int = 1920, height: int = 1080, seed: int = 42) -> Image.Image:
+    """Hintergrund für den Salami-Modus: dunkles Holzbrett mit Salamischeiben am Rand.
+
+    Die Mitte bleibt frei (dort stehen Spielerfigur und Start-Knopf)."""
+    rnd = random.Random(seed)
+    img = Image.new("RGB", (width, height), (58, 36, 22))
+    d = ImageDraw.Draw(img)
+
+    # Holzmaserung: viele leicht gewellte, horizontale Linien in Brauntönen
+    for y in range(0, height, 3):
+        shade = rnd.randint(-14, 14)
+        base = (74 + shade, 46 + shade // 2, 28 + shade // 3)
+        amp = rnd.uniform(1.5, 6)
+        freq = rnd.uniform(0.002, 0.006)
+        phase = rnd.uniform(0, math.tau)
+        pts = [(x, y + amp * math.sin(x * freq + phase)) for x in range(0, width + 40, 40)]
+        d.line(pts, fill=base, width=3)
+    # Bretter-Fugen
+    for x in (width // 3, 2 * width // 3):
+        d.line([(x, 0), (x, height)], fill=(36, 22, 13), width=4)
+    img = img.filter(ImageFilter.GaussianBlur(1.2))
+
+    # Salamischeiben: links, rechts und unten, nicht in der Mitte
+    slices = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    shadows = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    sd = ImageDraw.Draw(shadows)
+    placed: list[tuple[int, int, int]] = []
+    attempts = 0
+    while len(placed) < 22 and attempts < 5000:
+        attempts += 1
+        size = rnd.randint(130, 250)
+        x = rnd.randint(-size // 3, width - size * 2 // 3)
+        y = rnd.randint(-size // 3, height - size * 2 // 3)
+        cx, cy = x + size / 2, y + size / 2
+        # Mittelbereich freihalten (Ellipse um die Bildmitte)
+        if ((cx - width / 2) / (width * 0.30)) ** 2 + ((cy - height * 0.45) / (height * 0.40)) ** 2 < 1:
+            continue
+        if any(math.hypot(cx - px, cy - py) < (size + ps) * 0.42 for px, py, ps in placed):
+            continue
+        placed.append((int(cx), int(cy), size))
+        piece = draw_slice(size, seed=rnd.randint(0, 10_000)).rotate(rnd.uniform(0, 360), resample=Image.BICUBIC)
+        sd.ellipse([x + 8, y + 14, x + size + 8, y + size + 14], fill=(0, 0, 0, 120))
+        slices.alpha_composite(piece, (x, y))
+    shadows = shadows.filter(ImageFilter.GaussianBlur(10))
+
+    out = img.convert("RGBA")
+    out.alpha_composite(shadows)
+    out.alpha_composite(slices)
+
+    # Vignette + leichte Abdunklung, damit Text und Knöpfe lesbar bleiben
+    vignette = Image.new("L", (width, height), 0)
+    vd = ImageDraw.Draw(vignette)
+    for i in range(60):
+        t = i / 59
+        inset = int(t * min(width, height) * 0.45)
+        vd.rectangle([inset, inset, width - inset, height - inset], fill=int(70 + 110 * t))
+    vignette = vignette.filter(ImageFilter.GaussianBlur(80))
+    dark = Image.new("RGBA", (width, height), (20, 10, 6, 255))
+    out = Image.composite(out, dark, vignette)
+    return out.convert("RGB")
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
+    board = draw_board_background()
+    board_path = ROOT / "launcher/public/themes/salami_theme.jpg"
+    board.save(board_path, quality=85, optimize=True)
+    print("->", board_path.relative_to(ROOT))
+
     master = draw_slice(1024)
     master.save(OUT / "salami-logo-1024.png")
     for s in (512, 128, 64):

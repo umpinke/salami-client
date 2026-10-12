@@ -17,6 +17,18 @@ dependencies {
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 }
 
+fabricApi {
+	// Client-Gametests: startet Minecraft, prüft UI/Logik automatisch, macht Screenshots.
+	// Ausführen: ./gradlew runClientGameTest  (Screenshots: build/run/clientGameTest/screenshots)
+	configureTests {
+		createSourceSet = true
+		modId = "salami-gametest"
+		enableGameTests = false
+		enableClientGameTests = true
+		eula = true
+	}
+}
+
 processResources {
 	def version = project.version
 	inputs.property "version", version

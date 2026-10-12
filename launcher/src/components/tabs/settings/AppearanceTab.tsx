@@ -6,6 +6,7 @@ import { SnowEffectToggle } from "../../ui/SnowEffectToggle";
 import { SettingsSection } from "../../ui/settings/SettingsSection";
 import { SettingRow } from "../../ui/settings/SettingRow";
 import { ThemeSelector } from "../../ThemeSelector";
+import { SalamiModeCard } from "../../../themes/salami/SalamiModeCard";
 import { FontSelector } from "../../FontSelector";
 import EffectPreviewCard from "../../EffectPreviewCard";
 import { useThemeStore } from "../../../store/useThemeStore";
@@ -54,7 +55,8 @@ export function AppearanceTab() {
         keywords={kw("settings.theme.title", "color", "colour", "farbe", "theme", "thema", "design", "skin", "aussehen")}
         description={t("settings.theme.description")}
       >
-        <div className="py-3">
+        <div className="py-3 space-y-4">
+          <SalamiModeCard />
           <ThemeSelector />
         </div>
       </SettingsSection>

@@ -152,6 +152,8 @@ export interface LauncherConfig {
   pack_rollout_override: "auto" | "off" | "on";
   clips: ClipConfig;
   log_level: LogLevel;
+  /** Salami-Modus, wird als -Dsalami.theme an salami-core übergeben. */
+  salami_theme?: boolean;
 }
 
 export type LogLevel = "error" | "warn" | "info" | "debug" | "trace";

@@ -411,6 +411,9 @@ pub struct LauncherConfig {
     pub clips: ClipConfig,
     #[serde(default)]
     pub log_level: LogLevel,
+    /// Salami-Modus: wird beim Start als `-Dsalami.theme` an salami-core übergeben.
+    #[serde(default)]
+    pub salami_theme: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -513,6 +516,7 @@ impl Default for LauncherConfig {
             pack_rollout_override: default_pack_rollout_override(),
             clips: ClipConfig::default(),
             log_level: LogLevel::default(),
+            salami_theme: false,
         }
     }
 }
@@ -874,6 +878,7 @@ impl ConfigManager {
                         clips
                     },
                     log_level: new_config.log_level,
+                    salami_theme: new_config.salami_theme,
                 };
 
                 true

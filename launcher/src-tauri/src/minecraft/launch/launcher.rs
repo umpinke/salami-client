@@ -365,6 +365,12 @@ impl MinecraftLauncher {
         // Pass meta dir to game client for shared Discord state file
         command.arg(format!("-Dnorisk.meta.dir={}", crate::config::LAUNCHER_DIRECTORY.meta_dir().display()));
 
+        // Salami: Theme-Brücke – salami-core übernimmt den Salami-Modus des Launchers.
+        command.arg(format!(
+            "-Dsalami.theme={}",
+            if launcher_config.salami_theme { "salami" } else { "default" }
+        ));
+
         // Hand off asset management to the in-game client only for packs whose
         // client owns asset management (see `client_managed_assets`). Every
         // other pack runs the legacy launcher-side asset pipeline — passing the

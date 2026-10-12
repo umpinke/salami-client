@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { AccentColor } from "./useThemeStore";
+import { SALAMI_ACCENT, SALAMI_THEME_ID } from "../themes/salami/salami-theme";
 
 export interface LauncherTheme {
   id: string;
@@ -14,6 +15,13 @@ export interface LauncherTheme {
 }
 
 export const LAUNCHER_THEMES: Record<string, LauncherTheme> = {
+  // Salami-Modus (src/themes/salami) – ohne Freischaltbedingung
+  [SALAMI_THEME_ID]: {
+    id: SALAMI_THEME_ID,
+    name: "Salami",
+    accentColor: SALAMI_ACCENT,
+    backgroundImage: "/themes/salami_theme.jpg",
+  },
   christmas_theme: {
     id: "christmas_theme",
     name: "Christmas Theme",

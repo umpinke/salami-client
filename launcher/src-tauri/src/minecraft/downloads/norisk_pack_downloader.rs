@@ -184,7 +184,10 @@ impl NoriskPackDownloadService {
                         // frische Dev-Builds von salami-core sofort im Spiel sind.
                         if let Some(local) = effective_identifier.strip_prefix("file:") {
                             let source_path = {
-                                let p = PathBuf::from(local.trim_start_matches("//"));
+                                // "file:dev/x.jar" (relativ) oder "file:///C:/x.jar" bzw. "file:///home/x.jar"
+                                let raw = local.strip_prefix("//").unwrap_or(local);
+                                let raw = if cfg!(windows) { raw.trim_start_matches('/') } else { raw };
+                                let p = PathBuf::from(raw);
                                 if p.is_absolute() { p } else { LAUNCHER_DIRECTORY.root_dir().join(p) }
                             };
                             info!("Copying local pack mod '{}' from {:?}", display_name, source_path);

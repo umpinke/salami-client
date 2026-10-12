@@ -463,9 +463,21 @@ public final class ClickGuiScreen extends Screen {
 	private void loadPanels() {
 		JsonElement saved = config.gui().get("panels");
 		JsonObject state = saved != null && saved.isJsonObject() ? saved.getAsJsonObject() : new JsonObject();
-		int defaultX = 10;
+		// Standard-Layout: nebeneinander, bei schmalem Fenster in die nächste Reihe umbrechen
+		int gap = 8;
+		int x = 10;
+		int y = 24;
+		int rowHeight = 0;
 		for (Category category : Category.values()) {
-			Panel panel = new Panel(category, defaultX, 24);
+			if (x > 10 && x + PANEL_WIDTH > width - 10) {
+				x = 10;
+				y += rowHeight + gap;
+				rowHeight = 0;
+			}
+			Panel panel = new Panel(category, x, y);
+			rowHeight = Math.max(rowHeight, bottom(panel, rows(panel)) - panel.y);
+			x += PANEL_WIDTH + gap;
+
 			JsonElement entry = state.get(category.id());
 			if (entry != null && entry.isJsonObject()) {
 				JsonObject obj = entry.getAsJsonObject();
@@ -474,7 +486,6 @@ public final class ClickGuiScreen extends Screen {
 				if (obj.has("open")) panel.open = obj.get("open").getAsBoolean();
 			}
 			panels.add(panel);
-			defaultX += PANEL_WIDTH + 8;
 		}
 	}
 

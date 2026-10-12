@@ -67,6 +67,35 @@ npx yarn@1.22.22 tauri dev
   - Theme-Schalter im Mod (`SalamiThemeModule`).
   - Der Launcher kann ihn per `-Dsalami.theme=salami|default` vorgeben.
 
+## Salami-Modus
+
+Ein Schalter für den ganzen Client: *Launcher → Einstellungen → Darstellung → Salami-Modus*.
+
+| Wo | Was passiert |
+|---|---|
+| Launcher | Salami-Rot als Akzent, fallende Salamischeiben, Schneidebrett-Hintergrund auf dem Spielen-Tab, Wortspiele („Anschneiden“, „Belag“, „Gewürzmischung“ …) |
+| Spiel | Salami-Buttons in allen Menüs, „SALAMI / CLIENT“-Logo im Titelbildschirm, ClickGUI und HUD in Salami-Farben |
+
+Der Launcher speichert den Schalter in seiner Config (`salami_theme`) und gibt ihn beim Start per `-Dsalami.theme` an `salami-core` weiter. Im Spiel kannst du den Modus zusätzlich jederzeit in der ClickGUI umschalten (*Client → Salami-Modus*). Die Texturen werden live getauscht, ein Ressourcen-Neuladen ist nicht nötig.
+
+Alle Grafiken erzeugen die Skripte unter `branding/` (`generate_logo.py`, `generate_mc_textures.py`).
+
+## Tests
+
+```bash
+cd mod
+./gradlew runClientGameTest
+```
+
+Der Test startet Minecraft mit einer Testwelt und prüft:
+
+- ClickGUI per Taste,
+- Klicks auf Module und Einstellungen,
+- Easy Leave und die Safe-Mode-Sperre,
+- den Salami-Look.
+
+Screenshots: `mod/build/run/clientGameTest/screenshots/`.
+
 ## Hinweis zu Utility-Modulen
 
 Kampf-Automatisierung (Auto Totem, Auto Crystal, Anchors …) ist auf den meisten Servern verboten und führt dort zum Bann. Diese Module sind in der ClickGUI klar als *Utility* markiert. Gedacht sind sie für Singleplayer, eigene Server und Server, die so etwas ausdrücklich erlauben.

@@ -12,6 +12,6 @@ import dev.salamiclient.module.Module;
  */
 public final class SalamiThemeModule extends Module {
 	public SalamiThemeModule() {
-		super("salami_theme", Category.CLIENT, true);
+		super("salami_theme", Category.CLIENT);
 	}
 }

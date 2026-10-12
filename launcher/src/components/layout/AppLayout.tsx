@@ -32,6 +32,8 @@ import * as ConfigService from "../../services/launcher-config-service";
 import { SocialsModal } from "../modals/SocialsModal";
 import { FriendsSidebar } from "../friends/FriendsSidebar";
 import { FEATURES } from "../../config/salami";
+import { SalamiFall } from "../../themes/salami/SalamiFall";
+import { SALAMI_THEME_ID } from "../../themes/salami/salami-theme";
 // TODO: Re-enable when WebSocket is stable
 // import { useFriendsWebSocket } from "../../hooks/useFriendsWebSocket";
 import { useFriendsStore } from "../../store/friends-store";
@@ -370,6 +372,7 @@ export function AppLayout({
           {shouldShowEffects && renderBackgroundEffect()}
           {/* Snow overlay - independent of theme/background */}
           {shouldShowEffects && isSnowEnabled && <Snowfall />}
+          {shouldShowEffects && selectedTheme?.id === SALAMI_THEME_ID && <SalamiFall />}
 
           <div className="relative z-10 h-full overflow-hidden custom-scrollbar">
             {children}
