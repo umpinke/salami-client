@@ -1,0 +1,45 @@
+{
+	"key.category.salami.main": "Salami Client",
+	"key.salami.clickgui": "ClickGUI öffnen",
+	"key.salami.easy_leave": "Easy Leave (Kampfmodule aus)",
+
+	"salami.on": "An",
+	"salami.off": "Aus",
+
+	"salami.category.client": "Client",
+	"salami.category.visual": "Visuals",
+	"salami.category.misc": "Sonstiges",
+	"salami.category.utility": "Utility",
+	"salami.category.utility.warning": "Achtung: Kampf-Automatisierung ist auf den meisten Servern verboten und führt dort zum Bann. Nur im Singleplayer, auf eigenen Servern oder dort nutzen, wo es ausdrücklich erlaubt ist.",
+
+	"salami.clickgui.title": "Salami Client",
+	"salami.clickgui.hint": "Linksklick: an/aus  ·  Rechtsklick: Einstellungen  ·  Kopfzeile ziehen: verschieben",
+	"salami.clickgui.empty": "Noch keine Module",
+	"salami.clickgui.entries": "%s Einträge",
+	"salami.clickgui.edit_in_config": "Bearbeiten in .minecraft/config/salami/config.json",
+
+	"salami.setting.keybind": "Taste",
+	"salami.setting.keybind.desc": "Linksklick: Taste festlegen  ·  Rechtsklick oder Entf: entfernen  ·  Esc: abbrechen",
+
+	"salami.module.crashed": "%s hatte einen Fehler und wurde ausgeschaltet (Details im Log).",
+
+	"salami.module.salami_theme": "Salami-Modus",
+	"salami.module.salami_theme.desc": "Der komplette Client im Salami-Look. Beim Start über den Salami-Launcher gilt die Einstellung im Launcher.",
+
+	"salami.module.safe_mode": "Safe Mode",
+	"salami.module.safe_mode.desc": "Schaltet alle Utility-(Kampf-)Module aus und sperrt sie. Wird auch per Easy-Leave-Taste (Standard: Ende) aktiviert.",
+	"salami.module.safe_mode.setting.auto_servers": "Auto auf Servern",
+	"salami.module.safe_mode.setting.auto_servers.desc": "Safe Mode automatisch aktivieren, wenn du einen Server aus der Liste betrittst.",
+	"salami.module.safe_mode.setting.servers": "Server-Liste",
+	"salami.safe_mode.on": "Safe Mode aktiv – alle Kampfmodule sind aus.",
+	"salami.safe_mode.server": "Server auf der Safe-Liste: Safe Mode aktiv, %s Kampfmodul(e) ausgeschaltet.",
+	"salami.safe_mode.blocked": "Safe Mode ist aktiv. Zum Einschalten erst Client → Safe Mode ausschalten.",
+	"salami.easy_leave.done": "Easy Leave: %s Kampfmodul(e) ausgeschaltet. Safe Mode ist aktiv.",
+
+	"salami.module.watermark": "Watermark",
+	"salami.module.watermark.desc": "Salami-Logo und Name oben links.",
+	"salami.module.watermark.setting.show_version": "Version anzeigen",
+	"salami.module.watermark.setting.scale": "Größe",
+
+	"salami.theme.tagline": "frisch angeschnitten"
+}

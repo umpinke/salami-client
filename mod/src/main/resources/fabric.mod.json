@@ -1,0 +1,21 @@
+{
+	"schemaVersion": 1,
+	"id": "salami",
+	"version": "${version}",
+	"name": "Salami Client",
+	"description": "Salami Client core mod: modules, ClickGUI, HUD and the Salami theme.",
+	"authors": ["Salami Client contributors"],
+	"license": "GPL-3.0-only",
+	"icon": "assets/salami/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"client": ["dev.salamiclient.SalamiClient"]
+	},
+	"mixins": ["salami.mixins.json"],
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~1.21.11",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}

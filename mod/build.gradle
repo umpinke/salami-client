@@ -1,0 +1,59 @@
+plugins {
+	id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+	archivesName = project.archives_base_name
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	// Mojang-Mappings: gleiche Namen wie ab 26.x (unobfuscated) -> leichteres Porten.
+	mappings loom.officialMojangMappings()
+	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+}
+
+processResources {
+	def version = project.version
+	inputs.property "version", version
+
+	filesMatching("fabric.mod.json") {
+		expand "version": version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 21
+	it.options.encoding = "UTF-8"
+}
+
+java {
+	sourceCompatibility = JavaVersion.VERSION_21
+	targetCompatibility = JavaVersion.VERSION_21
+}
+
+jar {
+	from(rootProject.file("../LICENSE")) {
+		rename { "LICENSE_salami-core" }
+	}
+}
+
+// Kopiert den gebauten Jar in den Datenordner des Salami-Launchers, wo das Pack
+// "salami" ihn als file:dev/salami-core.jar erwartet (siehe packs/salami-packs.json).
+// Anderer Ort: ./gradlew installDev -PlauncherDir=<pfad>
+def launcherDir = providers.gradleProperty("launcherDir").orElse(
+	providers.environmentVariable("APPDATA").map { "$it/salamiclient/SalamiClient" }
+		.orElse(providers.systemProperty("user.home").map { "$it/.local/share/salamiclient" })
+)
+
+tasks.register("installDev", Copy) {
+	group = "salami"
+	description = "Builds salami-core and copies it into the Salami launcher (dev pack)."
+	from(tasks.named("remapJar").flatMap { it.archiveFile })
+	into(launcherDir.map { "$it/dev" })
+	rename { "salami-core.jar" }
+}

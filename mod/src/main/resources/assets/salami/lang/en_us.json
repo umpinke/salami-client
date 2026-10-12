@@ -1,0 +1,45 @@
+{
+	"key.category.salami.main": "Salami Client",
+	"key.salami.clickgui": "Open ClickGUI",
+	"key.salami.easy_leave": "Easy Leave (combat modules off)",
+
+	"salami.on": "On",
+	"salami.off": "Off",
+
+	"salami.category.client": "Client",
+	"salami.category.visual": "Visuals",
+	"salami.category.misc": "Misc",
+	"salami.category.utility": "Utility",
+	"salami.category.utility.warning": "Warning: combat automation is forbidden on most servers and will get you banned there. Only use it in singleplayer, on your own servers or where it is explicitly allowed.",
+
+	"salami.clickgui.title": "Salami Client",
+	"salami.clickgui.hint": "Left click: toggle  ·  Right click: settings  ·  Drag header: move",
+	"salami.clickgui.empty": "No modules yet",
+	"salami.clickgui.entries": "%s entries",
+	"salami.clickgui.edit_in_config": "Edit in .minecraft/config/salami/config.json",
+
+	"salami.setting.keybind": "Key",
+	"salami.setting.keybind.desc": "Left click: set key  ·  Right click or Delete: clear  ·  Esc: cancel",
+
+	"salami.module.crashed": "%s ran into an error and was disabled (see log).",
+
+	"salami.module.salami_theme": "Salami Mode",
+	"salami.module.salami_theme.desc": "The whole client in salami style. When started from the Salami launcher, the launcher setting wins.",
+
+	"salami.module.safe_mode": "Safe Mode",
+	"salami.module.safe_mode.desc": "Turns off and locks all utility (combat) modules. Also activated by the Easy Leave key (default: End).",
+	"salami.module.safe_mode.setting.auto_servers": "Auto on servers",
+	"salami.module.safe_mode.setting.auto_servers.desc": "Enable Safe Mode automatically when joining a server from the list.",
+	"salami.module.safe_mode.setting.servers": "Server list",
+	"salami.safe_mode.on": "Safe Mode active – all combat modules are off.",
+	"salami.safe_mode.server": "Server is on the safe list: Safe Mode active, %s combat module(s) turned off.",
+	"salami.safe_mode.blocked": "Safe Mode is active. Turn off Client → Safe Mode first.",
+	"salami.easy_leave.done": "Easy Leave: %s combat module(s) turned off. Safe Mode is active.",
+
+	"salami.module.watermark": "Watermark",
+	"salami.module.watermark.desc": "Salami logo and name in the top left corner.",
+	"salami.module.watermark.setting.show_version": "Show version",
+	"salami.module.watermark.setting.scale": "Scale",
+
+	"salami.theme.tagline": "freshly sliced"
+}
