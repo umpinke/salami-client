@@ -50,6 +50,17 @@ npx yarn@1.22.22 tauri dev --config src-tauri/tauri.dev-noclips.json
 
 Beim ersten Start legt der Launcher den Datenordner `%APPDATA%\salamiclient\SalamiClient` an. Das Standardprofil „Salami Client 1.21.11“ lädt `salami-core` aus `dev/salami-core.jar` (vorher in `mod/` `./gradlew installDev` ausführen) sowie die Performance-Mods von Modrinth. Importierte `.noriskpack`-Profile laufen automatisch mit dem Salami-Pack.
 
+### Launcher installieren (Windows)
+
+```bash
+cd launcher
+npx yarn@1.22.22 tauri build --config src-tauri/tauri.release-local.json
+```
+
+Das erzeugt `src-tauri/target/release/bundle/nsis/Salami Client_<version>_x64-setup.exe`. Der Installer installiert ohne Admin-Rechte nach `%LOCALAPPDATA%\Salami Client` und legt Startmenü- und Desktop-Verknüpfung an.
+
+Der lokale Build lässt die Updater-Signatur und die Clip-Komponente weg. Die Clip-Komponente braucht LLVM.
+
 ### CurseForge-API-Key
 
 CurseForge vergibt API-Keys pro Anwendung. Der Salami Client liefert deshalb keinen fremden Key mit. Den eigenen Key (kostenlos über die [CurseForge Console](https://console.curseforge.com)) beim Bauen als Umgebungsvariable setzen:

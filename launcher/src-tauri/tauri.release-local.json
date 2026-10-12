@@ -1,0 +1,9 @@
+{
+  "build": {
+    "beforeBuildCommand": "yarn build"
+  },
+  "bundle": {
+    "targets": ["nsis"],
+    "createUpdaterArtifacts": false
+  }
+}
