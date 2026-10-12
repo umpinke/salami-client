@@ -29,6 +29,10 @@ pub const NORISK_SERVICES_ENABLED: bool = false;
 pub const UPDATE_BASE_URL: Option<&str> = None;
 pub const UPDATE_BASE_URL_BETA: Option<&str> = None;
 
+/// Pack für Profile, die auf unbekannte (z. B. NoRisk-)Packs verweisen – etwa nach dem
+/// Import einer `.noriskpack`-Datei mit "norisk-prod".
+pub const FALLBACK_PACK_ID: &str = "salami";
+
 /// Optionale Remote-Quellen für Packs/Standardprofile (z. B. GitHub raw).
 /// `None` = nur die eingebetteten Dateien aus `packs/`.
 pub const PACKS_URL: Option<&str> = None;

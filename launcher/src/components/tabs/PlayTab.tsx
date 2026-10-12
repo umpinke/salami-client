@@ -22,6 +22,7 @@ import { isWebGLAvailable } from "@noriskclient/nrc-skin-renderer";
 import { useLauncherTheme } from "../../hooks/useLauncherTheme";
 import { setDiscordState } from "../../utils/discordRpc";
 import { useTranslation } from "react-i18next";
+import { FEATURES } from "../../config/salami";
 
 export function PlayTab() {
   const { t } = useTranslation();
@@ -127,7 +128,7 @@ export function PlayTab() {
         </div>
       </div>
 
-      <NewsSection className="w-1/3 border-l-2 border-white/40 bg-black/10 backdrop-blur-lg p-5 overflow-hidden flex flex-col relative z-10" />
+      {FEATURES.news && <NewsSection className="w-1/3 border-l-2 border-white/40 bg-black/10 backdrop-blur-lg p-5 overflow-hidden flex flex-col relative z-10" />}
     </div>
   );
 }

@@ -4,7 +4,7 @@ version = "0.6.28"
 description = "A Tauri App"
 authors = ["NoRiskk"]
 edition = "2021"
-default-run = "noriskclient-launcher-v3"
+default-run = "salami-client"
 
 [workspace]
 members = ["crates/norisk-ipc", "crates/norisk-logging", "crates/norisk-capture"]
@@ -25,7 +25,8 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [[bin]]
-name = "noriskclient-launcher-v3"
+# Salami: eigener Exe-Name (sonst identisch mit dem NoRisk-Launcher im Task-Manager)
+name = "salami-client"
 path = "src/main.rs"
 
 [dependencies]

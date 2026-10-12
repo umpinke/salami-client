@@ -31,7 +31,7 @@ import { useLauncherTheme } from "../../hooks/useLauncherTheme";
 import * as ConfigService from "../../services/launcher-config-service";
 import { SocialsModal } from "../modals/SocialsModal";
 import { FriendsSidebar } from "../friends/FriendsSidebar";
-import { FEATURES } from "../../config/salami";
+import { BRAND, FEATURES } from "../../config/salami";
 import { SalamiFall } from "../../themes/salami/SalamiFall";
 import { SALAMI_THEME_ID } from "../../themes/salami/salami-theme";
 // TODO: Re-enable when WebSocket is stable
@@ -543,7 +543,7 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
               className="font-smallcaps text-2xl tracking-wider font-bold text-shadow"
               data-tauri-drag-region
             >
-              NoRiskClient
+              {BRAND.name}
             </h1>
             {availableUpdate && (
               <Tooltip content={isUpdating ? t('header.update.tooltip_updating') : t('header.update.tooltip_available', { version: availableUpdate.version })}>

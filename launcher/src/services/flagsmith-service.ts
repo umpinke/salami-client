@@ -232,6 +232,19 @@ export const getBlockedModsConfig = async (): Promise<BlockedModsConfig> => {
     return cachedBlockedModsConfig;
   }
 
+  // Salami: ohne NoRisk-Feature-Flags gibt es keine Sperrliste – leer statt Fehler.
+  if (!FEATURES.flagsmith) {
+    cachedBlockedModsConfig = {
+      exact_filenames: [],
+      filename_patterns: [],
+      mod_ids: [],
+      modrinth_project_ids: [],
+      warning_project_ids: [],
+      description: "",
+    };
+    return cachedBlockedModsConfig;
+  }
+
   if (configFetchPromise) {
     return configFetchPromise;
   }

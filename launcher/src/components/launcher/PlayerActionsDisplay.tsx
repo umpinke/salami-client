@@ -15,7 +15,7 @@ import { StaticTooltip } from '../ui/Tooltip';
 import { toast } from 'sonner';
 import { isWorldCupEventActive } from '../../data/worldcup-event';
 import type { LaunchOverrides } from '../../services/process-service';
-import { BRAND } from "../../config/salami";
+import { BRAND, FEATURES } from "../../config/salami";
 
 // Featured server configuration
 // Option A: profileId = null → uses currently selected profile from MainLaunchButton
@@ -150,7 +150,7 @@ export function PlayerActionsDisplay({
         {!isLoadingProfiles && (
           <>
             {/* Featured Server Toggle - above the launch button */}
-            <div
+            {FEATURES.featuredServer && <div
               className={`absolute left-0 right-0 flex justify-center px-4 z-30 transition-all duration-300 ${featureMode ? 'bottom-32' : 'bottom-24'}`}
             >
               {!featureMode && worldCupActive ? (
@@ -186,9 +186,9 @@ export function PlayerActionsDisplay({
                     : FEATURED_SERVER.name}
                 </button>
               )}
-            </div>
+            </div>}
             <div className={`absolute left-0 right-0 flex justify-center px-4 bottom-2`}>
-              {featureMode ? (
+              {featureMode && FEATURES.featuredServer ? (
                 <ServerLaunchCard
                   serverAddress={FEATURED_SERVER.address}
                   serverName={FEATURED_SERVER.name}

@@ -31,4 +31,8 @@ export const FEATURES = {
   analyticsBanner: NORISK_SERVICES_ENABLED,
   /** Remote-Feature-Flags über NoRisks Flagsmith. */
   flagsmith: NORISK_SERVICES_ENABLED,
+  /** News/Changelog aus dem NoRisk-Blog auf dem Spielen-Tab. */
+  news: NORISK_SERVICES_ENABLED,
+  /** NoRisk-Partnerserver-Werbung über dem Start-Knopf. */
+  featuredServer: NORISK_SERVICES_ENABLED,
 } as const;

@@ -818,6 +818,22 @@ pub async fn handle_noriskpack_file_paths<R: tauri::Runtime>(
 }
 
 impl NoriskModpacksConfig {
+    /// Salami: Profile aus NoRisk-Exporten verweisen auf NoRisk-Packs ("norisk-prod" …),
+    /// die es hier nicht gibt. Solche Profile laufen mit dem Salami-Pack, statt beim
+    /// Start mit "Pack ID not found" abzubrechen.
+    pub fn effective_pack_id<'a>(&'a self, pack_id: &'a str) -> &'a str {
+        if self.packs.contains_key(pack_id) || crate::branding::NORISK_SERVICES_ENABLED {
+            return pack_id;
+        }
+        match self.packs.get_key_value(crate::branding::FALLBACK_PACK_ID) {
+            Some((fallback, _)) => {
+                debug!("Pack '{}' unknown – using '{}' instead", pack_id, fallback);
+                fallback.as_str()
+            }
+            None => pack_id,
+        }
+    }
+
     pub fn resolve_pack_mods(
         &self,
         pack_id: &str,
@@ -968,6 +984,7 @@ impl NoriskModpacksConfig {
     // Helper function to get a fully resolved pack definition (including mods)
     // This combines the base definition with the resolved mods.
     pub fn get_resolved_pack_definition(&self, pack_id: &str) -> Result<NoriskPackDefinition> {
+        let pack_id = self.effective_pack_id(pack_id);
         let base_definition = self.packs.get(pack_id).ok_or_else(|| {
             error!("Pack ID '{}' not found in configuration.", pack_id);
             AppError::Other(format!("Pack ID '{}' not found", pack_id))
