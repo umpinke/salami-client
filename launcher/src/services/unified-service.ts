@@ -17,6 +17,10 @@ import type { CacheBehaviour, ModPackSource } from "../types/profile";
 import type { SwitchContentVersionPayload, ContentType } from "../types/content";
 import type { LocalContentItem } from "../types/profile";
 import { invoke } from "@tauri-apps/api/core";
+import { TtlCache, cacheKey } from "../features/mod-downloader/ttl-cache";
+
+const searchCache = new TtlCache<UnifiedModSearchResponse>(2 * 60_000, 100);
+const versionsCache = new TtlCache<UnifiedVersionResponse>(10 * 60_000, 300);
 
 export interface BatchUpdateResult {
     applied: number[];
@@ -25,11 +29,18 @@ export interface BatchUpdateResult {
 
 class UnifiedService {
     static async searchMods(params: UnifiedModSearchParams): Promise<UnifiedModSearchResponse> {
-        return invoke<UnifiedModSearchResponse>("search_mods_unified_command", { params });
+        // Salami: kurzer Cache – Zurück-Navigation und wiederholte Filter laden sofort
+        return searchCache
+            .get(cacheKey("search", params), () => invoke<UnifiedModSearchResponse>("search_mods_unified_command", { params }))
+            .then((response) => ({ ...response, results: [...response.results] }));
     }
 
     static async getModVersions(params: UnifiedModVersionsParams): Promise<UnifiedVersionResponse> {
-        return invoke<UnifiedVersionResponse>("get_mod_versions_unified_command", { params });
+        // Salami: Versionslisten ändern sich selten; Quick-Install, Detailseite und Abhängigkeits-
+        // Vorschau teilen sich so dieselbe Antwort. Kopie, weil Aufrufer in-place sortieren.
+        return versionsCache
+            .get(cacheKey("versions", params), () => invoke<UnifiedVersionResponse>("get_mod_versions_unified_command", { params }))
+            .then((response) => ({ ...response, versions: [...response.versions] }));
     }
 
     static async checkModUpdates(request: UnifiedUpdateCheckRequest, cacheBehaviour?: CacheBehaviour): Promise<UnifiedUpdateCheckResponse> {

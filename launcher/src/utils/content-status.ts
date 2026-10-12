@@ -1,6 +1,7 @@
 import type { Profile } from '../types/profile';
 import type { UnifiedVersion } from '../types/unified';
 import type { ContentInstallStatus } from '../types/profile';
+import { findBestVersionFor } from '../features/mod-downloader/version-selection';
 
 export const statusForNewInstall = (
   previous?: ContentInstallStatus | null,
@@ -13,23 +14,12 @@ export const statusForNewInstall = (
   norisk_pack_item_details: previous?.norisk_pack_item_details || null,
 });
 
+/**
+ * Passende Version für ein Profil – oder `null`, wenn keine kompatibel ist.
+ * Salami: kein stiller Rückfall mehr auf beliebige Versionen; Quilt nimmt Fabric-Mods
+ * (siehe features/mod-downloader/version-selection.ts).
+ */
 export const findBestVersionForProfile = (
   profile: Profile,
   versions: UnifiedVersion[],
-): UnifiedVersion | null => {
-  if (!profile || !versions?.length) return null;
-
-  if (profile.game_version && profile.loader) {
-    const exact = versions.find(
-      (v) => v.game_versions.includes(profile.game_version) && v.loaders.includes(profile.loader),
-    );
-    if (exact) return exact;
-  }
-
-  if (profile.game_version) {
-    const byGameVersion = versions.find((v) => v.game_versions.includes(profile.game_version));
-    if (byGameVersion) return byGameVersion;
-  }
-
-  return versions[0];
-};
+): UnifiedVersion | null => findBestVersionFor(profile, versions);

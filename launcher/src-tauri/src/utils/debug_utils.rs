@@ -225,6 +225,7 @@ pub async fn debug_unified_mod_search() {
         source: ModPlatform::Modrinth, // Default, will be overridden
         project_type: UnifiedProjectType::Mod,
         game_version: None,
+        game_versions: None,
         categories: None,
         mod_loaders: None,
         limit: Some(5),
@@ -283,6 +284,7 @@ pub async fn debug_unified_mod_versions() {
         source: ModPlatform::Modrinth, // Default, will be overridden
         project_type: UnifiedProjectType::Mod,
         game_version: None,
+        game_versions: None,
         categories: None,
         mod_loaders: None,
         limit: Some(1), // Only get the first result

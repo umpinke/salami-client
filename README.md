@@ -42,6 +42,42 @@ npx yarn@1.22.22 install
 npx yarn@1.22.22 tauri dev
 ```
 
+### CurseForge-API-Key
+
+CurseForge vergibt API-Keys pro Anwendung. Der Salami Client liefert deshalb keinen fremden Key mit. Den eigenen Key (kostenlos über die [CurseForge Console](https://console.curseforge.com)) beim Bauen als Umgebungsvariable setzen:
+
+```bash
+SALAMI_CURSEFORGE_API_KEY='$2a$10$...' npx yarn@1.22.22 tauri build
+```
+
+Ohne Key funktioniert Modrinth normal. Bei CurseForge-Funktionen erscheint der Hinweis „CurseForge ist nicht eingerichtet“.
+
+## Mod-Downloader
+
+| Verbesserung | Wo |
+|---|---|
+| **Strikte Versionswahl**: Minecraft-Version und Loader müssen passen, Releases vor Betas. Kein stiller Rückfall auf eine inkompatible Version mehr. | `src/features/mod-downloader/version-selection.ts` |
+| **Quilt lädt Fabric-Mods**: beim Installieren, beim Spielstart und bei Abhängigkeiten. Vorher wurden solche Mods beim Start übersprungen. | `ModLoader::runs_on` / `pick_for_profile` (Rust) |
+| **Abhängigkeits-Vorschau** vor jeder Mod-Installation (siehe unten) | `install-preflight.tsx`, `DependencyPlanModal.tsx` |
+| **Mod-Warenkorb**: Mods sammeln und in einem Rutsch in ein Profil installieren, jeweils in der passenden Version | `cart-store.ts`, `InstallCart.tsx` |
+| **Mehrere MC-Versionen und Loader** gleichzeitig in der Modrinth-Suche (ODER-verknüpft) | `modrinth.rs` (Facetten-Gruppen) |
+| **Cache** für Suche (2 min) und Versionslisten (10 min) | `ttl-cache.ts`, `unified-service.ts` |
+| **Rate-Limit-Schutz**: 429/5xx werden mit Backoff wiederholt (`Retry-After`/`X-Ratelimit-Reset`) | `utils/http_retry.rs` |
+| CurseForge: Fingerprint wird bei jeder Installation gespeichert (bessere Update-Erkennung). `relationType 6` („Include“) wird einheitlich als eingebettet behandelt. | `ModrinthSearchV2.tsx`, `unified_mod.rs` |
+
+Die **Abhängigkeits-Vorschau** zeigt:
+
+- was mitinstalliert wird,
+- welche optionalen Abhängigkeiten du dazuwählen kannst,
+- welche installierten Mods laut Autor inkompatibel sind.
+
+Unit-Tests (ohne zusätzliche Abhängigkeiten, Node 22+):
+
+```bash
+cd launcher
+node --test "src/features/mod-downloader/*.test.ts"
+```
+
 ## Architektur in Kürze
 
 **Launcher**

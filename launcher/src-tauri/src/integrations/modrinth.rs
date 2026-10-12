@@ -1,4 +1,5 @@
 use crate::error::{AppError, Result};
+use crate::utils::http_retry::SendWithRetry; // Salami: 429/5xx-Wiederholung
 use crate::integrations::lenient;
 use futures::future::join_all;
 use log::{self, error, info};
@@ -353,8 +354,8 @@ impl ModrinthSortType {
 pub async fn search_projects(
     query: String,
     project_type: ModrinthProjectType,
-    game_version: Option<String>,
-    loader: Option<String>,
+    game_versions: Vec<String>,
+    loaders: Vec<String>,
     limit: Option<u32>,
     offset: Option<u32>,
     sort: Option<ModrinthSortType>,
@@ -394,21 +395,29 @@ pub async fn search_projects(
     }
 
     // Construct facets for filtering
-    let mut facets: Vec<String> = Vec::new();
+    // Salami: Facetten-Gruppen – innerhalb einer Gruppe ODER, zwischen Gruppen UND.
+    let mut facets: Vec<Vec<String>> = Vec::new();
 
     // Add project type facet
-    facets.push(format!("project_type:{}", project_type.to_string()));
+    facets.push(vec![format!("project_type:{}", project_type.to_string())]);
 
-    if let Some(gv) = game_version {
-        let version_facet = format!("versions:{}", gv);
-        log::debug!("Modrinth search - Adding version facet: {}", version_facet);
-        facets.push(version_facet);
+    let version_group: Vec<String> = game_versions
+        .iter()
+        .filter(|v| !v.is_empty())
+        .map(|v| format!("versions:{}", v))
+        .collect();
+    if !version_group.is_empty() {
+        log::debug!("Modrinth search - Adding version facets (OR): {:?}", version_group);
+        facets.push(version_group);
     }
-    if let Some(ld) = loader {
-        // Use lowercased loader string for Modrinth category filter
-        let loader_facet = format!("categories:{}", ld.to_lowercase());
-        log::debug!("Modrinth search - Adding loader facet: {}", loader_facet);
-        facets.push(loader_facet);
+    let loader_group: Vec<String> = loaders
+        .iter()
+        .filter(|l| !l.is_empty())
+        .map(|l| format!("categories:{}", l.to_lowercase()))
+        .collect();
+    if !loader_group.is_empty() {
+        log::debug!("Modrinth search - Adding loader facets (OR): {:?}", loader_group);
+        facets.push(loader_group);
     }
 
     // Add categories filter (can be multiple)
@@ -420,7 +429,7 @@ pub async fn search_projects(
                     "Modrinth search - Adding category facet: {}",
                     category_facet
                 );
-                facets.push(category_facet);
+                facets.push(vec![category_facet]);
             }
         }
     }
@@ -433,7 +442,7 @@ pub async fn search_projects(
                 "Modrinth search - Adding client_side facet: {}",
                 client_facet
             );
-            facets.push(client_facet);
+            facets.push(vec![client_facet]);
         }
     }
 
@@ -445,7 +454,7 @@ pub async fn search_projects(
                 "Modrinth search - Adding server_side facet: {}",
                 server_facet
             );
-            facets.push(server_facet);
+            facets.push(vec![server_facet]);
         }
     }
 
@@ -453,7 +462,10 @@ pub async fn search_projects(
     // So we need to wrap each facet string in ["..."] and then join them within an outer [
     let facet_list: Vec<String> = facets
         .iter()
-        .map(|f| format!("[\"{}\"]", f)) // Wrap each item like ["key:value"]
+        .map(|group| {
+            let items: Vec<String> = group.iter().map(|f| format!("\"{}\"", f)).collect();
+            format!("[{}]", items.join(","))
+        })
         .collect();
 
     let facets_str = format!("[{}]", facet_list.join(","));
@@ -468,7 +480,7 @@ pub async fn search_projects(
 
     let response = client
         .get(final_url)
-        .send()
+        .send_with_retry()
         .await
         .map_err(|e| AppError::Other(format!("Modrinth API request failed: {}", e)))?;
 
@@ -501,8 +513,8 @@ pub async fn search_mods(
     let result = search_projects(
         query,
         ModrinthProjectType::Mod,
-        game_version,
-        loader,
+        game_version.into_iter().collect(),
+        loader.into_iter().collect(),
         limit,
         None,
         None,
@@ -565,7 +577,7 @@ pub async fn get_mod_versions(
 
     let response = client
         .get(final_url)
-        .send()
+        .send_with_retry()
         .await
         .map_err(|e| AppError::Other(format!("Modrinth API request failed: {}", e)))?;
 
@@ -599,7 +611,7 @@ pub async fn get_version_details(version_id: String) -> Result<ModrinthVersion> 
 
     let response = client
         .get(url)
-        .send()
+        .send_with_retry()
         .await
         .map_err(|e| {
             AppError::Other(format!(
@@ -729,7 +741,7 @@ pub async fn get_version_by_hash(file_hash: String) -> Result<ModrinthVersion> {
 
     let response = client
         .get(&url) // Pass URL by reference
-        .send()
+        .send_with_retry()
         .await
         .map_err(|e| {
             AppError::Other(format!(
@@ -808,7 +820,7 @@ pub async fn get_versions_by_hashes(
         .post(&url) // Use POST
         .header("Content-Type", "application/json") // Set content type
         .json(&request_body) // Send the serialized request body
-        .send()
+        .send_with_retry()
         .await
         .map_err(|e| {
             AppError::Other(format!(
@@ -923,7 +935,7 @@ pub async fn check_bulk_updates(
         .post(&url)
         .header("Content-Type", "application/json")
         .json(&request)
-        .send()
+        .send_with_retry()
         .await
         .map_err(|e| {
             AppError::Other(format!(
@@ -1000,7 +1012,7 @@ pub async fn get_multiple_projects(ids: Vec<String>) -> Result<Vec<ModrinthProje
 
     let response = client
         .get(final_url)
-        .send()
+        .send_with_retry()
         .await
         .map_err(|e| {
             AppError::RequestError(format!(
@@ -1085,7 +1097,7 @@ pub async fn get_modrinth_categories() -> Result<Vec<ModrinthCategory>> {
 
     let response = client
         .get(&url)
-        .send()
+        .send_with_retry()
         .await
         .map_err(|e| {
             AppError::Other(format!(
@@ -1127,7 +1139,7 @@ pub async fn get_modrinth_loaders() -> Result<Vec<ModrinthLoader>> {
 
     let response = client
         .get(&url)
-        .send()
+        .send_with_retry()
         .await
         .map_err(|e| {
             AppError::Other(format!(
@@ -1169,7 +1181,7 @@ pub async fn get_modrinth_game_versions() -> Result<Vec<ModrinthGameVersion>> {
 
     let response = client
         .get(&url)
-        .send()
+        .send_with_retry()
         .await
         .map_err(|e| {
             AppError::Other(format!(
@@ -1216,7 +1228,7 @@ pub async fn get_project_members(project_id_or_slug: String) -> Result<Vec<Modri
 
     let response = client
         .get(&url)
-        .send()
+        .send_with_retry()
         .await
         .map_err(|e| {
             AppError::Other(format!(

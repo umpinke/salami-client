@@ -1,6 +1,9 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { ContentInstallTarget, UninstallContentPayload, ToggleContentPayload, InstallContentPayload, InstallLocalContentPayload, SwitchContentVersionPayload, ToggleModUpdatesPayload, BulkToggleModUpdatesPayload } from '../types/content';
 import { addContentToSyncPack, removeContentFromSyncPack } from './sync-pack-service';
+import i18n from '../i18n/i18n';
+import { runInstallPreflight, type PreflightMode } from '../features/mod-downloader/install-preflight';
+import { installOptionalDependencies } from '../features/mod-downloader/optional-dependencies';
 
 /**
  * Uninstalls content from a specified profile based on the provided payload.
@@ -112,12 +115,20 @@ export async function installContentToProfile(
 export async function installContentToTarget(
   payload: InstallContentPayload,
   target?: ContentInstallTarget,
-  options?: { pinVersion?: boolean },
+  options?: { pinVersion?: boolean; preflight?: PreflightMode },
 ): Promise<void> {
   if (target?.type === 'syncPack') {
     return addContentToSyncPack(target.packId, payload, options?.pinVersion);
   }
-  return installContentToProfile(payload);
+  // Salami: Abhängigkeits-Vorschau (Pflicht/optional/Konflikte) vor der Installation
+  const preflight = await runInstallPreflight(payload, options?.preflight ?? 'full');
+  if (!preflight.proceed) {
+    throw new Error(i18n.t('salami.downloader.cancelled'));
+  }
+  await installContentToProfile(payload);
+  if (preflight.optional.length > 0) {
+    await installOptionalDependencies(payload, preflight.optional);
+  }
 }
 
 export async function uninstallContentFromTarget(

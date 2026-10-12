@@ -23,6 +23,7 @@ import { installContentToProfile, installContentToTarget } from "../../services/
 import { ContentType, type ContentInstallTarget, type InstallContentPayload } from "../../types/content";
 import { EventType, type EventPayload } from "../../types/events";
 import { useNavigate } from "react-router-dom";
+import { findBestVersionFor } from '../../features/mod-downloader/version-selection';
 
 interface ModDetailHeaderProps {
   project: UnifiedProjectDetails;
@@ -72,29 +73,9 @@ function mapProjectTypeToContentType(projectType: string): ContentType | null {
   }
 }
 
-// Helper to find best version for a profile
+// Salami: gemeinsame, strikte Versionswahl (features/mod-downloader/version-selection.ts)
 function findBestVersionForProfile(profile: Profile, versions: UnifiedVersion[]): UnifiedVersion | null {
-  if (!profile || !versions || versions.length === 0) return null;
-
-  // First try: find a version matching both game version and loader
-  if (profile.game_version && profile.loader) {
-    const exactMatch = versions.find(v =>
-      v.game_versions.includes(profile.game_version!) &&
-      v.loaders.map(l => l.toLowerCase()).includes(profile.loader!.toLowerCase())
-    );
-    if (exactMatch) return exactMatch;
-  }
-
-  // Second try: match just game version
-  if (profile.game_version) {
-    const gameVersionMatch = versions.find(v =>
-      v.game_versions.includes(profile.game_version!)
-    );
-    if (gameVersionMatch) return gameVersionMatch;
-  }
-
-  // Last resort: just return the latest version
-  return versions[0];
+  return findBestVersionFor(profile, versions);
 }
 
 export function ModDetailHeader({ project, accentColor, showVersions, onToggleVersions, targetProfile, installTarget }: ModDetailHeaderProps) {

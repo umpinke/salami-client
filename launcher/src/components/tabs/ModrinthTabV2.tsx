@@ -7,6 +7,7 @@ import { useProfileStore } from "../../store/profile-store";
 import { ErrorMessage } from "../ui/ErrorMessage";
 import { setDiscordState } from "../../utils/discordRpc";
 import { traceStart, traceMark } from "../../utils/perf-trace";
+import { InstallCart } from "../../features/mod-downloader/InstallCart";
 
 interface ModrinthTabV2Props {
   profiles?: Profile[];
@@ -59,6 +60,7 @@ export function ModrinthTabV2({
       <div className="flex-1 overflow-hidden flex space-x-4">
         <div className="flex-1 overflow-hidden">{memoizedSearch}</div>
       </div>
+      <InstallCart profiles={profiles} />
     </div>
   );
 }

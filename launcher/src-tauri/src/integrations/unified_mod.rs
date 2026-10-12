@@ -170,6 +170,9 @@ pub struct UnifiedModSearchParams {
     pub source: ModPlatform,
     pub project_type: UnifiedProjectType,
     pub game_version: Option<String>,
+    /// Salami: mehrere MC-Versionen (ODER), ergänzt `game_version`; nur Modrinth.
+    #[serde(default)]
+    pub game_versions: Option<Vec<String>>,
     pub categories: Option<Vec<String>>,
     pub mod_loaders: Option<Vec<String>>,
     pub limit: Option<u32>,
@@ -522,15 +525,8 @@ impl From<curseforge::CurseForgeFile> for UnifiedVersion {
                 project_id: Some(dep.mod_id.to_string()),
                 version_id: None, // CurseForge doesn't specify version IDs in dependencies
                 file_name: None, // CurseForge doesn't specify file names in dependencies
-                dependency_type: match dep.relation_type {
-                    1 => UnifiedDependencyType::Embedded, // EmbeddedLibrary
-                    2 => UnifiedDependencyType::Optional, // OptionalDependency
-                    3 => UnifiedDependencyType::Required, // RequiredDependency
-                    4 => UnifiedDependencyType::Optional, // Tool (treated as optional)
-                    5 => UnifiedDependencyType::Incompatible, // Incompatible
-                    6 => UnifiedDependencyType::Optional, // Include (treated as optional)
-                    _ => UnifiedDependencyType::Optional, // Default to optional for unknown types
-                },
+                // Salami: eine gemeinsame Zuordnung für Suche, Installation und Update-Check
+                dependency_type: convert_curseforge_dependency_type(dep.relation_type),
             })
             .collect();
 
@@ -618,11 +614,18 @@ pub async fn search_mods_unified(
                 Some(modrinth::ModrinthSortType::Relevance)
             };
 
+            // Salami: alle gewählten Versionen und Loader statt nur der ersten
+            let mut game_versions: Vec<String> = params.game_versions.clone().unwrap_or_default();
+            if let Some(single) = &params.game_version {
+                if !game_versions.contains(single) {
+                    game_versions.insert(0, single.clone());
+                }
+            }
             match modrinth::search_projects(
                 params.query,
                 params.project_type.to_modrinth_project_type(),
-                params.game_version,
-                params.mod_loaders.as_ref().and_then(|loaders| loaders.first()).cloned(),
+                game_versions,
+                params.mod_loaders.clone().unwrap_or_default(),
                 params.limit,
                 params.offset,
                 modrinth_sort,
@@ -705,8 +708,18 @@ pub async fn get_mod_versions_unified(
                 }
             };
 
+            // Salami: mehrere Loader (z. B. Quilt-Profil: quilt + fabric) -> ohne Loader-Filter
+            // abfragen und danach selbst filtern, statt nur den ersten Loader zu nehmen.
+            let loader_filter: Option<Vec<String>> = params
+                .loaders
+                .as_ref()
+                .filter(|loaders| loaders.len() > 1)
+                .map(|loaders| loaders.iter().map(|l| l.to_lowercase()).collect());
+
             // Convert string loaders to CurseForge loader types
-            let curseforge_loader = if let Some(ref loaders_vec) = &params.loaders {
+            let curseforge_loader = if loader_filter.is_some() {
+                None
+            } else if let Some(ref loaders_vec) = &params.loaders {
                 if loaders_vec.is_empty() {
                     None
                 } else {
@@ -741,10 +754,13 @@ pub async fn get_mod_versions_unified(
             ).await {
                 Ok(response) => {
                     log::info!("CurseForge files successful: {} files", response.data.len());
-                    let unified_versions: Vec<UnifiedVersion> = response.data
+                    let mut unified_versions: Vec<UnifiedVersion> = response.data
                         .into_iter()
                         .map(|file| file.into())
                         .collect();
+                    if let Some(filter) = &loader_filter {
+                        unified_versions.retain(|v| v.loaders.iter().any(|l| filter.contains(&l.to_lowercase())));
+                    }
                     all_versions.extend(unified_versions);
                     total_count += response.pagination.total_count as u64;
                 }
@@ -1224,7 +1240,7 @@ fn convert_curseforge_dependency_type(relation_type: u32) -> UnifiedDependencyTy
         3 => UnifiedDependencyType::Required, // RequiredDependency -> Required
         4 => UnifiedDependencyType::Optional, // Tool -> Optional (no direct mapping)
         5 => UnifiedDependencyType::Incompatible, // Incompatible -> Incompatible
-        6 => UnifiedDependencyType::Required, // Include -> Required (no direct mapping, closest is Required)
+        6 => UnifiedDependencyType::Embedded, // Include: steckt bereits in der Datei (Salami: vorher teils Required, teils Optional)
         _ => UnifiedDependencyType::Optional, // Default to optional
     }
 }

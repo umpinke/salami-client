@@ -50,8 +50,8 @@ pub async fn search_modrinth_projects(
     let result = search_projects(
         query,
         project_type,
-        game_version,
-        loader,
+        game_version.into_iter().collect(),
+        loader.into_iter().collect(),
         limit,
         offset,
         sort,

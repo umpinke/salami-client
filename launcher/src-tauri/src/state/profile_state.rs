@@ -267,6 +267,42 @@ impl ModLoader {
             _ => Err(AppError::Other(format!("Invalid mod loader: {}", s))),
         }
     }
+
+    /// Salami: Kann ein Mod für `self` in einem Profil mit `profile_loader` laufen?
+    /// Quilt lädt Fabric-Mods; alles andere muss exakt passen.
+    pub fn runs_on(self, profile_loader: ModLoader) -> bool {
+        self == profile_loader || (self == ModLoader::Fabric && profile_loader == ModLoader::Quilt)
+    }
+
+    /// Salami: Wählt aus den Loadern einer Mod-Version den zum Profil passenden –
+    /// exakt vor kompatibel (Fabric im Quilt-Profil) vor dem ersten Eintrag.
+    pub fn pick_for_profile(loaders: &[String], profile_loader: ModLoader) -> Option<ModLoader> {
+        let parsed: Vec<ModLoader> = loaders
+            .iter()
+            .filter_map(|s| ModLoader::from_str(s).ok())
+            .collect();
+        parsed
+            .iter()
+            .copied()
+            .find(|l| *l == profile_loader)
+            .or_else(|| parsed.iter().copied().find(|l| l.runs_on(profile_loader)))
+            .or_else(|| parsed.first().copied())
+    }
+}
+
+/// Salami: Setzt den Loader eines neu installierten/ersetzten Mods passend zum Profil
+/// (statt blind den ersten Eintrag der Version – das ließ Mods in Quilt-Profilen
+/// oder Multi-Loader-Jars beim Start überspringen).
+fn fit_loader_to_profile(
+    entry: &mut Mod,
+    payload: &crate::commands::content_command::InstallContentPayload,
+    profile_loader: ModLoader,
+) {
+    if let Some(loaders) = &payload.loaders {
+        if let Some(loader) = ModLoader::pick_for_profile(loaders, profile_loader) {
+            entry.associated_loader = Some(loader);
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -579,7 +615,12 @@ fn apply_unified_version_to_mod(
     {
         m.force_include_versions.push(profile_mc_version.to_string());
     }
-    if let Some(loader) = v.loaders.first().and_then(|s| ModLoader::from_str(s).ok()) {
+    // Salami: beim bisherigen (zum Profil passenden) Loader bleiben, falls die Version ihn hat
+    let picked = match m.associated_loader {
+        Some(current) => ModLoader::pick_for_profile(&v.loaders, current),
+        None => v.loaders.first().and_then(|s| ModLoader::from_str(s).ok()),
+    };
+    if let Some(loader) = picked {
         m.associated_loader = Some(loader);
     }
     if m.display_name.is_none() {
@@ -1396,6 +1437,7 @@ impl ProfileManager {
                     _ => Vec::new(),
                 };
 
+                let profile_loader = profile.loader;
                 match upsert_mod_from_payload(&profile.mods, payload, force_include_versions) {
                     ModUpsert::Unchanged => {
                         info!(
@@ -1403,7 +1445,8 @@ impl ProfileManager {
                             platform_name, display_name_log, payload.profile_id
                         );
                     }
-                    ModUpsert::Replaced(entry) => {
+                    ModUpsert::Replaced(mut entry) => {
+                        fit_loader_to_profile(&mut entry, payload, profile_loader);
                         info!(
                             "{} mod {} already present in profile {} in a different version. Replacing it instead of adding a duplicate.",
                             platform_name, display_name_log, payload.profile_id
@@ -1413,7 +1456,8 @@ impl ProfileManager {
                             profile.mods[index] = entry;
                         }
                     }
-                    ModUpsert::Added(entry) => {
+                    ModUpsert::Added(mut entry) => {
+                        fit_loader_to_profile(&mut entry, payload, profile_loader);
                         info!(
                             "Adding mod {} to profile {}",
                             display_name_log, payload.profile_id

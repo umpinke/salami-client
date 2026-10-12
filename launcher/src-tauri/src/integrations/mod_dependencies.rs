@@ -12,6 +12,15 @@ pub struct DependencyTarget {
     pub game_version: String,
 }
 
+/// Salami: Quilt lädt Fabric-Mods – Abhängigkeiten dürfen daher auch Fabric-Versionen sein.
+fn dependency_loaders(loader: &str) -> Vec<String> {
+    if loader.eq_ignore_ascii_case("quilt") {
+        vec!["quilt".to_string(), "fabric".to_string()]
+    } else {
+        vec![loader.to_string()]
+    }
+}
+
 pub struct ResolvedDependency {
     pub project_id: String,
     pub version: UnifiedVersion,
@@ -100,7 +109,7 @@ pub async fn resolve_required_dependencies_seen(
             let params = UnifiedModVersionsParams {
                 source: platform.clone(),
                 project_id: project_id.clone(),
-                loaders: Some(vec![target.loader.clone()]),
+                loaders: Some(dependency_loaders(&target.loader)),
                 game_versions: Some(vec![target.game_version.clone()]),
                 limit: None,
                 offset: None,

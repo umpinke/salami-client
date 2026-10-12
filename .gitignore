@@ -21,3 +21,6 @@ mod/*.log
 
 # Generierte Logo-Ausgaben (Quelle: branding/generate_logo.py)
 branding/out/
+.install-toolchain.log
+.cargo-check.log
+.vite-build.log

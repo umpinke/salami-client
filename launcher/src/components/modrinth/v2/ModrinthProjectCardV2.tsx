@@ -22,6 +22,7 @@ import { useTranslation } from "react-i18next";
 import { ThemedSurface } from "../../ui/ThemedSurface";
 import { Tooltip } from "../../ui/Tooltip";
 import { useNavigate } from "react-router-dom";
+import { CartToggleButton } from "../../../features/mod-downloader/CartToggleButton";
 
 type Profile = any;
 
@@ -454,6 +455,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
               size="sm"
             />
           )}
+          <CartToggleButton project={hit} />
           <ActionButton
             icon={
               isLoadingVersions

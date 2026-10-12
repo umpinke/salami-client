@@ -1,4 +1,5 @@
 use crate::config::HTTP_CLIENT;
+use crate::utils::http_retry::SendWithRetry; // Salami: 429/5xx-Wiederholung
 use crate::error::{AppError, Result};
 use crate::integrations::lenient;
 use crate::state::event_state::{EventPayload, EventType, ProgressThrottle};
@@ -29,8 +30,24 @@ use crate::utils::string_utils::safe_truncate;
 // Base URL for CurseForge API
 const CURSEFORGE_API_BASE_URL: &str = "https://api.curseforge.com/v1";
 
-// Public CurseForge API Key (from PrismLauncher/MultiMC)
-const CURSEFORGE_API_KEY: &str = "$2a$10$bL4bIL5pUWqfcO7KQtnMReakwtfHbNKh6v1uTpKlzhwoueEJQnPnm";
+// Salami: Der CurseForge-API-Key wird beim Build per Umgebungsvariable gesetzt
+// (SALAMI_CURSEFORGE_API_KEY). CurseForge vergibt Keys pro Anwendung
+// (https://console.curseforge.com) – fremde Keys werden nicht mitgeliefert.
+const CURSEFORGE_API_KEY: &str = match option_env!("SALAMI_CURSEFORGE_API_KEY") {
+    Some(key) => key,
+    None => "",
+};
+
+/// Key für Requests; ohne Key eine verständliche Fehlermeldung statt eines 403.
+fn curseforge_api_key() -> Result<&'static str> {
+    if CURSEFORGE_API_KEY.is_empty() {
+        Err(AppError::Other(
+            "CurseForge ist nicht eingerichtet: Dieser Build enthält keinen API-Key (SALAMI_CURSEFORGE_API_KEY).".to_string(),
+        ))
+    } else {
+        Ok(CURSEFORGE_API_KEY)
+    }
+}
 
 /// Determines appropriate memory settings based on recommended RAM and system capabilities
 fn determine_memory_settings(recommended_ram_mb: Option<u64>) -> crate::state::profile_state::MemorySettings {
@@ -274,8 +291,8 @@ pub async fn find_project_by_slug(slug: &str, class_id: u32) -> Result<Option<u3
 
     let response: CurseForgeSearchResponse = HTTP_CLIENT
         .get(url)
-        .header("x-api-key", CURSEFORGE_API_KEY)
-        .send()
+        .header("x-api-key", curseforge_api_key()?)
+        .send_with_retry()
         .await
         .map_err(|e| AppError::Other(format!("CurseForge slug lookup failed: {}", e)))?
         .json()
@@ -384,8 +401,8 @@ pub async fn search_mods(
 
     let response = HTTP_CLIENT
         .get(final_url)
-        .header("x-api-key", CURSEFORGE_API_KEY)
-        .send()
+        .header("x-api-key", curseforge_api_key()?)
+        .send_with_retry()
         .await
         .map_err(|e| AppError::Other(format!("CurseForge API request failed: {}", e)))?;
 
@@ -679,8 +696,8 @@ pub async fn get_mod_files(
 
     let response = HTTP_CLIENT
         .get(final_url)
-        .header("x-api-key", CURSEFORGE_API_KEY)
-        .send()
+        .header("x-api-key", curseforge_api_key()?)
+        .send_with_retry()
         .await
         .map_err(|e| AppError::Other(format!("CurseForge API request failed: {}", e)))?;
 
@@ -758,9 +775,9 @@ pub async fn get_file_details(mod_id: u32, file_id: u32) -> Result<CurseForgeFil
 
     let response = HTTP_CLIENT
         .get(&url)
-        .header("x-api-key", CURSEFORGE_API_KEY)
+        .header("x-api-key", curseforge_api_key()?)
         .header("Accept", "application/json")
-        .send()
+        .send_with_retry()
         .await
         .map_err(|e| AppError::Other(format!("Failed to get CurseForge file details: {}", e)))?;
 
@@ -789,9 +806,9 @@ pub async fn get_mod_info(mod_id: u32) -> Result<CurseForgeMod> {
 
     let response = HTTP_CLIENT
         .get(&url)
-        .header("x-api-key", CURSEFORGE_API_KEY)
+        .header("x-api-key", curseforge_api_key()?)
         .header("Accept", "application/json")
-        .send()
+        .send_with_retry()
         .await
         .map_err(|e| AppError::Other(format!("Failed to get CurseForge mod info: {}", e)))?;
 
@@ -827,9 +844,9 @@ pub async fn get_file_changelog(mod_id: u32, file_id: u32) -> Result<String> {
 
     let response = HTTP_CLIENT
         .get(&url)
-        .header("x-api-key", CURSEFORGE_API_KEY)
+        .header("x-api-key", curseforge_api_key()?)
         .header("Accept", "application/json")
-        .send()
+        .send_with_retry()
         .await
         .map_err(|e| AppError::Other(format!("Failed to get CurseForge file changelog: {}", e)))?;
 
@@ -884,9 +901,9 @@ pub async fn get_mod_description(mod_id: u32) -> Result<String> {
 
     let response = HTTP_CLIENT
         .get(&url)
-        .header("x-api-key", CURSEFORGE_API_KEY)
+        .header("x-api-key", curseforge_api_key()?)
         .header("Accept", "application/json")
-        .send()
+        .send_with_retry()
         .await
         .map_err(|e| AppError::Other(format!("Failed to get CurseForge mod description: {}", e)))?;
 
@@ -940,11 +957,11 @@ pub async fn get_mods_by_ids(
 
     let response = HTTP_CLIENT
         .post(&url)
-        .header("x-api-key", CURSEFORGE_API_KEY)
+        .header("x-api-key", curseforge_api_key()?)
         .header("Accept", "application/json")
         .header("Content-Type", "application/json")
         .json(&request_body)
-        .send()
+        .send_with_retry()
         .await
         .map_err(|e| AppError::Other(format!("Failed to get CurseForge mods by IDs: {}", e)))?;
 
@@ -1029,11 +1046,11 @@ pub async fn get_files_by_ids(file_ids: Vec<u32>) -> Result<Vec<CurseForgeFile>>
 
     let response = HTTP_CLIENT
         .post(&url)
-        .header("x-api-key", CURSEFORGE_API_KEY)
+        .header("x-api-key", curseforge_api_key()?)
         .header("Accept", "application/json")
         .header("Content-Type", "application/json")
         .json(&request_body)
-        .send()
+        .send_with_retry()
         .await
         .map_err(|e| AppError::Other(format!("Failed to get CurseForge files by IDs: {}", e)))?;
 
@@ -2227,7 +2244,7 @@ pub async fn download_and_install_curseforge_modpack(
     let client = HTTP_CLIENT.clone();
     let response = client
         .get(&download_url)
-        .send()
+        .send_with_retry()
         .await
         .map_err(|e| {
             error!("Failed to download CurseForge modpack: {}", e);
@@ -2345,12 +2362,12 @@ async fn post_fingerprints(fingerprints: Vec<u64>) -> Result<CurseForgeFingerpri
     let url = format!("{}/fingerprints", CURSEFORGE_API_BASE_URL);
     let response = HTTP_CLIENT
         .post(&url)
-        .header("x-api-key", CURSEFORGE_API_KEY)
+        .header("x-api-key", curseforge_api_key()?)
         .header("Accept", "application/json")
         .header("Content-Type", "application/json")
         .timeout(FINGERPRINT_REQUEST_TIMEOUT)
         .json(&CurseForgeFingerprintRequest { fingerprints })
-        .send()
+        .send_with_retry()
         .await
         .map_err(|e| AppError::Other(format!("CurseForge fingerprint request failed: {}", e)))?;
 
@@ -2643,11 +2660,11 @@ pub async fn check_mod_updates_bulk(
 
     let response = HTTP_CLIENT
         .post(&url)
-        .header("x-api-key", CURSEFORGE_API_KEY)
+        .header("x-api-key", curseforge_api_key()?)
         .header("Accept", "application/json")
         .header("Content-Type", "application/json")
         .json(&request_body)
-        .send()
+        .send_with_retry()
         .await
         .map_err(|e| {
             error!("Failed to send CurseForge fingerprint request: {}", e);

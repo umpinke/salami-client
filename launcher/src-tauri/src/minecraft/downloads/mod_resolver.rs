@@ -444,7 +444,7 @@ async fn resolve_profile_mod(
     let profile_loader = profile.loader;
     match mod_info.associated_loader {
         Some(mod_loader) => {
-            if mod_loader != profile_loader {
+            if !mod_loader.runs_on(profile_loader) {
                 debug!(
                     "Skipping profile mod '{}' (intended for loader {:?}) because profile loader is {:?}",
                     mod_name, mod_loader, profile_loader

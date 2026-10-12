@@ -68,6 +68,8 @@ export interface UnifiedModSearchParams {
   source: ModPlatform;
   project_type: UnifiedProjectType;
   game_version?: string;
+  /** Salami: mehrere MC-Versionen (ODER-verknüpft, nur Modrinth). */
+  game_versions?: string[];
   categories?: string[];
   mod_loaders?: string[];
   limit?: number;

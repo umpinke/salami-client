@@ -443,6 +443,8 @@ export function ModrinthSearchV2({
         source: modSource,
         project_type: convertToUnifiedProjectType(projectType),
         game_version: gameVersionForSearch,
+        // Salami: alle gewählten Versionen (Modrinth verknüpft sie per ODER)
+        game_versions: selectedGameVersions.length > 1 ? selectedGameVersions : undefined,
         mod_loaders: currentSelectedLoaders.length > 0 ? currentSelectedLoaders : undefined,
         limit,
         offset: newSearch ? 0 : offset,
@@ -1273,7 +1275,7 @@ export function ModrinthSearchV2({
         file_name: primaryFile.filename,
         download_url: primaryFile.url,
         file_hash_sha1: primaryFile.hashes?.sha1 || undefined,
-        file_fingerprint: undefined, // Modrinth doesn't use fingerprints
+        file_fingerprint: primaryFile.fingerprint || undefined, // Salami: CurseForge-Fingerprint für Update-Checks
         content_name: targetProject.title,
         version_number: targetVersion.version_number,
         content_type: mappedContentType,
@@ -1648,7 +1650,7 @@ export function ModrinthSearchV2({
         file_name: primaryFile.filename,
         download_url: primaryFile.url,
         file_hash_sha1: primaryFile.hashes?.sha1 || undefined,
-        file_fingerprint: undefined, // Modrinth doesn't use fingerprints
+        file_fingerprint: primaryFile.fingerprint || undefined, // Salami: CurseForge-Fingerprint für Update-Checks
         content_name: project.title,
         version_number: bestVersion.version_number,
         content_type: mappedContentType,
@@ -1851,7 +1853,7 @@ export function ModrinthSearchV2({
         file_name: primaryFile.filename,
         download_url: primaryFile.url,
         file_hash_sha1: primaryFile.hashes?.sha1 || undefined,
-        file_fingerprint: undefined, // Modrinth doesn't use fingerprints
+        file_fingerprint: primaryFile.fingerprint || undefined, // Salami: CurseForge-Fingerprint für Update-Checks
         content_name: project.title,
         version_number: bestVersion.version_number,
         content_type: mappedContentType,
@@ -1973,7 +1975,7 @@ export function ModrinthSearchV2({
         file_name: primaryFile.filename,
         download_url: primaryFile.url,
         file_hash_sha1: primaryFile.hashes?.sha1 || undefined,
-        file_fingerprint: undefined, // Modrinth doesn't use fingerprints
+        file_fingerprint: primaryFile.fingerprint || undefined, // Salami: CurseForge-Fingerprint für Update-Checks
         content_name: quickInstallProject.title,
         version_number: bestVersion.version_number,
         content_type: mappedContentType,

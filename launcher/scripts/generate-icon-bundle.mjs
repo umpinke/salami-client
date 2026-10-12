@@ -21,6 +21,7 @@ const COLLECTIONS = [
 const NOT_ICONS = new Set([
   "hover", "group-hover", "focus", "active", "data", "0",
   "visibility", "overflow",
+  "node", // Salami: Node-Modul-Specifier in Unit-Tests ("node:test")
 ]);
 
 const ICON_RE = /["'`]([a-z][a-z0-9-]*):([a-z0-9][a-z0-9-]*)["'`]/g;
