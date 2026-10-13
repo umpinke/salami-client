@@ -2,7 +2,7 @@
   "packs": {
     "salami": {
       "displayName": "Salami Client",
-      "description": "salami-core + open-source performance mods (Sodium, Lithium, ImmediatelyFast, EntityCulling, FerriteCore).",
+      "description": "salami-core + open-source mods: performance (Sodium, Lithium, ImmediatelyFast, EntityCulling, FerriteCore, More Culling) and comfort (Mod Menu, Wavey Capes, 3D Skin Layers, AppleSkin, Shulker Box Tooltip, Tiers).",
       "inheritsFrom": null,
       "excludeMods": null,
       "mods": [
@@ -55,6 +55,60 @@
           "displayName": "FerriteCore",
           "source": { "type": "modrinth", "projectId": "uXXizFIs", "projectSlug": "ferrite-core" },
           "compatibility": { "1.21.11": { "fabric": { "identifier": "Ii0gP3D8", "filename": null, "source": null } } }
+        },
+        {
+          "id": "cloth-config",
+          "displayName": "Cloth Config API",
+          "source": { "type": "modrinth", "projectId": "9s6osm5g", "projectSlug": "cloth-config" },
+          "compatibility": { "1.21.11": { "fabric": { "identifier": "xuX40TN5", "filename": null, "source": null } } }
+        },
+        {
+          "id": "placeholder-api",
+          "displayName": "Text Placeholder API",
+          "source": { "type": "modrinth", "projectId": "eXts2L7r", "projectSlug": "placeholder-api" },
+          "compatibility": { "1.21.11": { "fabric": { "identifier": "qxjzQ9xY", "filename": null, "source": null } } }
+        },
+        {
+          "id": "modmenu",
+          "displayName": "Mod Menu",
+          "source": { "type": "modrinth", "projectId": "mOgUt4GM", "projectSlug": "modmenu" },
+          "compatibility": { "1.21.11": { "fabric": { "identifier": "cLkYaVuL", "filename": null, "source": null } } }
+        },
+        {
+          "id": "wavey-capes",
+          "displayName": "Wavey Capes",
+          "source": { "type": "modrinth", "projectId": "kYuIpRLv", "projectSlug": "wavey-capes" },
+          "compatibility": { "1.21.11": { "fabric": { "identifier": "HiXJOcqr", "filename": null, "source": null } } }
+        },
+        {
+          "id": "3dskinlayers",
+          "displayName": "3D Skin Layers",
+          "source": { "type": "modrinth", "projectId": "zV5r3pPn", "projectSlug": "3dskinlayers" },
+          "compatibility": { "1.21.11": { "fabric": { "identifier": "TpZj1P0j", "filename": null, "source": null } } }
+        },
+        {
+          "id": "appleskin",
+          "displayName": "AppleSkin",
+          "source": { "type": "modrinth", "projectId": "EsAfCjCV", "projectSlug": "appleskin" },
+          "compatibility": { "1.21.11": { "fabric": { "identifier": "59ti1rvg", "filename": null, "source": null } } }
+        },
+        {
+          "id": "shulkerboxtooltip",
+          "displayName": "Shulker Box Tooltip",
+          "source": { "type": "modrinth", "projectId": "2M01OLQq", "projectSlug": "shulkerboxtooltip" },
+          "compatibility": { "1.21.11": { "fabric": { "identifier": "rZovgkWT", "filename": null, "source": null } } }
+        },
+        {
+          "id": "moreculling",
+          "displayName": "More Culling",
+          "source": { "type": "modrinth", "projectId": "51shyZVL", "projectSlug": "moreculling" },
+          "compatibility": { "1.21.11": { "fabric": { "identifier": "wOzykoLV", "filename": null, "source": null } } }
+        },
+        {
+          "id": "tiers",
+          "displayName": "Tiers",
+          "source": { "type": "modrinth", "projectId": "bubOj4AD", "projectSlug": "tiers" },
+          "compatibility": { "1.21.11": { "fabric": { "identifier": "dDJ7wOUg", "filename": null, "source": null } } }
         }
       ],
       "assets": [],
