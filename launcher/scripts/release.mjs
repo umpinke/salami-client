@@ -1,6 +1,7 @@
 // Salami-Release: signierten Installer bauen und als GitHub-Release veröffentlichen.
 //
 //   node scripts/release.mjs --notes "Was ist neu"            (bauen + hochladen)
+//   node scripts/release.mjs --notes-file notes.md            (Notizen aus Datei)
 //   node scripts/release.mjs --notes "..." --skip-build       (vorhandenen Build hochladen)
 //   node scripts/release.mjs --dry-run                        (nur bauen + latest.json schreiben)
 //
@@ -38,7 +39,10 @@ function capture(command) {
 
 const version = JSON.parse(readFileSync(join(tauriDir, "tauri.conf.json"), "utf8")).version;
 const tag = `v${version}`;
-const notes = option("--notes") ?? `Salami Client ${version}`;
+const notesFileArg = option("--notes-file");
+const notes = notesFileArg
+  ? readFileSync(notesFileArg, "utf8").trim()
+  : option("--notes") ?? `Salami Client ${version}`;
 console.log(`Salami Client ${version}`);
 
 const repo = capture("gh repo view --json nameWithOwner --jq .nameWithOwner");
