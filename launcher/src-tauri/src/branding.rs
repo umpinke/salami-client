@@ -23,10 +23,13 @@ pub const DEEP_LINK_SCHEME: &str = "salami";
 /// `utils::http_client` (alle Requests an `*.norisk.gg` werden abgelehnt).
 pub const NORISK_SERVICES_ENABLED: bool = false;
 
-/// Basis-URL des Update-Servers (Tauri-Updater-Manifest), ohne `/{target}/…`.
-/// `None` = Updater aus, bis ein eigener Endpoint **und** ein eigener
-/// Signaturschlüssel (`plugins.updater.pubkey` in `tauri.conf.json`) existieren.
-pub const UPDATE_BASE_URL: Option<&str> = None;
+/// Update-Quelle des Launchers. Endet sie auf `.json`, ist es ein statisches
+/// Tauri-Manifest – hier `latest.json` des neuesten GitHub-Releases (erstellt von
+/// `launcher/scripts/release.mjs`). Sonst ein dynamischer Server `{base}/{target}/…`.
+/// Updates müssen mit dem Schlüssel zu `plugins.updater.pubkey` (`tauri.conf.json`)
+/// signiert sein. `None` = Updater aus.
+pub const UPDATE_BASE_URL: Option<&str> =
+    Some("https://github.com/umpinke/salami-client/releases/latest/download/latest.json");
 pub const UPDATE_BASE_URL_BETA: Option<&str> = None;
 
 /// Pack für Profile, die auf unbekannte (z. B. NoRisk-)Packs verweisen – etwa nach dem

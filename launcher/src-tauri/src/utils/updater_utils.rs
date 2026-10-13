@@ -59,6 +59,20 @@ pub fn is_flatpak() -> bool {
     is_flatpak
 }
 
+/// Salami: Endet die Adresse auf `.json`, ist sie ein statisches Manifest (z. B. `latest.json`
+/// im neuesten GitHub-Release) und wird unverändert benutzt. Sonst der dynamische
+/// Update-Server im NoRisk-Schema `{base}/{target}/{arch}/{current_version}`.
+fn update_manifest_url(base: &str, platform_specific_target: &str) -> String {
+    if base.ends_with(".json") {
+        base.to_string()
+    } else {
+        format!(
+            "{}/{}/{{{{arch}}}}/{{{{current_version}}}}",
+            base, platform_specific_target
+        )
+    }
+}
+
 /// Update-Basis-URL für den Kanal aus `branding.rs` (`None` = Updater deaktiviert).
 fn configured_update_base(is_beta_channel: bool) -> Option<&'static str> {
     if is_beta_channel {
@@ -118,10 +132,7 @@ pub async fn check_update_available_detailed(
     }
 
     // Construct the final update URL string
-    let update_url_str = format!(
-        "{}/{}/{{{{arch}}}}/{{{{current_version}}}}",
-        base_repo_url, platform_specific_target
-    );
+    let update_url_str = update_manifest_url(base_repo_url, &platform_specific_target);
 
     trace!("Using update endpoint template: {}", update_url_str);
 
@@ -279,7 +290,7 @@ pub async fn create_updater_window(app_handle: &AppHandle) -> tauri::Result<Webv
         "updater",                              // Unique label
         WebviewUrl::App("updater.html".into()), // Load local HTML file
     )
-    .title("NoRiskClient Updater")
+    .title(format!("{} Updater", crate::branding::PRODUCT_NAME))
     .inner_size(325.0, 400.0)
     .resizable(false)
     .center()
@@ -524,10 +535,7 @@ pub async fn check_for_updates(
     // Tauri will replace {{arch}} and {{current_version}}.
     // {{target}} will also be replaced by Tauri *if* platform_specific_target is "{{target}}".
     // Otherwise, our specific target (e.g., "debian") is used directly.
-    let update_url_str = format!(
-        "{}/{}/{{{{arch}}}}/{{{{current_version}}}}",
-        base_repo_url, platform_specific_target
-    );
+    let update_url_str = update_manifest_url(base_repo_url, &platform_specific_target);
 
     info!("Using update endpoint template: {}", update_url_str);
 
@@ -647,4 +655,23 @@ pub async fn check_for_updates(
         "Update check process fully completed (Status: {}). Final Message: {}",
         final_status, final_message
     );
+}
+
+#[cfg(test)]
+mod update_manifest_tests {
+    use super::update_manifest_url;
+
+    #[test]
+    fn static_manifest_is_used_as_is() {
+        let url = "https://github.com/x/salami-client/releases/latest/download/latest.json";
+        assert_eq!(update_manifest_url(url, "{{target}}"), url);
+    }
+
+    #[test]
+    fn dynamic_server_gets_target_arch_and_version() {
+        assert_eq!(
+            update_manifest_url("https://updates.example.org", "{{target}}"),
+            "https://updates.example.org/{{target}}/{{arch}}/{{current_version}}"
+        );
+    }
 }

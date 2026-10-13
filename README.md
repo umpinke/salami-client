@@ -63,6 +63,27 @@ Der Build baut vorher `salami-core` (`scripts/bundle-salami-core.mjs` → `./gra
 
 Der lokale Build lässt die Updater-Signatur und die Clip-Komponente weg. Die Clip-Komponente braucht LLVM.
 
+### Updates veröffentlichen (Auto-Update)
+
+Der Launcher prüft beim Start `latest.json` im neuesten Release von
+[github.com/umpinke/salami-client](https://github.com/umpinke/salami-client/releases)
+und installiert neuere Versionen selbst – samt mitgelieferter `salami-core`-Mod.
+
+1. Version in `launcher/src-tauri/tauri.conf.json` und `launcher/src-tauri/Cargo.toml` erhöhen.
+2. Release bauen und hochladen:
+
+   ```bash
+   cd launcher
+   node scripts/release.mjs --notes "Was ist neu"
+   ```
+
+   Das Skript baut den Installer signiert (`tauri.release-signed.json`), schreibt `latest.json`
+   und legt mit `gh` das GitHub-Release `v<version>` an.
+
+Der Signaturschlüssel liegt in `%USERPROFILE%\.salami-client\updater.key` (nicht im Repo).
+**Sichern!** Ohne ihn können installierte Launcher keine Updates mehr annehmen. Der passende
+öffentliche Schlüssel steht in `tauri.conf.json` unter `plugins.updater.pubkey`.
+
 ### CurseForge-API-Key
 
 CurseForge vergibt API-Keys pro Anwendung. Der Salami Client liefert deshalb keinen fremden Key mit. Den eigenen Key (kostenlos über die [CurseForge Console](https://console.curseforge.com)) beim Bauen als Umgebungsvariable setzen:
