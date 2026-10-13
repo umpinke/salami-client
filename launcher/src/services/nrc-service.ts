@@ -116,17 +116,15 @@ export const refreshNrcDataOnMount = async (): Promise<void> => {
 
     // Fetch profiles from the store after NRC data is refreshed
     // This ensures the profile list (including standard versions) and last played are up-to-date.
-    if (nrcPacksSuccess || standardVersionsSuccess) { // Or simply always call it if appropriate
-      try {
-        console.log("Refreshing profiles state after NRC data update...");
-        await useProfileStore.getState().fetchProfiles();
-        console.log("Profiles state refreshed successfully.");
-        // fetchProfiles setzt loading: false bei Erfolg oder Fehler
-      } catch (error) {
-        console.error("Failed to refresh profiles state after NRC data update:", error);
-        // fetchProfiles sollte seinen eigenen Ladezustand und Fehler behandeln.
-        // Wenn fetchProfiles hier einen Fehler wirft, wird er vom äußeren Catch behandelt.
-      }
+    // Salami: Profile immer laden – auch wenn Packs/Standardversionen nicht aktualisiert werden
+    // konnten (nrcPacksSuccess/standardVersionsSuccess), sonst bleibt die Startseite leer.
+    try {
+      console.log("Refreshing profiles state after NRC data update...");
+      await useProfileStore.getState().fetchProfiles();
+      console.log("Profiles state refreshed successfully.");
+      // fetchProfiles setzt loading: false bei Erfolg oder Fehler
+    } catch (error) {
+      console.error("Failed to refresh profiles state after NRC data update:", error);
     }
   } catch (error) {
     // Dieser Catch fängt Fehler von refreshNoriskPacks, refreshStandardVersions

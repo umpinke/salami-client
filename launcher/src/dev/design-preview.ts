@@ -127,6 +127,10 @@ mockIPC((cmd, args) => {
       return [sampleAccount];
     case "is_flatpak":
       return false;
+    case "refresh_norisk_packs":
+      return null;
+    case "refresh_standard_versions":
+      return [];
   }
   if (cmd.startsWith("plugin:")) return null;
   if (LIST_COMMANDS.test(cmd)) return [];

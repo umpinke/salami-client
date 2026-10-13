@@ -44,6 +44,14 @@ export function PlayTab() {
 
   useEffect(() => { setDiscordState("Idling"); }, []);
 
+  // Startseite nie ohne Profile lassen (z. B. wenn der Abgleich beim Start fehlschlug)
+  useEffect(() => {
+    if (profiles.length === 0) {
+      void useProfileStore.getState().fetchProfiles();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (!storeSelectedProfile && profiles.length > 0) {
       setSelectedProfile(profiles[0]);

@@ -53,7 +53,8 @@ export function SalamiPlayView({ profiles, selectedProfile, versions, onVersionC
 
   return (
     <div className="relative z-10 grid h-full w-full grid-cols-[minmax(360px,44%)_1fr] items-center gap-6 px-10">
-      <section className="flex flex-col gap-6 rounded-3xl border border-white/10 bg-black/50 p-8 shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-md">
+      {/* z-20: die Dreh-Ebene der Spielfigur ist größer als ihre Spalte und läge sonst über dem Panel */}
+      <section className="relative z-20 flex flex-col gap-6 rounded-3xl border border-white/10 bg-black/50 p-8 shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-md">
         <div>
           <p className="text-sm uppercase tracking-[0.3em] text-white/70">
             {playerName ? t("salami.play.greeting", { name: playerName }) : t("salami.play.greeting_anon")}
