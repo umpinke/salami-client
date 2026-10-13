@@ -805,7 +805,7 @@ export function CapeList({
       {contextMenu && contextMenu.cape && (
         <div
           ref={menuRef}
-          className="fixed z-[9999] rounded-md shadow-xl border-2 border-b-4 overflow-hidden"
+          className="fixed z-[9999] rounded-md shadow-xl border overflow-hidden"
           style={{
             top: menuPosition.y,
             left: menuPosition.x,

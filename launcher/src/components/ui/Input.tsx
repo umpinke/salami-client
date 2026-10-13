@@ -179,9 +179,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 
     const getBorderClasses = () => {
       if (variant === "3d") {
-        return "border-2 border-b-4";
+        return "border";
       }
-      return "border border-b-2";
+      return "border";
     };
 
     return (
@@ -207,7 +207,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
                 : accentColor.value,
             boxShadow:
               variant === "3d"
-                ? `0 4px 0 rgba(0,0,0,0.3), 0 6px 10px rgba(0,0,0,0.35)`
+                ? `0 4px 16px rgba(0,0,0,0.3), 0 6px 10px rgba(0,0,0,0.35)`
                 : "none",
             filter:
               (isFocused || isHovered) && !props.disabled

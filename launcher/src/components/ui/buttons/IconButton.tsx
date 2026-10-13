@@ -96,7 +96,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         shouldShowShadow()
       ) {
         gsap.to(buttonRef.current, {
-          boxShadow: `0 6px 0 rgba(0,0,0,0.25), 0 8px 12px rgba(0,0,0,0.4)`,
+          boxShadow: `0 6px 22px rgba(0,0,0,0.25), 0 8px 12px rgba(0,0,0,0.4)`,
           duration: 0.2,
           ease: "power2.out",
         });
@@ -113,7 +113,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         shouldShowShadow()
       ) {
         gsap.to(buttonRef.current, {
-          boxShadow: `0 4px 0 rgba(0,0,0,0.3), 0 6px 10px rgba(0,0,0,0.35)`,
+          boxShadow: `0 4px 16px rgba(0,0,0,0.3), 0 6px 10px rgba(0,0,0,0.35)`,
           duration: 0.2,
           ease: "power2.out",
         });
@@ -220,7 +220,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
       const part2Y = shadowDepth === "short" ? "6px" : "10px";
       const part2Blur = shadowDepth === "short" ? "10px" : "15px";
 
-      return `0 ${part1Y} 0 rgba(0,0,0,0.3), 0 ${part2Y} ${part2Blur} rgba(0,0,0,0.35), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`;
+      return `0 ${part1Y} 14px rgba(0,0,0,0.3), 0 ${part2Y} ${part2Blur} rgba(0,0,0,0.35), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`;
     };
 
     const getBorderClasses = () => {
@@ -233,10 +233,10 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
       }
 
       if (variant === "3d") {
-        return shadowDepth === "none" ? "border-2" : "border-2 border-b-4";
+        return "border";
       }
 
-      return "border border-b-2";
+      return "border";
     };
 
     const getShadowClasses = () => {
@@ -250,8 +250,8 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
       }
 
       return shadowDepth === "default"
-        ? "shadow-[0_8px_0_rgba(0,0,0,0.3),0_10px_15px_rgba(0,0,0,0.35)]"
-        : "shadow-[0_4px_0_rgba(0,0,0,0.3),0_6px_10px_rgba(0,0,0,0.35)]";
+        ? "shadow-[0_8px_28px_rgba(0,0,0,0.3),0_10px_15px_rgba(0,0,0,0.35)]"
+        : "shadow-[0_4px_16px_rgba(0,0,0,0.3),0_6px_10px_rgba(0,0,0,0.35)]";
     };
 
     const buttonElement = (

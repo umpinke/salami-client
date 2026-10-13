@@ -132,9 +132,9 @@ export const Label = forwardRef<HTMLDivElement, LabelProps>(
         return "";
       }
       if (variant === "3d") {
-        return "border-2 border-b-4";
+        return "border";
       }
-      return "border border-b-2";
+      return "border";
     };
 
     const getBackgroundColor = () => {

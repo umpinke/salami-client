@@ -130,10 +130,10 @@ export const LoadingSpinner = forwardRef<HTMLDivElement, LoadingSpinnerProps>(
       const colors = getVariantColors();
 
       if (shadowDepth === "short") {
-        return `0 2px 0 rgba(0,0,0,0.15), 0 3px 5px rgba(0,0,0,0.2), inset 0 1px 0 ${colors.light}30, inset 0 0 0 1px ${colors.main}15`;
+        return `0 2px 10px rgba(0,0,0,0.15), 0 3px 5px rgba(0,0,0,0.2), inset 0 1px 0 ${colors.light}30, inset 0 0 0 1px ${colors.main}15`;
       }
 
-      return `0 4px 0 rgba(0,0,0,0.15), 0 5px 8px rgba(0,0,0,0.25), inset 0 1px 0 ${colors.light}30, inset 0 0 0 1px ${colors.main}15`;
+      return `0 4px 16px rgba(0,0,0,0.15), 0 5px 8px rgba(0,0,0,0.25), inset 0 1px 0 ${colors.light}30, inset 0 0 0 1px ${colors.main}15`;
     };
 
     const colors = getVariantColors();

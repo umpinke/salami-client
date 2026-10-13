@@ -52,17 +52,17 @@ export const NavButton = forwardRef<HTMLButtonElement, NavButtonProps>(
       "font-smallcaps relative overflow-hidden transition-all duration-300",
       "w-16 rounded-md text-white flex items-center justify-center",
       label ? "py-2" : "h-16",
-      variant !== "ghost" && "border-2 border-b-4 border-transparent",
+      variant !== "ghost" && "border border-transparent",
       "text-shadow-sm",
       "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-1 focus-visible:ring-offset-black/20",
     );
 
     const activeStateClasses = cn(
       variant !== "ghost" && [
-        "border-2 border-b-4",
-        "shadow-[0_6px_0_rgba(0,0,0,0.25),0_8px_15px_rgba(0,0,0,0.3)]",
-        "hover:translate-y-[-2px] hover:shadow-[0_8px_0_rgba(0,0,0,0.2),0_10px_20px_rgba(0,0,0,0.25)]",
-        "active:translate-y-[2px] active:shadow-[0_3px_0_rgba(0,0,0,0.15),0_4px_8px_rgba(0,0,0,0.2)]",
+        "border",
+        "shadow-[0_6px_22px_rgba(0,0,0,0.25),0_8px_15px_rgba(0,0,0,0.3)]",
+        "hover:translate-y-[-2px] hover:shadow-[0_8px_28px_rgba(0,0,0,0.2),0_10px_20px_rgba(0,0,0,0.25)]",
+        "active:translate-y-[2px] active:shadow-[0_3px_13px_rgba(0,0,0,0.15),0_4px_8px_rgba(0,0,0,0.2)]",
       ],
       "hover:brightness-110 active:brightness-90",
     );
@@ -72,7 +72,7 @@ export const NavButton = forwardRef<HTMLButtonElement, NavButtonProps>(
       borderColor: `${colors.main}90`,
       borderTopColor: colors.light,
       borderBottomColor: colors.dark,
-      boxShadow: `0 6px 0 rgba(0,0,0,0.25), 0 8px 15px rgba(0,0,0,0.3), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`,
+      boxShadow: `0 6px 22px rgba(0,0,0,0.25), 0 8px 15px rgba(0,0,0,0.3), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`,
       color: colors.text,
     };
 

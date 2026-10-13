@@ -6,7 +6,7 @@ import { ErrorMessage } from "../ui/ErrorMessage";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import { useProfileStore } from "../../store/profile-store";
 import { useThemeStore } from "../../store/useThemeStore";
-import { PlayerActionsDisplay } from "../launcher/PlayerActionsDisplay";
+import { SalamiPlayView } from "../launcher/SalamiPlayView";
 import { RetroGridEffect } from "../effects/RetroGridEffect";
 import {
   BACKGROUND_EFFECTS,
@@ -71,7 +71,7 @@ export function PlayTab() {
 
   return (
     <div className="flex h-full relative">
-      <div className="flex-grow flex flex-col items-center justify-center p-8 relative z-15">
+      <div className="flex-grow flex flex-col items-center justify-center relative z-15">
         {/* Only show RetroGrid effect if no theme background is active and effects are not hidden */}
         {currentEffect === BACKGROUND_EFFECTS.RETRO_GRID && shouldShowEffects && !(isThemeActive && selectedTheme?.backgroundImage) && (
           <RetroGridEffect
@@ -105,27 +105,20 @@ export function PlayTab() {
           className="absolute top-6 left-6 z-10"
         /> */}
 
-        <div className="relative z-10">
-          {profilesError && !loading && (
-            <ErrorMessage
-              message={profilesError || "An unknown error occurred"}
-            />
-          )}
+        {profilesError && !loading && (
+          <div className="absolute left-10 top-6 z-20">
+            <ErrorMessage message={profilesError || "An unknown error occurred"} />
+          </div>
+        )}
 
-          <PlayerActionsDisplay
-            displayMode="playerName"
-            playerName={
-              activeAccount?.minecraft_username || activeAccount?.username
-            }
-            launchButtonDefaultVersion={
-              storeSelectedProfile?.id || versions[0]?.id || ""
-            }
-            onLaunchVersionChange={handleVersionChange}
-            launchButtonVersions={versions}
-            className=""
-            outline={outline}
-          />
-        </div>
+        <SalamiPlayView
+          profiles={profiles}
+          selectedProfile={currentDisplayProfile}
+          versions={versions}
+          onVersionChange={handleVersionChange}
+          playerName={activeAccount?.minecraft_username || activeAccount?.username}
+          outline={outline}
+        />
       </div>
 
       {FEATURES.news && <NewsSection className="w-1/3 border-l-2 border-white/40 bg-black/10 backdrop-blur-lg p-5 overflow-hidden flex flex-col relative z-10" />}

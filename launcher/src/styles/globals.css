@@ -57,7 +57,7 @@
     --radius-lg: 12px;
     --radius-xl: 16px;
     --radius-2xl: 24px;
-    --border-radius: 0px; 
+    --border-radius: 10px; 
     /* Standard: Salami-Schrift (Preset "salami" in config/fonts.ts setzt dasselbe) */
     --font-smallcaps: "Fredoka", sans-serif;
     --font-minecraft: "Fredoka", sans-serif;
@@ -421,7 +421,7 @@
 }
 
 :root {
-  --border-radius: 0px; 
+  --border-radius: 10px; 
 }
 
 .themed-radius {

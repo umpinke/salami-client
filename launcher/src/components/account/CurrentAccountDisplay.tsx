@@ -36,9 +36,9 @@ export function CurrentAccountDisplay({
   // Get border classes based on variant
   const getBorderClasses = () => {
     if (variant === "flat") {
-      return "border border-b-2";
+      return "border";
     }
-    return "border-2 border-b-4";
+    return "border";
   };
 
   // Get box shadow based on variant
@@ -46,7 +46,7 @@ export function CurrentAccountDisplay({
     if (variant === "flat") {
       return "none";
     }
-    return `0 8px 0 rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.35), inset 0 1px 0 ${accentColor.value}40, inset 0 0 0 1px ${accentColor.value}20`;
+    return `0 8px 28px rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.35), inset 0 1px 0 ${accentColor.value}40, inset 0 0 0 1px ${accentColor.value}20`;
   };
 
   // Get hover box shadow based on variant
@@ -54,7 +54,7 @@ export function CurrentAccountDisplay({
     if (variant === "flat") {
       return "none";
     }
-    return "0 10px 0 rgba(0,0,0,0.25), 0 12px 20px rgba(0,0,0,0.4)";
+    return "0 10px 34px rgba(0,0,0,0.25), 0 12px 20px rgba(0,0,0,0.4)";
   };
 
   // Get active box shadow based on variant
@@ -62,7 +62,7 @@ export function CurrentAccountDisplay({
     if (variant === "flat") {
       return "none";
     }
-    return "0 2px 0 rgba(0,0,0,0.2), 0 3px 5px rgba(0,0,0,0.3)";
+    return "0 2px 10px rgba(0,0,0,0.2), 0 3px 5px rgba(0,0,0,0.3)";
   };
 
   // Get hover transform based on variant
@@ -78,7 +78,7 @@ export function CurrentAccountDisplay({
     if (variant === "flat") {
       return "";
     }
-    return "active:translate-y-[2px] active:border-b-2";
+    return "active:scale-[0.98]";
   };
 
   // Get border bottom color based on variant and hover state
@@ -100,7 +100,7 @@ export function CurrentAccountDisplay({
           "text-shadow-sm",
           getBorderClasses(),
           variant !== "flat" &&
-            "shadow-[0_8px_0_rgba(0,0,0,0.3),0_10px_15px_rgba(0,0,0,0.35)]",
+            "shadow-[0_8px_28px_rgba(0,0,0,0.3),0_10px_15px_rgba(0,0,0,0.35)]",
           "cursor-pointer",
           getHoverTransform(),
           variant !== "flat" && `hover:shadow-[${getHoverBoxShadow()}]`,
@@ -171,7 +171,7 @@ export function CurrentAccountDisplay({
         "text-shadow-sm",
         getBorderClasses(),
         variant !== "flat" &&
-          "shadow-[0_8px_0_rgba(0,0,0,0.3),0_10px_15px_rgba(0,0,0,0.35)]",
+          "shadow-[0_8px_28px_rgba(0,0,0,0.3),0_10px_15px_rgba(0,0,0,0.35)]",
         "cursor-pointer",
         getHoverTransform(),
         variant !== "flat" && `hover:shadow-[${getHoverBoxShadow()}]`,

@@ -172,10 +172,10 @@ export const LoadingState = forwardRef<HTMLDivElement, LoadingStateProps>(
       if (shadowDepth === "none") return "none";
 
       if (shadowDepth === "short") {
-        return `0 4px 0 rgba(0,0,0,0.3), 0 6px 10px rgba(0,0,0,0.35), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`;
+        return `0 4px 16px rgba(0,0,0,0.3), 0 6px 10px rgba(0,0,0,0.35), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`;
       }
 
-      return `0 8px 0 rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.35), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`;
+      return `0 8px 28px rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.35), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`;
     };
 
     if (!isVisible) return null;
@@ -185,7 +185,7 @@ export const LoadingState = forwardRef<HTMLDivElement, LoadingStateProps>(
         ref={mergedRef}
         className={cn(
           "flex flex-col items-center justify-center space-y-4 rounded-md backdrop-blur-md",
-          shadowDepth !== "none" && "border-2 border-b-4",
+          shadowDepth !== "none" && "border",
           sizeStyles.container,
           className,
         )}

@@ -135,7 +135,7 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
       //       backgroundColor: `${accentColor.value}15`,
       //       borderColor: `${accentColor.value}60`,
       //       y: -3,
-      //       boxShadow: `0 8px 0 rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.35), inset 0 1px 0 ${accentColor.value}30, inset 0 0 0 1px ${accentColor.value}15`,
+      //       boxShadow: `0 8px 28px rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.35), inset 0 1px 0 ${accentColor.value}30, inset 0 0 0 1px ${accentColor.value}15`,
       //       duration: 0.2,
       //       ease: "power2.out",
       //     });
@@ -144,7 +144,7 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
       //       backgroundColor: `${accentColor.value}08`,
       //       borderColor: `${accentColor.value}30`,
       //       y: 0,
-      //       boxShadow: `0 2px 0 rgba(0,0,0,0.1), 0 3px 5px rgba(0,0,0,0.1)`,
+      //       boxShadow: `0 2px 10px rgba(0,0,0,0.1), 0 3px 5px rgba(0,0,0,0.1)`,
       //       duration: 0.2,
       //       ease: "power2.out",
       //     });

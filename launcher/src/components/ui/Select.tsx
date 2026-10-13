@@ -73,7 +73,7 @@ export function Select({
 
     if (triggerRef.current && shouldAnimate && variant === "3d") {
       gsap.to(triggerRef.current, {
-        boxShadow: `0 6px 0 rgba(0,0,0,0.25), 0 8px 12px rgba(0,0,0,0.4)`,
+        boxShadow: `0 6px 22px rgba(0,0,0,0.25), 0 8px 12px rgba(0,0,0,0.4)`,
         duration: 0.2,
         ease: "power2.out",
       });
@@ -87,7 +87,7 @@ export function Select({
 
     if (triggerRef.current && shouldAnimate && variant === "3d") {
       gsap.to(triggerRef.current, {
-        boxShadow: `0 4px 0 rgba(0,0,0,0.3), 0 6px 10px rgba(0,0,0,0.35)`,
+        boxShadow: `0 4px 16px rgba(0,0,0,0.3), 0 6px 10px rgba(0,0,0,0.35)`,
         duration: 0.2,
         ease: "power2.out",
       });
@@ -138,16 +138,16 @@ export function Select({
     return isHovered || isOpen ? `${colors.light}` : `${colors.main}80`;
   };
   const getBorderClasses = () => {
-    if (variant === "3d") return "border-2 border-b-4";
-    return "border border-b-2";
+    if (variant === "3d") return "border";
+    return "border";
   };
 
   const getBoxShadow = () => {
     if (variant !== "3d") return "none";
 
     return isHovered || isOpen
-      ? `0 6px 0 rgba(0,0,0,0.25), 0 8px 12px rgba(0,0,0,0.4), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`
-      : `0 4px 0 rgba(0,0,0,0.3), 0 6px 10px rgba(0,0,0,0.35), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`;
+      ? `0 6px 22px rgba(0,0,0,0.25), 0 8px 12px rgba(0,0,0,0.4), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`
+      : `0 4px 16px rgba(0,0,0,0.3), 0 6px 10px rgba(0,0,0,0.35), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`;
   };
 
   const buttonContent = (

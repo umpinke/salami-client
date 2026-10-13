@@ -523,11 +523,11 @@ export const ModrinthVersionListV2: React.FC<ModrinthVersionListV2Props> = ({
         </div>
       ) : (
         <div
-          className="relative overflow-hidden transition-colors duration-150 rounded-md p-4 text-sm text-gray-400 text-center border-2 border-b-4 backdrop-blur-md"
+          className="relative overflow-hidden transition-colors duration-150 rounded-md p-4 text-sm text-gray-400 text-center border backdrop-blur-md"
           style={{
             borderColor: `${accentColor.value}60`,
             borderBottomColor: accentColor.value,
-            boxShadow: `0 8px 0 rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.1), inset 0 0 0 1px rgba(255,255,255,0.05)`,
+            boxShadow: `0 8px 28px rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.1), inset 0 0 0 1px rgba(255,255,255,0.05)`,
             backgroundColor: `${accentColor.value}15`,
           }}
         >

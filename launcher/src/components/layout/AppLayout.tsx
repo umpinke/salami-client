@@ -338,7 +338,7 @@ export function AppLayout({
   return (
     <div
       ref={launcherRef}
-      className="h-screen w-full bg-black/50 backdrop-blur-lg border-2 overflow-hidden relative flex shadow-[0_0_25px_rgba(0,0,0,0.4)]"
+      className="h-screen w-full bg-black/50 backdrop-blur-lg border overflow-hidden relative flex"
       style={{
         backgroundColor: backgroundColor,
         backgroundSize: "cover",
@@ -347,10 +347,8 @@ export function AppLayout({
           ? `linear-gradient(to bottom right, ${getComplementaryBackgroundWithAlpha(0.3)}, rgba(0,0,0,0.5))`
           : `linear-gradient(to bottom right, ${backgroundColor}, rgba(0,0,0,0.9))`,
         borderColor: `${themeAccentColor.value}30`,
-        boxShadow: `0 0 15px ${themeAccentColor.value}30, inset 0 0 10px ${themeAccentColor.value}20`,
       }}
     >
-      <BorderGlowEffects accentColor={themeAccentColor.value} />
 
       <VerticalNavbar
         items={navItems}
@@ -388,37 +386,6 @@ export function AppLayout({
       <ProfileDuplicateModal />
       {FEATURES.friends && <FriendsSidebar />}
     </div>
-  );
-}
-
-function BorderGlowEffects({ accentColor }: { accentColor: string }) {
-  return (
-    <>
-      <div
-        className="absolute top-0 left-0 right-0 h-[2px]"
-        style={{
-          background: `linear-gradient(to right, transparent, ${accentColor}70, transparent)`,
-        }}
-      ></div>
-      <div
-        className="absolute bottom-0 left-0 right-0 h-[2px]"
-        style={{
-          background: `linear-gradient(to right, transparent, ${accentColor}70, transparent)`,
-        }}
-      ></div>
-      <div
-        className="absolute top-0 bottom-0 left-0 w-[2px]"
-        style={{
-          background: `linear-gradient(to bottom, transparent, ${accentColor}70, transparent)`,
-        }}
-      ></div>
-      <div
-        className="absolute top-0 bottom-0 right-0 w-[2px]"
-        style={{
-          background: `linear-gradient(to bottom, transparent, ${accentColor}70, transparent)`,
-        }}
-      ></div>
-    </>
   );
 }
 

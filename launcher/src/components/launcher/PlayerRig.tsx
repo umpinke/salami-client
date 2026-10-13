@@ -53,6 +53,8 @@ const flatStyle: React.CSSProperties = {
 interface PlayerRigProps {
   playerName: string | null | undefined;
   outline?: Partial<PromoOutlineConfig>;
+  /** Namensschild über dem Kopf (Salami-Startseite zeigt den Namen daneben). */
+  showNametag?: boolean;
 }
 
 function useMinLoading(active: boolean, minMs: number): boolean {
@@ -72,7 +74,7 @@ function useMinLoading(active: boolean, minMs: number): boolean {
   return active || !done;
 }
 
-export function PlayerRig({ playerName, outline }: PlayerRigProps) {
+export function PlayerRig({ playerName, outline, showNametag = true }: PlayerRigProps) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const activeAccount = useMinecraftAuthStore((state) => state.activeAccount);
@@ -102,14 +104,14 @@ export function PlayerRig({ playerName, outline }: PlayerRigProps) {
   );
   const ownNametag = useMemo(
     () =>
-      playerName
+      playerName && showNametag
         ? {
             text: playerName.toString(),
             iconUrl: selectedIcon.url,
             iconPlus: selectedIcon.plus,
           }
         : null,
-    [playerName, selectedIcon.url, selectedIcon.plus],
+    [playerName, showNametag, selectedIcon.url, selectedIcon.plus],
   );
 
   const rigTextureUrl = hasAccount ? textureUrl : NO_ACCOUNT_SKIN_URL;

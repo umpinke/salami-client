@@ -105,14 +105,14 @@ export function Modal({
 
   const getBorderClasses = () => {
     if (variant === "3d") {
-      return "border-2 border-b-4";
+      return "border";
     }
-    return "border border-b-2";
+    return "border";
   };
 
   const getBoxShadow = () => {
     if (variant === "3d") {
-      return `0 10px 0 rgba(0,0,0,0.3), 0 15px 25px rgba(0,0,0,0.5), inset 0 1px 0 ${accentColor.value}40, inset 0 0 0 1px ${accentColor.value}20`;
+      return `0 10px 34px rgba(0,0,0,0.3), 0 15px 25px rgba(0,0,0,0.5), inset 0 1px 0 ${accentColor.value}40, inset 0 0 0 1px ${accentColor.value}20`;
     }
     return "none";
   };

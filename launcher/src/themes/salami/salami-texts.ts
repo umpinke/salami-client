@@ -20,6 +20,11 @@ const SALAMI_UI_STRINGS: Record<string, Strings> = {
     "salami.mode.enabled": "Frisch angeschnitten!",
     "salami.mode.disabled": "Salami-Modus ausgeschaltet.",
     "salami.mode.game_hint": "Gilt für das Spiel ab dem nächsten Start.",
+    "salami.play.greeting": "Hallo, {{name}}",
+    "salami.play.greeting_anon": "Willkommen",
+    "salami.play.no_profile": "Kein Profil",
+    "salami.play.version": "Minecraft {{version}} · {{loader}}",
+    "salami.play.recent": "Zuletzt gespielt",
   },
   en: {
     "salami.mode.title": "Salami Mode",
@@ -28,6 +33,11 @@ const SALAMI_UI_STRINGS: Record<string, Strings> = {
     "salami.mode.enabled": "Freshly sliced!",
     "salami.mode.disabled": "Salami mode turned off.",
     "salami.mode.game_hint": "Applies to the game from the next launch.",
+    "salami.play.greeting": "Hi, {{name}}",
+    "salami.play.greeting_anon": "Welcome",
+    "salami.play.no_profile": "No profile",
+    "salami.play.version": "Minecraft {{version}} · {{loader}}",
+    "salami.play.recent": "Recently played",
   },
 };
 

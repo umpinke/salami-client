@@ -72,11 +72,11 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
   const getBoxShadow = () => {
     switch (variant) {
       case "3d":
-        return `0 8px 0 rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.35), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`;
+        return `0 8px 28px rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.35), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`;
       case "elevated":
-        return `0 10px 0 rgba(0,0,0,0.3), 0 15px 25px rgba(0,0,0,0.5), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`;
+        return `0 10px 34px rgba(0,0,0,0.3), 0 15px 25px rgba(0,0,0,0.5), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`;
       case "secondary":
-        return `0 6px 0 rgba(0,0,0,0.25), 0 8px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1), inset 0 0 0 1px rgba(255,255,255,0.05)`;
+        return `0 6px 22px rgba(0,0,0,0.25), 0 8px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1), inset 0 0 0 1px rgba(255,255,255,0.05)`;
       default:
         return "none";
     }
@@ -87,12 +87,12 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
       case "3d":
       case "elevated":
       case "secondary":
-        return "border-2 border-b-4";
+        return "border";
       case "flat-secondary":
       case "flat":
-        return "border border-b-2";
+        return "border";
       default:
-        return "border border-b-2";
+        return "border";
     }
   };
 

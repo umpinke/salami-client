@@ -48,7 +48,7 @@ export const NavTooltip = forwardRef<HTMLDivElement, NavTooltipProps>(
           "font-smallcaps relative overflow-hidden backdrop-blur-md",
           "px-4 py-2 rounded-md text-white whitespace-nowrap",
           "text-shadow-sm text-base",
-          "border-2 shadow-[0_4px_0_rgba(0,0,0,0.2),0_6px_10px_rgba(0,0,0,0.25)]",
+          "border-2 shadow-[0_4px_16px_rgba(0,0,0,0.2),0_6px_10px_rgba(0,0,0,0.25)]",
           className,
         )}
         style={{
@@ -59,7 +59,7 @@ export const NavTooltip = forwardRef<HTMLDivElement, NavTooltipProps>(
           boxShadow:
             variant === "ghost"
               ? "none"
-              : `0 4px 0 rgba(0,0,0,0.2), 0 6px 10px rgba(0,0,0,0.25), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`,
+              : `0 4px 16px rgba(0,0,0,0.2), 0 6px 10px rgba(0,0,0,0.25), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`,
           color: colors.text,
         }}
         {...props}

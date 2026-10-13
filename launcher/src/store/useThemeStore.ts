@@ -200,7 +200,8 @@ const calculateColorVariants = (baseColor: string): Partial<AccentColor> => {
   };
 };
 
-export const DEFAULT_BORDER_RADIUS = 0;
+/** Salami Client: abgerundete Ecken statt NoRisks eckigem Block-Look. */
+export const DEFAULT_BORDER_RADIUS = 10;
 export const MIN_BORDER_RADIUS = 0;
 export const MAX_BORDER_RADIUS = 32;
 
@@ -558,6 +559,15 @@ export const useThemeStore = create<ThemeState>()(
       },
     }),    {
       name: "norisk-theme-storage",
+      version: 1,
+      // Salami Client: einmalig von den eckigen NoRisk-Ecken (0) auf abgerundete wechseln
+      migrate: (persisted, version) => {
+        const state = persisted as Partial<ThemeState>;
+        if (version < 1 && (state.borderRadius ?? 0) === 0) {
+          return { ...state, borderRadius: DEFAULT_BORDER_RADIUS } as ThemeState;
+        }
+        return state as ThemeState;
+      },
       onRehydrateStorage: () => (state) => {
         if (state) {
           // Migration: Replace old "none" grouping criterion with "group"

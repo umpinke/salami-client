@@ -74,7 +74,7 @@ export function ColorPicker({
               relative transition-all duration-200
               ${disabled 
                 ? "opacity-40 cursor-not-allowed" 
-                : "cursor-pointer shadow-[0_4px_0_rgba(0,0,0,0.2),0_6px_10px_rgba(0,0,0,0.3),inset_0_1px_1px_rgba(255,255,255,0.3)] hover:shadow-[0_5px_0_rgba(0,0,0,0.15),0_8px_15px_rgba(0,0,0,0.25),inset_0_1px_1px_rgba(255,255,255,0.4)] hover:translate-y-[-2px] active:shadow-[0_2px_0_rgba(0,0,0,0.1),0_3px_5px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.2)] active:translate-y-[1px]"
+                : "cursor-pointer shadow-[0_4px_16px_rgba(0,0,0,0.2),0_6px_10px_rgba(0,0,0,0.3),inset_0_1px_1px_rgba(255,255,255,0.3)] hover:shadow-[0_5px_19px_rgba(0,0,0,0.15),0_8px_15px_rgba(0,0,0,0.25),inset_0_1px_1px_rgba(255,255,255,0.4)] hover:translate-y-[-2px] active:shadow-[0_2px_10px_rgba(0,0,0,0.1),0_3px_5px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.2)] active:translate-y-[1px]"
               }
               ${accentColor.value === color.value ? "ring-2 ring-white ring-offset-2 ring-offset-black/50" : ""}
             `}
@@ -110,7 +110,7 @@ export function ColorPicker({
               relative transition-all duration-200
               ${disabled 
                 ? "opacity-40 cursor-not-allowed" 
-                : "cursor-pointer shadow-[0_4px_0_rgba(0,0,0,0.2),0_6px_10px_rgba(0,0,0,0.3),inset_0_1px_1px_rgba(255,255,255,0.3)] hover:shadow-[0_5px_0_rgba(0,0,0,0.15),0_8px_15px_rgba(0,0,0,0.25),inset_0_1px_1px_rgba(255,255,255,0.4)] hover:translate-y-[-2px] active:shadow-[0_2px_0_rgba(0,0,0,0.1),0_3px_5px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.2)] active:translate-y-[1px]"
+                : "cursor-pointer shadow-[0_4px_16px_rgba(0,0,0,0.2),0_6px_10px_rgba(0,0,0,0.3),inset_0_1px_1px_rgba(255,255,255,0.3)] hover:shadow-[0_5px_19px_rgba(0,0,0,0.15),0_8px_15px_rgba(0,0,0,0.25),inset_0_1px_1px_rgba(255,255,255,0.4)] hover:translate-y-[-2px] active:shadow-[0_2px_10px_rgba(0,0,0,0.1),0_3px_5px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.2)] active:translate-y-[1px]"
               }
               bg-gradient-to-r from-purple-500 via-pink-500 to-red-500
               ${accentColor.isCustom ? "ring-2 ring-white ring-offset-2 ring-offset-black/50" : ""}
@@ -184,10 +184,10 @@ export function ColorPicker({
                       ${sizeClasses.sm} 
                       ${shapeClasses[shape]} 
                       relative cursor-pointer transition-all duration-200
-                      shadow-[0_2px_0_rgba(0,0,0,0.2),0_3px_5px_rgba(0,0,0,0.3)]
-                      hover:shadow-[0_3px_0_rgba(0,0,0,0.15),0_4px_8px_rgba(0,0,0,0.25)]
+                      shadow-[0_2px_10px_rgba(0,0,0,0.2),0_3px_5px_rgba(0,0,0,0.3)]
+                      hover:shadow-[0_3px_13px_rgba(0,0,0,0.15),0_4px_8px_rgba(0,0,0,0.25)]
                       hover:translate-y-[-1px]
-                      active:shadow-[0_1px_0_rgba(0,0,0,0.1),0_2px_3px_rgba(0,0,0,0.2)]
+                      active:shadow-[0_1px_7px_rgba(0,0,0,0.1),0_2px_3px_rgba(0,0,0,0.2)]
                       active:translate-y-[1px]
                       ${accentColor.value === historyColor ? "ring-1 ring-white ring-offset-1 ring-offset-black/50" : ""}
                     `}

@@ -253,7 +253,7 @@ export function ProfileCardV2({
     const part1Y = shadowDepth === "short" ? "4px" : "8px";
     const part2Y = shadowDepth === "short" ? "6px" : "10px";
     const part2Blur = shadowDepth === "short" ? "10px" : "15px";
-    const boxShadow = `0 ${part1Y} 0 rgba(0,0,0,0.3), 0 ${part2Y} ${part2Blur} rgba(0,0,0,0.35), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`;
+    const boxShadow = `0 ${part1Y} 14px rgba(0,0,0,0.3), 0 ${part2Y} ${part2Blur} rgba(0,0,0,0.35), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`;
 
     return {
       backgroundColor,
@@ -283,8 +283,8 @@ export function ProfileCardV2({
     const borderBottomColor = isHovered ? colors.light : colors.dark;
 
     const boxShadow = isHovered
-      ? `0 2px 0 rgba(0,0,0,0.4), 0 4px 8px rgba(0,0,0,0.3), inset 0 1px 0 ${colors.light}50, inset 0 0 0 1px ${colors.main}30`
-      : `0 2px 0 rgba(0,0,0,0.3), 0 3px 6px rgba(0,0,0,0.25), inset 0 1px 0 ${colors.light}30, inset 0 0 0 1px ${colors.main}20`;
+      ? `0 2px 10px rgba(0,0,0,0.4), 0 4px 8px rgba(0,0,0,0.3), inset 0 1px 0 ${colors.light}50, inset 0 0 0 1px ${colors.main}30`
+      : `0 2px 10px rgba(0,0,0,0.3), 0 3px 6px rgba(0,0,0,0.25), inset 0 1px 0 ${colors.light}30, inset 0 0 0 1px ${colors.main}20`;
 
     return {
       backgroundColor,
