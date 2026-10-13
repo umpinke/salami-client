@@ -51,7 +51,7 @@ public final class HudEditorScreen extends Screen {
 	}
 
 	private Box box(HudModule hud) {
-		float s = hud.scale.get().floatValue();
+		float s = hud.effectiveScale();
 		return new Box(hud.screenX(width), hud.screenY(height), Math.max(8, Math.round(hud.width() * s)), Math.max(8, Math.round(hud.height() * s)));
 	}
 

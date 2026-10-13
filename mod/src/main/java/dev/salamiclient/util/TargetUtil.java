@@ -42,6 +42,50 @@ public final class TargetUtil {
 			Mth.clamp(eye.z, box.minZ, box.maxZ));
 	}
 
+	/** {@code Entity.turn} multipliziert Mauswerte mit diesem Faktor. */
+	private static final double TURN_SCALE = 0.15;
+
+	/**
+	 * Dreht den Blick wie eine Mausbewegung, höchstens {@code maxStep} Grad je Achse,
+	 * Richtung (yaw, pitch).
+	 */
+	public static void turnTowards(LocalPlayer player, float yaw, float pitch, float maxStep, boolean vertical) {
+		float dYaw = Mth.clamp(Mth.wrapDegrees(yaw - player.getYRot()), -maxStep, maxStep);
+		float dPitch = vertical ? Mth.clamp(pitch - player.getXRot(), -maxStep, maxStep) : 0f;
+		player.turn(dYaw / TURN_SCALE, dPitch / TURN_SCALE);
+	}
+
+	/** Hitbox an der interpolierten Position (für flüssiges Zielen zwischen Ticks). */
+	public static AABB lerpedBox(Entity entity, float partial) {
+		return entity.getBoundingBox().move(entity.getPosition(partial).subtract(entity.position()));
+	}
+
+	/**
+	 * Ziel mit dem kleinsten Winkel zum Blick: innerhalb von {@code range} (Abstand zur Hitbox),
+	 * im Sichtfeld {@code fov} (Grad) und mit Sichtlinie.
+	 */
+	public static Entity bestInView(LocalPlayer player, Filter filter, Vec3 eye, Vec3 look, double range, double fov, float partial) {
+		double maxAngle = fov / 2;
+		Entity best = null;
+		double bestAngle = Double.MAX_VALUE;
+		for (Entity entity : Minecraft.getInstance().level.getEntities(player, player.getBoundingBox().inflate(range + 2))) {
+			if (!filter.accepts(entity)) {
+				continue;
+			}
+			AABB box = lerpedBox(entity, partial);
+			if (closestPoint(eye, box).distanceTo(eye) > range || !player.hasLineOfSight(entity)) {
+				continue;
+			}
+			Vec3 toTarget = box.getCenter().subtract(eye).normalize();
+			double angle = Math.toDegrees(Math.acos(Mth.clamp(look.dot(toTarget), -1, 1)));
+			if (angle <= maxAngle && angle < bestAngle) {
+				best = entity;
+				bestAngle = angle;
+			}
+		}
+		return best;
+	}
+
 	/** Blickwinkel (Yaw, Pitch) vom Auge zu einem Punkt. */
 	public static float[] rotationTo(Vec3 eye, Vec3 point) {
 		Vec3 d = point.subtract(eye);

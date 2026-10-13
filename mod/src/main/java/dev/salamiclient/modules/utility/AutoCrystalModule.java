@@ -5,17 +5,10 @@ import dev.salamiclient.module.Module;
 import dev.salamiclient.setting.BoolSetting;
 import dev.salamiclient.setting.ModeSetting;
 import dev.salamiclient.setting.NumberSetting;
+import dev.salamiclient.util.CrystalUtil;
 import dev.salamiclient.util.InteractUtil;
 import dev.salamiclient.util.InventoryUtil;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
@@ -71,47 +64,11 @@ public final class AutoCrystalModule extends Module {
 			return;
 		}
 		if (hit instanceof BlockHitResult blockHit && hit.getType() == HitResult.Type.BLOCK && placeCooldown == 0) {
-			if (canPlaceOn(blockHit.getBlockPos()) && holdCrystal()) {
+			if (CrystalUtil.canPlaceOn(blockHit.getBlockPos()) && CrystalUtil.holdCrystal(autoSwitch.isOn())) {
 				if (InteractUtil.useOn(blockHit)) {
 					placeCooldown = placeDelay.intValue();
 				}
 			}
 		}
-	}
-
-	/** Gleiche Bedingungen wie EndCrystalItem: Obsidian/Grundgestein, Luft darüber, kein Entity im Weg. */
-	private boolean canPlaceOn(BlockPos base) {
-		ClientLevel level = mc().level;
-		BlockState state = level.getBlockState(base);
-		if (!state.is(Blocks.OBSIDIAN) && !state.is(Blocks.BEDROCK)) {
-			return false;
-		}
-		BlockPos above = base.above();
-		if (!level.getBlockState(above).isAir()) {
-			return false;
-		}
-		AABB space = new AABB(above).expandTowards(0, 1, 0);
-		for (Entity entity : level.getEntities((Entity) null, space)) {
-			if (entity.isAlive()) {
-				return false;
-			}
-		}
-		return true;
-	}
-
-	private boolean holdCrystal() {
-		LocalPlayer player = mc().player;
-		if (player.getMainHandItem().is(Items.END_CRYSTAL)) {
-			return true;
-		}
-		if (!autoSwitch.isOn()) {
-			return false;
-		}
-		int slot = InventoryUtil.findHotbar(stack -> stack.is(Items.END_CRYSTAL));
-		if (slot == InventoryUtil.NOT_FOUND) {
-			return false;
-		}
-		InventoryUtil.selectHotbar(slot);
-		return true;
 	}
 }

@@ -9,7 +9,6 @@ import dev.salamiclient.util.TargetUtil;
 import dev.salamiclient.util.WeaponUtil;
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -20,9 +19,6 @@ import net.minecraft.world.phys.Vec3;
  * der dem aktuellen Blick am nächsten liegt; ist das Ziel schon im Fadenkreuz, passiert nichts.
  */
 public final class AimAssistModule extends Module implements WorldRenderListener {
-	/** {@code Entity.turn} multipliziert Mauswerte mit diesem Faktor. */
-	private static final double TURN_SCALE = 0.15;
-
 	private final BoolSetting players = add(new BoolSetting("players", true));
 	private final BoolSetting mobs = add(new BoolSetting("mobs", false));
 	private final BoolSetting invisible = add(new BoolSetting("invisible", false));
@@ -63,47 +59,17 @@ public final class AimAssistModule extends Module implements WorldRenderListener
 		float partial = mc().getDeltaTracker().getGameTimeDeltaPartialTick(true);
 		Vec3 eye = player.getEyePosition(partial);
 		Vec3 look = player.getViewVector(partial);
-		Entity target = findTarget(player, eye, look, partial);
+		TargetUtil.Filter filter = new TargetUtil.Filter(players.isOn(), mobs.isOn(), invisible.isOn());
+		Entity target = TargetUtil.bestInView(player, filter, eye, look, range.get(), fov.get(), partial);
 		if (target == null || mc().crosshairPickEntity == target) {
 			return;
 		}
 
-		AABB box = lerpedBox(target, partial);
+		AABB box = TargetUtil.lerpedBox(target, partial);
 		// Punkt auf dem Blickstrahl in Zielentfernung, in die Hitbox geklemmt
 		double distance = eye.distanceTo(box.getCenter());
 		Vec3 aim = TargetUtil.closestPoint(eye.add(look.scale(distance)), box.deflate(0.1));
 		float[] rotation = TargetUtil.rotationTo(eye, aim);
-		float step = speed.get().floatValue() * ticks;
-		float yaw = Mth.clamp(Mth.wrapDegrees(rotation[0] - player.getYRot()), -step, step);
-		float pitch = vertical.isOn() ? Mth.clamp(rotation[1] - player.getXRot(), -step, step) : 0f;
-		player.turn(yaw / TURN_SCALE, pitch / TURN_SCALE);
-	}
-
-	private Entity findTarget(LocalPlayer player, Vec3 eye, Vec3 look, float partial) {
-		TargetUtil.Filter filter = new TargetUtil.Filter(players.isOn(), mobs.isOn(), invisible.isOn());
-		double maxRange = range.get();
-		double maxAngle = fov.get() / 2;
-		Entity best = null;
-		double bestAngle = Double.MAX_VALUE;
-		for (Entity entity : mc().level.getEntities(player, player.getBoundingBox().inflate(maxRange + 2))) {
-			if (!filter.accepts(entity)) {
-				continue;
-			}
-			AABB box = lerpedBox(entity, partial);
-			if (TargetUtil.closestPoint(eye, box).distanceTo(eye) > maxRange || !player.hasLineOfSight(entity)) {
-				continue;
-			}
-			Vec3 toTarget = box.getCenter().subtract(eye).normalize();
-			double angle = Math.toDegrees(Math.acos(Mth.clamp(look.dot(toTarget), -1, 1)));
-			if (angle <= maxAngle && angle < bestAngle) {
-				best = entity;
-				bestAngle = angle;
-			}
-		}
-		return best;
-	}
-
-	private static AABB lerpedBox(Entity entity, float partial) {
-		return entity.getBoundingBox().move(entity.getPosition(partial).subtract(entity.position()));
+		TargetUtil.turnTowards(player, rotation[0], rotation[1], speed.get().floatValue() * ticks, vertical.isOn());
 	}
 }

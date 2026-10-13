@@ -1,5 +1,6 @@
 package dev.salamiclient.module;
 
+import dev.salamiclient.modules.client.GuiScaleModule;
 import dev.salamiclient.setting.NumberSetting;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.GuiGraphics;
@@ -38,13 +39,18 @@ public abstract class HudModule extends Module {
 		return true;
 	}
 
+	/** Eigene Größe × globale HUD-Größe (Modul „Oberfläche“). */
+	public float effectiveScale() {
+		return scale.get().floatValue() * GuiScaleModule.hudScale();
+	}
+
 	public int screenX(int guiWidth) {
-		int w = Math.round(width() * scale.get().floatValue());
+		int w = Math.round(width() * effectiveScale());
 		return Math.max(0, Math.min(guiWidth - w, (int) Math.round(x.get() * guiWidth)));
 	}
 
 	public int screenY(int guiHeight) {
-		int h = Math.round(height() * scale.get().floatValue());
+		int h = Math.round(height() * effectiveScale());
 		return Math.max(0, Math.min(guiHeight - h, (int) Math.round(y.get() * guiHeight)));
 	}
 
@@ -58,7 +64,7 @@ public abstract class HudModule extends Module {
 		if (!hasContent()) {
 			return;
 		}
-		float s = scale.get().floatValue();
+		float s = effectiveScale();
 		graphics.pose().pushMatrix();
 		graphics.pose().translate(screenX(graphics.guiWidth()), screenY(graphics.guiHeight()));
 		graphics.pose().scale(s, s);

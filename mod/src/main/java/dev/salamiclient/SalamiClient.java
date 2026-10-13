@@ -6,6 +6,7 @@ import dev.salamiclient.gui.clickgui.ClickGuiScreen;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.ModuleManager;
 import dev.salamiclient.modules.client.SafeModeModule;
+import dev.salamiclient.modules.client.GuiScaleModule;
 import dev.salamiclient.modules.client.SalamiThemeModule;
 import dev.salamiclient.modules.utility.AnchorMacroModule;
 import dev.salamiclient.modules.utility.AutoCrystalModule;
@@ -21,6 +22,10 @@ import dev.salamiclient.modules.utility.BlockEspModule;
 import dev.salamiclient.modules.utility.PlayerEspModule;
 import dev.salamiclient.modules.utility.TriggerBotModule;
 import dev.salamiclient.modules.utility.AimAssistModule;
+import dev.salamiclient.modules.utility.AutoDTapModule;
+import dev.salamiclient.modules.utility.AutoShieldBreakModule;
+import dev.salamiclient.modules.utility.BowAimModule;
+import dev.salamiclient.modules.utility.BowSpamModule;
 import dev.salamiclient.modules.utility.BreachSwapModule;
 import dev.salamiclient.modules.utility.SpeedLungeModule;
 import dev.salamiclient.modules.visual.ArmorHudModule;
@@ -112,6 +117,7 @@ public final class SalamiClient implements ClientModInitializer {
 		// Client
 		modules.register(new SalamiThemeModule());
 		modules.register(new SafeModeModule());
+		modules.register(new GuiScaleModule());
 		// Visual (Overlay-System: alle HudModule sind im HUD-Editor verschiebbar)
 		modules.register(new WatermarkModule());
 		modules.register(new LiveTrackerModule());
@@ -142,6 +148,10 @@ public final class SalamiClient implements ClientModInitializer {
 		modules.register(new PlayerEspModule());
 		modules.register(new TriggerBotModule());
 		modules.register(new AimAssistModule());
+		modules.register(new AutoDTapModule());
+		modules.register(new AutoShieldBreakModule());
+		modules.register(new BowSpamModule());
+		modules.register(new BowAimModule());
 	}
 
 	private void registerKeybinds() {

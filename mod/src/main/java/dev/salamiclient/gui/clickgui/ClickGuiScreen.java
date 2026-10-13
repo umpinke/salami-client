@@ -7,6 +7,7 @@ import dev.salamiclient.config.ConfigManager;
 import dev.salamiclient.gui.HudEditorScreen;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
+import dev.salamiclient.modules.client.GuiScaleModule;
 import dev.salamiclient.module.ModuleManager;
 import dev.salamiclient.setting.BoolSetting;
 import dev.salamiclient.setting.ColorSetting;
@@ -95,6 +96,7 @@ public final class ClickGuiScreen extends Screen {
 
 	@Override
 	protected void init() {
+		uiScale = GuiScaleModule.clickGuiScale();
 		if (panels.isEmpty()) {
 			loadPanels();
 		}
@@ -117,14 +119,18 @@ public final class ClickGuiScreen extends Screen {
 	public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
 		super.render(graphics, mouseX, mouseY, partialTick);
 		Theme theme = SalamiClient.get().theme();
-		Hit hover = (draggedPanel == null && draggedSlider == null) ? hitTest(mouseX, mouseY) : null;
+		int mx = (int) (mouseX / uiScale);
+		int my = (int) (mouseY / uiScale);
+		Hit hover = (draggedPanel == null && draggedSlider == null) ? hitTest(mx, my) : null;
 
+		graphics.pose().pushMatrix();
+		graphics.pose().scale(uiScale, uiScale);
 		for (Panel panel : panels) {
 			renderPanel(graphics, panel, theme, hover);
 		}
-
-		graphics.drawCenteredString(font, I18n.get("salami.clickgui.hint"), width / 2, height - 12, theme.textDim());
-		renderHudButton(graphics, theme, mouseX, mouseY);
+		graphics.drawCenteredString(font, I18n.get("salami.clickgui.hint"), uiWidth() / 2, uiHeight() - 12, theme.textDim());
+		renderHudButton(graphics, theme, mx, my);
+		graphics.pose().popMatrix();
 
 		Component tooltip = tooltipFor(hover);
 		if (tooltip != null) {
@@ -168,7 +174,7 @@ public final class ClickGuiScreen extends Screen {
 
 	private int[] hudButton() {
 		int w = font.width(I18n.get("salami.clickgui.hud_editor")) + 12;
-		return new int[] {width - w - 6, 4, width - 6, 18};
+		return new int[] {uiWidth() - w - 6, 4, uiWidth() - 6, 18};
 	}
 
 	private void renderHudButton(GuiGraphics g, Theme theme, int mouseX, int mouseY) {
@@ -348,6 +354,7 @@ public final class ClickGuiScreen extends Screen {
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+		event = scaled(event);
 		listeningKeybind = null;
 		int[] b = hudButton();
 		if (event.x() >= b[0] && event.x() < b[2] && event.y() >= b[1] && event.y() < b[3]) {
@@ -425,6 +432,7 @@ public final class ClickGuiScreen extends Screen {
 
 	@Override
 	public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
+		event = scaled(event);
 		if (draggedPanel != null) {
 			draggedPanel.x = (int) (event.x() - dragOffsetX);
 			draggedPanel.y = (int) (event.y() - dragOffsetY);
@@ -447,6 +455,7 @@ public final class ClickGuiScreen extends Screen {
 		}
 		if (draggedSlider != null) {
 			draggedSlider = null;
+			rescale(); // z. B. nach dem Ziehen des ClickGUI-Größe-Reglers
 			return true;
 		}
 		return super.mouseReleased(event);
@@ -483,6 +492,31 @@ public final class ClickGuiScreen extends Screen {
 		super.removed();
 	}
 
+	// ------------------------------------------------------------------ Skalierung
+
+	/** ClickGUI-Größe aus dem Modul „Oberfläche“; Layout und Maus rechnen in skalierten Koordinaten. */
+	private float uiScale = 1f;
+
+	private int uiWidth() {
+		return Math.round(width / uiScale);
+	}
+
+	private int uiHeight() {
+		return Math.round(height / uiScale);
+	}
+
+	private MouseButtonEvent scaled(MouseButtonEvent event) {
+		return uiScale == 1f ? event : new MouseButtonEvent(event.x() / uiScale, event.y() / uiScale, event.buttonInfo());
+	}
+
+	private void rescale() {
+		float next = GuiScaleModule.clickGuiScale();
+		if (next != uiScale) {
+			uiScale = next;
+			panels.forEach(this::clamp);
+		}
+	}
+
 	// ------------------------------------------------------------------ Panel-Zustand
 
 	private void bringToFront(Panel panel) {
@@ -491,8 +525,8 @@ public final class ClickGuiScreen extends Screen {
 	}
 
 	private void clamp(Panel panel) {
-		panel.x = Math.max(0, Math.min(panel.x, width - PANEL_WIDTH));
-		panel.y = Math.max(0, Math.min(panel.y, height - HEADER_HEIGHT));
+		panel.x = Math.max(0, Math.min(panel.x, uiWidth() - PANEL_WIDTH));
+		panel.y = Math.max(0, Math.min(panel.y, uiHeight() - HEADER_HEIGHT));
 	}
 
 	private void loadPanels() {
@@ -504,7 +538,7 @@ public final class ClickGuiScreen extends Screen {
 		int y = 24;
 		int rowHeight = 0;
 		for (Category category : Category.values()) {
-			if (x > 10 && x + PANEL_WIDTH > width - 10) {
+			if (x > 10 && x + PANEL_WIDTH > uiWidth() - 10) {
 				x = 10;
 				y += rowHeight + gap;
 				rowHeight = 0;

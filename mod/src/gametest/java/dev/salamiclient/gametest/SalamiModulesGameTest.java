@@ -1,21 +1,32 @@
 package dev.salamiclient.gametest;
 
 import dev.salamiclient.SalamiClient;
+import dev.salamiclient.gui.clickgui.ClickGuiScreen;
+import dev.salamiclient.module.HudModule;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.ModuleManager;
+import dev.salamiclient.modules.client.GuiScaleModule;
 import dev.salamiclient.modules.client.SafeModeModule;
 import dev.salamiclient.modules.utility.AimAssistModule;
 import dev.salamiclient.modules.utility.AnchorMacroModule;
 import dev.salamiclient.modules.utility.AutoCrystalModule;
+import dev.salamiclient.modules.utility.AutoDTapModule;
+import dev.salamiclient.modules.utility.BowAimModule;
+import dev.salamiclient.modules.utility.BowSpamModule;
 import dev.salamiclient.modules.utility.AutoTotemModule;
 import dev.salamiclient.modules.utility.DoubleHandTotemModule;
 import dev.salamiclient.modules.utility.GhostSpearModule;
 import dev.salamiclient.modules.utility.PlayerEspModule;
 import dev.salamiclient.modules.utility.TriggerBotModule;
 import dev.salamiclient.modules.visual.CapesModule;
+import dev.salamiclient.modules.visual.InfoHudModule;
 import dev.salamiclient.modules.visual.LiveTrackerModule;
 import dev.salamiclient.modules.visual.ParticlesModule;
 import dev.salamiclient.setting.Setting;
+import dev.salamiclient.util.ArrowBallistics;
+import dev.salamiclient.util.CrystalUtil;
+import dev.salamiclient.util.InteractUtil;
+import dev.salamiclient.util.TargetUtil;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
@@ -24,9 +35,11 @@ import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.entity.monster.zombie.Zombie;
+import net.minecraft.world.entity.projectile.arrow.Arrow;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
@@ -61,7 +74,127 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 			testPlayerEsp(context, modules);
 			testTriggerBot(context, server, modules);
 			testAimAssist(context, server, modules);
+			testBallistics();
+			testBowSpam(context, server, modules);
+			testBowAim(context, server, modules);
+			testAutoDTap(context, server, modules);
+			testGuiScale(context, modules);
 		}
+	}
+
+	// ------------------------------------------------------------------ Bogen
+
+	/** Rechnung allein: gefundener Winkel muss das Ziel treffen, Unerreichbares liefert null. */
+	private static void testBallistics() {
+		Float pitch = ArrowBallistics.solvePitch(3.0, 30, 0);
+		check(pitch != null, "Ballistics: no pitch for a 30 block shot");
+		ArrowBallistics.Flight flight = ArrowBallistics.fly(3.0, pitch, 30);
+		check(flight != null && Math.abs(flight.height()) < 0.05, "Ballistics: solved pitch misses (" + flight + ")");
+		check(pitch < 0, "Ballistics: a level 30 block shot must aim slightly upwards, got " + pitch);
+		check(ArrowBallistics.solvePitch(0.3, 100, 0) == null, "Ballistics: out-of-range target must be null");
+	}
+
+	private static void testBowSpam(ClientGameTestContext context, TestServerContext server, ModuleManager modules) {
+		server.runCommand("clear @a");
+		server.runCommand("item replace entity @p hotbar.0 with minecraft:bow");
+		server.runCommand("item replace entity @p hotbar.1 with minecraft:arrow 64");
+		server.runCommand("kill @e[type=minecraft:arrow]");
+		server.runCommand("tp @p 110.5 " + FEET_Y + " 0.5 180 -10");
+		context.waitTicks(5);
+		context.runOnClient(c -> c.player.getInventory().setSelectedSlot(0));
+		Module spam = modules.get(BowSpamModule.class);
+		set(spam, "charge", 4.0);
+		context.runOnClient(c -> modules.setEnabled(spam, true));
+		context.getInput().holdKeyFor(options -> options.keyUse, 30);
+		context.waitTicks(3);
+		int arrows = server.computeOnServer(s -> s.overworld().getEntitiesOfClass(Arrow.class, new AABB(100, FEET_Y - 5, -60, 121, FEET_Y + 30, 5)).size());
+		context.runOnClient(c -> modules.setEnabled(spam, false));
+		server.runCommand("kill @e[type=minecraft:arrow]");
+		check(arrows >= 3, "Bow Spam: only " + arrows + " arrows in 30 ticks");
+	}
+
+	private static void testBowAim(ClientGameTestContext context, TestServerContext server, ModuleManager modules) {
+		server.runCommand("summon minecraft:zombie 124.5 " + FEET_Y + " -14.0 {NoAI:1b,PersistenceRequired:1b,Tags:[\"salami_bow\"]}");
+		server.runCommand("tp @p 120.5 " + FEET_Y + " 0.5 180 0");
+		context.waitTicks(5);
+		Module aim = modules.get(BowAimModule.class);
+		set(aim, "players", false);
+		set(aim, "mobs", true);
+		set(aim, "speed", 30.0);
+		context.runOnClient(c -> modules.setEnabled(aim, true));
+		context.getInput().holdKey(options -> options.keyUse);
+		context.waitTicks(25);
+		float[] diff = context.computeOnClient(c -> {
+			Zombie zombie = c.level.getEntitiesOfClass(Zombie.class, new AABB(122, FEET_Y - 1, -16, 127, FEET_Y + 3, -12)).getFirst();
+			float[] direct = TargetUtil.rotationTo(c.player.getEyePosition(), zombie.getBoundingBox().getCenter());
+			return new float[] {Mth.wrapDegrees(direct[0] - c.player.getYRot()), c.player.getXRot() - direct[1]};
+		});
+		context.getInput().releaseKey(options -> options.keyUse);
+		context.runOnClient(c -> modules.setEnabled(aim, false));
+		server.runCommand("kill @e[type=minecraft:zombie,tag=salami_bow]");
+		server.runCommand("kill @e[type=minecraft:arrow]");
+		check(Math.abs(diff[0]) < 2f, "Bow Aim: yaw is " + diff[0] + " degrees off the zombie");
+		// Pfeile fallen: über das Ziel zielen, aber nicht absurd hoch
+		check(diff[1] < 0f && diff[1] > -10f, "Bow Aim: pitch offset for the arrow drop is " + diff[1]);
+	}
+
+	// ------------------------------------------------------------------ Auto D-Tap
+
+	private static void testAutoDTap(ClientGameTestContext context, TestServerContext server, ModuleManager modules) {
+		BlockPos base = new BlockPos(130, FEET_Y, -3);
+		server.runCommand("clear @a");
+		server.runCommand("gamemode survival @a");
+		server.runCommand("effect give @p minecraft:resistance 60 4 true");
+		server.runCommand("item replace entity @p hotbar.0 with minecraft:stone_sword");
+		server.runCommand("item replace entity @p hotbar.1 with minecraft:end_crystal 16");
+		server.runCommand("fill 128 " + FEET_Y + " -5 132 " + (FEET_Y + 3) + " 1 minecraft:air");
+		server.runCommand("setblock 130 " + FEET_Y + " -3 minecraft:obsidian");
+		server.runCommand("summon minecraft:end_crystal 130.5 " + (FEET_Y + 1) + " -2.5 {ShowBottom:0b}");
+		server.runCommand("tp @p 130.5 " + FEET_Y + " 0.5 180 0");
+		context.waitTicks(5);
+		context.runOnClient(c -> c.player.getInventory().setSelectedSlot(0));
+		check(context.computeOnClient(c -> CrystalUtil.crystalOn(base) != null), "Test setup: crystal missing");
+
+		Module dtap = modules.get(AutoDTapModule.class);
+		context.runOnClient(c -> modules.setEnabled(dtap, true));
+		context.runOnClient(c -> InteractUtil.attack(CrystalUtil.crystalOn(base)));
+		boolean firstGone = false;
+		boolean secondPlaced = false;
+		boolean secondGone = false;
+		for (int i = 0; i < 40 && !secondGone; i++) {
+			context.waitTick();
+			boolean present = context.computeOnClient(c -> CrystalUtil.crystalOn(base) != null);
+			if (!firstGone) {
+				firstGone = !present;
+			} else if (!secondPlaced) {
+				secondPlaced = present;
+			} else {
+				secondGone = !present;
+			}
+		}
+		context.runOnClient(c -> modules.setEnabled(dtap, false));
+		check(firstGone, "Auto D-Tap: first crystal was not destroyed");
+		check(secondPlaced, "Auto D-Tap: no second crystal was placed");
+		check(secondGone, "Auto D-Tap: second crystal was not destroyed");
+	}
+
+	// ------------------------------------------------------------------ Oberfläche
+
+	private static void testGuiScale(ClientGameTestContext context, ModuleManager modules) {
+		Module gui = modules.get(GuiScaleModule.class);
+		HudModule hud = modules.get(InfoHudModule.class);
+		float before = context.computeOnClient(c -> hud.effectiveScale());
+		set(gui, "hud_scale", 2.0);
+		float after = context.computeOnClient(c -> hud.effectiveScale());
+		check(Math.abs(after - before * 2) < 0.001f, "GUI scale: HUD scale " + before + " -> " + after);
+		set(gui, "hud_scale", 1.0);
+
+		set(gui, "clickgui_scale", 1.5);
+		context.setScreen(() -> new ClickGuiScreen(modules, SalamiClient.get().config()));
+		context.waitTicks(3);
+		context.takeScreenshot("salami-14-clickgui-scaled");
+		context.setScreen(() -> null);
+		set(gui, "clickgui_scale", 1.0);
 	}
 
 	// ------------------------------------------------------------------ Partikel
