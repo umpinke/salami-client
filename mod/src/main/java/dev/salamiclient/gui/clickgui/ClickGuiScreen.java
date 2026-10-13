@@ -130,11 +130,18 @@ public final class ClickGuiScreen extends Screen {
 		}
 		graphics.drawCenteredString(font, I18n.get("salami.clickgui.hint"), uiWidth() / 2, uiHeight() - 12, theme.textDim());
 		renderHudButton(graphics, theme, mx, my);
+		renderScaleControls(graphics, theme, mx, my);
 		graphics.pose().popMatrix();
 
 		Component tooltip = tooltipFor(hover);
+		int tooltipY = mouseY;
+		if (scaleControlAt(mx, my) >= 0) {
+			// unter die Knöpfe, damit die Prozentzahl sichtbar bleibt
+			tooltip = Component.translatable("salami.clickgui.scale.tooltip");
+			tooltipY = Math.round(CONTROL_BOTTOM * uiScale) + 16;
+		}
 		if (tooltip != null) {
-			graphics.setTooltipForNextFrame(font.split(tooltip, 220), mouseX, mouseY);
+			graphics.setTooltipForNextFrame(font.split(tooltip, 220), mouseX, tooltipY);
 		}
 	}
 
@@ -183,6 +190,61 @@ public final class ClickGuiScreen extends Screen {
 		g.fill(b[0], b[1], b[2], b[3], hovered ? theme.header() : theme.panel());
 		g.renderOutline(b[0], b[1], b[2] - b[0], b[3] - b[1], theme.outline());
 		g.drawString(font, I18n.get("salami.clickgui.hud_editor"), b[0] + 6, b[1] + 3, theme.headerText(), false);
+	}
+
+	// ------------------------------------------------------------------ Größe (− 100 % +)
+
+	private static final int CONTROL_TOP = 4;
+	private static final int CONTROL_BOTTOM = 18;
+	private static final int CONTROL_BUTTON = 14;
+
+	/** Felder links neben dem HUD-Knopf: [−], [Prozent], [+] jeweils als {x0, x1}. */
+	private int[][] scaleControls() {
+		int right = hudButton()[0] - 4;
+		int plus = right - CONTROL_BUTTON;
+		int label = plus - (font.width("200%") + 8);
+		int minus = label - CONTROL_BUTTON;
+		return new int[][] {{minus, label}, {label, plus}, {plus, right}};
+	}
+
+	/** 0 = kleiner, 1 = Prozentanzeige (zurücksetzen), 2 = größer, -1 = nichts. */
+	private int scaleControlAt(double x, double y) {
+		if (y < CONTROL_TOP || y >= CONTROL_BOTTOM) {
+			return -1;
+		}
+		int[][] controls = scaleControls();
+		for (int i = 0; i < controls.length; i++) {
+			if (x >= controls[i][0] && x < controls[i][1]) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	private void renderScaleControls(GuiGraphics g, Theme theme, int mouseX, int mouseY) {
+		int[][] controls = scaleControls();
+		int hovered = scaleControlAt(mouseX, mouseY);
+		String[] labels = {"-", Math.round(uiScale * 100) + "%", "+"};
+		for (int i = 0; i < controls.length; i++) {
+			int x0 = controls[i][0];
+			int x1 = controls[i][1];
+			g.fill(x0, CONTROL_TOP, x1, CONTROL_BOTTOM, hovered == i ? theme.header() : theme.panel());
+			g.renderOutline(x0, CONTROL_TOP, x1 - x0, CONTROL_BOTTOM - CONTROL_TOP, theme.outline());
+			g.drawString(font, labels[i], (x0 + x1 - font.width(labels[i])) / 2, CONTROL_TOP + 3, theme.headerText(), false);
+		}
+	}
+
+	/** Größe ändern ({@code steps} × 10 %, 0 = 100 %); schaltet das Modul „Oberfläche“ bei Bedarf ein. */
+	private void stepScale(int steps) {
+		GuiScaleModule module = GuiScaleModule.get();
+		if (module == null) {
+			return;
+		}
+		if (!module.isEnabled()) {
+			modules.setEnabled(module, true);
+		}
+		module.stepClickGui(steps);
+		rescale();
 	}
 
 	private void renderModuleRow(GuiGraphics g, Panel panel, Row row, Theme theme, boolean hovered) {
@@ -356,6 +418,11 @@ public final class ClickGuiScreen extends Screen {
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
 		event = scaled(event);
 		listeningKeybind = null;
+		int control = scaleControlAt(event.x(), event.y());
+		if (control >= 0 && event.button() == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+			stepScale(control - 1); // − = -1, Prozent = zurücksetzen, + = +1
+			return true;
+		}
 		int[] b = hudButton();
 		if (event.x() >= b[0] && event.x() < b[2] && event.y() >= b[1] && event.y() < b[3]) {
 			minecraft.setScreen(new HudEditorScreen(this));
@@ -447,6 +514,15 @@ public final class ClickGuiScreen extends Screen {
 	}
 
 	@Override
+	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+		if (minecraft.hasControlDown() && scrollY != 0) {
+			stepScale(scrollY > 0 ? 1 : -1);
+			return true;
+		}
+		return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+	}
+
+	@Override
 	public boolean mouseReleased(MouseButtonEvent event) {
 		if (draggedPanel != null) {
 			draggedPanel = null;
@@ -482,6 +558,19 @@ public final class ClickGuiScreen extends Screen {
 		if (SalamiClient.get().clickGuiKey().matches(event)) {
 			onClose();
 			return true;
+		}
+		if (event.hasControlDown() || minecraft.hasControlDown()) {
+			int steps = switch (event.key()) {
+				// „+“/„-“ liegen auf deutschen Tastaturen auf ] und /
+				case GLFW.GLFW_KEY_EQUAL, GLFW.GLFW_KEY_KP_ADD, GLFW.GLFW_KEY_RIGHT_BRACKET -> 1;
+				case GLFW.GLFW_KEY_MINUS, GLFW.GLFW_KEY_KP_SUBTRACT, GLFW.GLFW_KEY_SLASH -> -1;
+				case GLFW.GLFW_KEY_0, GLFW.GLFW_KEY_KP_0 -> 0;
+				default -> Integer.MIN_VALUE;
+			};
+			if (steps != Integer.MIN_VALUE) {
+				stepScale(steps);
+				return true;
+			}
 		}
 		return super.keyPressed(event);
 	}

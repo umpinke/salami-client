@@ -414,6 +414,10 @@ pub struct LauncherConfig {
     /// Salami-Modus: wird beim Start als `-Dsalami.theme` an salami-core übergeben.
     #[serde(default)]
     pub salami_theme: bool,
+    /// NoRisk Client im Spiel: NoRisk-Login und NoRisk-Mod zusätzlich laden (siehe
+    /// `branding::norisk_ingame`).
+    #[serde(default)]
+    pub norisk_ingame: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -517,6 +521,7 @@ impl Default for LauncherConfig {
             clips: ClipConfig::default(),
             log_level: LogLevel::default(),
             salami_theme: false,
+            norisk_ingame: false,
         }
     }
 }
@@ -569,6 +574,7 @@ impl ConfigManager {
 
                 // Update cache
                 update_custom_game_dir(loaded_config.custom_game_directory);
+                crate::branding::set_norisk_ingame(loaded_config.norisk_ingame);
             }
             Err(e) => {
                 error!("Failed to parse config file: {}", e);
@@ -879,6 +885,7 @@ impl ConfigManager {
                     },
                     log_level: new_config.log_level,
                     salami_theme: new_config.salami_theme,
+                    norisk_ingame: new_config.norisk_ingame,
                 };
 
                 true
@@ -892,6 +899,7 @@ impl ConfigManager {
 
             // Update cache
             update_custom_game_dir(new_config.custom_game_directory.clone());
+            crate::branding::set_norisk_ingame(new_config.norisk_ingame);
 
             // Update Discord status if it changed
             if let Ok(state) = crate::state::State::get().await {

@@ -79,6 +79,7 @@ const launcherConfig = {
   clips: { enabled: false },
   log_level: "info",
   salami_theme: true,
+  norisk_ingame: false,
 };
 
 /** Cape-Speicher im Speicher (statt salami_capes/ im Launcher-Ordner). */
@@ -112,7 +113,14 @@ mockIPC((cmd, args) => {
     case "salami_capes_download_template":
       return "C:\\Users\\Du\\Downloads\\salami_cape_vorlage.png";
     case "get_launcher_config":
-      return launcherConfig;
+      return structuredClone(launcherConfig);
+    case "set_launcher_config":
+      Object.assign(launcherConfig, a.config as object);
+      return structuredClone(launcherConfig);
+    case "plugin:webview|set_webview_zoom":
+      // im Browser: Zoom über CSS nachstellen
+      (document.documentElement.style as CSSStyleDeclaration & { zoom: string }).zoom = String(a.value);
+      return null;
     case "get_all_profiles_and_last_played":
       return { all_profiles: sampleProfiles, last_played_profile_id: sampleProfiles[1].id };
     case "list_profiles":

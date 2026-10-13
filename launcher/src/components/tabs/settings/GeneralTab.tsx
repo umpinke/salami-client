@@ -19,6 +19,13 @@ import { invalidateAnalyticsCache } from "../../../services/analytics-service";
 import { LANGUAGE_OPTIONS, type SupportedLanguage } from "../../../i18n";
 import { useSettingsConfig, useSettingsKeywords } from "./settings-context";
 import { isWindows } from "../../../utils/platform";
+import { useEffect, useRef, useState } from "react";
+import { useConfirmDialog } from "../../../hooks/useConfirmDialog";
+import { openExternalUrl } from "../../../services/tauri-service";
+import { refreshNoriskPacks } from "../../../services/nrc-service";
+import { UI_SCALE_MAX, UI_SCALE_MIN, UI_SCALE_STEP, useUiScaleStore } from "../../../store/ui-scale-store";
+
+const NORISK_TERMS_URL = "https://norisk.gg/tos";
 
 export function GeneralTab() {
   const { t } = useTranslation();
@@ -35,6 +42,53 @@ export function GeneralTab() {
     !!tempConfig?.is_experimental ||
     !!config?.is_experimental;
 
+  const { confirm, confirmDialog } = useConfirmDialog();
+  const uiScale = useUiScaleStore((s) => s.scale);
+  const setUiScale = useUiScaleStore((s) => s.setScale);
+  const resetUiScale = useUiScaleStore((s) => s.reset);
+  // Beim Ziehen erst loslassen, dann zoomen – sonst rutscht der Regler unter der Maus weg.
+  const [uiScaleDraft, setUiScaleDraft] = useState<number | null>(null);
+  const uiScaleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const commitUiScale = (percent: number) => {
+    if (uiScaleTimer.current) clearTimeout(uiScaleTimer.current);
+    uiScaleTimer.current = null;
+    setUiScale(percent / 100);
+    setUiScaleDraft(null);
+  };
+  const draftUiScale = (percent: number) => {
+    setUiScaleDraft(percent);
+    if (uiScaleTimer.current) clearTimeout(uiScaleTimer.current);
+    uiScaleTimer.current = setTimeout(() => commitUiScale(percent), 600);
+  };
+  useEffect(() => () => {
+    if (uiScaleTimer.current) clearTimeout(uiScaleTimer.current);
+  }, []);
+
+  // Nach dem Speichern die Pack-Liste neu laden, damit der NoRisk-Mod sofort (nicht) dabei ist.
+  const savedNoriskIngame = !!config?.norisk_ingame;
+  const lastNoriskIngame = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (!config) return;
+    if (lastNoriskIngame.current !== null && lastNoriskIngame.current !== savedNoriskIngame) {
+      refreshNoriskPacks().catch((err) => console.error("Failed to refresh packs:", err));
+    }
+    lastNoriskIngame.current = savedNoriskIngame;
+  }, [config, savedNoriskIngame]);
+
+  const handleNoriskIngameChange = async (checked: boolean) => {
+    if (!tempConfig) return;
+    if (checked) {
+      const ok = await confirm({
+        title: t("settings.norisk_ingame.confirm_title"),
+        message: t("settings.norisk_ingame.confirm_message"),
+        confirmText: t("settings.norisk_ingame.confirm_button"),
+        type: "warning",
+      });
+      if (!ok) return;
+    }
+    setTempConfig({ ...tempConfig, norisk_ingame: checked });
+  };
+
   const handleConcurrentDownloadsChange = (value: number) => {
     if (tempConfig) setTempConfig({ ...tempConfig, concurrent_downloads: value });
   };
@@ -44,6 +98,7 @@ export function GeneralTab() {
 
   return (
     <div className="space-y-6">
+      {confirmDialog}
       <SettingsSection
         id="settings-section-language"
         title={t("settings.language")}
@@ -169,6 +224,30 @@ export function GeneralTab() {
             />
           </SettingRow>
         )}
+        <SettingRow
+          label={t("settings.norisk_ingame")}
+          description={
+            <>
+              {t("settings.norisk_ingame.tooltip")}{" "}
+              <button
+                type="button"
+                className="underline text-white/70 hover:text-white"
+                onClick={() => openExternalUrl(NORISK_TERMS_URL)}
+              >
+                {t("settings.norisk_ingame.terms")}
+              </button>
+            </>
+          }
+          searchKeywords={kw("settings.norisk_ingame", "norisk", "nrc", "cosmetics", "emotes", "menü", "menu")}
+          disabled={saving}
+        >
+          <ToggleSwitch
+            checked={tempConfig?.norisk_ingame || false}
+            onChange={(checked) => void handleNoriskIngameChange(checked)}
+            disabled={saving}
+            size="md"
+          />
+        </SettingRow>
         <SettingRow
           label={t("settings.discord_presence")}
           description={t("settings.discord_presence.tooltip")}
@@ -302,6 +381,40 @@ export function GeneralTab() {
             maxLabel="20"
             icon={<Icon icon="solar:server-bold" className="w-3 h-3" />}
           />
+        </SettingRow>
+        <SettingRow
+          label={t("settings.ui_scale")}
+          description={t("settings.ui_scale.tooltip")}
+          searchKeywords={kw("settings.ui_scale", "zoom", "größe", "groesse", "size", "scale", "skalierung", "kleiner", "größer")}
+          vertical
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <RangeSlider
+                value={uiScaleDraft ?? Math.round(uiScale * 100)}
+                onChange={draftUiScale}
+                onChangeEnd={commitUiScale}
+                min={Math.round(UI_SCALE_MIN * 100)}
+                max={Math.round(UI_SCALE_MAX * 100)}
+                step={Math.round(UI_SCALE_STEP * 100)}
+                variant="flat"
+                size="sm"
+                unit="%"
+                recommendedValue={100}
+                minLabel={`${Math.round(UI_SCALE_MIN * 100)}%`}
+                maxLabel={`${Math.round(UI_SCALE_MAX * 100)}%`}
+                icon={<Icon icon="solar:magnifer-zoom-in-bold" className="w-3 h-3" />}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={resetUiScale}
+              disabled={uiScale === 1}
+              className="px-3 py-1.5 rounded-lg text-xs font-minecraft text-white/80 bg-white/10 hover:bg-white/15 disabled:opacity-40 disabled:cursor-default"
+            >
+              {t("settings.ui_scale.reset")}
+            </button>
+          </div>
         </SettingRow>
         <SettingRow
           label={t("settings.border_radius")}

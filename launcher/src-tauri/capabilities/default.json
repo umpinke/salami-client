@@ -23,6 +23,7 @@
     "core:window:allow-show",
     "core:window:allow-unminimize",
     "core:window:allow-set-focus",
+    "core:webview:allow-set-webview-zoom",
     "dialog:default",
     "opener:allow-open-path",
     "opener:allow-reveal-item-in-dir",

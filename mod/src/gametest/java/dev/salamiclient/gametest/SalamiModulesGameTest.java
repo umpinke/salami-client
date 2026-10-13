@@ -33,6 +33,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.resources.language.I18n;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
@@ -40,6 +41,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.entity.monster.zombie.Zombie;
 import net.minecraft.world.entity.projectile.arrow.Arrow;
+import org.lwjgl.glfw.GLFW;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
@@ -195,6 +197,45 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 		context.takeScreenshot("salami-14-clickgui-scaled");
 		context.setScreen(() -> null);
 		set(gui, "clickgui_scale", 1.0);
+
+		// Größe direkt im Menü: Knopf „+“, Strg + Mausrad, Strg + 0, Strg + −
+		context.setScreen(() -> new ClickGuiScreen(modules, SalamiClient.get().config()));
+		context.waitTicks(2);
+		double[] plus = context.computeOnClient(c -> {
+			float ui = GuiScaleModule.clickGuiScale();
+			int uiWidth = Math.round(c.getWindow().getGuiScaledWidth() / ui);
+			int hudLeft = uiWidth - (c.font.width(I18n.get("salami.clickgui.hud_editor")) + 12) - 6;
+			double toWindow = c.getWindow().getGuiScale() * ui;
+			return new double[] {(hudLeft - 4 - 7) * toWindow, 11 * toWindow};
+		});
+		context.getInput().setCursorPos(plus[0], plus[1]);
+		context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+		context.waitTick();
+		checkClickGuiScale(context, 1.1f, "+ button");
+		context.runOnClient(c -> c.getToastManager().clear()); // Rezept-Meldung liegt sonst über den Knöpfen
+		context.getInput().setCursorPos(plus[0] - 200, plus[1] + 200);
+		context.waitTick();
+		context.takeScreenshot("salami-15-clickgui-size-buttons");
+		context.getInput().setCursorPos(plus[0], plus[1]);
+
+		context.getInput().holdControl();
+		context.getInput().scroll(1);
+		context.waitTick();
+		checkClickGuiScale(context, 1.2f, "Ctrl + scroll");
+		context.getInput().pressKey(GLFW.GLFW_KEY_0);
+		context.waitTick();
+		checkClickGuiScale(context, 1.0f, "Ctrl + 0");
+		context.getInput().pressKey(GLFW.GLFW_KEY_MINUS);
+		context.waitTick();
+		checkClickGuiScale(context, 0.9f, "Ctrl + -");
+		context.getInput().releaseControl();
+		context.setScreen(() -> null);
+		set(gui, "clickgui_scale", 1.0);
+	}
+
+	private static void checkClickGuiScale(ClientGameTestContext context, float expected, String via) {
+		float actual = context.computeOnClient(c -> GuiScaleModule.clickGuiScale());
+		check(Math.abs(actual - expected) < 0.001f, "GUI scale via " + via + ": expected " + expected + ", got " + actual);
 	}
 
 	// ------------------------------------------------------------------ Partikel

@@ -29,4 +29,17 @@ public final class GuiScaleModule extends Module {
 		GuiScaleModule module = instance;
 		return module != null && module.isEnabled() ? module.clickGui.get().floatValue() : 1f;
 	}
+
+	public static GuiScaleModule get() {
+		return instance;
+	}
+
+	/** ClickGUI-Größe um {@code steps} × 10 % ändern; 0 setzt sie auf 100 % zurück. */
+	public void stepClickGui(int steps) {
+		if (steps == 0) {
+			clickGui.reset();
+		} else {
+			clickGui.set(clickGui.get() + steps * 0.1);
+		}
+	}
 }

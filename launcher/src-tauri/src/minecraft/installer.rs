@@ -602,10 +602,15 @@ pub async fn install_minecraft_version(
             pack_id
         );
         if !crate::branding::NORISK_SERVICES_ENABLED {
-            // Salami: Packs kommen ohne Token aus integrations::salami_packs.
+            // Salami: Packs kommen aus integrations::salami_packs. Das NoRisk-Token braucht es nur
+            // für „NoRisk Client im Spiel“ (NoRisk-Mod aus NoRisks Pack-Liste).
+            let norisk_token = credentials
+                .as_ref()
+                .and_then(|c| c.norisk_credentials.get_token_for_mode(is_experimental_mode).ok())
+                .unwrap_or_default();
             if let Err(update_err) = state
                 .norisk_pack_manager
-                .fetch_and_update_config("", is_experimental_mode)
+                .fetch_and_update_config(&norisk_token, is_experimental_mode)
                 .await
             {
                 warn!(

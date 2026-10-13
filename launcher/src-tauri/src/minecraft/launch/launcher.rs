@@ -417,22 +417,20 @@ impl MinecraftLauncher {
 
         if let Some(creds) = &self.credentials {
             if has_norisk_pack {
-                // Get the appropriate NoRisk token based on experimental mode setting
-                if let Some(norisk_token) = if params.is_experimental_mode {
-                    info!("[NoRisk Launcher] Using experimental mode token");
-                    creds
-                        .norisk_credentials
-                        .experimental
-                        .as_ref()
-                        .map(|t| &t.value)
+                // Salami: Das NoRisk-Token gehört nur ins Spiel, wenn der NoRisk-Mod mitläuft –
+                // sonst könnte jede andere Mod es aus den System-Properties lesen.
+                let norisk_token_value = if crate::branding::norisk_login_enabled() {
+                    if params.is_experimental_mode {
+                        info!("[NoRisk Launcher] Using experimental mode token");
+                        creds.norisk_credentials.experimental.as_ref().map(|t| &t.value)
+                    } else {
+                        info!("[NoRisk Launcher] Using production mode token");
+                        creds.norisk_credentials.production.as_ref().map(|t| &t.value)
+                    }
                 } else {
-                    info!("[NoRisk Launcher] Using production mode token");
-                    creds
-                        .norisk_credentials
-                        .production
-                        .as_ref()
-                        .map(|t| &t.value)
-                } {
+                    None
+                };
+                if let Some(norisk_token) = norisk_token_value {
                     info!("[NoRisk Launcher] Adding NoRisk token to launch parameters");
                     command.arg(format!("-Dnorisk.token={}", norisk_token));
                 } else {

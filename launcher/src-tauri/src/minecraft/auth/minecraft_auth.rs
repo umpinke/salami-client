@@ -119,8 +119,8 @@ impl NoRiskCredentials {
         token_option
             .map(|token| token.value.clone())
             .ok_or_else(|| {
-                // Salami: ohne NoRisk-Dienste ist ein fehlendes Token der Normalfall
-                if !crate::branding::NORISK_SERVICES_ENABLED {
+                // Salami: ohne NoRisk-Login ist ein fehlendes Token der Normalfall
+                if !crate::branding::norisk_login_enabled() {
                     return AppError::NoCredentialsError;
                 }
                 error!(
@@ -810,9 +810,10 @@ impl MinecraftAuthStore {
             }
         }
 
-        // Salami: ohne NoRisk-Dienste gibt es kein NoRisk-Token – nicht erst versuchen
+        // Salami: ohne NoRisk-Login (Einstellung „NoRisk Client im Spiel“) gibt es kein
+        // NoRisk-Token – nicht erst versuchen
         // (spart HWID-Hash, Request-Versuch und Fehlermeldungen im Log).
-        if !crate::branding::NORISK_SERVICES_ENABLED {
+        if !crate::branding::norisk_login_enabled() {
             return Ok((creds.clone(), false));
         }
 

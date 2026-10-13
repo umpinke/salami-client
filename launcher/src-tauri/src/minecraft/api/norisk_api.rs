@@ -268,9 +268,10 @@ impl NoRiskApi {
         force: bool,
         is_experimental: bool,
     ) -> Result<NoRiskToken> {
-        // Salami: Kein NoRisk-Login – es werden keine Minecraft-Sessiondaten an NoRisk gemeldet.
-        // Der Aufrufer behandelt den Fehler als "kein Token" und startet normal weiter.
-        if !crate::branding::NORISK_SERVICES_ENABLED {
+        // Salami: Kein NoRisk-Login, solange „NoRisk Client im Spiel“ aus ist – dann werden keine
+        // Minecraft-Sessiondaten an NoRisk gemeldet. Der Aufrufer behandelt den Fehler als
+        // "kein Token" und startet normal weiter.
+        if !crate::branding::norisk_login_enabled() {
             return Err(AppError::Other("NoRisk services are disabled in Salami Client".into()));
         }
         info!("[NoRisk API] Refreshing NoRisk token v3 with SystemID: {}", system_id);
@@ -416,7 +417,20 @@ impl NoRiskApi {
         is_experimental: bool,
     ) -> Result<NoriskModpacksConfig> {
         if !crate::branding::NORISK_SERVICES_ENABLED {
-            return crate::integrations::salami_packs::load_packs().await;
+            let packs = crate::integrations::salami_packs::load_packs().await?;
+            if !crate::branding::norisk_ingame() {
+                return Ok(packs);
+            }
+            // Salami: NoRisk-Mod aus NoRisks Pack-Liste ins Salami-Pack übernehmen. Schlägt das
+            // fehl, gibt es einen Fehler – der Aufrufer nutzt dann die zuletzt gespeicherte Liste.
+            let norisk: NoriskModpacksConfig = Self::get_from_norisk_endpoint(
+                "launcher/modpacks-v3",
+                norisk_token,
+                None,
+                is_experimental,
+            )
+            .await?;
+            return crate::integrations::salami_packs::with_norisk_ingame(packs, &norisk);
         }
         trace!(
             "[NoRisk API] Fetching modpack configuration from v3 endpoint. Experimental: {}",

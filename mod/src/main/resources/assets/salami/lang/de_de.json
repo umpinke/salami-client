@@ -127,6 +127,7 @@
 	"salami.setting.theme_color": "Theme-Farbe",
 	"salami.setting.width": "Linienstärke",
 	"salami.clickgui.hud_editor": "HUD bearbeiten",
+	"salami.clickgui.scale.tooltip": "Größe des Menüs · Klick auf die Prozentzahl: zurücksetzen · auch Strg + Mausrad oder Strg + / Strg −",
 	"salami.hud_editor.title": "HUD-Editor",
 	"salami.hud_editor.hint": "Elemente mit der Maus verschieben  ·  Esc: zurück",
 	"salami.module.breach_swap": "Breach Swap",
