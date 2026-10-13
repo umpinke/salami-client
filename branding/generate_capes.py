@@ -140,42 +140,93 @@ TEMPLATE_OUT = ROOT / "launcher/src-tauri/assets/salami_cape_template.png"
 LAUNCHER_CAPES = ROOT / "launcher/public/capes"
 FONT = ROOT / "launcher/public/fonts/fredoka.ttf"
 
-# (Bereich im 64x32-Raster, Farbe, Beschriftung)
-TEMPLATE_AREAS = [
-    ((1, 1, 10, 16), (178, 58, 58, 255), "AUSSEN\nsichtbar"),
-    ((12, 1, 10, 16), (122, 36, 37, 255), "INNEN"),
-    ((1, 0, 10, 1), (243, 227, 211, 255), ""),     # oben
-    ((11, 0, 10, 1), (222, 196, 180, 255), ""),    # unten
-    ((0, 1, 1, 16), (122, 74, 53, 255), ""),       # Rand links
-    ((11, 1, 1, 16), (122, 74, 53, 255), ""),      # Rand rechts
-    ((24, 2, 10, 20), (196, 150, 98, 255), "ELYTRA\naußen"),
-    ((36, 2, 10, 20), (164, 118, 72, 255), "ELYTRA\ninnen"),
-    ((24, 0, 10, 2), (243, 227, 211, 255), ""),
-    ((34, 0, 10, 2), (222, 196, 180, 255), ""),
-    ((22, 2, 2, 20), (74, 40, 30, 255), ""),
-    ((34, 2, 2, 20), (74, 40, 30, 255), ""),
+YELLOW = (255, 216, 0, 255)
+CYAN = (0, 255, 255, 255)
+BLUE = (0, 148, 255, 255)
+TEMPLATE_RED = (255, 0, 0, 255)
+ORANGE = (255, 120, 0, 255)
+GREEN = (40, 162, 0, 255)
+PURPLE = (216, 0, 255, 255)
+
+# Cape-Box 10x16x1 bei (0,0): (Bereich im 64x32-Raster, Farbe, Beschriftung, gedreht)
+TEMPLATE_CAPE = [
+    ((1, 0, 10, 1), YELLOW, "Oben", False),
+    ((11, 0, 10, 1), CYAN, "Unten", False),
+    ((0, 1, 1, 16), YELLOW, "Links", True),
+    ((1, 1, 10, 16), BLUE, "Vorne", False),
+    ((11, 1, 1, 16), YELLOW, "Rechts", True),
+    ((12, 1, 10, 16), TEMPLATE_RED, "Hinten", False),
+]
+
+# Elytra (Box 10x20x2 bei (22,0)): Minecraft zeichnet nur diese Pixel – dieselbe Form wie
+# die Original-Elytra (textures/entity/equipment/wings/elytra.png). Zeile -> Spaltenbereiche.
+ELYTRA_ROWS = {
+    0: [(31, 39)], 1: [(32, 33)], 2: [(34, 41)], 3: [(34, 42)],
+    4: [(35, 43)], 5: [(35, 43)], 6: [(35, 43)],
+    7: [(35, 44)], 8: [(35, 44)], 9: [(35, 44)], 10: [(35, 44)],
+    **{y: [(22, 22), (36, 45)] for y in range(11, 16)},
+    **{y: [(22, 22), (37, 45)] for y in range(16, 19)},
+    19: [(22, 22), (38, 45)], 20: [(22, 22), (38, 45)], 21: [(22, 22), (39, 45)],
+}
+
+
+def elytra_part(x: int, y: int) -> str | None:
+    """Seite eines benutzten Elytra-Pixels (wie in der Vorlage beschriftet)."""
+    if not any(a <= x <= b for a, b in ELYTRA_ROWS.get(y, [])):
+        return None
+    if y == 0:
+        return "top" if x <= 33 else "bottom"
+    if y == 1:
+        return "top"
+    if x == 22:
+        return "left"
+    if x <= 35:
+        return "right"
+    return "front"
+
+
+ELYTRA_STYLE = {"top": ORANGE, "bottom": CYAN, "left": GREEN, "right": GREEN, "front": PURPLE}
+# Beschriftung je Elytra-Seite: (Mitte im 64x32-Raster, Text, gedreht)
+ELYTRA_LABELS = [
+    ((32.9, 0.9), "Oben", False),
+    ((37.0, 0.5), "Unten", False),
+    ((35.0, 6.5), "Rechts", True),
+    ((40.8, 9.0), "Vorne", False),
+    ((22.5, 16.5), "Links", True),
 ]
 
 
-def template() -> Image.Image:
-    """Vorlage zum Selbermalen: jede Fläche eigene Farbe + Beschriftung, Rest durchsichtig."""
+def _label(img: Image.Image, center, text: str, size: int, rotated: bool) -> None:
+    """Schwarze Beschriftung, bei schmalen Streifen um 90° gedreht."""
     from PIL import ImageFont
 
+    font = ImageFont.truetype(str(FONT), size)
+    probe = ImageDraw.Draw(img).textbbox((0, 0), text, font=font, anchor="lt")
+    w, h = probe[2] - probe[0] + 2, probe[3] - probe[1] + 2
+    layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    ImageDraw.Draw(layer).text((1, 1), text, font=font, fill=(0, 0, 0, 255), anchor="lt")
+    if rotated:
+        layer = layer.rotate(-90, expand=True)
+    cx, cy = center
+    img.alpha_composite(layer, (round(cx - layer.width / 2), round(cy - layer.height / 2)))
+
+
+def template() -> Image.Image:
+    """Vorlage zum Selbermalen: Cape + Elytra, jede Seite eigene Farbe + Beschriftung, Rest durchsichtig."""
     s = TEMPLATE_SCALE
     img = Image.new("RGBA", (64 * s, 32 * s), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    font = ImageFont.truetype(str(FONT), 15)
-    small = ImageFont.truetype(str(FONT), 16)
-    for (x, y, w, h), color, label in TEMPLATE_AREAS:
-        box_ = (x * s, y * s, (x + w) * s - 1, (y + h) * s - 1)
-        draw.rectangle(box_, fill=color)
-        if label:
-            cx, cy = (box_[0] + box_[2]) / 2, (box_[1] + box_[3]) / 2
-            dark = sum(color[:3]) < 450
-            draw.multiline_text((cx, cy), label, font=font, fill=(255, 255, 255, 230) if dark else (43, 29, 26, 230),
-                                anchor="mm", align="center", spacing=4)
-    draw.multiline_text((50 * s, 26 * s), "Salami Client\nCape-Vorlage", font=small, fill=(178, 58, 58, 255),
-                        anchor="mm", align="center")
+    for (x, y, w, h), color, _, _ in TEMPLATE_CAPE:
+        draw.rectangle((x * s, y * s, (x + w) * s - 1, (y + h) * s - 1), fill=color)
+    for y, ranges in ELYTRA_ROWS.items():
+        for a, b in ranges:
+            for x in range(a, b + 1):
+                draw.rectangle((x * s, y * s, (x + 1) * s - 1, (y + 1) * s - 1), fill=ELYTRA_STYLE[elytra_part(x, y)])
+    for (x, y, w, h), _, label, rotated in TEMPLATE_CAPE:
+        big = w >= 10 and h >= 10
+        _label(img, ((x + w / 2) * s, (y + h / 2) * s - (3 * s if big else 0)), label, 16 if big else 9, rotated)
+    for (cx, cy), label, rotated in ELYTRA_LABELS:
+        _label(img, (cx * s, cy * s), label, 14 if label == "Vorne" else 9, rotated)
     return img
 
 

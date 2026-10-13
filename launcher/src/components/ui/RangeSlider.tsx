@@ -65,7 +65,6 @@ export function RangeSlider({
   const trackRef = useRef<HTMLDivElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const thumbRef = useRef<HTMLDivElement>(null);
-  const valueDisplayRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const lastChangeTimeRef = useRef(0);
   
@@ -109,13 +108,9 @@ export function RangeSlider({
     const percentage = getPercentage(newValue);
     progressRef.current.style.width = `${percentage}%`;
     thumbRef.current.style.left = `${percentage}%`;
-
-    if (valueDisplayRef.current) {
-      valueDisplayRef.current.innerHTML = unit
-        ? `${newValue} <span class="text-white/70">${unit}</span>`
-        : String(newValue);
-    }
-  }, [getPercentage, unit]);
+    // Die Zahl rendert React aus localValue. Früher wurde sie hier per innerHTML gesetzt –
+    // danach blieb sie bei Änderungen von außen (z. B. „Zurücksetzen“) stehen.
+  }, [getPercentage]);
 
   const calculateValueFromMouseEvent = useCallback((e: MouseEvent | React.MouseEvent) => {
     if (!trackRef.current) return localValue;
@@ -251,7 +246,6 @@ export function RangeSlider({
             )}
             <div className="flex items-center gap-1">
               <span
-                ref={valueDisplayRef}
                 className={cn(
                   "text-white font-minecraft",
                   sizeConfig[size].text,

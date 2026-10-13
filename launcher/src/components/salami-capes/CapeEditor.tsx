@@ -6,7 +6,7 @@ import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 import { builtinCapeImage, saveCape, type SalamiCape } from "../../services/salami-cape-service";
 import { Cape3D } from "./Cape3D";
-import { EDITOR_AREAS, TEXTURE_HEIGHT, TEXTURE_WIDTH, type CapeRect } from "./cape-layout";
+import { EDITOR_AREAS, TEXTURE_HEIGHT, TEXTURE_WIDTH, areaAt } from "./cape-layout";
 import "./i18n";
 
 /** Neues Cape (`cape` leer) oder ein vorhandenes bearbeiten. */
@@ -42,9 +42,8 @@ const hexToRgba = (hex: string): Rgba => [
 ];
 const rgbaToHex = ([r, g, b]: Rgba) => `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
 
-function areaAt(x: number, y: number): CapeRect | null {
-  const hit = EDITOR_AREAS.find(({ rect: [rx, ry, w, h] }) => x >= rx && x < rx + w && y >= ry && y < ry + h);
-  return hit?.rect ?? null;
+function forEachCell([rx, ry, w, h]: readonly [number, number, number, number], fn: (x: number, y: number) => void) {
+  for (let y = ry; y < ry + h; y++) for (let x = rx; x < rx + w; x++) fn(x, y);
 }
 
 /** Lädt ein Bild auf 64x32 (größere Capes werden pixelgenau verkleinert). */
@@ -92,9 +91,11 @@ export function CapeEditor({ target, onClose, onSaved }: CapeEditorProps) {
     if (!canvas || !ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (showAreas) {
-      for (const { rect: [x, y, w, h], color: areaColor } of EDITOR_AREAS) {
-        ctx.fillStyle = areaColor;
-        ctx.fillRect(x * ZOOM, y * ZOOM, w * ZOOM, h * ZOOM);
+      for (const area of EDITOR_AREAS) {
+        ctx.fillStyle = area.color;
+        forEachCell(area.rect, (x, y) => {
+          if (area.contains(x, y)) ctx.fillRect(x * ZOOM, y * ZOOM, ZOOM, ZOOM);
+        });
       }
     }
     const data = pixels.current;
@@ -122,8 +123,27 @@ export function CapeEditor({ target, onClose, onSaved }: CapeEditorProps) {
       ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
       ctx.font = "600 11px Fredoka, sans-serif";
       ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
-      for (const { rect: [x, y, w, h], labelKey } of EDITOR_AREAS) {
-        ctx.strokeRect(x * ZOOM + 0.5, y * ZOOM + 0.5, w * ZOOM - 1, h * ZOOM - 1);
+      const edge = (x0: number, y0: number, x1: number, y1: number) => {
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
+      };
+      ctx.beginPath();
+      for (const area of EDITOR_AREAS) {
+        // Umriss: Kanten zu Pixeln außerhalb der Fläche (funktioniert auch für die Flügelform)
+        forEachCell(area.rect, (x, y) => {
+          if (!area.contains(x, y)) return;
+          const left = x * ZOOM + 0.5;
+          const top = y * ZOOM + 0.5;
+          const right = (x + 1) * ZOOM - 0.5;
+          const bottom = (y + 1) * ZOOM - 0.5;
+          if (!area.contains(x, y - 1)) edge(left, top, right, top);
+          if (!area.contains(x, y + 1)) edge(left, bottom, right, bottom);
+          if (!area.contains(x - 1, y)) edge(left, top, left, bottom);
+          if (!area.contains(x + 1, y)) edge(right, top, right, bottom);
+        });
+      }
+      ctx.stroke();
+      for (const { rect: [x, y, , h], labelKey } of EDITOR_AREAS) {
         if (labelKey) ctx.fillText(t(labelKey), x * ZOOM + 4, (y + h) * ZOOM - 5);
       }
     }
@@ -172,8 +192,8 @@ export function CapeEditor({ target, onClose, onSaved }: CapeEditorProps) {
     pixels.current.set(rgba, (y * W + x) * 4);
     if (mirror) {
       const area = areaAt(x, y);
-      if (area) {
-        const [ax, , aw] = area;
+      if (area?.mirror) {
+        const [ax, , aw] = area.rect;
         const mx = ax + aw - 1 - (x - ax);
         pixels.current.set(rgba, (y * W + mx) * 4);
       }
@@ -209,12 +229,13 @@ export function CapeEditor({ target, onClose, onSaved }: CapeEditorProps) {
     const start = (y * W + x) * 4;
     const target = Array.from(data.slice(start, start + 4));
     if (target.every((v, i) => v === rgba[i])) return;
+    // Füllen bleibt in der angeklickten Fläche (außerhalb aller Flächen: im freien Bereich)
     const area = areaAt(x, y);
-    const [ax, ay, aw, ah] = area ?? [0, 0, W, H];
+    const sameArea = (px: number, py: number) => px >= 0 && py >= 0 && px < W && py < H && areaAt(px, py) === area;
     const stack: [number, number][] = [[x, y]];
     while (stack.length) {
       const [px, py] = stack.pop()!;
-      if (px < ax || py < ay || px >= ax + aw || py >= ay + ah) continue;
+      if (!sameArea(px, py)) continue;
       const i = (py * W + px) * 4;
       if (data[i] !== target[0] || data[i + 1] !== target[1] || data[i + 2] !== target[2] || data[i + 3] !== target[3]) continue;
       data.set(rgba, i);

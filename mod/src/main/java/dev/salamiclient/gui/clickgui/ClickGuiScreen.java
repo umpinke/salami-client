@@ -224,13 +224,34 @@ public final class ClickGuiScreen extends Screen {
 	private void renderScaleControls(GuiGraphics g, Theme theme, int mouseX, int mouseY) {
 		int[][] controls = scaleControls();
 		int hovered = scaleControlAt(mouseX, mouseY);
-		String[] labels = {"-", Math.round(uiScale * 100) + "%", "+"};
 		for (int i = 0; i < controls.length; i++) {
 			int x0 = controls[i][0];
 			int x1 = controls[i][1];
 			g.fill(x0, CONTROL_TOP, x1, CONTROL_BOTTOM, hovered == i ? theme.header() : theme.panel());
 			g.renderOutline(x0, CONTROL_TOP, x1 - x0, CONTROL_BOTTOM - CONTROL_TOP, theme.outline());
-			g.drawString(font, labels[i], (x0 + x1 - font.width(labels[i])) / 2, CONTROL_TOP + 3, theme.headerText(), false);
+			if (i == 1) {
+				String percent = Math.round(uiScale * 100) + "%";
+				g.drawString(font, percent, (x0 + x1 - font.width(percent)) / 2, CONTROL_TOP + 3, theme.headerText(), false);
+			} else {
+				drawMagnifier(g, (x0 + x1) / 2 - 5, CONTROL_TOP + 2, i == 2, theme.headerText());
+			}
+		}
+	}
+
+	/** Pixel-Lupe (10x10) mit − oder + im Glas; (x, y) ist die linke obere Ecke. */
+	private static void drawMagnifier(GuiGraphics g, int x, int y, boolean plus, int color) {
+		// Glas: Ring 7x7 ohne Ecken
+		g.fill(x + 1, y, x + 6, y + 1, color);
+		g.fill(x + 1, y + 6, x + 6, y + 7, color);
+		g.fill(x, y + 1, x + 1, y + 6, color);
+		g.fill(x + 6, y + 1, x + 7, y + 6, color);
+		// Griff schräg nach rechts unten
+		g.fill(x + 6, y + 6, x + 8, y + 8, color);
+		g.fill(x + 8, y + 8, x + 10, y + 10, color);
+		// − bzw. + im Glas
+		g.fill(x + 2, y + 3, x + 5, y + 4, color);
+		if (plus) {
+			g.fill(x + 3, y + 2, x + 4, y + 5, color);
 		}
 	}
 

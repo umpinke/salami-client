@@ -86,7 +86,10 @@ const launcherConfig = {
 const capeStore = {
   selected: "builtin:salami" as string | null,
   builtin: ["salami", "pepperoni", "board"],
-  capes: [] as { id: string; name: string; created: string; image: string }[],
+  // Beispiel: die Vorlage selbst als eigenes Cape (zeigt Cape- und Elytra-Flächen)
+  capes: [
+    { id: "vorlage", name: "Vorlage", created: now, image: "/src-tauri/assets/salami_cape_template.png" },
+  ] as { id: string; name: string; created: string; image: string }[],
 };
 
 mockWindows("main");
