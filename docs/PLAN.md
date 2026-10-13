@@ -308,3 +308,35 @@ salami-client/
 | Live Tracker | Visual-Modul: Rüstung des Gegners über seinem Namen |
 | Ghost Spear | Utility-Makro: Droppen → Offhand → Slotwechsel automatisch (Desync-Trick) |
 | Auto Plug | gestrichen (Funktion unklar) |
+
+---
+
+## 8. Ausbau 2 (13.10.2026)
+
+Wünsche: Capes und weitere NoRisk-Features behalten oder nachbauen, Launcher soll nicht mehr nach NoRisk aussehen, abgeschnittener Reiter „Varieties“, Partikel pro Quelle abschaltbar, Trigger Bot, Aim Assist, Player ESP, Screenshare-Block.
+
+### Befund
+
+- NoRisks Capes, Cosmetics, Friends und Emotes stecken in den closed-source Mods `nrc-cosmetics`, `nrc-friends`, `nrc-animations`, `nrc-client`. Sie brauchen NoRisk-Login und -Server und sehen im Spiel nach NoRisk aus. Übernehmen geht nicht (§2 ❌), also selbst bauen.
+- Das NoRisk-Pack enthält außerdem freie Modrinth-Mods (WaveyCapes, 3D Skin Layers, AppleSkin, Shulker Box Tooltip, Mod Menu, MoreCulling, Tiers …). Die kann das Salami-Pack direkt mitliefern.
+- „Varieties“ ist abgeschnitten, weil jeder Navigationsknopf nur 64 px breit ist und die Beschriftung nicht umbrechen darf.
+
+### Phasen
+
+| Phase | Inhalt | Ergebnis |
+|---|---|---|
+| A | **Partikel-Modul** (Visual): Explosionen, Krit-/Verzauberungs-Treffer, Totem, Blockabbau, Trank-/Effektpartikel, Feuer/Rauch, Wetter, Sonstige – je einzeln abschaltbar | weniger Partikel-Spam im Kampf |
+| B | **Player ESP** (Utility): Spieler durch Wände als Box oder Leucht-Umriss, Farbe einstellbar | |
+| C | **Trigger Bot** und **Aim Assist** (Utility) | |
+| D | **Salami Capes**: eigene Capes (mitgelieferte Salami-Designs + eigenes PNG), im Spiel und auf den Elytren. Mojang-Capes im Launcher bleiben. | Cape ohne NoRisk |
+| E | **Salami-Pack erweitern** um die freien Mods aus dem NoRisk-Pack | gewohnte Features zurück |
+| F | **Launcher-Design-Update**: Navigation neu (Beschriftung passt), eigener Look statt NoRisk-Layout, NoRisk-Reste suchen und ersetzen | sieht nicht mehr nach NoRisk aus |
+| G | Gametests, Build, Installer, im echten Spiel prüfen | |
+
+### Entscheidungen
+
+| Frage | Entscheidung |
+|---|---|
+| Capes | Eigenes System in `salami-core`. **Sichtbar nur für dich**: damit andere Spieler sie sehen, bräuchte es einen eigenen Cape-Server (Hosting) – später möglich. |
+| Trigger Bot, Aim Assist, Player ESP | Kategorie „Utility“ wie die anderen Kampfmodule: offen gekennzeichnet, durch Safe Mode und Easy Leave abschaltbar, keine Anti-Cheat-Tarnung. |
+| Screenshare-Block | **Wird nicht gebaut** (wie §2 ❌ „Screen-Share Detection / Protection“): Bildschirmaufnahme erkennen und dann alles ausschalten dient nur dazu, Moderatoren bei einer Screenshare-Prüfung zu täuschen. Easy Leave bleibt als manueller Schalter. |
