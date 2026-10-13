@@ -32,6 +32,15 @@ pub const UPDATE_BASE_URL: Option<&str> =
     Some("https://github.com/umpinke/salami-client/releases/latest/download/latest.json");
 pub const UPDATE_BASE_URL_BETA: Option<&str> = None;
 
+/// Discord-Anwendung „Salami Client“ (Application ID aus dem Discord Developer Portal).
+/// Discord zeigt den Namen dieser Anwendung als „Spielt …“ an. `None` = keine
+/// Discord-Anzeige (statt der Anwendung des NoRisk Client).
+pub const DISCORD_APP_ID: Option<&str> = None;
+/// Name des Rich-Presence-Bilds („Art Asset“) in der Discord-Anwendung.
+pub const DISCORD_LARGE_IMAGE: &str = "logo";
+/// Knopf unter der Discord-Anzeige: (Beschriftung, Link).
+pub const DISCORD_BUTTON: (&str, &str) = ("Download", "https://github.com/umpinke/salami-client/releases/latest");
+
 /// Pack für Profile, die auf unbekannte (z. B. NoRisk-)Packs verweisen – etwa nach dem
 /// Import einer `.noriskpack`-Datei mit "norisk-prod".
 pub const FALLBACK_PACK_ID: &str = "salami";

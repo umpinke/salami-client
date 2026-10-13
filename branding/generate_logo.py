@@ -16,6 +16,8 @@ from PIL import Image, ImageDraw, ImageFilter
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "branding" / "out"
+# Offizielles Logo (rundes „S“ mit Salami). Ist es da, ersetzt es die gezeichnete Scheibe.
+BRAND_LOGO = ROOT / "branding" / "salami-logo.jpg"
 
 # Salami-Palette (identisch mit Launcher-Theme und In-Game-Theme)
 CASING = (90, 35, 32, 255)       # Pelle
@@ -147,6 +149,22 @@ def draw_board_background(width: int = 1920, height: int = 1080, seed: int = 42)
     return out.convert("RGB")
 
 
+def brand_master(size: int) -> Image.Image:
+    """Offizielles Logo auf den Kreis zugeschnitten, außen durchsichtig."""
+    src = Image.open(BRAND_LOGO).convert("RGB")
+    # Alles Helle liegt im Ring → Bounding-Box der hellen Pixel = Ring
+    left, top, right, bottom = src.convert("L").point(lambda v: 255 if v > 70 else 0).getbbox()
+    cx, cy = (left + right) / 2, (top + bottom) / 2
+    half = max(right - left, bottom - top) / 2 * 1.02
+    square = src.crop((round(cx - half), round(cy - half), round(cx + half), round(cy + half)))
+    logo = square.resize((size, size), Image.LANCZOS).convert("RGBA")
+    big = size * 4  # Maske 4-fach zeichnen → glatter Rand
+    mask = Image.new("L", (big, big), 0)
+    ImageDraw.Draw(mask).ellipse((0, 0, big - 1, big - 1), fill=255)
+    logo.putalpha(mask.resize((size, size), Image.LANCZOS))
+    return logo
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     board = draw_board_background()
@@ -154,7 +172,7 @@ def main() -> None:
     board.save(board_path, quality=85, optimize=True)
     print("->", board_path.relative_to(ROOT))
 
-    master = draw_slice(1024)
+    master = brand_master(1024) if BRAND_LOGO.exists() else draw_slice(1024)
     master.save(OUT / "salami-logo-1024.png")
     for s in (512, 128, 64):
         master.resize((s, s), Image.LANCZOS).save(OUT / f"salami-logo-{s}.png")

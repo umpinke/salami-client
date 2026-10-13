@@ -7,7 +7,6 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
-const DISCORD_APP_ID: &str = "1237087999104122981";
 const RECONNECT_BACKOFF: Duration = Duration::from_secs(60);
 
 #[derive(Debug, Clone, PartialEq)]
@@ -119,13 +118,18 @@ impl DiscordManager {
             debug!("Discord Rich Presence is disabled, skipping connection");
             return Ok(());
         }
+        // Salami: ohne eigene Discord-Anwendung keine Anzeige (nicht die des NoRisk Client)
+        let Some(app_id) = crate::branding::DISCORD_APP_ID else {
+            debug!("Discord Rich Presence: no Discord application configured in branding.rs");
+            return Ok(());
+        };
 
         trace!("Attempting to connect to Discord...");
         let mut client_lock = self.client.lock().await;
 
         if client_lock.is_none() {
             trace!("No existing Discord client, creating new one...");
-            match DiscordIpcClient::new(DISCORD_APP_ID)
+            match DiscordIpcClient::new(app_id)
                 .map_err(|e| AppError::DiscordError(format!("Discord error: {}", e)))
             {
                 Ok(mut client) => {
@@ -269,8 +273,9 @@ impl DiscordManager {
     }
 
     async fn build_and_set_activity(&self, state: &DiscordState, client_ref: &mut DiscordIpcClient) -> std::result::Result<(), AppError> {
-        let icon = "icon_512px";
-        let download_button = activity::Button::new("DOWNLOAD", "https://norisk.gg/");
+        let icon = crate::branding::DISCORD_LARGE_IMAGE;
+        let (button_label, button_url) = crate::branding::DISCORD_BUTTON;
+        let download_button = activity::Button::new(button_label, button_url);
         let buttons = vec![download_button];
 
         let client_state = Self::read_active_client_state();
@@ -327,7 +332,7 @@ impl DiscordManager {
             .assets(
                 activity::Assets::new()
                     .large_image(icon)
-                    .large_text("NoRisk Client"),
+                    .large_text(crate::branding::PRODUCT_NAME),
             )
             .timestamps(activity::Timestamps::new().start(start_time))
             .buttons(buttons);
