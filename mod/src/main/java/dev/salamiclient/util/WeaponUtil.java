@@ -7,8 +7,10 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.tags.ItemTags;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.enchantment.Enchantment;
 
 import java.util.function.Predicate;
@@ -51,6 +53,12 @@ public final class WeaponUtil {
 
 	public static boolean isSpear(ItemStack stack) {
 		return stack.has(DataComponents.PIERCING_WEAPON);
+	}
+
+	/** Nahkampfwaffe: Schwert, Axt, Streitkolben, Speer oder Dreizack. */
+	public static boolean isMeleeWeapon(ItemStack stack) {
+		return stack.is(ItemTags.SWORDS) || stack.is(ItemTags.AXES) || stack.is(Items.MACE)
+			|| stack.is(Items.TRIDENT) || isSpear(stack);
 	}
 
 	public static boolean wearsArmor(LivingEntity entity) {

@@ -4,23 +4,33 @@ import dev.salamiclient.SalamiClient;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.ModuleManager;
 import dev.salamiclient.modules.client.SafeModeModule;
+import dev.salamiclient.modules.utility.AimAssistModule;
 import dev.salamiclient.modules.utility.AnchorMacroModule;
 import dev.salamiclient.modules.utility.AutoCrystalModule;
 import dev.salamiclient.modules.utility.AutoTotemModule;
 import dev.salamiclient.modules.utility.DoubleHandTotemModule;
 import dev.salamiclient.modules.utility.GhostSpearModule;
+import dev.salamiclient.modules.utility.PlayerEspModule;
+import dev.salamiclient.modules.utility.TriggerBotModule;
+import dev.salamiclient.modules.visual.CapesModule;
 import dev.salamiclient.modules.visual.LiveTrackerModule;
+import dev.salamiclient.modules.visual.ParticlesModule;
 import dev.salamiclient.setting.Setting;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
+import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
+import net.minecraft.world.entity.monster.zombie.Zombie;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.EntityHitResult;
 import org.apache.commons.lang3.function.FailableFunction;
 
 /**
@@ -46,7 +56,109 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 			testAnchorMacro(context, server, modules);
 			testGhostSpear(context, server, modules);
 			testLiveTracker(context, server, modules);
+			testParticles(context, server, modules);
+			testCapes(context, modules);
+			testPlayerEsp(context, modules);
+			testTriggerBot(context, server, modules);
+			testAimAssist(context, server, modules);
 		}
+	}
+
+	// ------------------------------------------------------------------ Partikel
+
+	private static void testParticles(ClientGameTestContext context, TestServerContext server, ModuleManager modules) {
+		server.runCommand("tp @p 90.5 " + FEET_Y + " 0.5 180 0");
+		context.waitTicks(3);
+		Module particles = modules.get(ParticlesModule.class);
+		set(particles, "explosions", true);
+		String spawn = "particle minecraft:explosion 90.5 " + (FEET_Y + 1) + " -2.5 0.5 0.5 0.5 0 20 force";
+
+		context.runOnClient(c -> modules.setEnabled(particles, true));
+		context.runOnClient(c -> c.particleEngine.clearParticles());
+		server.runCommand(spawn);
+		context.waitTicks(3);
+		int hidden = context.computeOnClient(c -> Integer.parseInt(c.particleEngine.countParticles()));
+
+		context.runOnClient(c -> modules.setEnabled(particles, false));
+		context.runOnClient(c -> c.particleEngine.clearParticles());
+		server.runCommand(spawn);
+		context.waitTicks(3);
+		int shown = context.computeOnClient(c -> Integer.parseInt(c.particleEngine.countParticles()));
+
+		check(shown >= 10, "Particles: test setup spawned only " + shown + " explosion particles");
+		check(hidden == 0, "Particles: " + hidden + " explosion particles were not hidden");
+	}
+
+	// ------------------------------------------------------------------ Capes
+
+	private static void testCapes(ClientGameTestContext context, ModuleManager modules) {
+		Module capes = modules.get(CapesModule.class);
+		set(capes, "cape", CapesModule.Cape.SALAMI);
+		context.runOnClient(c -> modules.setEnabled(capes, true));
+		context.waitTick();
+		check(context.computeOnClient(c -> c.player.getSkin().cape() != null
+				&& c.player.getSkin().cape().texturePath().equals(Identifier.fromNamespaceAndPath("salami", "textures/cape/salami.png"))),
+			"Capes: own player has no salami cape");
+		context.runOnClient(c -> c.options.setCameraType(CameraType.THIRD_PERSON_BACK));
+		context.waitTicks(5);
+		context.takeScreenshot("salami-10-cape");
+		context.runOnClient(c -> c.options.setCameraType(CameraType.FIRST_PERSON));
+	}
+
+	// ------------------------------------------------------------------ Player ESP
+
+	private static void testPlayerEsp(ClientGameTestContext context, ModuleManager modules) {
+		Module esp = modules.get(PlayerEspModule.class);
+		set(esp, "mode", PlayerEspModule.Mode.BOTH);
+		context.runOnClient(c -> modules.setEnabled(esp, true));
+		context.waitTicks(5); // Render-Durchgänge mit aktivem Modul dürfen nicht abstürzen
+		check(context.computeOnClient(c -> esp.isEnabled()), "Player ESP: module crashed while rendering");
+		check(!context.computeOnClient(c -> PlayerEspModule.glows(c.player)), "Player ESP: own player must not glow");
+		context.runOnClient(c -> modules.setEnabled(esp, false));
+	}
+
+	// ------------------------------------------------------------------ Trigger Bot
+
+	private static void testTriggerBot(ClientGameTestContext context, TestServerContext server, ModuleManager modules) {
+		server.runCommand("difficulty easy");
+		server.runCommand("clear @a");
+		server.runCommand("item replace entity @p hotbar.0 with minecraft:stone_sword");
+		server.runCommand("summon minecraft:zombie 90.5 " + FEET_Y + " -2.0 {NoAI:1b,PersistenceRequired:1b,Tags:[\"salami_trigger\"]}");
+		server.runCommand("tp @p 90.5 " + FEET_Y + " 0.5 180 0");
+		context.waitTicks(5);
+		context.runOnClient(c -> c.player.getInventory().setSelectedSlot(0));
+		check(waitFor(context, 10, c -> c.hitResult instanceof EntityHitResult hit && hit.getEntity() instanceof Zombie),
+			"Test setup: zombie not in crosshair");
+
+		Module trigger = modules.get(TriggerBotModule.class);
+		set(trigger, "players", false);
+		set(trigger, "mobs", true);
+		context.runOnClient(c -> modules.setEnabled(trigger, true));
+		boolean hit = waitFor(context, 40, c -> c.level.getEntitiesOfClass(Zombie.class, new AABB(88, FEET_Y - 1, -5, 93, FEET_Y + 3, 1))
+			.stream().allMatch(z -> z.getHealth() < z.getMaxHealth()));
+		context.runOnClient(c -> modules.setEnabled(trigger, false));
+		server.runCommand("kill @e[type=minecraft:zombie,tag=salami_trigger]");
+		check(hit, "Trigger Bot: zombie in crosshair was not attacked");
+	}
+
+	// ------------------------------------------------------------------ Aim Assist
+
+	private static void testAimAssist(ClientGameTestContext context, TestServerContext server, ModuleManager modules) {
+		// Zombie etwa 30° rechts vom Blick
+		server.runCommand("summon minecraft:zombie 102.5 " + FEET_Y + " -3.0 {NoAI:1b,PersistenceRequired:1b,Tags:[\"salami_aim\"]}");
+		server.runCommand("tp @p 100.5 " + FEET_Y + " 0.5 180 0");
+		context.waitTicks(5);
+		check(context.computeOnClient(c -> !(c.hitResult instanceof EntityHitResult)), "Test setup: zombie already in crosshair");
+
+		Module aim = modules.get(AimAssistModule.class);
+		set(aim, "players", false);
+		set(aim, "mobs", true);
+		set(aim, "fov", 90.0);
+		context.runOnClient(c -> modules.setEnabled(aim, true));
+		boolean onTarget = waitFor(context, 40, c -> c.crosshairPickEntity instanceof Zombie);
+		context.runOnClient(c -> modules.setEnabled(aim, false));
+		server.runCommand("kill @e[type=minecraft:zombie,tag=salami_aim]");
+		check(onTarget, "Aim Assist: view was not pulled onto the zombie");
 	}
 
 	// ------------------------------------------------------------------ Totems

@@ -14,7 +14,9 @@ import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 /**
@@ -44,6 +46,13 @@ public final class WorldLines {
 	public static void shape(PoseStack pose, MultiBufferSource buffers, RenderType type, BlockPos pos, VoxelShape shape, int argb, float width) {
 		Vec3 cam = Minecraft.getInstance().gameRenderer.getMainCamera().position();
 		ShapeRenderer.renderShape(pose, buffers.getBuffer(type), shape, pos.getX() - cam.x, pos.getY() - cam.y, pos.getZ() - cam.z, argb, width);
+	}
+
+	/** Zeichnet den Rahmen einer Box in Weltkoordinaten (z. B. eine Entity-Hitbox). */
+	public static void box(PoseStack pose, MultiBufferSource buffers, RenderType type, AABB box, int argb, float width) {
+		Vec3 cam = Minecraft.getInstance().gameRenderer.getMainCamera().position();
+		VoxelShape shape = Shapes.create(0, 0, 0, box.getXsize(), box.getYsize(), box.getZsize());
+		ShapeRenderer.renderShape(pose, buffers.getBuffer(type), shape, box.minX - cam.x, box.minY - cam.y, box.minZ - cam.z, argb, width);
 	}
 
 	/** Gepufferte Linien eines Typs sofort zeichnen (z. B. am Ende eines Welt-Events). */

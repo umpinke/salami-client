@@ -4,12 +4,16 @@
 	"compatibilityLevel": "JAVA_21",
 	"client": [
 		"AbstractButtonMixin",
+		"AbstractClientPlayerMixin",
 		"AbstractContainerScreenAccessor",
+		"ClientLevelMixin",
+		"EntityRendererMixin",
 		"GameRendererMixin",
 		"LogoRendererMixin",
 		"MinecraftAccessor",
 		"MinecraftMixin",
-		"MultiPlayerGameModeMixin"
+		"MultiPlayerGameModeMixin",
+		"ParticleEngineMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

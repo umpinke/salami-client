@@ -18,6 +18,9 @@ import dev.salamiclient.modules.utility.AttributeSwapModule;
 import dev.salamiclient.modules.utility.AutoElytraModule;
 import dev.salamiclient.modules.utility.AutoMaceModule;
 import dev.salamiclient.modules.utility.BlockEspModule;
+import dev.salamiclient.modules.utility.PlayerEspModule;
+import dev.salamiclient.modules.utility.TriggerBotModule;
+import dev.salamiclient.modules.utility.AimAssistModule;
 import dev.salamiclient.modules.utility.BreachSwapModule;
 import dev.salamiclient.modules.utility.SpeedLungeModule;
 import dev.salamiclient.modules.visual.ArmorHudModule;
@@ -28,6 +31,8 @@ import dev.salamiclient.modules.visual.InfoHudModule;
 import dev.salamiclient.modules.visual.ItemCounterModule;
 import dev.salamiclient.modules.visual.LiveTrackerModule;
 import dev.salamiclient.modules.visual.LogoOverlayModule;
+import dev.salamiclient.modules.visual.ParticlesModule;
+import dev.salamiclient.modules.visual.CapesModule;
 import dev.salamiclient.render.WorldLines;
 import dev.salamiclient.modules.visual.WatermarkModule;
 import dev.salamiclient.theme.Theme;
@@ -117,6 +122,8 @@ public final class SalamiClient implements ClientModInitializer {
 		modules.register(new InfoHudModule());
 		modules.register(new ComboCounterModule());
 		modules.register(new LogoOverlayModule());
+		modules.register(new ParticlesModule());
+		modules.register(new CapesModule());
 		// Misc
 		modules.register(new KitsModule());
 		// Utility (Kampf-Automatisierung – von Safe Mode / Easy Leave gesperrt)
@@ -132,6 +139,9 @@ public final class SalamiClient implements ClientModInitializer {
 		modules.register(new AutoElytraModule());
 		modules.register(new SpeedLungeModule());
 		modules.register(new BlockEspModule());
+		modules.register(new PlayerEspModule());
+		modules.register(new TriggerBotModule());
+		modules.register(new AimAssistModule());
 	}
 
 	private void registerKeybinds() {

@@ -1,0 +1,117 @@
+package dev.salamiclient.modules.visual;
+
+import com.mojang.blaze3d.platform.NativeImage;
+import dev.salamiclient.SalamiClient;
+import dev.salamiclient.module.Category;
+import dev.salamiclient.module.Module;
+import dev.salamiclient.setting.BoolSetting;
+import dev.salamiclient.setting.ModeSetting;
+import dev.salamiclient.util.Chat;
+import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.core.ClientAsset;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.entity.player.PlayerSkin;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.EnumMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
+
+/**
+ * Salami Capes: ein eigenes Cape (und auf Wunsch dieselbe Textur auf den Elytren) für
+ * den eigenen Spieler. Mitgeliefert sind Salami-Designs; {@code CUSTOM} lädt
+ * {@code config/salami/cape.png} (Minecraft-Cape-Layout 64x32 oder ein Vielfaches).
+ *
+ * <p>Nur für dich sichtbar – andere Spieler sehen ihr eigenes bzw. dein Mojang-Cape.
+ */
+public final class CapesModule extends Module {
+	public enum Cape { SALAMI, PEPPERONI, BOARD, CUSTOM }
+
+	private static final Identifier CUSTOM_TEXTURE = Identifier.fromNamespaceAndPath(SalamiClient.MOD_ID, "cape/custom");
+	private static CapesModule instance;
+
+	private final ModeSetting<Cape> cape = add(new ModeSetting<>("cape", Cape.SALAMI));
+	private final BoolSetting elytra = add(new BoolSetting("elytra", true));
+
+	/** Geladenes eigenes Cape ({@code null} = keins oder Fehler). */
+	private ClientAsset.Texture custom;
+	private boolean customTried;
+	private final Map<Cape, ClientAsset.Texture> builtIn = new EnumMap<>(Cape.class);
+	private PlayerSkin lastBase;
+	private PlayerSkin lastResult;
+
+	public CapesModule() {
+		super("capes", Category.VISUAL, true);
+		instance = this;
+		cape.onChange(value -> customTried = false);
+	}
+
+	public static Path customCapeFile() {
+		return FabricLoader.getInstance().getConfigDir().resolve(SalamiClient.MOD_ID).resolve("cape.png");
+	}
+
+	@Override
+	protected void onEnable() {
+		customTried = false;
+	}
+
+	/** Für {@code AbstractClientPlayerMixin}: Skin des Spielers, ggf. mit Salami-Cape. */
+	public static PlayerSkin apply(UUID player, PlayerSkin skin) {
+		CapesModule module = instance;
+		if (module == null || !module.isEnabled() || !player.equals(mc().getUser().getProfileId())) {
+			return skin;
+		}
+		ClientAsset.Texture texture = module.texture();
+		if (texture == null) {
+			return skin;
+		}
+		// getSkin() läuft jedes Frame – Ergebnis wiederverwenden, solange sich nichts ändert
+		ClientAsset.Texture elytraTexture = module.elytra.isOn() ? texture : skin.elytra();
+		PlayerSkin cached = module.lastResult;
+		if (cached == null || module.lastBase != skin || !cached.cape().equals(texture) || cached.elytra() != elytraTexture) {
+			module.lastBase = skin;
+			module.lastResult = new PlayerSkin(skin.body(), texture, elytraTexture, skin.model(), skin.secure());
+		}
+		return module.lastResult;
+	}
+
+	private ClientAsset.Texture texture() {
+		Cape selected = cape.get();
+		if (selected != Cape.CUSTOM) {
+			return builtIn.computeIfAbsent(selected, c -> new ClientAsset.ResourceTexture(
+				Identifier.fromNamespaceAndPath(SalamiClient.MOD_ID, "cape/" + c.name().toLowerCase(Locale.ROOT))));
+		}
+		if (!customTried) {
+			customTried = true;
+			custom = loadCustom();
+		}
+		return custom;
+	}
+
+	private static ClientAsset.Texture loadCustom() {
+		Path file = customCapeFile();
+		if (!Files.isRegularFile(file)) {
+			Chat.warn("salami.capes.custom_missing", file.toString());
+			return null;
+		}
+		try (InputStream in = Files.newInputStream(file)) {
+			NativeImage image = NativeImage.read(in);
+			if (image.getWidth() != image.getHeight() * 2) {
+				image.close();
+				Chat.warn("salami.capes.custom_invalid");
+				return null;
+			}
+			mc().getTextureManager().register(CUSTOM_TEXTURE, new DynamicTexture(() -> "salami custom cape", image));
+			return new ClientAsset.ResourceTexture(CUSTOM_TEXTURE, CUSTOM_TEXTURE);
+		} catch (IOException e) {
+			SalamiClient.LOG.warn("Eigenes Cape konnte nicht geladen werden: {}", file, e);
+			Chat.warn("salami.capes.custom_invalid");
+			return null;
+		}
+	}
+}
