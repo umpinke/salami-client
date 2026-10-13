@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { BRAND } from "../../config/salami";
 import { Virtuoso } from "react-virtuoso";
 import type { Profile } from "../../types/profile";
 import { useProfileStore } from "../../store/profile-store";
@@ -100,7 +101,13 @@ export function ProfilesTabV2() {
   const isNrcGroup = (groupName: string | null): boolean => {
     if (!groupName) return false;
     const normalized = groupName.toLowerCase();
-    return normalized === "nrc" || normalized === "noriskclient" || normalized === "norisk client";
+    return (
+      normalized === "nrc" ||
+      normalized === "noriskclient" ||
+      normalized === "norisk client" ||
+      normalized === "salami" ||
+      normalized === "salami client"
+    );
   };
 
   // Reduce a full game version to its major bucket, e.g. "1.21.10" -> "1.21", "26.1.2" -> "26.1"
@@ -147,7 +154,7 @@ export function ProfilesTabV2() {
   const createGroups = (): GroupTab[] => {
     const defaultGroups: GroupTab[] = [
       { id: "all", name: "All", count: getFilteredCountForGroup("all") },
-      { id: "nrc", name: "NRC", count: getFilteredCountForGroup("nrc") },
+      { id: "nrc", name: BRAND.shortName, count: getFilteredCountForGroup("nrc") },
       { id: "server", name: "SERVER", count: getFilteredCountForGroup("server") },
       { id: "modpacks", name: "MODPACKS", count: getFilteredCountForGroup("modpacks") },
     ];

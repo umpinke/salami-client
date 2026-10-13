@@ -36,6 +36,8 @@ export const useFontStore = create<FontState>()(
       applyFontToDOM: () => {
         const { fontId, customFamily } = get();
         const root = document.documentElement.style;
+        // Schriftgewichte/Abstände in globals.css hängen an der gewählten Schrift
+        document.documentElement.dataset.font = fontId;
 
         if (fontId === CUSTOM_FONT_ID && customFamily.trim()) {
           const family = `"${customFamily.trim()}", sans-serif`;
@@ -51,6 +53,15 @@ export const useFontStore = create<FontState>()(
     }),
     {
       name: "norisk-font-storage",
+      version: 1,
+      // Salami Client: einmalig von der Pixel-Schrift auf die Salami-Schrift wechseln
+      migrate: (persisted, version) => {
+        const state = persisted as Partial<FontState>;
+        if (version < 1 && state.fontId === "minecraft") {
+          return { ...state, fontId: DEFAULT_FONT_ID } as FontState;
+        }
+        return state as FontState;
+      },
       onRehydrateStorage: () => (state) => {
         state?.applyFontToDOM();
       },

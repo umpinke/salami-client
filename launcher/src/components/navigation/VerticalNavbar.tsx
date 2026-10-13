@@ -5,12 +5,12 @@ import { gsap } from "gsap";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { Logo } from "../ui/Logo";
-import { NavButton } from "../ui/nav/NavButton";
 import { NavTooltip } from "../ui/nav/NavTooltip";
 import { CreditsModal } from "../modals/CreditsModal";
 import * as ConfigService from "../../services/launcher-config-service";
 import { useThemeStore } from "../../store/useThemeStore";
 import { createPortal } from "react-dom";
+import { BRAND } from "../../config/salami";
 
 interface NavItem {
   id: string;
@@ -35,7 +35,7 @@ export function VerticalNavbar({
   onItemClick,
   version = "v0.5.22",
 }: VerticalNavbarProps) {  const [active, setActive] = useState(activeItem || items[0]?.id);
-  const navRef = useRef<HTMLDivElement>(null);
+  const navRef = useRef<HTMLElement>(null);
   const [showTooltip, setShowTooltip] = useState<string | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -120,52 +120,93 @@ export function VerticalNavbar({
     setShowTooltip(null);
   };
 
-  const renderItem = (item: NavItem) => (
-    <div
-      key={item.id}
-      className="relative group nav-item flex flex-col items-center"
-      ref={(el) => (buttonRefs.current[item.id] = el)}
-    >
-      <NavButton
-        icon={<Icon icon={item.icon} className="w-8 h-8" />}
-        label={!item.isAction && showNavLabels ? item.label : undefined}
-        isActive={active === item.id}
-        onClick={() => handleItemClick(item.id, item.isAction)}
-        onMouseEnter={() => handleMouseEnter(item.id)}
-        onMouseLeave={handleMouseLeave}
-        aria-label={item.label}
-      />
-    </div>
-  );
+  const expanded = showNavLabels;
+
+  const renderItem = (item: NavItem) => {
+    const isActive = !item.isAction && active === item.id;
+    return (
+      <div
+        key={item.id}
+        className="nav-item w-full"
+        ref={(el) => (buttonRefs.current[item.id] = el)}
+      >
+        <button
+          type="button"
+          onClick={() => handleItemClick(item.id, item.isAction)}
+          onMouseEnter={() => !expanded && handleMouseEnter(item.id)}
+          onMouseLeave={handleMouseLeave}
+          aria-label={item.label}
+          aria-current={isActive ? "page" : undefined}
+          title={expanded ? item.label : undefined}
+          className={cn(
+            "relative flex w-full items-center rounded-xl transition-colors duration-150",
+            "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
+            expanded ? "h-11 gap-3 px-3 text-left" : "h-12 justify-center",
+            isActive ? "text-white" : "text-white/70 hover:bg-white/5 hover:text-white",
+          )}
+          style={
+            isActive
+              ? {
+                  backgroundColor: `${accentColor.value}66`,
+                  boxShadow: `inset 3px 0 0 ${accentColor.hoverValue ?? accentColor.value}`,
+                }
+              : undefined
+          }
+        >
+          <Icon icon={item.icon} className="h-6 w-6 shrink-0" />
+          {expanded && (
+            <span className="truncate font-minecraft text-[15px] leading-none">{item.label}</span>
+          )}
+        </button>
+      </div>
+    );
+  };
 
   return (
     <>
-      <div
+      <nav
         ref={navRef}
+        aria-label={BRAND.name}
         className={cn(
-          "flex flex-col items-center py-6 w-24 backdrop-blur-lg",
+          "flex flex-col py-5 backdrop-blur-lg",
+          expanded ? "w-56 px-3" : "w-20 items-center px-2",
           className,
         )}
         style={{
-          backgroundColor: `rgba(${parseInt(accentColor.value.slice(1, 3), 16)}, ${parseInt(accentColor.value.slice(3, 5), 16)}, ${parseInt(accentColor.value.slice(5, 7), 16)}, 0.4)`,
-          borderRight: `2px solid ${accentColor.value}60`,
-          borderLeft: `2px solid ${accentColor.value}60`,
-          boxShadow: `0 0 10px ${accentColor.value}30 inset`,
+          backgroundColor: `rgba(${parseInt(accentColor.value.slice(1, 3), 16)}, ${parseInt(accentColor.value.slice(3, 5), 16)}, ${parseInt(accentColor.value.slice(5, 7), 16)}, 0.35)`,
+          borderRight: `2px solid ${accentColor.value}50`,
         }}
-      >        <div className="mb-12">
-          <Logo size="sm" onClick={() => setShowCreditsModal(true)} />
-        </div>
+      >
+        <button
+          type="button"
+          onClick={() => setShowCreditsModal(true)}
+          aria-label={BRAND.name}
+          className={cn(
+            "mb-7 flex items-center rounded-xl transition-colors hover:bg-white/5",
+            expanded ? "w-full gap-3 px-2 py-1.5 text-left" : "justify-center p-1",
+          )}
+        >
+          <Logo size="sm" className="shrink-0" />
+          {expanded && (
+            <span className="flex flex-col leading-none">
+              <span className="font-minecraft text-xl text-white">{BRAND.shortName}</span>
+              <span className="mt-1 text-[11px] uppercase tracking-[0.25em] text-white/55">Client</span>
+            </span>
+          )}
+        </button>
 
-        <div className="flex-1 flex flex-col items-center space-y-4 min-h-[400px]">
+        <div className="flex w-full flex-1 flex-col gap-1">
           {items.filter((item) => !item.isAction).map(renderItem)}
         </div>
 
-        {items.some((item) => item.isAction) && (
-          <div className="flex flex-col items-center space-y-4 mt-4">
-            {items.filter((item) => item.isAction).map(renderItem)}
-          </div>
-        )}
-      </div>      {isMounted &&
+        <div className="mt-4 flex w-full flex-col gap-1">
+          {items.filter((item) => item.isAction).map(renderItem)}
+          {expanded && (
+            <span className="px-3 pt-2 text-[11px] text-white/40">{appVersion ?? version}</span>
+          )}
+        </div>
+      </nav>
+      {isMounted &&
         showTooltip &&
         document.body &&
         createPortal(

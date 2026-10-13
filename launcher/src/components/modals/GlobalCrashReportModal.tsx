@@ -23,6 +23,7 @@ import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import type { EventPayload, CrashReportContentAvailablePayload } from '../../types/events';
 import { EventType } from '../../types/events';
+import { NORISK_SERVICES_ENABLED } from '../../config/salami';
 
 export function GlobalCrashReportModal() {
   const { t } = useTranslation();
@@ -31,7 +32,8 @@ export function GlobalCrashReportModal() {
   const [profileName, setProfileName] = useState<string>('');
   const [mclogsUrl, setMclogsUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [analyzeWithNoRisk, setAnalyzeWithNoRisk] = useState(true);
+  // NoRisk-Absturzanalyse gibt es nur mit NoRisk-Diensten; sonst nur Log-Upload zu mclo.gs
+  const [analyzeWithNoRisk, setAnalyzeWithNoRisk] = useState(NORISK_SERVICES_ENABLED);
   const [statusText, setStatusText] = useState<string | null>(null); // inline progress while analyzing
   const [displayedCrashReportContent, setDisplayedCrashReportContent] = useState<string | undefined>(undefined);
   const [isListeningForCrashContent, setIsListeningForCrashContent] = useState(false);
@@ -329,6 +331,7 @@ ${gameLog}`
         </div>
         )}
       </div>
+      {NORISK_SERVICES_ENABLED && (
       <Button
         onClick={handleContactSupport}
         variant="default"
@@ -338,6 +341,7 @@ ${gameLog}`
       >
         {t('crash_modal.button.contact_support')}
       </Button>
+      )}
     </div>
   );
 
@@ -378,12 +382,14 @@ ${gameLog}`
               <p className="text-sm font-minecraft text-gray-400">
                 {t('crash_modal.upload_notice')}
               </p>
-              <Checkbox
-                checked={analyzeWithNoRisk}
-                onChange={(e) => setAnalyzeWithNoRisk(e.target.checked)}
-                label={t('crash_modal.report_checkbox')}
-                size="sm"
-              />
+              {NORISK_SERVICES_ENABLED && (
+                <Checkbox
+                  checked={analyzeWithNoRisk}
+                  onChange={(e) => setAnalyzeWithNoRisk(e.target.checked)}
+                  label={t('crash_modal.report_checkbox')}
+                  size="sm"
+                />
+              )}
             </div>
           </>
         )}

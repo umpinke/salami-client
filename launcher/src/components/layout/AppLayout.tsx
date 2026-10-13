@@ -362,6 +362,7 @@ export function AppLayout({
 
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         <HeaderBar
+          title={navItems.find((item) => item.id === activeTab)?.label ?? BRAND.name}
           minimizeRef={minimizeRef}
           maximizeRef={maximizeRef}
           closeRef={closeRef}
@@ -422,12 +423,14 @@ function BorderGlowEffects({ accentColor }: { accentColor: string }) {
 }
 
 interface HeaderBarProps {
+  /** Name der aktuellen Seite – das Branding steht in der Seitenleiste. */
+  title: string;
   minimizeRef: React.RefObject<HTMLDivElement>;
   maximizeRef: React.RefObject<HTMLDivElement>;
   closeRef: React.RefObject<HTMLDivElement>;
 }
 
-function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
+function HeaderBar({ title, minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const [appVersion, setAppVersion] = useState<string | null>(null);
@@ -543,7 +546,7 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
               className="font-smallcaps text-2xl tracking-wider font-bold text-shadow"
               data-tauri-drag-region
             >
-              {BRAND.name}
+              {title}
             </h1>
             {availableUpdate && (
               <Tooltip content={isUpdating ? t('header.update.tooltip_updating') : t('header.update.tooltip_available', { version: availableUpdate.version })}>

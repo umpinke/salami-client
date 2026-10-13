@@ -25,3 +25,6 @@ branding/out/
 .cargo-check.log
 .vite-build.log
 /.*.log
+
+# lokale Claude-Code-Einstellungen (Vorschau-Server)
+/.claude/

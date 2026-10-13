@@ -10,6 +10,15 @@
     font-display: swap;
 }
 
+/* Salami-Schrift: Fredoka (SIL Open Font License, public/fonts/fredoka-OFL.txt) */
+@font-face {
+    font-family: "Fredoka";
+    src: url("/fonts/fredoka.ttf") format("truetype");
+    font-weight: 300 700;
+    font-style: normal;
+    font-display: swap;
+}
+
 @font-face {
     font-family: "MinecraftTen";
     src: url("/fonts/minecraft.woff2") format("woff2");
@@ -49,8 +58,9 @@
     --radius-xl: 16px;
     --radius-2xl: 24px;
     --border-radius: 0px; 
-    --font-smallcaps: "SmallCaps", monospace;
-    --font-minecraft: "MinecraftTen", sans-serif;
+    /* Standard: Salami-Schrift (Preset "salami" in config/fonts.ts setzt dasselbe) */
+    --font-smallcaps: "Fredoka", sans-serif;
+    --font-minecraft: "Fredoka", sans-serif;
     --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.15);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.2);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.25);
@@ -277,6 +287,27 @@
 .font-minecraft {
     font-family: var(--font-minecraft), sans-serif;
     letter-spacing: 0.03em;
+}
+
+/* Salami-Schrift (Fredoka): echte Schriftgewichte statt Pixel-Look, engere Abstände */
+:root:not([data-font]) body,
+:root[data-font="salami"] body {
+    font-weight: 500;
+    letter-spacing: 0.01em;
+}
+
+:root:not([data-font]) .font-smallcaps,
+:root[data-font="salami"] .font-smallcaps {
+    font-weight: 500;
+    letter-spacing: 0.01em;
+}
+
+:root:not([data-font]) .font-minecraft,
+:root[data-font="salami"] .font-minecraft,
+:root:not([data-font]) :is(h1, h2, h3, h4, h5, h6),
+:root[data-font="salami"] :is(h1, h2, h3, h4, h5, h6) {
+    font-weight: 600;
+    letter-spacing: 0.01em;
 }
 
 .text-shadow {

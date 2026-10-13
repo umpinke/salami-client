@@ -7,6 +7,13 @@ export interface FontPreset {
 }
 
 export const FONT_PRESETS: Record<string, FontPreset> = {
+  salami: {
+    id: "salami",
+    name: "Salami",
+    smallcaps: '"Fredoka", sans-serif',
+    minecraft: '"Fredoka", sans-serif',
+    preview: '"Fredoka", sans-serif',
+  },
   minecraft: {
     id: "minecraft",
     name: "Minecraft",
@@ -30,4 +37,4 @@ export const FONT_PRESETS: Record<string, FontPreset> = {
   },
 };
 
-export const DEFAULT_FONT_ID = "minecraft";
+export const DEFAULT_FONT_ID = "salami";
