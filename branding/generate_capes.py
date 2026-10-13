@@ -1,4 +1,4 @@
-"""Salami-Capes für salami-core (CapesModule).
+"""Salami-Capes für salami-core (CapesModule) und den Launcher (Cape-Galerie, Vorlage).
 
 Erzeugt Cape-Texturen im Minecraft-Layout (64x32, hier 4-fach = 256x128):
 Cape-Box bei (0,0) mit 10x16x1, Elytra-Box bei (22,0) mit 10x20x2.
@@ -135,12 +135,61 @@ def board() -> Image.Image:
     return img
 
 
+TEMPLATE_SCALE = 8  # 512x256: groß genug für Beschriftungen, Verhältnis wie 64x32
+TEMPLATE_OUT = ROOT / "launcher/src-tauri/assets/salami_cape_template.png"
+LAUNCHER_CAPES = ROOT / "launcher/public/capes"
+FONT = ROOT / "launcher/public/fonts/fredoka.ttf"
+
+# (Bereich im 64x32-Raster, Farbe, Beschriftung)
+TEMPLATE_AREAS = [
+    ((1, 1, 10, 16), (178, 58, 58, 255), "AUSSEN\nsichtbar"),
+    ((12, 1, 10, 16), (122, 36, 37, 255), "INNEN"),
+    ((1, 0, 10, 1), (243, 227, 211, 255), ""),     # oben
+    ((11, 0, 10, 1), (222, 196, 180, 255), ""),    # unten
+    ((0, 1, 1, 16), (122, 74, 53, 255), ""),       # Rand links
+    ((11, 1, 1, 16), (122, 74, 53, 255), ""),      # Rand rechts
+    ((24, 2, 10, 20), (196, 150, 98, 255), "ELYTRA\naußen"),
+    ((36, 2, 10, 20), (164, 118, 72, 255), "ELYTRA\ninnen"),
+    ((24, 0, 10, 2), (243, 227, 211, 255), ""),
+    ((34, 0, 10, 2), (222, 196, 180, 255), ""),
+    ((22, 2, 2, 20), (74, 40, 30, 255), ""),
+    ((34, 2, 2, 20), (74, 40, 30, 255), ""),
+]
+
+
+def template() -> Image.Image:
+    """Vorlage zum Selbermalen: jede Fläche eigene Farbe + Beschriftung, Rest durchsichtig."""
+    from PIL import ImageFont
+
+    s = TEMPLATE_SCALE
+    img = Image.new("RGBA", (64 * s, 32 * s), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    font = ImageFont.truetype(str(FONT), 15)
+    small = ImageFont.truetype(str(FONT), 16)
+    for (x, y, w, h), color, label in TEMPLATE_AREAS:
+        box_ = (x * s, y * s, (x + w) * s - 1, (y + h) * s - 1)
+        draw.rectangle(box_, fill=color)
+        if label:
+            cx, cy = (box_[0] + box_[2]) / 2, (box_[1] + box_[3]) / 2
+            dark = sum(color[:3]) < 450
+            draw.multiline_text((cx, cy), label, font=font, fill=(255, 255, 255, 230) if dark else (43, 29, 26, 230),
+                                anchor="mm", align="center", spacing=4)
+    draw.multiline_text((50 * s, 26 * s), "Salami Client\nCape-Vorlage", font=small, fill=(178, 58, 58, 255),
+                        anchor="mm", align="center")
+    return img
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
+    LAUNCHER_CAPES.mkdir(parents=True, exist_ok=True)
     for name, make in (("salami", salami), ("pepperoni", pepperoni), ("board", board)):
-        path = OUT / f"{name}.png"
-        make().save(path)
-        print(path.relative_to(ROOT))
+        image = make()
+        for target in (OUT / f"{name}.png", LAUNCHER_CAPES / f"{name}.png"):
+            image.save(target)
+            print(target.relative_to(ROOT))
+    TEMPLATE_OUT.parent.mkdir(parents=True, exist_ok=True)
+    template().save(TEMPLATE_OUT)
+    print(TEMPLATE_OUT.relative_to(ROOT))
 
 
 if __name__ == "__main__":

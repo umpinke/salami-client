@@ -95,6 +95,12 @@ use tauri::{
 // Import path commands
 use commands::path_commands::{get_launcher_directory, resolve_image_path};
 
+// Salami Capes (lokale Capes, Vorlage, Auswahl fürs Spiel)
+use commands::salami_cape_command::{
+    salami_capes_delete, salami_capes_download_template, salami_capes_import, salami_capes_overview,
+    salami_capes_rename, salami_capes_save, salami_capes_select,
+};
+
 // Import cape commands
 use commands::cape_command::{
     browse_capes, check_is_moderator, delete_cape, download_template_and_open_explorer, equip_cape,
@@ -742,6 +748,13 @@ async fn main() {
             commands::minecraft_command::get_base64_from_skin_source_command,
             commands::file_command::get_image_preview,
             download_template_and_open_explorer,
+            salami_capes_overview,
+            salami_capes_import,
+            salami_capes_save,
+            salami_capes_rename,
+            salami_capes_delete,
+            salami_capes_select,
+            salami_capes_download_template,
             get_all_profiles_and_last_played,
             get_local_content,
             install_local_content_to_profile,

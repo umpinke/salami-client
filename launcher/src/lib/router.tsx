@@ -5,6 +5,8 @@ import { PlayTab } from "../components/tabs/PlayTab";
 import ModrinthTabV2 from "../components/tabs/ModrinthTabV2";
 import { SkinsTab } from "../components/tabs/SkinsTab";
 import { StoreTab } from "../components/tabs/StoreTab";
+import { SalamiCapesTab } from "../components/salami-capes/SalamiCapesTab";
+import { FEATURES } from "../config/salami";
 import { ClipsPage } from "../components/tabs/ClipsPage";
 import { BrowseTabWrapper } from "../components/profiles/BrowseTabWrapper";
 import { ProfilesTabV2 } from "../components/tabs/ProfilesTabV2";
@@ -66,7 +68,8 @@ export const router = createHashRouter([
       },
       {
         path: "capes",
-        element: <StoreTab />,
+        // Salami: eigene, lokale Capes statt NoRisks Cape-Shop (braucht NoRisk-Dienste)
+        element: FEATURES.capes ? <StoreTab /> : <SalamiCapesTab />,
       },
       {
         path: "clips",

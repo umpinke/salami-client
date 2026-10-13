@@ -44,6 +44,14 @@ const sampleProfiles = [
   },
 ];
 
+const sampleAccount = {
+  id: "00000000-0000-0000-0000-000000000001",
+  username: "SalamiFan",
+  minecraft_username: "SalamiFan",
+  active: true,
+  access_token: "preview",
+};
+
 /** Befehle, die eine Liste liefern. */
 const LIST_COMMANDS = /^(get_|list_|search_|fetch_).*(s|_list)$/;
 
@@ -73,9 +81,36 @@ const launcherConfig = {
   salami_theme: true,
 };
 
+/** Cape-Speicher im Speicher (statt salami_capes/ im Launcher-Ordner). */
+const capeStore = {
+  selected: "builtin:salami" as string | null,
+  builtin: ["salami", "pepperoni", "board"],
+  capes: [] as { id: string; name: string; created: string; image: string }[],
+};
+
 mockWindows("main");
-mockIPC((cmd) => {
+mockIPC((cmd, args) => {
+  const a = (args ?? {}) as Record<string, unknown>;
   switch (cmd) {
+    case "salami_capes_overview":
+      return structuredClone(capeStore);
+    case "salami_capes_select":
+      capeStore.selected = (a.selection as string | null) ?? null;
+      return null;
+    case "salami_capes_save": {
+      const id = (a.id as string | null) ?? crypto.randomUUID();
+      const cape = { id, name: String(a.name), created: now, image: String(a.pngBase64) };
+      capeStore.capes = [...capeStore.capes.filter((c) => c.id !== id), cape];
+      return cape;
+    }
+    case "salami_capes_rename":
+      capeStore.capes = capeStore.capes.map((c) => (c.id === a.id ? { ...c, name: String(a.name) } : c));
+      return null;
+    case "salami_capes_delete":
+      capeStore.capes = capeStore.capes.filter((c) => c.id !== a.id);
+      return null;
+    case "salami_capes_download_template":
+      return "C:\\Users\\Du\\Downloads\\salami_cape_vorlage.png";
     case "get_launcher_config":
       return launcherConfig;
     case "get_all_profiles_and_last_played":
@@ -85,7 +120,13 @@ mockIPC((cmd) => {
       return sampleProfiles;
     case "get_app_version":
     case "get_launcher_version":
-      return "0.6.28";
+      return "1.0.0";
+    case "get_active_account":
+      return sampleAccount;
+    case "get_accounts":
+      return [sampleAccount];
+    case "is_flatpak":
+      return false;
   }
   if (cmd.startsWith("plugin:")) return null;
   if (LIST_COMMANDS.test(cmd)) return [];

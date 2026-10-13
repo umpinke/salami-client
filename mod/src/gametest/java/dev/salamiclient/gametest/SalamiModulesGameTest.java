@@ -103,6 +103,18 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 		context.waitTicks(5);
 		context.takeScreenshot("salami-10-cape");
 		context.runOnClient(c -> c.options.setCameraType(CameraType.FIRST_PERSON));
+
+		// Auswahl aus dem Launcher (-Dsalami.cape)
+		set(capes, "cape", CapesModule.Cape.LAUNCHER);
+		System.setProperty("salami.cape", "builtin:pepperoni");
+		check(context.computeOnClient(c -> c.player.getSkin().cape() != null
+				&& c.player.getSkin().cape().texturePath().equals(Identifier.fromNamespaceAndPath("salami", "textures/cape/pepperoni.png"))),
+			"Capes: launcher selection builtin:pepperoni not applied");
+		System.setProperty("salami.cape", "none");
+		check(context.computeOnClient(c -> c.player.getSkin().cape() == null
+				|| !c.player.getSkin().cape().texturePath().getNamespace().equals("salami")),
+			"Capes: launcher selection none still shows a salami cape");
+		System.clearProperty("salami.cape");
 	}
 
 	// ------------------------------------------------------------------ Player ESP

@@ -24,18 +24,23 @@ import java.util.UUID;
 
 /**
  * Salami Capes: ein eigenes Cape (und auf Wunsch dieselbe Textur auf den Elytren) für
- * den eigenen Spieler. Mitgeliefert sind Salami-Designs; {@code CUSTOM} lädt
- * {@code config/salami/cape.png} (Minecraft-Cape-Layout 64x32 oder ein Vielfaches).
+ * den eigenen Spieler. {@code LAUNCHER} nimmt das im Launcher gewählte Cape
+ * ({@code -Dsalami.cape=builtin:<name> | <pfad> | none}); daneben die mitgelieferten
+ * Salami-Designs und {@code CUSTOM} = {@code config/salami/cape.png} (Cape-Layout 64x32
+ * oder ein Vielfaches).
  *
  * <p>Nur für dich sichtbar – andere Spieler sehen ihr eigenes bzw. dein Mojang-Cape.
  */
 public final class CapesModule extends Module {
-	public enum Cape { SALAMI, PEPPERONI, BOARD, CUSTOM }
+	public enum Cape { LAUNCHER, SALAMI, PEPPERONI, BOARD, CUSTOM }
+
+	/** Vom Launcher übergebene Auswahl (siehe {@code salami_capes.rs}). */
+	private static final String LAUNCHER_PROPERTY = "salami.cape";
 
 	private static final Identifier CUSTOM_TEXTURE = Identifier.fromNamespaceAndPath(SalamiClient.MOD_ID, "cape/custom");
 	private static CapesModule instance;
 
-	private final ModeSetting<Cape> cape = add(new ModeSetting<>("cape", Cape.SALAMI));
+	private final ModeSetting<Cape> cape = add(new ModeSetting<>("cape", Cape.LAUNCHER));
 	private final BoolSetting elytra = add(new BoolSetting("elytra", true));
 
 	/** Geladenes eigenes Cape ({@code null} = keins oder Fehler). */
@@ -82,19 +87,48 @@ public final class CapesModule extends Module {
 
 	private ClientAsset.Texture texture() {
 		Cape selected = cape.get();
-		if (selected != Cape.CUSTOM) {
-			return builtIn.computeIfAbsent(selected, c -> new ClientAsset.ResourceTexture(
-				Identifier.fromNamespaceAndPath(SalamiClient.MOD_ID, "cape/" + c.name().toLowerCase(Locale.ROOT))));
+		if (selected == Cape.LAUNCHER) {
+			return fromLauncher(System.getProperty(LAUNCHER_PROPERTY));
 		}
+		if (selected == Cape.CUSTOM) {
+			return customFrom(customCapeFile());
+		}
+		return builtIn(selected);
+	}
+
+	private ClientAsset.Texture builtIn(Cape selected) {
+		return builtIn.computeIfAbsent(selected, c -> new ClientAsset.ResourceTexture(
+			Identifier.fromNamespaceAndPath(SalamiClient.MOD_ID, "cape/" + c.name().toLowerCase(Locale.ROOT))));
+	}
+
+	/** {@code null}/leer = Spiel ohne Launcher gestartet → Salami-Cape. */
+	private ClientAsset.Texture fromLauncher(String selection) {
+		if (selection == null || selection.isBlank()) {
+			return builtIn(Cape.SALAMI);
+		}
+		if (selection.equals("none")) {
+			return null;
+		}
+		if (selection.startsWith("builtin:")) {
+			try {
+				Cape named = Cape.valueOf(selection.substring("builtin:".length()).toUpperCase(Locale.ROOT));
+				return named == Cape.LAUNCHER || named == Cape.CUSTOM ? builtIn(Cape.SALAMI) : builtIn(named);
+			} catch (IllegalArgumentException unknown) {
+				return builtIn(Cape.SALAMI);
+			}
+		}
+		return customFrom(Path.of(selection));
+	}
+
+	private ClientAsset.Texture customFrom(Path file) {
 		if (!customTried) {
 			customTried = true;
-			custom = loadCustom();
+			custom = loadCustom(file);
 		}
 		return custom;
 	}
 
-	private static ClientAsset.Texture loadCustom() {
-		Path file = customCapeFile();
+	private static ClientAsset.Texture loadCustom(Path file) {
 		if (!Files.isRegularFile(file)) {
 			Chat.warn("salami.capes.custom_missing", file.toString());
 			return null;

@@ -370,6 +370,11 @@ impl MinecraftLauncher {
             "-Dsalami.theme={}",
             if launcher_config.salami_theme { "salami" } else { "default" }
         ));
+        // Salami Capes: im Launcher gewähltes Cape (builtin:<name>, Pfad oder none)
+        command.arg(format!(
+            "-Dsalami.cape={}",
+            crate::integrations::salami_capes::launch_arg(&crate::integrations::salami_capes::capes_dir())
+        ));
 
         // Hand off asset management to the in-game client only for packs whose
         // client owns asset management (see `client_managed_assets`). Every
