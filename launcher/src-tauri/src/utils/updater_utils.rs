@@ -74,11 +74,25 @@ fn update_manifest_url(base: &str, platform_specific_target: &str) -> String {
 }
 
 /// Update-Basis-URL für den Kanal aus `branding.rs` (`None` = Updater deaktiviert).
+/// Ohne eigenen Beta-Kanal bekommt auch der Beta-Kanal die normalen Updates
+/// (die Beta-Einstellung kann z. B. aus importierten NoRisk-Einstellungen stammen).
 fn configured_update_base(is_beta_channel: bool) -> Option<&'static str> {
+    pick_update_base(
+        is_beta_channel,
+        crate::branding::UPDATE_BASE_URL,
+        crate::branding::UPDATE_BASE_URL_BETA,
+    )
+}
+
+fn pick_update_base(
+    is_beta_channel: bool,
+    stable: Option<&'static str>,
+    beta: Option<&'static str>,
+) -> Option<&'static str> {
     if is_beta_channel {
-        crate::branding::UPDATE_BASE_URL_BETA
+        beta.or(stable)
     } else {
-        crate::branding::UPDATE_BASE_URL
+        stable
     }
 }
 
@@ -659,7 +673,16 @@ pub async fn check_for_updates(
 
 #[cfg(test)]
 mod update_manifest_tests {
-    use super::update_manifest_url;
+    use super::{pick_update_base, update_manifest_url};
+
+    #[test]
+    fn beta_channel_falls_back_to_stable() {
+        let stable = Some("https://example.org/latest.json");
+        assert_eq!(pick_update_base(true, stable, None), stable);
+        assert_eq!(pick_update_base(true, stable, Some("beta")), Some("beta"));
+        assert_eq!(pick_update_base(false, stable, Some("beta")), stable);
+        assert_eq!(pick_update_base(false, None, Some("beta")), None);
+    }
 
     #[test]
     fn static_manifest_is_used_as_is() {
