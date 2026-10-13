@@ -128,35 +128,63 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 	// ------------------------------------------------------------------ Anker
 
 	private static void testAnchorMacro(ClientGameTestContext context, TestServerContext server, ModuleManager modules) {
-		server.runCommand("clear @a");
-		server.runCommand("give @a minecraft:totem_of_undying 1");
-		server.runCommand("give @a minecraft:glowstone 16");
-		// Bereich bei x=30 (weit weg von der Kristall-Explosion)
-		BlockPos anchor = new BlockPos(30, FEET_Y, -2);
-		BlockPos shield = anchor.south();
-		server.runCommand("fill 28 " + (FEET_Y - 1) + " -4 32 " + (FEET_Y - 1) + " 1 minecraft:stone");
-		server.runCommand("fill 28 " + FEET_Y + " -4 32 " + (FEET_Y + 2) + " 1 minecraft:air");
-		server.runCommand("setblock 30 " + FEET_Y + " -2 minecraft:respawn_anchor");
-		// auf die Oberseite des Ankers schauen (über den späteren Glowstone-Schutz hinweg)
-		server.runCommand("tp @p 30.5 " + FEET_Y + " 0.5 180 17");
-		context.waitTicks(5);
-		check(context.computeOnClient(c -> c.level.getBlockState(anchor).is(Blocks.RESPAWN_ANCHOR)), "Test setup: anchor missing");
-
 		Module macro = modules.get(AnchorMacroModule.class);
-		set(macro, "trigger", AnchorMacroModule.Trigger.AUTO);
-		context.runOnClient(c -> modules.setEnabled(macro, true));
 
+		// Automatisch: Anker nur anvisieren
+		set(macro, "trigger", AnchorMacroModule.Trigger.AUTO);
+		buildAnchorScene(context, server);
+		context.runOnClient(c -> modules.setEnabled(macro, true));
+		runAnchorSequence(context, "auto");
+		context.runOnClient(c -> modules.setEnabled(macro, false));
+
+		// Rechtsklick: ein kurzer Klick muss reichen, das Makro läuft bis zur Explosion weiter
+		set(macro, "trigger", AnchorMacroModule.Trigger.HOLD_USE);
+		buildAnchorScene(context, server);
+		context.runOnClient(c -> modules.setEnabled(macro, true));
+		context.getInput().holdKeyFor(options -> options.keyUse, 2);
+		runAnchorSequence(context, "click");
+		context.takeScreenshot("salami-08-anchor");
+		context.runOnClient(c -> modules.setEnabled(macro, false));
+		check(waitFor(context, 5, c -> c.player.getInventory().getSelectedSlot() == 0),
+			"Anchor Macro: did not switch back to the sword slot");
+	}
+
+	private static final BlockPos ANCHOR = new BlockPos(30, FEET_Y, -2);
+
+	/**
+	 * Anker auf dem Boden, Spieler 3 Blöcke davor mit Blick auf die Seitenfläche –
+	 * wie im Kampf. Der Glowstone-Schutz landet genau im Fadenkreuz.
+	 */
+	private static void buildAnchorScene(ClientGameTestContext context, TestServerContext server) {
+		server.runCommand("clear @a");
+		server.runCommand("item replace entity @p hotbar.0 with minecraft:stone_sword");
+		server.runCommand("item replace entity @p hotbar.1 with minecraft:totem_of_undying");
+		server.runCommand("item replace entity @p hotbar.2 with minecraft:glowstone 16");
+		server.runCommand("effect give @p minecraft:resistance 30 4 true");
+		// Bereich bei x=30 (weit weg von der Kristall-Explosion)
+		server.runCommand("fill 28 " + (FEET_Y - 1) + " -4 32 " + (FEET_Y - 1) + " 2 minecraft:stone");
+		server.runCommand("fill 28 " + FEET_Y + " -4 32 " + (FEET_Y + 2) + " 2 minecraft:air");
+		server.runCommand("setblock 30 " + FEET_Y + " -2 minecraft:respawn_anchor");
+		server.runCommand("tp @p 30.5 " + FEET_Y + " 1.5 180 24");
+		context.waitTicks(5);
+		context.runOnClient(c -> c.player.getInventory().setSelectedSlot(0));
+		context.waitTicks(2);
+		check(context.computeOnClient(c -> c.level.getBlockState(ANCHOR).is(Blocks.RESPAWN_ANCHOR)), "Test setup: anchor missing");
+		check(context.computeOnClient(c -> c.hitResult instanceof net.minecraft.world.phys.BlockHitResult hit && hit.getBlockPos().equals(ANCHOR)),
+			"Test setup: crosshair is not on the anchor side");
+	}
+
+	private static void runAnchorSequence(ClientGameTestContext context, String variant) {
+		BlockPos shield = ANCHOR.south();
 		boolean shieldSeen = false;
 		boolean exploded = false;
 		for (int i = 0; i < 60 && !exploded; i++) {
 			shieldSeen |= context.computeOnClient(c -> c.level.getBlockState(shield).is(Blocks.GLOWSTONE));
-			exploded = context.computeOnClient(c -> !c.level.getBlockState(anchor).is(Blocks.RESPAWN_ANCHOR));
+			exploded = context.computeOnClient(c -> !c.level.getBlockState(ANCHOR).is(Blocks.RESPAWN_ANCHOR));
 			context.waitTick();
 		}
-		context.takeScreenshot("salami-08-anchor");
-		context.runOnClient(c -> modules.setEnabled(macro, false));
-		check(shieldSeen, "Safe Anchor: no glowstone shield was placed");
-		check(exploded, "Anchor Macro: anchor was not detonated");
+		check(shieldSeen, "Safe Anchor (" + variant + "): no glowstone shield was placed");
+		check(exploded, "Anchor Macro (" + variant + "): anchor was not detonated");
 	}
 
 	// ------------------------------------------------------------------ Ghost Spear
