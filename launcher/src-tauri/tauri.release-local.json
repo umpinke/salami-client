@@ -1,9 +1,12 @@
 {
   "build": {
-    "beforeBuildCommand": "yarn build"
+    "beforeBuildCommand": "node scripts/bundle-salami-core.mjs && yarn build"
   },
   "bundle": {
     "targets": ["nsis"],
-    "createUpdaterArtifacts": false
+    "createUpdaterArtifacts": false,
+    "resources": {
+      "../../mod/build/launcher/salami-core.jar": "mods/salami-core.jar"
+    }
   }
 }

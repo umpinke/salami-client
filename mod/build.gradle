@@ -82,3 +82,13 @@ tasks.register("installDev", Copy) {
 	into(launcherDir.map { "$it/dev" })
 	rename { "salami-core.jar" }
 }
+
+// Fester Pfad für den Launcher-Installer (bundle.resources in tauri.release-local.json):
+// der Installer legt die Datei als mods/salami-core.jar neben die Launcher-Exe.
+tasks.register("launcherBundle", Copy) {
+	group = "salami"
+	description = "Builds salami-core and stages it for the launcher installer."
+	from(tasks.named("remapJar").flatMap { it.archiveFile })
+	into(layout.buildDirectory.dir("launcher"))
+	rename { "salami-core.jar" }
+}

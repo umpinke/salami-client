@@ -183,20 +183,14 @@ impl NoriskPackDownloadService {
                         // Launcher-Datenordner). Wird bei jedem Start neu kopiert, damit
                         // frische Dev-Builds von salami-core sofort im Spiel sind.
                         if let Some(local) = effective_identifier.strip_prefix("file:") {
-                            let source_path = {
-                                // "file:dev/x.jar" (relativ) oder "file:///C:/x.jar" bzw. "file:///home/x.jar"
-                                let raw = local.strip_prefix("//").unwrap_or(local);
-                                let raw = if cfg!(windows) { raw.trim_start_matches('/') } else { raw };
-                                let p = PathBuf::from(raw);
-                                if p.is_absolute() { p } else { LAUNCHER_DIRECTORY.root_dir().join(p) }
-                            };
+                            let source_path = local_pack_mod_source(local);
                             info!("Copying local pack mod '{}' from {:?}", display_name, source_path);
                             if let Some(parent) = target_path.parent() {
                                 fs::create_dir_all(parent).await?;
                             }
                             fs::copy(&source_path, &target_path).await.map_err(|e| {
                                 AppError::Download(format!(
-                                    "Local mod '{}' not found at {:?}: {} (build it with `gradlew installDev` in mod/)",
+                                    "Local mod '{}' not found at {:?}: {} (build it with `gradlew installDev` in mod/, or reinstall the launcher)",
                                     display_name, source_path, e
                                 ))
                             })?;
@@ -301,6 +295,90 @@ impl NoriskPackDownloadService {
     }
 
 
+}
+
+/// Ordner neben der Launcher-Exe, in den der Installer mitgelieferte Mods legt
+/// (`bundle.resources` in tauri.release-local.json).
+const BUNDLED_MODS_DIR: &str = "mods";
+
+/// Salami: Quelle einer "file:"-Packmod.
+/// 1. der angegebene Pfad – relativ zum Launcher-Datenordner (`dev/salami-core.jar` von
+///    `gradlew installDev`) oder absolut (`file:///C:/x.jar` bzw. `file:///home/x.jar`)
+/// 2. die mit dem Installer ausgelieferte Kopie `<exe-Ordner>/mods/<dateiname>`
+/// Gibt es beide, gewinnt die neuere – so verdeckt weder ein alter Dev-Build ein
+/// Launcher-Update noch ein altes Update einen frischen Dev-Build.
+fn local_pack_mod_source(local: &str) -> PathBuf {
+    let raw = local.strip_prefix("//").unwrap_or(local);
+    let raw = if cfg!(windows) { raw.trim_start_matches('/') } else { raw };
+    let p = PathBuf::from(raw);
+    let explicit = if p.is_absolute() { p } else { LAUNCHER_DIRECTORY.root_dir().join(p) };
+    let bundled = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|dir| dir.join(BUNDLED_MODS_DIR)))
+        .zip(explicit.file_name())
+        .map(|(dir, name)| dir.join(name));
+    newest_source(explicit, bundled)
+}
+
+fn newest_source(explicit: PathBuf, bundled: Option<PathBuf>) -> PathBuf {
+    let modified = |p: &PathBuf| std::fs::metadata(p).and_then(|m| m.modified()).ok();
+    let Some(bundled) = bundled else {
+        return explicit;
+    };
+    match (modified(&explicit), modified(&bundled)) {
+        (Some(e), Some(b)) if b > e => bundled,
+        (None, Some(_)) => bundled,
+        _ => explicit,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::newest_source;
+    use std::fs::File;
+    use std::path::PathBuf;
+    use std::time::{Duration, SystemTime};
+
+    fn file_with_age(dir: &PathBuf, name: &str, age_secs: u64) -> PathBuf {
+        let path = dir.join(name);
+        let file = File::create(&path).unwrap();
+        file.set_modified(SystemTime::now() - Duration::from_secs(age_secs)).unwrap();
+        path
+    }
+
+    fn temp_dir(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("salami-pack-src-{}-{}", tag, std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn newer_bundled_jar_wins_over_stale_dev_build() {
+        let dir = temp_dir("bundled-newer");
+        let dev = file_with_age(&dir, "dev.jar", 3600);
+        let bundled = file_with_age(&dir, "bundled.jar", 10);
+        assert_eq!(newest_source(dev, Some(bundled.clone())), bundled);
+    }
+
+    #[test]
+    fn newer_dev_build_wins_over_bundled_jar() {
+        let dir = temp_dir("dev-newer");
+        let dev = file_with_age(&dir, "dev.jar", 10);
+        let bundled = file_with_age(&dir, "bundled.jar", 3600);
+        assert_eq!(newest_source(dev.clone(), Some(bundled)), dev);
+    }
+
+    #[test]
+    fn falls_back_to_whichever_exists() {
+        let dir = temp_dir("fallback");
+        let missing = dir.join("missing.jar");
+        let bundled = file_with_age(&dir, "bundled.jar", 10);
+        assert_eq!(newest_source(missing.clone(), Some(bundled.clone())), bundled);
+        assert_eq!(newest_source(bundled.clone(), Some(missing.clone())), bundled);
+        // nichts da: der angegebene Pfad, damit die Fehlermeldung ihn nennt
+        assert_eq!(newest_source(missing.clone(), None), missing);
+    }
 }
 
 // Note: Syncing logic (like `sync_mods_to_profile` from ModDownloadService)

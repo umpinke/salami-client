@@ -48,7 +48,7 @@ Die Clip-Aufnahme (`norisk-capture`, FFmpeg) braucht zusätzlich **LLVM/libclang
 npx yarn@1.22.22 tauri dev --config src-tauri/tauri.dev-noclips.json
 ```
 
-Beim ersten Start legt der Launcher den Datenordner `%APPDATA%\salamiclient\SalamiClient` an. Das Standardprofil „Salami Client 1.21.11“ lädt `salami-core` aus `dev/salami-core.jar` (vorher in `mod/` `./gradlew installDev` ausführen) sowie die Performance-Mods von Modrinth. Importierte `.noriskpack`-Profile laufen automatisch mit dem Salami-Pack.
+Beim ersten Start legt der Launcher den Datenordner `%APPDATA%\salamiclient\SalamiClient` an. Das Standardprofil „Salami Client 1.21.11“ lädt `salami-core` – beim Entwickeln aus `dev/salami-core.jar` (vorher in `mod/` `./gradlew installDev` ausführen), im installierten Launcher die mitgelieferte Kopie – sowie die Performance-Mods von Modrinth. Importierte `.noriskpack`-Profile laufen automatisch mit dem Salami-Pack.
 
 ### Launcher installieren (Windows)
 
@@ -58,6 +58,8 @@ npx yarn@1.22.22 tauri build --config src-tauri/tauri.release-local.json
 ```
 
 Das erzeugt `src-tauri/target/release/bundle/nsis/Salami Client_<version>_x64-setup.exe`. Der Installer installiert ohne Admin-Rechte nach `%LOCALAPPDATA%\Salami Client` und legt Startmenü- und Desktop-Verknüpfung an.
+
+Der Build baut vorher `salami-core` (`scripts/bundle-salami-core.mjs` → `./gradlew launcherBundle`). Der Installer legt die Mod als `mods\salami-core.jar` neben die Launcher-Exe, damit braucht der installierte Launcher keinen Dev-Ordner. Liegt zusätzlich ein `dev\salami-core.jar` im Datenordner (von `installDev`), nimmt der Launcher die neuere der beiden Dateien.
 
 Der lokale Build lässt die Updater-Signatur und die Clip-Komponente weg. Die Clip-Komponente braucht LLVM.
 
