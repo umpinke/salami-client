@@ -9,11 +9,6 @@ import { RunningInstancesIndicator } from "../process/RunningInstancesIndicator"
 import { CurrentAccountDisplay } from "../account/CurrentAccountDisplay";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { MinecraftAccountManager } from "../account/MinecraftAccountManager";
-import { IconButton } from "../ui/buttons/IconButton";
-import { useSocialsModalStore } from "../../store/socials-modal-store";
-import { useFriendsStore } from "../../store/friends-store";
-import { Icon } from "@iconify/react";
-import { NotificationBell } from "./NotificationBell";
 import { UiZoomControls } from "./UiZoomControls";
 
 interface UserProfileBarProps {
@@ -28,8 +23,6 @@ export function UserProfileBar({ className }: UserProfileBarProps) {
   const { initializeAccounts } = useMinecraftAuthStore();
   const accountCount = useMinecraftAuthStore((s) => s.accounts.length);
   const [_, setMounted] = useState(false);
-  const { openModal: openSocialsModal } = useSocialsModalStore();
-  const { toggleSidebar: toggleFriendsSidebar } = useFriendsStore();
 
   useEffect(() => {
     setMounted(true);
@@ -71,7 +64,6 @@ export function UserProfileBar({ className }: UserProfileBarProps) {
     <div className={cn("relative flex items-center gap-3", className)}>
       <div className="profile-bar-container flex items-center gap-2">
         <UiZoomControls />
-        <NotificationBell />
         <RunningInstancesIndicator />
 
         <div ref={profileButtonRef}>
@@ -81,23 +73,6 @@ export function UserProfileBar({ className }: UserProfileBarProps) {
           />
         </div>
 
-        <IconButton
-          icon={<Icon icon="solar:users-group-rounded-linear" className="w-5 h-5" />}
-          onClick={toggleFriendsSidebar}
-          variant="flat"
-          size="sm"
-          aria-label={t('header.toggle_friends')}
-          className="text-white/70 hover:text-white h-10 w-10"
-        />
-
-        <IconButton
-          icon={<Icon icon="solar:link-linear" className="w-5 h-5" />}
-          onClick={openSocialsModal}
-          variant="flat"
-          size="sm"
-          aria-label={t('header.open_socials')}
-          className="text-white/70 hover:text-white h-10 w-10"
-        />
       </div>
 
   

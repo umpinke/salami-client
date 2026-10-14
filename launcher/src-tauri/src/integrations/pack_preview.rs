@@ -31,7 +31,7 @@ pub enum PackFormat {
 impl PackFormat {
     fn from_extension(extension: &str) -> Option<Self> {
         match extension {
-            "noriskpack" => Some(Self::Noriskpack),
+            "salamipack" | "noriskpack" => Some(Self::Noriskpack),
             "mrpack" => Some(Self::Mrpack),
             "zip" => Some(Self::Curseforge),
             _ => None,

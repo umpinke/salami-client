@@ -22,14 +22,12 @@ import { NebulaGrid } from ".././effects/NebulaGrid";
 import { NebulaVoxels } from ".././effects/NebulaVoxels";
 import { NebulaLightning } from ".././effects/NebulaLightning";
 import { NebulaLiquidChrome } from ".././effects/NebulaLiquidChrome";
-import { RetroGridEffect } from "../effects/RetroGridEffect";
 import PlainBackground from "../effects/PlainBackground";
 import CustomMediaBackground from "../effects/CustomMediaBackground";
 import { Snowfall } from "../../features/snow-effect/Snowfall";
 import { useSnowEffectStore } from "../../store/snow-effect-store";
 import { useLauncherTheme } from "../../hooks/useLauncherTheme";
 import * as ConfigService from "../../services/launcher-config-service";
-import { SocialsModal } from "../modals/SocialsModal";
 import { FriendsSidebar } from "../friends/FriendsSidebar";
 import { BRAND, FEATURES } from "../../config/salami";
 import { SalamiFall } from "../../themes/salami/SalamiFall";
@@ -45,7 +43,7 @@ import { ProfileWizardV2Modal } from "../modals/ProfileWizardV2Modal";
 import { ProfileSettingsModal } from "../modals/ProfileSettingsModal";
 import { SettingsModal } from "../modals/SettingsModal";
 import { ProfileDuplicateModal } from "../modals/ProfileDuplicateModal";
-import { exit, relaunch } from '@tauri-apps/plugin-process';
+import { exit } from '@tauri-apps/plugin-process';
 import { Tooltip } from "../ui/Tooltip";
 import { HeaderInfoCarousel } from "../header/HeaderInfoCarousel";
 import { toast } from 'react-hot-toast';
@@ -379,7 +377,6 @@ export function AppLayout({
         </div>
       </div>
       {/* Global Modals Portal */}
-      <SocialsModal />
       <ProfileWizardV2Modal />
       <ProfileSettingsModal />
       <SettingsModal />

@@ -116,8 +116,8 @@ export function ProfileWizardV2Step3({
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const defaultNoriskPackId = noriskPacks["norisk-prod"]
-        ? "norisk-prod"
+    const defaultNoriskPackId = noriskPacks["salami"]
+        ? "salami"
         : Object.keys(noriskPacks)[0] ?? null;
 
     useEffect(() => {
@@ -168,10 +168,9 @@ export function ProfileWizardV2Step3({
                 // Get the mods in the pack
                 const mods = selectedPack.mods || [];
 
-                // Check if any NoRisk Client mod exists and is compatible with the selected version/loader
+                // Salami Client kompatibel = salami-core gibt es für die gewählte Version/den Loader
                 const hasCompatibleNoRiskClient = mods.some((mod: NoriskModEntryDefinition) => {
-                    // Check if this is a NoRisk Client mod
-                    if (mod.id === "noriskclient-client" || mod.id === "nrc-client") {
+                    if (mod.id === "salami-core") {
                         // Check if it has compatibility for the selected version and loader
                         const versionCompat = mod.compatibility?.[selectedMinecraftVersion];
                         const loaderCompat = versionCompat?.[selectedLoader];
@@ -188,7 +187,7 @@ export function ProfileWizardV2Step3({
                 });
 
                 console.log("Pack mods for", selectedNoriskPackId, selectedMinecraftVersion, selectedLoader, ":", mods);
-                console.log("Has compatible NoRisk Client:", hasCompatibleNoRiskClient);
+                console.log("Has compatible Salami Client:", hasCompatibleNoRiskClient);
 
                 if (!hasCompatibleNoRiskClient) {
                     setShowYellowWarning(true);

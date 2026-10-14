@@ -1,29 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import i18n from '../../i18n/i18n';
 import { Modal } from '../ui/Modal';
-import { StaticTooltip } from '../ui/Tooltip';
 import { useCrashModalStore } from '../../store/crash-modal-store';
 import { Button } from '../ui/buttons/Button';
-import { Checkbox } from '../ui/Checkbox';
 import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
 import { getProfile } from '../../services/profile-service';
 import { uploadLogToMclogs } from '../../services/log-service';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
-import { checkCrashLog, fetchCrashReport, getProcessLogCursor } from '../../services/process-service';
-import type { CrashlogDto, ProcessMetadata } from '../../types/processState';
-import type { CrashCheckResult } from '../../types/crash-analysis';
+import { fetchCrashReport, getProcessLogCursor } from '../../services/process-service';
+import type { ProcessMetadata } from '../../types/processState';
 import { openExternalUrl } from '../../services/tauri-service';
 import { useGlobalModal } from '../../hooks/useGlobalModal';
-import { CrashAnalysisModal } from './CrashAnalysisModal';
 import { logError, logWarn } from '../../utils/logging-utils';
 import { Window } from '@tauri-apps/api/window';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import type { EventPayload, CrashReportContentAvailablePayload } from '../../types/events';
 import { EventType } from '../../types/events';
-import { NORISK_SERVICES_ENABLED } from '../../config/salami';
 
 export function GlobalCrashReportModal() {
   const { t } = useTranslation();
@@ -33,7 +27,6 @@ export function GlobalCrashReportModal() {
   const [mclogsUrl, setMclogsUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   // NoRisk-Absturzanalyse gibt es nur mit NoRisk-Diensten; sonst nur Log-Upload zu mclo.gs
-  const [analyzeWithNoRisk, setAnalyzeWithNoRisk] = useState(NORISK_SERVICES_ENABLED);
   const [statusText, setStatusText] = useState<string | null>(null); // inline progress while analyzing
   const [displayedCrashReportContent, setDisplayedCrashReportContent] = useState<string | undefined>(undefined);
   const [isListeningForCrashContent, setIsListeningForCrashContent] = useState(false);
@@ -57,7 +50,6 @@ export function GlobalCrashReportModal() {
       }
       setMclogsUrl(null);
       setIsProcessing(false);
-      setAnalyzeWithNoRisk(true);
       setDisplayedCrashReportContent(crashData.crash_report_content);
       setIsListeningForCrashContent(false);
       hasFetchedCrashReportRef.current = false; // Reset fetch flag for new crash
@@ -244,29 +236,6 @@ ${gameLog}`
     return url;
   };
 
-  const analyze = async (url: string, profileId: string, metadata: ProcessMetadata) => {
-    setStatusText(t('crash_modal.toast.analyzing'));
-    const payload: CrashlogDto = { mcLogsUrl: url, metadata, locale: i18n.language };
-    let result: CrashCheckResult;
-    try {
-      result = await checkCrashLog(payload);
-    } catch (e) {
-      logError(`Crash analysis failed, falling back to log link: ${e}`);
-      toast.error(t('crash_modal.toast.analyze_failed'));
-      await shareLogLink(url);
-      return;
-    }
-    closeCrashModal();
-    showModal(
-      'crash-analysis',
-      <CrashAnalysisModal
-        result={result}
-        profileId={profileId}
-        onClose={() => hideModal('crash-analysis')}
-      />,
-    );
-  };
-
   const handlePrimaryAction = async () => {
     const profileId = crashData?.profile_id;
     const metadata = crashData?.process_metadata;
@@ -280,13 +249,9 @@ ${gameLog}`
     setStatusText(t('crash_modal.toast.processing'));
     try {
       const url = await ensureUploaded(profileId, metadata);
-      if (analyzeWithNoRisk) {
-        await analyze(url, profileId, metadata);
-      } else {
-        toast.success(t('crash_modal.toast.url_copied'));
-        await shareLogLink(url);
-        closeCrashModal();
-      }
+      toast.success(t('crash_modal.toast.url_copied'));
+      await shareLogLink(url);
+      closeCrashModal();
     } catch (error: any) {
       toast.error(error.message || t('crash_modal.toast.unexpected_error'));
       logError(`Crash report processing error: ${error}`);
@@ -296,17 +261,7 @@ ${gameLog}`
     }
   };
 
-  const handleContactSupport = async () => {
-    try {
-      await openExternalUrl('https://discord.norisk.gg');
-      toast.success(t('crash_modal.toast.discord_opened'));
-    } catch (error) {
-      logError(`Failed to open Discord URL: ${error}`);
-      toast.error(t('crash_modal.toast.discord_failed'));
-    }
-  };
-
-  const primaryButtonText = analyzeWithNoRisk ? t('crash_modal.button.analyze') : t('crash_modal.button.upload_only');
+  const primaryButtonText = t('crash_modal.button.upload_only');
 
   const modalFooter = (
     <div className="flex gap-3 w-full">
@@ -314,34 +269,13 @@ ${gameLog}`
         <Button
           onClick={handlePrimaryAction}
           variant="secondary"
-          icon={<Icon icon={analyzeWithNoRisk ? "solar:shield-check-bold" : "solar:cloud-upload-bold"} className="w-5 h-5" />}
+          icon={<Icon icon="solar:cloud-upload-bold" className="w-5 h-5" />}
           disabled={isProcessing || !crashData?.process_metadata}
           className="w-full justify-center whitespace-nowrap"
         >
           {primaryButtonText}
         </Button>
-        {/* BETA badge — corner overlay like the rollout blitz in MainLaunchButton; tooltip on hover */}
-        {analyzeWithNoRisk && (
-        <div className="absolute -top-2 -left-2 z-10 pointer-events-auto">
-          <StaticTooltip content={t('crash_modal.tooltip.beta')} delay={0}>
-            <span className="rounded border border-amber-400/50 bg-amber-400/30 px-1.5 py-0.5 text-[10px] font-minecraft uppercase leading-none text-amber-200 cursor-help shadow-md">
-              beta
-            </span>
-          </StaticTooltip>
-        </div>
-        )}
       </div>
-      {NORISK_SERVICES_ENABLED && (
-      <Button
-        onClick={handleContactSupport}
-        variant="default"
-        icon={<Icon icon="solar:letter-linear" className="w-5 h-5" />}
-        disabled={isProcessing}
-        className="flex-1 justify-center whitespace-nowrap"
-      >
-        {t('crash_modal.button.contact_support')}
-      </Button>
-      )}
     </div>
   );
 
@@ -382,14 +316,6 @@ ${gameLog}`
               <p className="text-sm font-minecraft text-gray-400">
                 {t('crash_modal.upload_notice')}
               </p>
-              {NORISK_SERVICES_ENABLED && (
-                <Checkbox
-                  checked={analyzeWithNoRisk}
-                  onChange={(e) => setAnalyzeWithNoRisk(e.target.checked)}
-                  label={t('crash_modal.report_checkbox')}
-                  size="sm"
-                />
-              )}
             </div>
           </>
         )}

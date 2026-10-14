@@ -48,20 +48,14 @@ let launcherStartTracked = false;
 import flagsmith from 'flagsmith';
 import { FlagsmithProvider } from 'flagsmith/react';
 import { Button } from "./components/ui/buttons/Button";
-import { openExternalUrl } from "./services/tauri-service";
-import { ExternalLink } from "lucide-react";
-import { MinecraftAuthService } from "./services/minecraft-auth-service";
 import { LauncherNoticeBanner } from "./components/ui/LauncherNoticeBanner";
 import ChildProtectionModal from "./components/modals/ChildProtectionModal";
-import { NotificationModal } from "./components/modals/NotificationModal";
-import { useNotificationStore } from "./store/notification-store";
 import { useMinecraftAuthStore } from "./store/minecraft-auth-store";
 import { useWelcomeStore } from "./store/welcome-store";
 import { WelcomeScreen } from "./components/welcome/WelcomeScreen";
 import { useSettingsModalStore } from "./store/settings-modal-store";
 import { useSkinStore } from "./store/useSkinStore";
 import { invalidatePlayerAppearance } from "./services/cosmetic-cache";
-import { hasPermission, refreshPermissions } from "./services/permission-service";
 import {
   fetchTesterQueueCount,
   openTesterWindow,
@@ -88,7 +82,6 @@ export function App() {
   } = useThemeStore();
   const { showModal, hideModal } = useGlobalModal();
   const { activeAccount } = useMinecraftAuthStore();
-  const { fetchNotifications } = useNotificationStore();
 
   // The welcome screen covers the whole app, so the account list has to be
   // loaded here — its usual trigger sits inside AppLayout's header, behind the
@@ -349,36 +342,6 @@ export function App() {
     })();
   }, [analyticsConsent.decision, language]);
 
-  // Fetch notifications when user is logged in
-  useEffect(() => {
-    if (activeAccount) {
-      fetchNotifications().catch((error) => {
-        console.error("[App.tsx] Failed to fetch notifications:", error);
-      });
-    }
-  }, [activeAccount, fetchNotifications]);
-
-  useEffect(() => {
-    if (!activeAccount) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        await refreshPermissions();
-        if (cancelled) return;
-        const allowed = await hasPermission("norisk.tester");
-        if (cancelled || !allowed) return;
-        const { count } = await fetchTesterQueueCount();
-        if (cancelled || count <= 0) return;
-        await openTesterWindow();
-      } catch (err) {
-        console.warn("[App.tsx] tester queue check skipped:", err);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeAccount]);
-
   // Icons beim App-Start vorladen
   useEffect(() => {
     const preloadIcons = async () => {
@@ -594,7 +557,6 @@ export function App() {
         <GlobalModalPortal />
         <MacCapturePermissionMonitor />
         <ChildProtectionModal />
-        <NotificationModal />
         <AppLayout activeTab={activeTab} onNavChange={handleNavChange}>
           <Outlet context={profilesTabContext} />
         </AppLayout>

@@ -15,7 +15,8 @@ export function extractNrcCompatibility(
     if (!pack?.mods) continue;
 
     for (const mod of pack.mods) {
-      if (mod.id === "noriskclient-client" || mod.id === "nrc-client") {
+      // Salami: ein Pack ist "Salami Client kompatibel", wenn es salami-core für die Version hat
+      if (mod.id === "salami-core") {
         if (mod.compatibility) {
           for (const [version, loaderMap] of Object.entries(mod.compatibility)) {
             compatibleVersions.add(version);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { BRAND } from "../../config/salami";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { useThemeStore } from "../../store/useThemeStore";
@@ -177,7 +178,7 @@ export function WelcomeScreen() {
             header uses. The painted logo asset is not the current brand. */}
         <div className="relative z-10" style={rise(60)}>
           <span className="font-smallcaps text-3xl tracking-wider font-bold text-white text-shadow">
-            NoRiskClient
+            {BRAND.name}
           </span>
         </div>
 

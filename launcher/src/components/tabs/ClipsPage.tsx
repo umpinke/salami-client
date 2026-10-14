@@ -29,7 +29,7 @@ import { cn } from "../../lib/utils";
 
 const STATUS_POLL_MS = 2000;
 const ALL_GAMES = "__all__";
-const FEEDBACK_URL = "https://discord.norisk.gg";
+const FEEDBACK_URL = "https://github.com/umpinke/salami-client/issues";
 
 type Tone = "live" | "waiting" | "warn" | "off";
 

@@ -24,7 +24,7 @@ import { FloatingActionBar, type FABActionConfig } from "../profiles/v3/shared/F
 import { useSyncPacks } from "./useSyncPacks";
 import { BetaNotice } from "../ui/BetaNotice";
 
-const SYNC_PACKS_DISCORD_URL = "https://discord.norisk.gg";
+const SYNC_PACKS_DISCORD_URL = "https://github.com/umpinke/salami-client/issues";
 
 preloadIcons([
   "solar:arrow-left-linear",

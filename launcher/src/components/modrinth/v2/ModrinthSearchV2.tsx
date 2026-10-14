@@ -2884,12 +2884,12 @@ export function ModrinthSearchV2({
           return { versionName: version.version_number };
         },
         {
-          loading: `${toastMessage} NoRisk Pack item: ${project.title} (${version.version_number})...`,
-          success: ({ versionName }) => `Successfully ${successMessage} NoRisk Pack item: ${project.title} (${versionName})`,
-          error: (err) => `Failed to ${toastMessage.toLowerCase()} NoRisk Pack item: ${err.message || parseErrorMessage(err)}`
+          loading: `${toastMessage} pack item: ${project.title} (${version.version_number})...`,
+          success: ({ versionName }) => `Successfully ${successMessage} pack item: ${project.title} (${versionName})`,
+          error: (err) => `Failed to ${toastMessage.toLowerCase()} pack item: ${err.message || parseErrorMessage(err)}`
         }
       ).catch(err => {
-        console.error(`Error ${toastMessage.toLowerCase()} NoRisk Pack item:`, err);
+        console.error(`Error ${toastMessage.toLowerCase()} pack item:`, err);
       });
       
       return; // Exit after handling NoRisk pack item

@@ -92,7 +92,7 @@ pub enum ExportFormat {
 impl ExportFormat {
     fn extension(&self) -> &'static str {
         match self {
-            Self::Noriskpack => "noriskpack",
+            Self::Noriskpack => "salamipack",
             Self::Mrpack => "mrpack",
             Self::Curseforge => "zip",
         }
@@ -1350,8 +1350,9 @@ pub async fn import_profile(
             log::info!("File extension is .mrpack, proceeding with mrpack processing.");
             mrpack::import_mrpack_as_profile(file_path_buf, None, None, event_id_uuid, 0.0, 1.0).await?
         }
-        Some("noriskpack") => {
-            log::info!("File extension is .noriskpack, proceeding with noriskpack processing.");
+        // .salamipack; ältere Exporte heißen noch .noriskpack (gleiches Format)
+        Some("salamipack") | Some("noriskpack") => {
+            log::info!("File extension is .salamipack/.noriskpack, proceeding with pack processing.");
             crate::integrations::norisk_packs::import_noriskpack_as_profile(file_path_buf, event_id_uuid).await?
         }
         Some("zip") => {
@@ -1364,7 +1365,7 @@ pub async fn import_profile(
                 file_path_buf
             );
             return Err(CommandError::from(AppError::Other(
-                "Invalid file type selected. Please select a .mrpack, .noriskpack, or .zip file."
+                "Invalid file type selected. Please select a .salamipack, .mrpack or .zip file."
                     .to_string(),
             )));
         }

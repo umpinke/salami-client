@@ -21,6 +21,32 @@ pub struct UploadProfileImagesPayload {
 }
 
 /// Returns the root launcher directory path
+/// Ordner für Profilbilder (Icon/Banner) im Profilordner.
+pub const PROFILE_IMAGE_DIR: &str = "SalamiClient";
+/// Früherer Name (NoRisk-Fork). Gespeicherte Pfade mit diesem Präfix funktionieren weiter.
+const LEGACY_PROFILE_IMAGE_DIR: &str = "NoRiskClientLauncher";
+
+/// Profilbild-Pfad relativ zum Profilordner auflösen. Ein alter Ordner `NoRiskClientLauncher/`
+/// wird beim ersten Zugriff in `SalamiClient/` umbenannt; alte Pfade zeigen dann dorthin.
+pub fn resolve_profile_image(profile_path: &std::path::Path, relative: &str) -> PathBuf {
+    let normalized = relative.replace('\\', "/");
+    let legacy_prefix = format!("{}/", LEGACY_PROFILE_IMAGE_DIR);
+    if let Some(rest) = normalized.strip_prefix(&legacy_prefix) {
+        let legacy_dir = profile_path.join(LEGACY_PROFILE_IMAGE_DIR);
+        let current_dir = profile_path.join(PROFILE_IMAGE_DIR);
+        if legacy_dir.is_dir() && !current_dir.exists() {
+            if let Err(e) = std::fs::rename(&legacy_dir, &current_dir) {
+                log::warn!("Could not rename {:?} -> {:?}: {}", legacy_dir, current_dir, e);
+            }
+        }
+        let migrated = current_dir.join(rest);
+        if migrated.exists() {
+            return migrated;
+        }
+    }
+    profile_path.join(relative)
+}
+
 #[command]
 pub async fn get_launcher_directory() -> Result<String> {
     let path = LAUNCHER_DIRECTORY.root_dir();
@@ -105,7 +131,7 @@ pub async fn resolve_image_path(
             let profile_path = profile_manager
                 .get_profile_instance_path(profile_uuid)
                 .await?;
-            let full_path = profile_path.join(path);
+            let full_path = resolve_profile_image(&profile_path, &path);
 
             debug!("Resolved profile-relative path to: {:?}", full_path);
             if !full_path.exists() {
@@ -151,7 +177,7 @@ pub async fn upload_profile_images(payload: UploadProfileImagesPayload) -> Resul
         .get_profile_instance_path(profile_uuid)
         .await?;
 
-    let target_sub_dir_name = "NoRiskClientLauncher";
+    let target_sub_dir_name = PROFILE_IMAGE_DIR;
     // Dynamically determine filename based on image_type and extension
     // Default extension if not found
     let mut extension = ".png".to_string();
@@ -339,4 +365,25 @@ pub async fn upload_profile_images(payload: UploadProfileImagesPayload) -> Resul
         .await?;
 
     Ok(relative_image_path_str)
+}
+
+#[cfg(test)]
+mod profile_image_tests {
+    use super::resolve_profile_image;
+
+    #[test]
+    fn legacy_image_folder_is_renamed_and_old_paths_still_work() {
+        let profile = std::env::temp_dir().join(format!("salami-profile-images-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&profile);
+        std::fs::create_dir_all(profile.join("NoRiskClientLauncher")).unwrap();
+        std::fs::write(profile.join("NoRiskClientLauncher").join("icon.png"), "png").unwrap();
+
+        let resolved = resolve_profile_image(&profile, "NoRiskClientLauncher/icon.png");
+        assert_eq!(resolved, profile.join("SalamiClient").join("icon.png"));
+        assert!(resolved.exists());
+        assert!(!profile.join("NoRiskClientLauncher").exists());
+        // neue Pfade bleiben unverändert
+        assert_eq!(resolve_profile_image(&profile, "SalamiClient/banner.png"), profile.join("SalamiClient/banner.png"));
+        let _ = std::fs::remove_dir_all(&profile);
+    }
 }

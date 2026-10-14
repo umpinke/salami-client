@@ -332,10 +332,10 @@
     "fileAssociations": [
       {
         "ext": [
-          "noriskpack"
+          "salamipack"
         ],
         "name": "Salami Client Modpack",
-        "description": "Modpack file (.noriskpack format)"
+        "description": "Salami Client modpack (.salamipack)"
       }
     ]
   }

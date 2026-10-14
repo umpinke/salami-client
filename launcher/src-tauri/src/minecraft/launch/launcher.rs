@@ -145,7 +145,7 @@ fn resolve_profile_banner_path(
             }
         }
         ImageSource::RelativeProfile { path } => {
-            let full_path = profile_path.join(path);
+            let full_path = crate::commands::path_commands::resolve_profile_image(&profile_path, path);
             if full_path.exists() {
                 Some(full_path.to_string_lossy().to_string())
             } else {

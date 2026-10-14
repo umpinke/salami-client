@@ -96,14 +96,14 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
               <div className="min-h-[3rem] flex flex-col justify-center">
                 <div className="flex items-baseline gap-2">
                   <h4 className="text-base font-smallcaps text-white tracking-wider">
-                    NoRisk
+                    NoRisk Client Launcher
                   </h4>
                 </div>
               </div>
             </div>
             <div className="text-right">
               <p className="text-white/80 font-smallcaps text-xs tracking-wide">
-                {t('credits_modal.backend_core')}
+                {t('credits_modal.based_on')}
               </p>
             </div>
           </div>
@@ -113,7 +113,7 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
             <Button
               variant="ghost"
               className="flex items-center gap-2 px-6 py-3 border border-[#ffffff20] hover:bg-white/5 transition-colors"
-              onClick={() => handleOpenUrl("https://norisk.gg/licenses")}
+              onClick={() => handleOpenUrl("https://github.com/umpinke/salami-client/blob/main/launcher/LICENSE")}
             >
               <Icon icon="solar:arrow-right-up-bold" className="w-5 h-5" />
               <span className="font-smallcaps text-xs">{t('credits_modal.view_licenses')}</span>

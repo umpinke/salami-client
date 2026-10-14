@@ -10,7 +10,7 @@ use crate::minecraft::downloads::mc_client_download::MinecraftClientDownloadServ
 use crate::minecraft::downloads::mc_libraries_download::MinecraftLibrariesDownloadService;
 use crate::minecraft::downloads::mc_natives_download::MinecraftNativesDownloadService;
 use crate::minecraft::downloads::NoriskPackDownloadService;
-use crate::minecraft::downloads::{ModDownloadService, NoriskClientAssetsDownloadService};
+use crate::minecraft::downloads::ModDownloadService;
 use crate::minecraft::dto::JavaDistribution;
 use crate::minecraft::launch::launch_summary::LaunchSummary;
 use crate::minecraft::{MinecraftLaunchParameters, MinecraftLauncher};
@@ -448,16 +448,6 @@ pub async fn install_minecraft_version(
             .await?
     });
 
-    // Download NoRiskClient assets (handles progress events internally)
-    let norisk_assets_service = NoriskClientAssetsDownloadService::new()
-        .with_concurrent_downloads(launcher_config.concurrent_downloads)
-        .with_stats(summary.nrc_assets.clone());
-    summary_phase!(summary, "nrc assets", {
-        norisk_assets_service
-            .download_nrc_assets_for_profile(&profile, credentials.as_ref(), is_experimental_mode)
-            .await?
-    });
-
     // Download Minecraft client
     let client_service = MinecraftClientDownloadService::new().with_stats(summary.client.clone());
     timed_step(&state, &summary, EventType::DownloadingClient, profile.id, "client", || async {
@@ -507,7 +497,7 @@ pub async fn install_minecraft_version(
 
         if let Some(version) = resolved_loader.version {
             let reason_str = match resolved_loader.reason {
-                crate::minecraft::modloader::LoaderVersionReason::NoriskPack => "Norisk pack policy",
+                crate::minecraft::modloader::LoaderVersionReason::NoriskPack => "pack policy",
                 crate::minecraft::modloader::LoaderVersionReason::UserOverwrite => "user overwrite",
                 crate::minecraft::modloader::LoaderVersionReason::ProfileDefault => "profile default",
                 crate::minecraft::modloader::LoaderVersionReason::NotResolved => "not resolved",
@@ -598,56 +588,19 @@ pub async fn install_minecraft_version(
         &profile.selected_norisk_pack_id
     {
         info!(
-            "Fetching Norisk config because pack '{}' is selected. Attempting to refresh first.",
+            "Loading pack config because pack '{}' is selected.",
             pack_id
         );
-        if !crate::branding::NORISK_SERVICES_ENABLED {
-            // Salami: Packs kommen ohne Token aus integrations::salami_packs.
-            if let Err(update_err) = state
-                .norisk_pack_manager
-                .fetch_and_update_config("", is_experimental_mode)
-                .await
-            {
-                warn!(
-                    "Failed to load Salami pack configuration for '{}': {}. Using cached version.",
-                    pack_id, update_err
-                );
-            }
-        } else if let Some(creds) = credentials.as_ref() {
-            match creds
-                .norisk_credentials
-                .get_token_for_mode(is_experimental_mode)
-            {
-                Ok(norisk_token_value) => {
-                    info!("Attempting to update Norisk pack configuration using obtained token for pack '{}'...", pack_id);
-                    if let Err(update_err) = state
-                        .norisk_pack_manager
-                        .fetch_and_update_config(&norisk_token_value, is_experimental_mode)
-                        .await
-                    {
-                        warn!(
-                                "Failed to update Norisk pack '{}' configuration: {}. Will proceed with cached version.",
-                                pack_id, update_err
-                            );
-                    } else {
-                        info!(
-                            "Successfully updated Norisk pack '{}' configuration from API.",
-                            pack_id
-                        );
-                    }
-                }
-                Err(token_err) => {
-                    warn!(
-                            "Could not obtain Norisk token for pack '{}' to update configuration: {}. Will proceed with cached version.",
-                            pack_id, token_err
-                        );
-                }
-            }
-        } else {
-            error!(
-                    "A Norisk pack ('{}') is selected, but no credentials were provided. Cannot attempt to update pack configuration.",
-                    pack_id
-                );
+        // Salami: Packs kommen ohne Token aus integrations::salami_packs.
+        if let Err(update_err) = state
+            .norisk_pack_manager
+            .fetch_and_update_config("", is_experimental_mode)
+            .await
+        {
+            warn!(
+                "Failed to load Salami pack configuration for '{}': {}. Using cached version.",
+                pack_id, update_err
+            );
         }
         // No need to clone state here, it's still valid in this scope
         // Always attempt to get the config, which will be the latest if updated, or cached otherwise.
@@ -682,7 +635,7 @@ pub async fn install_minecraft_version(
                 EventType::DownloadingMods,
                 profile.id,
                 &format!(
-                    "Downloading Norisk Pack '{}' Mods... (Phase 2)",
+                    "Downloading pack '{}' mods...",
                     selected_pack_id
                 ),
                 0.0,
@@ -691,7 +644,7 @@ pub async fn install_minecraft_version(
             .await?;
 
             info!(
-                "Downloading mods for selected Norisk Pack '{}'...",
+                "Downloading mods for selected pack '{}'...",
                 selected_pack_id
             );
 
@@ -713,7 +666,7 @@ pub async fn install_minecraft_version(
             {
                 Ok(_) => {
                     info!(
-                        "Norisk Pack '{}' mods download completed successfully.",
+                        "Pack '{}' mods download completed successfully.",
                         selected_pack_id
                     );
                     emit_progress_event(
@@ -721,7 +674,7 @@ pub async fn install_minecraft_version(
                         EventType::DownloadingMods,
                         profile.id,
                         &format!(
-                            "Norisk Pack '{}' Mods downloaded successfully! (Phase 2) ({}ms)",
+                            "Pack '{}' mods downloaded ({}ms)",
                             selected_pack_id, pack_download_start.elapsed().as_millis()
                         ),
                         1.0,
@@ -731,14 +684,14 @@ pub async fn install_minecraft_version(
                 }
                 Err(e) => {
                     error!(
-                        "Failed to download Norisk Pack '{}' mods: {}",
+                        "Failed to download pack '{}' mods: {}",
                         selected_pack_id, e
                     );
                     emit_progress_event(
                         &state,
                         EventType::DownloadingMods,
                         profile.id,
-                        &format!("Error downloading Norisk Pack '{}' mods!", selected_pack_id),
+                        &format!("Error downloading pack '{}' mods!", selected_pack_id),
                         1.0,
                         Some(e.to_string()),
                     )
@@ -748,13 +701,13 @@ pub async fn install_minecraft_version(
         } else {
             // Should not happen if selected_pack_id is Some, but handle defensively
             error!(
-                "Norisk config was expected but not loaded for pack ID: {}",
+                "Pack config was expected but not loaded for pack ID: {}",
                 selected_pack_id
             );
         }
     } else {
         info!(
-            "No Norisk Pack selected for profile '{}', skipping pack download.",
+            "No pack selected for profile '{}', skipping pack download.",
             profile.name
         );
     }

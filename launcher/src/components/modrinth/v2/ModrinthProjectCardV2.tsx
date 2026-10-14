@@ -257,7 +257,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
         {/* Blocked Mod Warning Icon - Top Left */}
         {projectNoRiskStatus === 'blocked' && (
           <div className="absolute top-2 left-2 z-10 pointer-events-auto">
-            <Tooltip content="This mod is blocked by NoRisk Client as it is known to cause crashes or severe compatibility issues. Installation is not recommended.">
+            <Tooltip content="This mod is blocked by Salami Client as it is known to cause crashes or severe compatibility issues. Installation is not recommended.">
               <div>
                 <Icon 
                   icon="solar:danger-triangle-bold" 
@@ -269,7 +269,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
         )}
         {projectNoRiskStatus === 'warning' && (
           <div className="absolute top-2 left-2 z-10 pointer-events-auto">
-            <Tooltip content="This version is known to cause crashes or compatibility issues with NoRisk Client. Installation is possible but not recommended.">
+            <Tooltip content="This version is known to cause crashes or compatibility issues with Salami Client. Installation is possible but not recommended.">
               <div>
                 <Icon 
                   icon="solar:danger-triangle-bold" 
@@ -282,7 +282,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
         {/* Fallback for deprecated isBlocked prop */}
         {!projectNoRiskStatus && isBlocked && (
           <div className="absolute top-2 left-2 z-10 pointer-events-auto">
-            <Tooltip content="This mod is blocked by NoRisk Client as it is known to cause crashes or severe compatibility issues. Installation is not recommended.">
+            <Tooltip content="This mod is blocked by Salami Client as it is known to cause crashes or severe compatibility issues. Installation is not recommended.">
               <div>
                 <Icon 
                   icon="solar:danger-triangle-bold" 
@@ -392,7 +392,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
                     }
                     size="sm"
                   >
-                    NoRisk Pack
+                    Salami Pack
                   </TagBadge>
                 )}
               </>

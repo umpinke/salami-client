@@ -1094,7 +1094,7 @@ pub async fn export_profile_to_noriskpack(
             // Generate a default output path
             let safe_name = profile.name.replace(" ", "_").to_lowercase();
             let default_name = format!(
-                "{}_v{}_{}.noriskpack",
+                "{}_v{}_{}.salamipack",
                 safe_name,
                 profile.game_version,
                 profile.loader.as_str()

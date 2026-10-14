@@ -30,7 +30,7 @@ const EXPORT_FORMATS: {
   {
     value: "noriskpack",
     labelKey: "export.format_noriskpack",
-    extension: "noriskpack",
+    extension: "salamipack",
     image: "/logo.png",
   },
   {
@@ -43,7 +43,7 @@ const EXPORT_FORMATS: {
     value: "curseforge",
     labelKey: "export.format_curseforge",
     extension: "zip",
-    image: "https://cdn.norisk.gg/misc/curseforge.webp",
+    image: "/icons/curseforge.svg",
   },
 ];
 
@@ -425,7 +425,7 @@ export function ExportSettingsTab({
                 "resourcepacks",
                 "shaderpacks",
                 "options.txt",
-                "NoRiskClientLauncher",
+                "SalamiClient",
                 "config",
                 "custom_mods",
                 "mods",

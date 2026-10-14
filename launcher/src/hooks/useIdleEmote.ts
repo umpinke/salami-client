@@ -10,9 +10,10 @@ type EmoteKind = "randomLocal" | "special" | "calm";
 // Relative weights, rolled once per launcher open. Don't need to sum to 100 —
 // the pick is proportional to the weights.
 const PROBABILITY: Record<EmoteKind, number> = {
-  randomLocal: 20,
+  // Salami: keine Emotes aus NoRisks Cosmetics-Paket – nur die eigenen Animationen
+  randomLocal: 0,
   special: 10,
-  calm: 70,
+  calm: 90,
 };
 
 const CALM_IDLES = [
@@ -21,7 +22,7 @@ const CALM_IDLES = [
 ];
 const SPECIAL_IDLE = "/emotes/launcheridle3.animation.json";
 
-const LAST_IDLE_KEY = "nrc-launcher-last-idle";
+const LAST_IDLE_KEY = "salami-launcher-last-idle";
 
 function write(key: string, value: string) {
   try {

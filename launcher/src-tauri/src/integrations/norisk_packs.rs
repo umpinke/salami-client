@@ -334,7 +334,7 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf, event_id: Option<U
     let base_profiles_dir = crate::state::profile_state::default_profile_path();
     let sanitized_base_name = sanitize(&exported_profile.name);
     let final_profile_name = if sanitized_base_name.is_empty() {
-        let default_name = format!("imported-noriskpack-{}", Utc::now().timestamp_millis());
+        let default_name = format!("imported-pack-{}", Utc::now().timestamp_millis());
         warn!(
             "Profile name '{}' became empty after sanitization. Using default: {}",
             exported_profile.name, default_name
@@ -740,7 +740,8 @@ pub async fn handle_noriskpack_file_paths<R: tauri::Runtime>(
         };
 
         if let Some(path) = path_candidate {
-            if path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("noriskpack")
+            if path.is_file()
+                && matches!(path.extension().and_then(|ext| ext.to_str()), Some("salamipack") | Some("noriskpack"))
             {
                 info!("Found .noriskpack file to process: {}", path.display());
                 noriskpack_to_import = Some(path);

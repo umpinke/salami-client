@@ -405,7 +405,7 @@ export function AdvancedTab() {
             variant="ghost"
             size="sm"
             onClick={() => {
-              openExternalUrl("https://norisk.gg/licenses")
+              openExternalUrl("https://github.com/umpinke/salami-client/blob/main/launcher/LICENSE")
             }}
             icon={<Icon icon="solar:arrow-right-up-bold" className="w-5 h-5" />}
           >

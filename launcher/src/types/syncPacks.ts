@@ -242,7 +242,6 @@ export interface SyncTargetPreset {
 export const SYNC_TARGET_PRESETS: SyncTargetPreset[] = [
   { path: "saves", kindType: "dir_link", icon: "solar:planet-bold", hint: "syncPacks.presets.saves" },
   { path: "config", kindType: "dir_link", icon: "solar:settings-bold", hint: "syncPacks.presets.config" },
-  { path: "NoRiskClient", kindType: "dir_link", icon: "solar:shield-star-bold", hint: "syncPacks.presets.noriskclient" },
   { path: "screenshots", kindType: "dir_link", icon: "solar:camera-bold", hint: "syncPacks.presets.screenshots" },
   { path: "shaderpacks", kindType: "dir_link", icon: "solar:sun-bold", hint: "syncPacks.presets.shaderpacks" },
   { path: "resourcepacks", kindType: "dir_link", icon: "solar:gallery-bold", hint: "syncPacks.presets.resourcepacks" },

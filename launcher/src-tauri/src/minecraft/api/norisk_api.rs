@@ -271,7 +271,7 @@ impl NoRiskApi {
         // Salami: Kein NoRisk-Login – es werden keine Minecraft-Sessiondaten an NoRisk gemeldet.
         // Der Aufrufer behandelt den Fehler als "kein Token" und startet normal weiter.
         if !crate::branding::NORISK_SERVICES_ENABLED {
-            return Err(AppError::Other("NoRisk services are disabled in Salami Client".into()));
+            return Err(AppError::Other("Online services are disabled".into()));
         }
         info!("[NoRisk API] Refreshing NoRisk token v3 with SystemID: {}", system_id);
         debug!("[NoRisk API] Username: {}", username);

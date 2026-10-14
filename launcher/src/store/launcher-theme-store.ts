@@ -35,10 +35,7 @@ export const LAUNCHER_THEMES: Record<string, LauncherTheme> = {
       isCustom: true,
     },
     backgroundImage: "/themes/christmas_theme.png",
-    unlockRequirement: {
-      type: "advent-door",
-      day: 2,
-    },
+    // Salami: kein Adventskalender mehr – das Weihnachts-Theme ist frei verfügbar.
   },
 };
 

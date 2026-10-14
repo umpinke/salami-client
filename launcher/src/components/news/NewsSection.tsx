@@ -144,7 +144,7 @@ export function NewsSection({ className }: NewsSectionProps) {
       <div className="flex flex-col space-y-1 w-full">
         {posts.map((post) => {
           const rawTitle = post.yoast_head_json?.title || t('news.item');
-          const suffixToRemove = " - NoRisk Client Blog";
+          const suffixToRemove = " - Blog";
           let displayTitle = rawTitle;
           if (rawTitle.endsWith(suffixToRemove)) {
             displayTitle = rawTitle.substring(
