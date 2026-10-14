@@ -87,6 +87,8 @@ import dev.salamiclient.modules.utility.PlayerEspModule;
 import dev.salamiclient.modules.utility.TriggerBotModule;
 import dev.salamiclient.modules.utility.AimAssistModule;
 import dev.salamiclient.modules.utility.AutoDTapModule;
+import dev.salamiclient.modules.utility.AutoPotModule;
+import dev.salamiclient.modules.utility.HitboxExpandModule;
 import dev.salamiclient.modules.utility.AutoShieldBreakModule;
 import dev.salamiclient.modules.utility.BowAimModule;
 import dev.salamiclient.modules.utility.BowSpamModule;
@@ -291,6 +293,8 @@ public final class SalamiClient implements ClientModInitializer {
 		modules.register(new LungeMacroModule());
 		modules.register(new SpeedBridgeModule());
 		modules.register(new FastXpModule());
+		modules.register(new AutoPotModule());
+		modules.register(new HitboxExpandModule());
 	}
 
 	private void registerKeybinds() {

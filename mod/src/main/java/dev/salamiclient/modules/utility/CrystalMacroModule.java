@@ -82,6 +82,15 @@ public final class CrystalMacroModule extends Module {
 		reset();
 	}
 
+	/** Läuft das Makro gerade (Benutzen-Taste gehalten, Kristall in der Hand)? Auto D-Tap hält sich dann raus. */
+	public boolean isRunning() {
+		return isEnabled()
+			&& mc().screen == null
+			&& mc().options.keyUse.isDown()
+			&& mc().player != null
+			&& mc().player.getMainHandItem().is(Items.END_CRYSTAL);
+	}
+
 	private void reset() {
 		placeCooldown = 0;
 		breakCooldown = 0;

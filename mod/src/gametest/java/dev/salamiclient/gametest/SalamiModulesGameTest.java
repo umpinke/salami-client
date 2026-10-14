@@ -16,6 +16,7 @@ import dev.salamiclient.modules.utility.BowSpamModule;
 import dev.salamiclient.modules.utility.AutoTotemModule;
 import dev.salamiclient.modules.utility.DoubleHandTotemModule;
 import dev.salamiclient.modules.utility.GhostSpearModule;
+import dev.salamiclient.modules.utility.HitboxExpandModule;
 import dev.salamiclient.modules.utility.PlayerEspModule;
 import dev.salamiclient.modules.utility.TriggerBotModule;
 import dev.salamiclient.modules.visual.CapesModule;
@@ -76,6 +77,7 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 			testPlayerEsp(context, modules);
 			testTriggerBot(context, server, modules);
 			testAimAssist(context, server, modules);
+			testHitboxExpand(context, server, modules);
 			testBallistics();
 			testBowSpam(context, server, modules);
 			testBowAim(context, server, modules);
@@ -380,6 +382,29 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 		context.runOnClient(c -> modules.setEnabled(aim, false));
 		server.runCommand("kill @e[type=minecraft:zombie,tag=salami_aim]");
 		check(onTarget, "Aim Assist: view was not pulled onto the zombie");
+	}
+
+	// ------------------------------------------------------------------ Hitbox Expand
+
+	private static void testHitboxExpand(ClientGameTestContext context, TestServerContext server, ModuleManager modules) {
+		// Blick genau nach Norden; der Zombie steht so, dass der Strahl 0,15 Blöcke an ihm vorbeigeht
+		server.runCommand("summon minecraft:zombie 220.95 " + FEET_Y + " -1.5 {NoAI:1b,IsBaby:0b,PersistenceRequired:1b,Tags:[\"salami_hitbox\"]}");
+		server.runCommand("tp @p 220.5 " + FEET_Y + " 0.5 180 0");
+		context.waitTicks(5);
+		check(context.computeOnClient(c -> c.crosshairPickEntity == null), "Test setup: zombie already in crosshair");
+
+		Module hitbox = modules.get(HitboxExpandModule.class);
+		set(hitbox, "expand", 0.3);
+		context.runOnClient(c -> modules.setEnabled(hitbox, true));
+		boolean picked = waitFor(context, 10, c -> c.crosshairPickEntity instanceof Zombie);
+		context.takeScreenshot("salami-16-hitbox-expand");
+		set(hitbox, "affect_aim", false);
+		boolean displayOnly = waitFor(context, 10, c -> c.crosshairPickEntity == null);
+		set(hitbox, "affect_aim", true);
+		context.runOnClient(c -> modules.setEnabled(hitbox, false));
+		server.runCommand("kill @e[type=minecraft:zombie,tag=salami_hitbox]");
+		check(picked, "Hitbox Expand: crosshair did not hit the enlarged hitbox");
+		check(displayOnly, "Hitbox Expand: display-only mode still changed the crosshair");
 	}
 
 	// ------------------------------------------------------------------ Totems

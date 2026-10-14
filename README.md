@@ -171,7 +171,7 @@ Der Test startet Minecraft mit einer Testwelt und prüft:
 - Klicks auf Module und Einstellungen,
 - Easy Leave und die Safe-Mode-Sperre,
 - den Salami-Look,
-- Auto Totem, Double Hand Totem, Crystal Macro (inkl. Obsidian setzen), Anchor Macro (inkl. Safe Anchor), Ghost Spear, Live Tracker, Breach Swap, Auto Mace, Auto Elytra, Speed Lunge, Key Pearl, Cobweb Placer, Fast XP, Speed Bridge, Lunge Macro und Kits in echten Testszenen,
+- Auto Totem, Double Hand Totem, Crystal Macro (inkl. Obsidian setzen), Anchor Macro (inkl. Safe Anchor), Ghost Spear, Live Tracker, Breach Swap, Auto Mace (inkl. „Maximaler Schaden“), Auto Elytra, Speed Lunge, Key Pearl, Cobweb Placer, Fast XP, Speed Bridge, Lunge Macro, Auto Pot, Hitbox Expand, Configs und Kits in echten Testszenen,
 - Screenshots aller Visuals und des HUD-Editors.
 
 Screenshots: `mod/build/run/clientGameTest/screenshots/`.
@@ -193,7 +193,10 @@ Screenshots: `mod/build/run/clientGameTest/screenshots/`.
 | Utility | Crystal Tweaks | wechselt automatisch auf Kristalle (optional nur beim Zielen auf Obsidian/Kristalle) |
 | Utility | Anchor Macro | Seelenanker laden/zünden; **Safe Anchor** setzt vorher Glowstone als Schutz |
 | Utility | Breach Swap · Attribute Swap | im Schlag-Tick auf Bresche-Streitkolben bzw. andere Waffe wechseln, danach zurück |
-| Utility | Auto Mace · Auto Elytra | Smash-Treffer im Fall; Elytra beim Fallen an, vor dem Boden/Treffer zurück zum Brustpanzer |
+| Utility | Auto Mace · Auto Elytra | Smash-Treffer im Fall (Reichweite, Zielfilter, Timing „Sofort“ oder „Maximaler Schaden“, lässt Schild-Blocker aus); Elytra beim Fallen an, vor dem Boden/Treffer zurück zum Brustpanzer |
+| Utility | Auto D-Tap | nach jedem zerstörten Kristall neu setzen und zerstören (1–3×); Reichweiten-Check, optional Obsidian nachsetzen |
+| Utility | Auto Pot | Heil-, Stärke- und Schnelligkeitstränke automatisch (Wurftränke vor die Füße, optional Trinktränke, holt Tränke aus dem Inventar, nie Tränke mit schädlichen Effekten) |
+| Utility | Hitbox Expand | vergrößerte Gegner-Hitboxen anzeigen (lokal) und – nur in der eigenen Einzelspieler-Welt – für das Fadenkreuz nutzen |
 | Utility | Speed Lunge · Ghost Spear | automatische Ausfall-Stöße mit dem Speer; Drop → Offhand → Slot-Makro |
 | Utility | Block ESP | Blöcke (CPvP, Kisten, Erze, Spawner) hervorheben, optional durch Wände |
 | Utility | Key Pearl · Pearl Catch | Enderperle per Taste werfen; Perle + Windkugel als Kombo |

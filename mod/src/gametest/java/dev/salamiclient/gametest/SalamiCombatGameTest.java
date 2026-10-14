@@ -8,6 +8,7 @@ import dev.salamiclient.modules.client.SafeModeModule;
 import dev.salamiclient.modules.misc.KitsModule;
 import dev.salamiclient.modules.utility.AutoElytraModule;
 import dev.salamiclient.modules.utility.AutoMaceModule;
+import dev.salamiclient.modules.utility.AutoPotModule;
 import dev.salamiclient.modules.utility.BlockEspModule;
 import dev.salamiclient.modules.utility.BreachSwapModule;
 import dev.salamiclient.modules.utility.CobwebPlacerModule;
@@ -31,6 +32,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.ItemTags;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.monster.zombie.Zombie;
@@ -63,6 +65,7 @@ public final class SalamiCombatGameTest implements FabricClientGameTest {
 			testFastXp(context, server, modules);
 			testSpeedBridge(context, server, modules);
 			testLungeMacro(context, server, modules);
+			testAutoPot(context, server, modules);
 			testKits(context, server, modules);
 			testVisuals(context, server, modules);
 		}
@@ -122,6 +125,30 @@ public final class SalamiCombatGameTest implements FabricClientGameTest {
 		context.runOnClient(c -> modules.setEnabled(mace, false));
 		check(hurt, "Auto Mace: zombie was not hit while falling");
 		server.runCommand("kill @e[type=minecraft:zombie]");
+
+		// Maximaler Schaden: erst im letzten Tick vor der Landung zuschlagen
+		set(mace, "timing", AutoMaceModule.Timing.MAX_DAMAGE);
+		server.runCommand("clear @a");
+		server.runCommand("item replace entity @p hotbar.0 with minecraft:diamond_sword");
+		server.runCommand("item replace entity @p hotbar.1 with minecraft:mace");
+		server.runCommand("fill 208 " + (FEET_Y - 1) + " -2 212 " + (FEET_Y - 1) + " 2 minecraft:stone");
+		summonDummy(server, "210.5 " + FEET_Y + " 0.5", false);
+		server.runCommand("tp @p 210.5 " + (FEET_Y + 8) + " 0.5 0 90");
+		context.runOnClient(c -> c.player.getInventory().setSelectedSlot(0));
+		context.runOnClient(c -> modules.setEnabled(mace, true));
+		double heightAtHit = Double.NaN;
+		for (int i = 0; i < 60 && Double.isNaN(heightAtHit); i++) {
+			if (context.computeOnClient(c -> zombieHurt(c))) {
+				heightAtHit = context.computeOnClient(c -> c.player.getY()) - FEET_Y;
+			}
+			context.waitTick();
+		}
+		context.runOnClient(c -> modules.setEnabled(mace, false));
+		set(mace, "timing", AutoMaceModule.Timing.INSTANT);
+		server.runCommand("kill @e[type=minecraft:zombie]");
+		check(!Double.isNaN(heightAtHit), "Auto Mace (max damage): zombie was not hit");
+		// Sofort-Modus trifft schon gut 3 Blöcke über dem Boden
+		check(heightAtHit < 2, "Auto Mace (max damage): hit too early, " + heightAtHit + " blocks above ground");
 	}
 
 	private static boolean zombieHurt(Minecraft client) {
@@ -271,6 +298,50 @@ public final class SalamiCombatGameTest implements FabricClientGameTest {
 		check(swapped, "Lunge Macro: did not swap to the mace");
 		check(hurt, "Lunge Macro: zombie was not hit");
 		check(back, "Lunge Macro: did not swap back");
+	}
+
+	// ------------------------------------------------------------------ Auto Pot
+
+	private static void testAutoPot(ClientGameTestContext context, TestServerContext server, ModuleManager modules) {
+		server.runCommand("clear @a");
+		server.runCommand("effect clear @a");
+		server.runCommand("fill 198 " + (FEET_Y - 1) + " -3 202 " + (FEET_Y - 1) + " 3 minecraft:stone");
+		server.runCommand("tp @p 200.5 " + FEET_Y + " 0.5 180 0");
+		server.runCommand("item replace entity @p hotbar.0 with minecraft:diamond_sword");
+		// Stärke mit Gift-Nebenwirkung: darf nie benutzt werden, obwohl er vor dem sauberen Trank liegt
+		server.runCommand("item replace entity @p hotbar.3 with minecraft:splash_potion[potion_contents={custom_effects:"
+			+ "[{id:\"minecraft:strength\",duration:600},{id:\"minecraft:poison\",duration:100}]}]");
+		server.runCommand("item replace entity @p hotbar.4 with minecraft:splash_potion[potion_contents={potion:\"minecraft:strong_healing\"}]");
+		server.runCommand("item replace entity @p hotbar.5 with minecraft:splash_potion[potion_contents={potion:\"minecraft:strength\"}]");
+		// Schnelligkeit nur im Inventar: wird in den Trank-Slot (7) geholt
+		server.runCommand("item replace entity @p inventory.3 with minecraft:splash_potion[potion_contents={potion:\"minecraft:swiftness\"}]");
+		// volles Leben, dann verletzen – ohne natürliche Regeneration, damit nur der Trank heilt
+		server.runCommand("gamerule natural_health_regeneration false");
+		server.runCommand("effect give @p minecraft:instant_health 1 5 true");
+		context.waitTicks(3);
+		server.runCommand("damage @p 12 minecraft:generic");
+		context.waitTicks(5);
+		context.runOnClient(c -> c.player.getInventory().setSelectedSlot(0));
+		check(context.computeOnClient(c -> c.player.getHealth() <= 10), "Test setup: player not hurt");
+
+		Module pot = modules.get(AutoPotModule.class);
+		context.runOnClient(c -> modules.setEnabled(pot, true));
+		boolean healed = waitFor(context, 60, c -> c.player.getHealth() > 10);
+		boolean strong = waitFor(context, 60, c -> c.player.hasEffect(MobEffects.STRENGTH));
+		boolean fast = waitFor(context, 80, c -> c.player.hasEffect(MobEffects.SPEED));
+		context.waitTicks(5);
+		boolean poisoned = context.computeOnClient(c -> c.player.hasEffect(MobEffects.POISON));
+		boolean mixedLeft = context.computeOnClient(c -> c.player.getInventory().getItem(3).is(Items.SPLASH_POTION));
+		boolean back = context.computeOnClient(c -> c.player.getInventory().getSelectedSlot() == 0);
+		context.takeScreenshot("salami-15-auto-pot");
+		context.runOnClient(c -> modules.setEnabled(pot, false));
+		server.runCommand("effect clear @a");
+		server.runCommand("gamerule natural_health_regeneration true");
+		check(healed, "Auto Pot: no healing potion used at low health");
+		check(strong, "Auto Pot: strength potion not used");
+		check(fast, "Auto Pot: speed potion from the inventory not used");
+		check(!poisoned && mixedLeft, "Auto Pot: used a potion with a harmful effect");
+		check(back, "Auto Pot: did not switch back");
 	}
 
 	// ------------------------------------------------------------------ Kits
