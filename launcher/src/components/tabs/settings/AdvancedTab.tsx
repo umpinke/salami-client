@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type InputHTMLAttributes } from "react";
 import { Icon } from "@iconify/react";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
@@ -25,6 +25,15 @@ export function AdvancedTab() {
   const [isWrapperEditEnabled, setIsWrapperEditEnabled] = useState(false);
   const [isPostExitEditEnabled, setIsPostExitEditEnabled] = useState(false);
   const [adsEnabled, setAdsEnabled] = useState(false);
+
+  // Salami: Start-Befehle werden erst beim Verlassen des Feldes gespeichert – das Backend
+  // fragt dann einmal per nativem Dialog nach (nicht bei jedem Tastendruck).
+  const commitHook = (hook: "pre_launch" | "wrapper" | "post_exit", value: string) => {
+    if (!tempConfig) return;
+    const next = value.trim() ? value : null;
+    if ((tempConfig.hooks?.[hook] ?? null) === next) return;
+    setTempConfig({ ...tempConfig, hooks: { ...tempConfig.hooks, [hook]: next } });
+  };
 
   useEffect(() => {
     isApplixirEnabled().then(setAdsEnabled).catch(() => setAdsEnabled(false));
@@ -216,20 +225,9 @@ export function AdvancedTab() {
               <p className="text-sm text-white/60 font-minecraft mb-4">
                 {t("settings.hooks.pre_launch.description")}
               </p>
-              <input
-                type="text"
+              <HookInput
                 value={tempConfig?.hooks?.pre_launch || ""}
-                onChange={(e) => {
-                  if (tempConfig) {
-                    setTempConfig({
-                      ...tempConfig,
-                      hooks: {
-                        ...tempConfig.hooks,
-                        pre_launch: e.target.value || null,
-                      },
-                    });
-                  }
-                }}
+                onCommit={(value) => commitHook("pre_launch", value)}
                 placeholder={t("settings.hooks.pre_launch.placeholder")}
                 className="w-full p-3 rounded-md bg-black/40 border border-[#ffffff20] text-white placeholder-white/40 font-minecraft focus:outline-none focus:ring-2 focus:ring-white/30"
                 disabled={saving || !isPreLaunchEditEnabled}
@@ -278,20 +276,9 @@ export function AdvancedTab() {
               <p className="text-sm text-white/60 font-minecraft mb-4">
                 {t("settings.hooks.wrapper.description")}
               </p>
-              <input
-                type="text"
+              <HookInput
                 value={tempConfig?.hooks?.wrapper || ""}
-                onChange={(e) => {
-                  if (tempConfig) {
-                    setTempConfig({
-                      ...tempConfig,
-                      hooks: {
-                        ...tempConfig.hooks,
-                        wrapper: e.target.value || null,
-                      },
-                    });
-                  }
-                }}
+                onCommit={(value) => commitHook("wrapper", value)}
                 placeholder={t("settings.hooks.wrapper.placeholder")}
                 className="w-full p-3 rounded-md bg-black/40 border border-[#ffffff20] text-white placeholder-white/40 font-minecraft focus:outline-none focus:ring-2 focus:ring-white/30"
                 disabled={saving || !isWrapperEditEnabled}
@@ -340,20 +327,9 @@ export function AdvancedTab() {
               <p className="text-sm text-white/60 font-minecraft mb-4">
                 {t("settings.hooks.post_exit.description")}
               </p>
-              <input
-                type="text"
+              <HookInput
                 value={tempConfig?.hooks?.post_exit || ""}
-                onChange={(e) => {
-                  if (tempConfig) {
-                    setTempConfig({
-                      ...tempConfig,
-                      hooks: {
-                        ...tempConfig.hooks,
-                        post_exit: e.target.value || null,
-                      },
-                    });
-                  }
-                }}
+                onCommit={(value) => commitHook("post_exit", value)}
                 placeholder={t("settings.hooks.post_exit.placeholder")}
                 className="w-full p-3 rounded-md bg-black/40 border border-[#ffffff20] text-white placeholder-white/40 font-minecraft focus:outline-none focus:ring-2 focus:ring-white/30"
                 disabled={saving || !isPostExitEditEnabled}
@@ -418,5 +394,30 @@ export function AdvancedTab() {
 
       {confirmDialog}
     </div>
+  );
+}
+
+/** Textfeld, das erst beim Verlassen (oder mit Enter) übernimmt. */
+function HookInput({
+  value,
+  onCommit,
+  ...rest
+}: { value: string; onCommit: (value: string) => void } & Omit<
+  InputHTMLAttributes<HTMLInputElement>,
+  "value" | "onChange"
+>) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  return (
+    <input
+      type="text"
+      {...rest}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => onCommit(draft)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+      }}
+    />
   );
 }

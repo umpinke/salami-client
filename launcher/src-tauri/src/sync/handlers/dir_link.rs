@@ -102,12 +102,12 @@ impl DirLinkHandler {
             }
 
             if holds_our_copy {
-                let removed = match fs::symlink_metadata(&source).await {
-                    Ok(meta) if meta.is_dir() => fs::remove_dir_all(&source).await,
-                    Ok(_) => fs::remove_file(&source).await,
-                    Err(e) => Err(e),
-                };
-                if removed.is_ok() {
+                // Salami: nicht endgültig löschen – in den Launcher-Papierkorb verschieben, falls
+                // die lokale Kopie doch eigene Änderungen enthielt.
+                if crate::utils::trash_utils::move_path_to_trash(&source, Some("sync-adopt"))
+                    .await
+                    .is_ok()
+                {
                     discarded += 1;
                     continue;
                 }

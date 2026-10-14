@@ -44,6 +44,17 @@ pub fn mask_sensitive_data(content: &str) -> String {
             r#"(?i)"(value|token|access_token|accessToken|refresh_token|refreshToken|id_token|client_secret|DeviceToken|TitleToken|UserToken|XSTSToken|authorization)"\s*:\s*"[^"]*""#
         ).unwrap();
         static ref JWT_REGEX: Regex = Regex::new(r"\beyJ[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]*){0,2}").unwrap();
+        // Salami: Token-Felder in maskiertem JSON (z. B. `{:?}` eines Antwort-Bodys)
+        static ref ESCAPED_JSON_TOKEN_FIELD_REGEX: Regex = Regex::new(
+            r#"(?i)\\"(value|token|access_token|accessToken|refresh_token|refreshToken|id_token|client_secret|DeviceToken|TitleToken|UserToken|XSTSToken|authorization)\\"\s*:\s*\\"(?:[^"\\]|\\[^"])*\\""#
+        ).unwrap();
+        // OAuth-Formulare und Redirect-URLs (`refresh_token=…&`, `?code=…`)
+        static ref FORM_TOKEN_REGEX: Regex = Regex::new(
+            r"(?i)\b(access_token|refresh_token|id_token|client_secret|code_verifier|code)=[A-Za-z0-9._~+/%!*$-]{16,}"
+        ).unwrap();
+        // Microsoft-Refresh-Token / Auth-Codes (`M.C5xx_BAY.0.U.…`) und RPS-Access-Token (`EwA…`)
+        static ref MS_REFRESH_TOKEN_REGEX: Regex = Regex::new(r"\bM\.[CR][0-9A-Za-z]*_[A-Za-z0-9]+\.[^\s\x22',;&<>]{16,}").unwrap();
+        static ref MS_ACCESS_TOKEN_REGEX: Regex = Regex::new(r"\bEw[A-Za-z0-9+/_-]{100,}={0,2}").unwrap();
         static ref WINDOWS_USER_PATH_REGEX: Regex = Regex::new(r#"(?i)([A-Z]:[/\\]+Users[/\\]+)[^/\\"'\s]+"#).unwrap();
         static ref UNIX_USER_PATH_REGEX: Regex = Regex::new(r#"(/+(?:home|Users)/+)[^/"'\s]+"#).unwrap();
         static ref EMAIL_REGEX: Regex = Regex::new(r"\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b").unwrap();
@@ -56,6 +67,12 @@ pub fn mask_sensitive_data(content: &str) -> String {
     masked_content = BEARER_REGEX.replace_all(&masked_content, "Bearer *****").to_string();
     masked_content = JSON_TOKEN_FIELD_REGEX.replace_all(&masked_content, "\"$1\":\"*****\"").to_string();
     masked_content = JWT_REGEX.replace_all(&masked_content, "*****").to_string();
+    masked_content = ESCAPED_JSON_TOKEN_FIELD_REGEX
+        .replace_all(&masked_content, r#"\"$1\":\"*****\""#)
+        .to_string();
+    masked_content = FORM_TOKEN_REGEX.replace_all(&masked_content, "$1=*****").to_string();
+    masked_content = MS_REFRESH_TOKEN_REGEX.replace_all(&masked_content, "*****").to_string();
+    masked_content = MS_ACCESS_TOKEN_REGEX.replace_all(&masked_content, "*****").to_string();
     masked_content = WINDOWS_USER_PATH_REGEX.replace_all(&masked_content, "${1}*****").to_string();
     masked_content = UNIX_USER_PATH_REGEX.replace_all(&masked_content, "${1}*****").to_string();
     masked_content = EMAIL_REGEX.replace_all(&masked_content, "*****@*****").to_string();
@@ -187,6 +204,34 @@ mod tests {
     fn masks_email_addresses() {
         let masked = mask_sensitive_data("account email: some.user+mc@gmail.com logged in");
         assert_eq!(masked, "account email: *****@***** logged in");
+    }
+
+    #[test]
+    fn masks_escaped_json_and_opaque_microsoft_tokens() {
+        let escaped = r#"Body: "{\"token_type\":\"bearer\",\"access_token\":\"EwB4A+secret\",\"refresh_token\":\"M.C507_BAY.0.U.-Cl!abc*def$$\"}""#;
+        let masked = mask_sensitive_data(escaped);
+        assert!(!masked.contains("EwB4A"), "access token leaked: {}", masked);
+        assert!(!masked.contains("M.C507"), "refresh token leaked: {}", masked);
+        assert!(masked.contains(r#"\"access_token\":\"*****\""#), "{}", masked);
+
+        let form = mask_sensitive_data("grant_type=refresh_token&refresh_token=M.C507_BAY.0.U.-Cl1234567890abcdef&client_id=x");
+        assert!(!form.contains("M.C507"), "{}", form);
+        assert!(form.contains("refresh_token=*****"), "{}", form);
+
+        let redirect = mask_sensitive_data("GET /?code=M.C519_SN1.2.U.0123456789abcdef0123&state=abc");
+        assert!(!redirect.contains("0123456789abcdef"), "{}", redirect);
+
+        let rps = format!("RpsTicket d={}", format!("EwA{}", "x".repeat(200)));
+        assert!(!mask_sensitive_data(&rps).contains("xxxxxxxxxx"));
+
+        let bare = mask_sensitive_data("token M.R3_BAY.-CVjRk4dSo8x0123456789!*$ end");
+        assert!(!bare.contains("CVjRk4dSo8"), "{}", bare);
+    }
+
+    #[test]
+    fn keeps_exit_codes_and_short_values() {
+        assert_eq!(mask_sensitive_data("Process exited code=1"), "Process exited code=1");
+        assert_eq!(mask_sensitive_data("Every Ew is fine"), "Every Ew is fine");
     }
 
     #[test]

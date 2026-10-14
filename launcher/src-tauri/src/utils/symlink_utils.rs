@@ -48,64 +48,43 @@ pub async fn create_symlink(target_path: &Path, link_path: &Path, is_dir: bool) 
 
 #[cfg(windows)]
 async fn create_junction(target: &Path, junction: &Path) -> Result<()> {
-    use std::process::Command;
-    
-    // Convert paths to absolute paths
-    let target_abs = tokio::fs::canonicalize(target).await
+    // Salami: Junction direkt über die Windows-API anlegen statt `cmd /C mklink /J` – über cmd.exe
+    // hätten Sonderzeichen in Profil- oder Pack-Namen (`&`, `|`, `^` …) Befehle ausführen können.
+    let target_abs = tokio::fs::canonicalize(target)
+        .await
         .map_err(|e| AppError::Other(format!("Failed to resolve target path: {}", e)))?;
-    
-    // Normalize junction path to ensure proper separators on Windows
-    // PathBuf normalization should handle this, but we ensure it's canonicalized
-    let junction_normalized = if junction.is_absolute() {
-        tokio::fs::canonicalize(junction).await
-            .unwrap_or_else(|_| junction.to_path_buf())
-    } else {
-        junction.to_path_buf()
-    };
-    
-    // Convert to string with proper Windows separators
-    // to_string_lossy() should produce backslashes on Windows, but we ensure it's normalized
-    let junction_str = junction_normalized.to_string_lossy().replace('/', "\\");
-    let target_str = target_abs.to_string_lossy().replace('/', "\\");
-    
-    // Log the full command before execution
-    info!("Executing mklink command: mklink /J \"{}\" \"{}\"", junction_str, target_str);
-    
-    // Use mklink /J which creates a junction point (no admin rights needed)
-    let output = tokio::task::spawn_blocking({
-        let junction_str = junction_str.clone();
-        let target_str = target_str.clone();
-        move || {
-            Command::new("cmd")
-                .args(&[
-                    "/C",
-                    "mklink",
-                    "/J",
-                    &junction_str,
-                    &target_str,
-                ])
-                .output()
-        }
+    let target_abs = strip_verbatim_prefix(&target_abs);
+    let junction_path = junction.to_path_buf();
+
+    info!("Creating junction point: {:?} -> {:?}", junction_path, target_abs);
+
+    tokio::task::spawn_blocking({
+        let target_abs = target_abs.clone();
+        let junction_path = junction_path.clone();
+        move || junction::create(&target_abs, &junction_path)
     })
     .await
     .map_err(|e| AppError::Other(format!("Join error: {}", e)))?
-    .map_err(|e| AppError::Other(format!("Failed to execute mklink command: {}", e)))?;
-
-    if !output.status.success() {
-        let stdout_msg = String::from_utf8_lossy(&output.stdout);
-        let stderr_msg = String::from_utf8_lossy(&output.stderr);
+    .map_err(|e| {
         error!(
-            "mklink command failed. Junction: {:?}, Target: {:?}, Stdout: {}, Stderr: {}",
-            junction_normalized, target_abs, stdout_msg, stderr_msg
+            "Creating junction failed. Junction: {:?}, Target: {:?}: {}",
+            junction_path, target_abs, e
         );
-        return Err(AppError::Other(format!(
-            "Failed to create junction point: {}",
-            if !stderr_msg.is_empty() { stderr_msg } else { stdout_msg }
-        )));
-    }
+        AppError::Other(format!("Failed to create junction point: {}", e))
+    })?;
 
-    info!("Successfully created junction point: {:?} -> {:?}", junction_normalized, target_abs);
+    info!("Successfully created junction point: {:?} -> {:?}", junction_path, target_abs);
     Ok(())
+}
+
+/// `\\?\C:\…` (von `canonicalize`) → `C:\…`; UNC-Pfade bleiben unverändert.
+#[cfg(windows)]
+fn strip_verbatim_prefix(path: &Path) -> std::path::PathBuf {
+    let text = path.to_string_lossy();
+    match text.strip_prefix(r"\\?\") {
+        Some(rest) if !rest.starts_with("UNC\\") => std::path::PathBuf::from(rest),
+        _ => path.to_path_buf(),
+    }
 }
 
 #[cfg(windows)]
@@ -246,4 +225,25 @@ pub async fn find_all_links(directory: &Path) -> Result<Vec<SymlinkInfo>> {
     }
     
     Ok(links)
+}
+
+#[cfg(all(test, windows))]
+mod junction_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn creates_junction_without_a_shell() {
+        let base = std::env::temp_dir().join(format!("salami-junction-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let target = base.join("target & echo pwned");
+        std::fs::create_dir_all(&target).unwrap();
+        std::fs::write(target.join("file.txt"), "ok").unwrap();
+        let link = base.join("link ^ & (x)");
+
+        create_symlink(&target, &link, true).await.unwrap();
+        assert_eq!(std::fs::read_to_string(link.join("file.txt")).unwrap(), "ok");
+
+        std::fs::remove_dir(&link).unwrap();
+        let _ = std::fs::remove_dir_all(&base);
+    }
 }

@@ -645,6 +645,10 @@ fn loader_mods_dir_name(loader: &ModLoader) -> Option<&'static str> {
 pub(crate) fn migrated_mods_dir(mods_root: &std::path::Path, suffix: &str) -> PathBuf {
     let current = mods_root.join(format!("salami-{}", suffix));
     let legacy = mods_root.join(format!("nrc-{}", suffix));
+    // Salami: in fremden Spielordnern (eigener Spielordner) nichts umbenennen
+    if !current.exists() && legacy.is_dir() && !crate::utils::legacy_cleanup::uses_own_meta_dir() {
+        return legacy;
+    }
     if !current.exists() && legacy.is_dir() {
         match std::fs::rename(&legacy, &current) {
             Ok(()) => log::info!("Renamed mods folder {:?} -> {:?}", legacy, current),

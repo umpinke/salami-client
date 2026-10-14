@@ -220,6 +220,13 @@ pub fn get_norisk_pack_mod_filename(
 pub async fn import_noriskpack_as_profile(pack_path: PathBuf, event_id: Option<Uuid>) -> Result<Uuid> {
     info!("Starting import process for noriskpack: {:?}", pack_path);
 
+    // Salami: unbekannte Programmdateien nur nach nativer Bestätigung
+    crate::integrations::pack_preview::ensure_pack_content_allowed(
+        &pack_path,
+        crate::integrations::pack_preview::PackFormat::Noriskpack,
+    )
+    .await?;
+
     let state = State::get().await?;
 
     // Helper to emit progress if event_id is provided
@@ -467,27 +474,14 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf, event_id: Option<U
                 _ => continue, // Skip if path after prefix is empty (e.g. just "overrides/")
             };
 
-            // Sanitize each component of the path to prevent directory traversal and invalid names
-            let sanitized_relative_path_buf = PathBuf::from(path_after_strip_str)
-                .components()
-                .filter_map(|comp| match comp {
-                    std::path::Component::Normal(os_str) => {
-                        let sanitized_comp = sanitize_filename::sanitize(os_str.to_string_lossy().as_ref());
-                        if sanitized_comp.is_empty() {
-                            None
-                        } else {
-                            Some(sanitized_comp)
-                        }
-                    }
-                    std::path::Component::ParentDir => {
-                        warn!("Parent directory component '..' found and removed in noriskpack override path: {}", path_after_strip_str);
-                        None 
-                    }
-                    std::path::Component::CurDir => None,
-                    std::path::Component::RootDir => None,
-                    std::path::Component::Prefix(_) => None,
-                })
-                .collect::<PathBuf>();
+            // Salami: ablehnen statt bereinigen – sonst würde z. B. aus `evil.ja:r` still `evil.jar`
+            let sanitized_relative_path_buf = match crate::utils::import_safety::canonical_pack_path(path_after_strip_str) {
+                Ok(path) => path,
+                Err(e) => {
+                    warn!("Skipping override entry {}: {}", entry_filename_str, e);
+                    continue;
+                }
+            };
 
             // If sanitization results in an empty path (e.g., path was only ".." or similar), skip it.
             if sanitized_relative_path_buf.as_os_str().is_empty() {

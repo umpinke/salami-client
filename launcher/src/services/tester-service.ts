@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import type {
   BugVote,
   NeedsTestingResponse,
@@ -7,13 +6,16 @@ import type {
   SubmitTestVoteResponse,
 } from "../types/tester";
 
+// Salami: Die NoRisk-Testerwarteschlange gibt es nicht – keine Backend-Aufrufe, kein Fenster.
+const unavailable = <T>(): Promise<T> =>
+  Promise.reject(new Error("Not available in Salami Client"));
+
 export const fetchTesterQueueCount = (): Promise<{ count: number }> =>
-  invoke("fetch_tester_queue_count");
+  Promise.resolve({ count: 0 });
 
-export const fetchTesterQueue = (): Promise<NeedsTestingResponse> =>
-  invoke("fetch_tester_queue");
+export const fetchTesterQueue = (): Promise<NeedsTestingResponse> => unavailable();
 
-export const openTesterWindow = (): Promise<void> => invoke("open_tester_window");
+export const openTesterWindow = (): Promise<void> => unavailable();
 
 export interface SubmitTesterVoteArgs {
   issueId: string;
@@ -23,11 +25,5 @@ export interface SubmitTesterVoteArgs {
 }
 
 export const submitTesterVote = (
-  args: SubmitTesterVoteArgs,
-): Promise<SubmitTestVoteResponse> =>
-  invoke("submit_tester_vote", {
-    issueId: args.issueId,
-    kind: args.kind,
-    vote: args.vote,
-    description: args.description ?? null,
-  });
+  _args: SubmitTesterVoteArgs,
+): Promise<SubmitTestVoteResponse> => unavailable();

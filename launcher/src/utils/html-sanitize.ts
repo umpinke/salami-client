@@ -55,6 +55,9 @@ export function sanitizeMotdHtml(html: string): string {
 const RICH_SANITIZE_CONFIG: Config = {
   ALLOW_UNKNOWN_PROTOCOLS: false,
   ADD_ATTR: ["target", "rel"],
+  // Formulare/Styles könnten das Fenster wegnavigieren oder die ganze Oberfläche überdecken
+  FORBID_TAGS: ["style", "form", "input", "button", "textarea", "select", "option", "meta", "base", "link", "iframe", "object", "embed", "area", "map"],
+  FORBID_ATTR: ["style", "action", "formaction", "srcdoc", "ping"],
 };
 
 /**

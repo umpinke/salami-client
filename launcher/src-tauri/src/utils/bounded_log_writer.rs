@@ -12,6 +12,8 @@ pub const MAX_LOG_BYTES: u64 = 10 * 1024 * 1024;
 pub const ROTATED_BACKUP_COUNT: u32 = 5;
 const ROTATE_MARKER: &[u8] = b"[Salami] log rotated -- previous chunk gzipped to game-process.log.N.gz; cap is 10 MB per segment, 5 backups.\n";
 const FORWARD_BUF_BYTES: usize = 8 * 1024;
+/// Längere Zeilen ohne Umbruch werden spätestens ab dieser Größe geschwärzt und geschrieben.
+const MAX_PENDING_LINE_BYTES: usize = 64 * 1024;
 const WRITE_RETRY_COOLDOWN: Duration = Duration::from_secs(30);
 
 pub struct BoundedLogWriter {
@@ -119,19 +121,42 @@ where
     R: AsyncRead + Unpin,
 {
     let mut buf = vec![0u8; FORWARD_BUF_BYTES];
+    // Salami: zeilenweise schwärzen (Token können sonst zwischen zwei Lese-Blöcken liegen)
+    let mut pending: Vec<u8> = Vec::new();
     // Keep draining after write failure; closing the pipe would SIGPIPE the game.
     let mut retry_writes_at: Option<Instant> = None;
     loop {
-        match reader.read(&mut buf).await {
-            Ok(0) => return,
+        let read = reader.read(&mut buf).await;
+        let eof = matches!(read, Ok(0));
+        match read {
             Ok(n) => {
+                pending.extend_from_slice(&buf[..n]);
+                let cut = if eof {
+                    pending.len()
+                } else {
+                    match pending.iter().rposition(|&b| b == b'\n') {
+                        Some(i) => i + 1,
+                        None if pending.len() >= MAX_PENDING_LINE_BYTES => pending.len(),
+                        None => continue,
+                    }
+                };
+                let chunk: Vec<u8> = pending.drain(..cut).collect();
+                if chunk.is_empty() {
+                    return;
+                }
                 if let Some(deadline) = retry_writes_at {
                     if Instant::now() < deadline {
+                        if eof {
+                            return;
+                        }
                         continue;
                     }
                 }
+                let masked = crate::utils::security_utils::mask_sensitive_data(
+                    &String::from_utf8_lossy(&chunk),
+                );
                 let mut w = writer.lock().await;
-                match w.write_all(&buf[..n]).await {
+                match w.write_all(masked.as_bytes()).await {
                     Ok(()) => {
                         if retry_writes_at.take().is_some() {
                             log::info!("[Log Archive] {} writes recovered", tag);
@@ -146,6 +171,9 @@ where
                         );
                         retry_writes_at = Some(Instant::now() + WRITE_RETRY_COOLDOWN);
                     }
+                }
+                if eof {
+                    return;
                 }
             }
             Err(e) => {

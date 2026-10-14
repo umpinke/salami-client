@@ -16,6 +16,10 @@ import { getBlockedModsConfig, getPackRolloutConfig, getPackFallbackConfig } fro
 import { refreshPermissions } from './permission-service';
 import { logInfo, logError } from '../utils/logging-utils';
 
+/** Salami: NoRisk-Dienste (Werbung, Konto-Verknüpfungen, Mobile-App, Benachrichtigungen …) gibt es nicht. */
+const unavailable = <T>(): Promise<T> =>
+  Promise.reject(new Error("Not available in Salami Client"));
+
 /**
  * Fetches the latest news and changelog posts from the backend.
  *
@@ -139,36 +143,22 @@ export const refreshNrcDataOnMount = async (): Promise<void> => {
   // da dies entweder durch fetchProfiles() oder den catch-Block oben abgedeckt wird.
 };
 
-export const showApplixirAd = (resetConsent = false): Promise<void> => {
-  return invoke('applixir_show_ad', { resetConsent });
-};
+export const showApplixirAd = (_resetConsent = false): Promise<void> => unavailable();
 
-export const mintApplixirSession = (): Promise<string | null> => {
-  return invoke('applixir_mint_session');
-};
+export const mintApplixirSession = (): Promise<string | null> => Promise.resolve(null);
 
-export const getAfkPointsBalance = (): Promise<AfkPointsBalance | null> => {
-  return invoke('get_afkpoints_balance');
-};
+export const getAfkPointsBalance = (): Promise<AfkPointsBalance | null> => Promise.resolve(null);
 
-export const getAfkDailyState = (): Promise<DailyClaimState | null> => {
-  return invoke('afk_daily_state');
-};
+export const getAfkDailyState = (): Promise<DailyClaimState | null> => Promise.resolve(null);
 
-export const claimAfkDaily = (): Promise<DailyClaimResult> => {
-  return invoke('afk_daily_claim');
-};
+export const claimAfkDaily = (): Promise<DailyClaimResult> => unavailable();
 
-export const getAfkShopCatalog = (): Promise<AfkShopCatalogResponse | null> => {
-  return invoke('afk_shop_catalog');
-};
+export const getAfkShopCatalog = (): Promise<AfkShopCatalogResponse | null> => Promise.resolve(null);
 
 export const purchaseAfkShopItem = (
-  itemId: string,
-  purchaseId: string,
-): Promise<AfkShopPurchaseResponse> => {
-  return invoke('afk_shop_purchase', { itemId, purchaseId });
-};
+  _itemId: string,
+  _purchaseId: string,
+): Promise<AfkShopPurchaseResponse> => unavailable();
 
 /**
  * Initiates the Discord account linking process.
@@ -176,9 +166,7 @@ export const purchaseAfkShopItem = (
  * @returns A promise that resolves when the command is successfully sent.
  * @throws If the backend command fails.
  */
-export const discordAuthLink = (): Promise<void> => {
-  return invoke('discord_auth_link');
-};
+export const discordAuthLink = (): Promise<void> => unavailable();
 
 /**
  * Checks the Discord account linking status.
@@ -186,9 +174,7 @@ export const discordAuthLink = (): Promise<void> => {
  * @returns A promise that resolves to a boolean indicating if a Discord account is linked.
  * @throws If the backend command fails.
  */
-export const discordAuthStatus = (): Promise<boolean> => {
-  return invoke('discord_auth_status');
-};
+export const discordAuthStatus = (): Promise<boolean> => Promise.resolve(false);
 
 /**
  * Unlinks the currently linked Discord account.
@@ -196,9 +182,7 @@ export const discordAuthStatus = (): Promise<boolean> => {
  * @returns A promise that resolves when the unlinking process is successful.
  * @throws If the backend command fails.
  */
-export const discordAuthUnlink = (): Promise<void> => {
-  return invoke('discord_auth_unlink');
-};
+export const discordAuthUnlink = (): Promise<void> => Promise.resolve();
 
 /**
  * Initiates the GitHub account linking process.
@@ -206,9 +190,7 @@ export const discordAuthUnlink = (): Promise<void> => {
  * @returns A promise that resolves when the command is successfully sent.
  * @throws If the backend command fails.
  */
-export const githubAuthLink = (): Promise<void> => {
-  return invoke('github_auth_link');
-};
+export const githubAuthLink = (): Promise<void> => unavailable();
 
 /**
  * Checks the GitHub account linking status.
@@ -216,9 +198,7 @@ export const githubAuthLink = (): Promise<void> => {
  * @returns A promise that resolves to a boolean indicating if a GitHub account is linked.
  * @throws If the backend command fails.
  */
-export const githubAuthStatus = (): Promise<boolean> => {
-  return invoke('github_auth_status');
-};
+export const githubAuthStatus = (): Promise<boolean> => Promise.resolve(false);
 
 /**
  * Unlinks the currently linked GitHub account.
@@ -226,9 +206,7 @@ export const githubAuthStatus = (): Promise<boolean> => {
  * @returns A promise that resolves when the unlinking process is successful.
  * @throws If the backend command fails.
  */
-export const githubAuthUnlink = (): Promise<void> => {
-  return invoke('github_auth_unlink');
-};
+export const githubAuthUnlink = (): Promise<void> => Promise.resolve();
 
 /**
  * Gets the mobile app token for NoRisk mobile app linking.
@@ -236,9 +214,7 @@ export const githubAuthUnlink = (): Promise<void> => {
  * @returns A promise that resolves to the mobile app token string.
  * @throws If the backend command fails.
  */
-export const getMobileAppToken = (): Promise<string> => {
-  return invoke('get_mobile_app_token');
-};
+export const getMobileAppToken = (): Promise<string> => unavailable();
 
 /**
  * Resets the mobile app token for NoRisk mobile app linking.
@@ -246,9 +222,7 @@ export const getMobileAppToken = (): Promise<string> => {
  * @returns A promise that resolves to the new mobile app token string.
  * @throws If the backend command fails.
  */
-export const resetMobileAppToken = (): Promise<string> => {
-  return invoke('reset_mobile_app_token');
-};
+export const resetMobileAppToken = (): Promise<string> => unavailable();
 
 /**
  * Checks if an application update is available.
@@ -279,9 +253,7 @@ export const downloadAndInstallUpdate = (): Promise<void> => {
  * @returns A promise that resolves to an array of AdventCalendarDay objects.
  * @throws If the backend command fails.
  */
-export const getAdventCalendar = (): Promise<AdventCalendarDay[]> => {
-  return invoke('get_advent_calendar_command');
-};
+export const getAdventCalendar = (): Promise<AdventCalendarDay[]> => Promise.resolve([]);
 
 /**
  * Claims a reward for a specific day in the advent calendar.
@@ -290,9 +262,7 @@ export const getAdventCalendar = (): Promise<AdventCalendarDay[]> => {
  * @returns A promise that resolves to the claimed AdventCalendarDay.
  * @throws If the backend command fails.
  */
-export const claimAdventCalendarDay = (tag: number): Promise<AdventCalendarDay> => {
-  return invoke('claim_advent_calendar_day_command', { tag });
-};
+export const claimAdventCalendarDay = (_tag: number): Promise<AdventCalendarDay> => unavailable();
 
 /**
  * Fetches all notifications for the current user.
@@ -300,9 +270,7 @@ export const claimAdventCalendarDay = (tag: number): Promise<AdventCalendarDay> 
  * @returns A promise that resolves to an array of UserNotification objects.
  * @throws If the backend command fails.
  */
-export const getNotifications = (): Promise<UserNotification[]> => {
-  return invoke('get_notifications');
-};
+export const getNotifications = (): Promise<UserNotification[]> => Promise.resolve([]);
 
 /**
  * Marks all notifications as read.
@@ -310,9 +278,7 @@ export const getNotifications = (): Promise<UserNotification[]> => {
  * @returns A promise that resolves when all notifications are marked as read.
  * @throws If the backend command fails.
  */
-export const markAllNotificationsRead = (): Promise<void> => {
-  return invoke('mark_all_notifications_read');
-};
+export const markAllNotificationsRead = (): Promise<void> => Promise.resolve();
 
 /**
  * Marks a specific notification as read.
@@ -321,9 +287,7 @@ export const markAllNotificationsRead = (): Promise<void> => {
  * @returns A promise that resolves when the notification is marked as read.
  * @throws If the backend command fails.
  */
-export const markNotificationRead = (notificationId: string): Promise<void> => {
-  return invoke('mark_notification_read', { notificationId });
-};
+export const markNotificationRead = (_notificationId: string): Promise<void> => Promise.resolve();
 
 export interface UniquePlayersResponse {
   count: number;
@@ -335,9 +299,7 @@ export interface UniquePlayersResponse {
  * Fetches the unique-players-in-the-last-24h stat from the backend
  * (cached server-side for 30 minutes).
  */
-export const getUniquePlayers24h = (): Promise<UniquePlayersResponse> => {
-  return invoke('get_unique_players_24h_command');
-};
+export const getUniquePlayers24h = (): Promise<UniquePlayersResponse> => unavailable();
 
 
 // Re-export logging utilities for backward compatibility

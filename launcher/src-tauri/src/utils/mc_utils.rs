@@ -1123,8 +1123,10 @@ pub async fn get_profile_worlds(profile_id: Uuid) -> Result<Vec<WorldInfo>> {
                         match fs::File::open(&level_dat_path).await {
                             Ok(file) => {
                                 let buf_reader = BufReader::new(file); // Wrap file in BufReader
-                                let mut decoder = GzipDecoder::new(buf_reader);
+                                let decoder = GzipDecoder::new(buf_reader);
                                 let mut decompressed_bytes = Vec::new();
+                                // Salami: Obergrenze gegen präparierte (Gzip-Bomben-)level.dat
+                                let mut decoder = tokio::io::AsyncReadExt::take(decoder, 64 * 1024 * 1024);
                                 // Read decompressed bytes asynchronously
                                 match decoder.read_to_end(&mut decompressed_bytes).await {
                                     Ok(_) => {

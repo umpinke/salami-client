@@ -48,6 +48,9 @@ pub async fn upload_log_to_mclogs(log_content: String) -> Result<MclogsUploadRes
         ));
     }
 
+    // Salami: Token, Pfade mit Windows-Benutzernamen und Account-Daten nie öffentlich hochladen
+    let log_content = crate::utils::security_utils::mask_sensitive_data(&log_content);
+
     // Create the form data payload
     let params = [("content", log_content)];
 

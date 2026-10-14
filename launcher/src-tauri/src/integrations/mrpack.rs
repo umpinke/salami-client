@@ -183,6 +183,7 @@ pub async fn process_mrpack(pack_path: PathBuf) -> Result<(Profile, ModrinthInde
             AppError::Other("Missing Minecraft dependency in manifest".into())
         })?
         .clone();
+    crate::utils::import_safety::require_version_like(&game_version)?;
 
     let (loader, loader_version) = determine_loader_from_dependencies(&manifest.dependencies);
 
@@ -231,32 +232,15 @@ pub async fn process_mrpack(pack_path: PathBuf) -> Result<(Profile, ModrinthInde
     Ok((profile, manifest))
 }
 
-fn is_manifest_mod_path(path: &str) -> bool {
-    let norm = path.replace('\\', "/");
-    let trimmed = norm.trim_start_matches("./");
-    trimmed.starts_with("mods/")
+/// Salami: gleiche Pfadregeln wie beim Schreiben; `Mods/` zählt genauso wie `mods/`.
+pub(crate) fn is_manifest_mod_path(path: &str) -> bool {
+    crate::utils::import_safety::canonical_pack_path(path)
+        .map_or(false, |p| crate::utils::import_safety::is_in_mods_dir(&p))
 }
 
 fn sanitize_manifest_relative_path(path: &str) -> Option<PathBuf> {
-    let sanitized = PathBuf::from(path.replace('\\', "/"))
-        .components()
-        .filter_map(|comp| match comp {
-            std::path::Component::Normal(os_str) => {
-                let s = sanitize_filename::sanitize(os_str.to_string_lossy().as_ref());
-                if s.is_empty() {
-                    None
-                } else {
-                    Some(s)
-                }
-            }
-            _ => None,
-        })
-        .collect::<PathBuf>();
-    if sanitized.as_os_str().is_empty() {
-        None
-    } else {
-        Some(sanitized)
-    }
+    // Salami: ablehnen statt bereinigen (siehe import_safety::canonical_pack_path)
+    crate::utils::import_safety::canonical_pack_path(path).ok()
 }
 
 pub async fn download_manifest_content_files(
@@ -294,11 +278,16 @@ pub async fn download_manifest_content_files(
         };
         let dest_path = target_dir.join(&sanitized_relative_path);
 
-        let url = match file_data.downloads.first() {
+        // Salami: nur https von den laut Modrinth-Spezifikation erlaubten Hosts
+        let url = match file_data
+            .downloads
+            .iter()
+            .find(|u| crate::integrations::modrinth::is_whitelisted_modpack_url(u))
+        {
             Some(u) => u,
             None => {
                 warn!(
-                    "Manifest content file '{}' has no download URL. Skipping.",
+                    "Manifest content file '{}' has no download URL on an allowed host. Skipping.",
                     file_data.path
                 );
                 continue;
@@ -313,12 +302,16 @@ pub async fn download_manifest_content_files(
             "Downloading manifest content file '{}' -> {:?}",
             file_data.path, dest_path
         );
+        // Salami: ohne Prüfsumme kein Download (die Modrinth-Spezifikation verlangt sha1)
         match file_data.hashes.get("sha1") {
-            Some(sha1) if sha1.len() == 40 => {
+            Some(sha1) if sha1.len() == 40 && sha1.chars().all(|c| c.is_ascii_hexdigit()) => {
                 DownloadUtils::download_with_sha1(url, &dest_path, sha1).await?;
             }
             _ => {
-                DownloadUtils::download_simple(url, &dest_path).await?;
+                warn!(
+                    "Manifest content file '{}' has no valid sha1. Skipping.",
+                    file_data.path
+                );
             }
         }
     }
@@ -348,6 +341,7 @@ pub async fn resolve_manifest_files(manifest: &ModrinthIndex) -> Result<Vec<Mod>
             AppError::Other("Missing Minecraft dependency in manifest".into())
         })?
         .clone();
+    crate::utils::import_safety::require_version_like(&game_version)?;
 
     let mut mods_to_add = Vec::new();
     let mut hashes_to_lookup = Vec::new();
@@ -669,31 +663,14 @@ pub async fn extract_mrpack_overrides(
                 _ => continue, // Skip if path after prefix is empty (e.g. just "overrides/")
             };
 
-            // Sanitize each component of the path to prevent directory traversal and invalid names
-            let sanitized_relative_path = PathBuf::from(path_after_prefix)
-                .components()
-                .filter_map(|comp| match comp {
-                    // Sanitize normal path components (filenames/directory names)
-                    std::path::Component::Normal(os_str) => {
-                        let sanitized_comp = sanitize_filename::sanitize(os_str.to_string_lossy().as_ref());
-                        // Ensure sanitized component is not empty (e.g. if original was just "..")
-                        if sanitized_comp.is_empty() {
-                            None
-                        } else {
-                            Some(sanitized_comp)
-                        }
-                    }
-                    // Disallow ParentDir components to prevent trivial directory traversal
-                    std::path::Component::ParentDir => {
-                        warn!("Parent directory component '..' found and removed in override path: {}", path_after_prefix);
-                        None 
-                    }
-                    // Ignore CurDir, RootDir, Prefix as they shouldn't be in relative archive paths or are handled by join
-                    std::path::Component::CurDir => None, 
-                    std::path::Component::RootDir => None, // Should not appear in relative paths
-                    std::path::Component::Prefix(_) => None, // Should not appear in relative paths
-                })
-                .collect::<PathBuf>();
+            // Salami: ablehnen statt bereinigen – sonst würde z. B. aus `evil.ja:r` still `evil.jar`
+            let sanitized_relative_path = match crate::utils::import_safety::canonical_pack_path(path_after_prefix) {
+                Ok(path) => path,
+                Err(e) => {
+                    warn!("Skipping override entry {}: {}", entry_filename_str, e);
+                    continue;
+                }
+            };
 
             // If sanitization results in an empty path (e.g., path was only ".." or similar), skip it.
             if sanitized_relative_path.as_os_str().is_empty() {
@@ -987,6 +964,13 @@ pub async fn import_mrpack_as_profile(
 ) -> Result<Uuid> {
     info!("Starting full import process for mrpack: {:?}", pack_path);
 
+    // Salami: unbekannte Programmdateien nur nach nativer Bestätigung
+    crate::integrations::pack_preview::ensure_pack_content_allowed(
+        &pack_path,
+        crate::integrations::pack_preview::PackFormat::Mrpack,
+    )
+    .await?;
+
     let state = State::get().await?;
 
     // Helper to emit progress if event_id is provided
@@ -1137,6 +1121,7 @@ pub async fn download_and_process_mrpack(
     event_id: Option<Uuid>,
 ) -> Result<Uuid> {
     info!("Downloading modpack from URL: {}", download_url);
+    crate::utils::import_safety::require_platform_download(download_url)?;
 
     let state = State::get().await?;
 
@@ -1166,7 +1151,12 @@ pub async fn download_and_process_mrpack(
         AppError::Other(format!("Failed to create temporary directory: {}", e))
     })?;
 
-    let temp_file_path = temp_dir.path().join(file_name);
+    // Salami: Dateiname vom Server nie ungeprüft als Pfad verwenden
+    let safe_file_name = crate::utils::import_safety::safe_file_component(file_name)
+        .ok()
+        .filter(|name| name.to_ascii_lowercase().ends_with(".mrpack"))
+        .unwrap_or_else(|| "modpack.mrpack".to_string());
+    let temp_file_path = temp_dir.path().join(&safe_file_name);
     debug!(
         "Temporary file path for downloaded modpack: {:?}",
         temp_file_path

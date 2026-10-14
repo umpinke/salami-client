@@ -93,6 +93,10 @@ pub async fn add_content_to_profile(
             .map_err(|e| AppError::Io(e))?;
     }
 
+    // Salami: Dateiname und Quelle vom Server prüfen, bevor daraus ein Pfad wird
+    crate::utils::import_safety::check_content_file_name(&file_name).map_err(AppError::Other)?;
+    crate::utils::import_safety::require_platform_download(&download_url)?;
+
     // Construct the file path
     let file_path = target_dir.join(&file_name);
     debug!("Target file path: {}", file_path.display());

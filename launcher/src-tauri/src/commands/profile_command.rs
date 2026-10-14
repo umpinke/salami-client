@@ -25,8 +25,9 @@ use crate::utils::profile_utils::{
 use crate::utils::resourcepack_utils::ResourcePackInfo;
 use crate::utils::shaderpack_utils::ShaderPackInfo;
 use crate::utils::world_utils;
+use crate::utils::launch_guard;
 use crate::utils::{
-    datapack_utils, disk_space_utils::DiskSpaceUtils, path_utils, profile_utils, referral_utils, repair_utils, resourcepack_utils,
+    datapack_utils, disk_space_utils::DiskSpaceUtils, path_utils, profile_utils, repair_utils, resourcepack_utils,
     shaderpack_utils,
 };
 use chrono::Utc;
@@ -298,13 +299,6 @@ pub async fn launch_profile(
     
     let credentials = resolve_credentials_for_profile(&state, &profile, is_experimental).await?;
 
-    // Fallback: Try to report pending referral code before launch (in case login report failed)
-    if let Some(ref creds) = credentials {
-        if let Err(e) = referral_utils::report_referral_after_login(creds.id).await {
-            log::debug!("[Command] Referral report before launch failed (may already be reported): {}", e);
-        }
-    }
-
     let profile_id = profile.id; // Store profile ID for later use
     let profile_clone = profile.clone();
 
@@ -516,11 +510,16 @@ pub async fn get_profile(id: Uuid) -> Result<Profile, CommandError> {
 }
 
 #[tauri::command]
-pub async fn update_profile(id: Uuid, params: UpdateProfileParams) -> Result<(), CommandError> {
+pub async fn update_profile(
+    app: tauri::AppHandle,
+    id: Uuid,
+    mut params: UpdateProfileParams,
+) -> Result<(), CommandError> {
     info!(
         "[CMD] update_profile called for ID: {} with params: {:?}",
         id, params
     );
+    guard_launch_settings(&app, id, &mut params).await?;
     match try_update_profile(id, params).await {
         Ok(_) => {
             info!("[CMD] update_profile successful for ID: {}", id);
@@ -531,6 +530,38 @@ pub async fn update_profile(id: Uuid, params: UpdateProfileParams) -> Result<(),
             Err(e)
         }
     }
+}
+
+/// Salami: Eigenes Java und code-ladende JVM-Optionen werden nur nach nativer Bestätigung
+/// übernommen – sonst bleiben die bisherigen Werte.
+async fn guard_launch_settings(
+    app: &tauri::AppHandle,
+    id: Uuid,
+    params: &mut UpdateProfileParams,
+) -> Result<(), CommandError> {
+    let Some(new_settings) = params.settings.as_mut() else {
+        return Ok(());
+    };
+    let state = State::get().await?;
+    let current = state.profile_manager.get_profile(id).await?.settings;
+    let mut risky = Vec::new();
+    if let Some(path) = launch_guard::changed_java_path(&current, new_settings) {
+        risky.push(format!("Java: {path}"));
+    }
+    let new_jvm = launch_guard::new_dangerous_jvm_args(
+        current.custom_jvm_args.as_deref(),
+        new_settings.custom_jvm_args.as_deref(),
+    );
+    if !new_jvm.is_empty() {
+        risky.push(format!("JVM: {}", new_jvm.join(" ")));
+    }
+    if !risky.is_empty() && !launch_guard::confirm(app, &risky).await {
+        warn!("[CMD] Java/JVM change for profile {} was not confirmed, keeping previous values", id);
+        new_settings.java_path = current.java_path.clone();
+        new_settings.use_custom_java_path = current.use_custom_java_path;
+        new_settings.custom_jvm_args = current.custom_jvm_args.clone();
+    }
+    Ok(())
 }
 
 /// Checks if mods directory migration is needed based on profile changes
@@ -2056,7 +2087,8 @@ pub async fn get_log_file_content(log_file_path: PathBuf) -> Result<String, Comm
         log_file_path.display()
     );
 
-    // Call the utility function from file_utils
+    // Salami: nur Log-Dateien innerhalb der Launcher-Ordner
+    let log_file_path = crate::utils::path_guard::ensure_allowed(&log_file_path)?;
     Ok(crate::utils::file_utils::read_log_file_content(&log_file_path).await?)
 }
 

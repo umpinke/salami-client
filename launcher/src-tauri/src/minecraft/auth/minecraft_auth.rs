@@ -162,7 +162,8 @@ pub enum MinecraftAuthenticationError {
         source: serde_json::Error,
     },
     #[error(
-        "Failed to deserialize response to JSON during step {step:?}: {source}. Status Code: {status_code} Body: {raw}"
+        "Failed to deserialize response to JSON during step {step:?}: {source}. Status Code: {status_code} Body: {}",
+        masked_body(.raw)
     )]
     DeserializeResponse {
         step: MinecraftAuthStep,
@@ -217,6 +218,16 @@ pub struct DirectOAuthFlow {
     pub state: String,
     pub redirect_uri: String,
     pub authorize_url: String,
+}
+
+/// Salami: Antwort-Rohdaten nur geschwärzt und gekürzt in Fehlermeldungen – die gehen bis in
+/// die Oberfläche.
+fn masked_body(raw: &str) -> String {
+    let masked = crate::utils::security_utils::mask_sensitive_data(raw);
+    match masked.char_indices().nth(300) {
+        Some((cut, _)) => format!("{}...", &masked[..cut]),
+        None => masked,
+    }
 }
 
 fn publish_log_redactions(accounts: &[Credentials]) {
@@ -275,7 +286,29 @@ impl MinecraftAuthStore {
                 data.len()
             );
 
-            let store: AccountStore = match serde_json::from_str(&data) {
+            // Salami: Login-Daten liegen per Windows DPAPI verschlüsselt; alte Klartext-Dateien
+            // werden unten sofort verschlüsselt neu geschrieben.
+            let (json, was_plain) = match crate::utils::secret_store::open(&data) {
+                Ok(crate::utils::secret_store::Opened::Protected(plain)) => (plain, false),
+                Ok(crate::utils::secret_store::Opened::Plain) => (data, true),
+                Err(e) => {
+                    // Nicht entschlüsselbar (anderer PC/Windows-Benutzer): beiseitelegen statt
+                    // überschreiben, mit leeren Accounts starten.
+                    let aside = self.store_path.with_extension(format!(
+                        "json.unreadable-{}",
+                        Utc::now().format("%Y%m%d%H%M%S")
+                    ));
+                    error!(
+                        "[Storage] Account file cannot be decrypted on this Windows account ({}). Moved to {} – please sign in again.",
+                        e,
+                        aside.display()
+                    );
+                    let _ = fs::rename(&self.store_path, &aside).await;
+                    return Ok(());
+                }
+            };
+
+            let store: AccountStore = match serde_json::from_str(&json) {
                 Ok(store) => store,
                 Err(e) => {
                     error!(
@@ -307,6 +340,13 @@ impl MinecraftAuthStore {
                 account_count,
                 if has_device_token { "yes" } else { "no" }
             );
+            drop(accounts);
+            if was_plain && cfg!(windows) {
+                match self.save().await {
+                    Ok(()) => info!("[Storage] Account file is now encrypted for this Windows account"),
+                    Err(e) => error!("[Storage] Could not encrypt the account file: {}", e),
+                }
+            }
         } else {
             info!("[Storage] No account file found, starting with empty accounts");
         }
@@ -334,7 +374,7 @@ impl MinecraftAuthStore {
             self.store_path.display()
         );
 
-        let data = serde_json::to_string_pretty(&store)?;
+        let data = crate::utils::secret_store::seal(&serde_json::to_string(&store)?)?;
         write_atomic(&self.store_path, data).await?;
 
         debug!("[Storage] Save operation completed successfully");
@@ -2376,40 +2416,66 @@ fn generate_oauth_challenge() -> String {
     bytes.iter().map(|byte| format!("{:02x}", byte)).collect()
 }
 
+/// Salami: Belegt den Login-Port sofort auf 127.0.0.1 und (falls IPv6 da ist) auf [::1] und hält
+/// ihn, bis der Login fertig ist. Ist der Port auf [::1] schon von einem anderen Programm belegt,
+/// wird ein anderer Port genommen – sonst könnte dieses Programm die Antwort für „localhost“
+/// abfangen.
+pub async fn bind_oauth_listeners(start_port: u16) -> Result<(u16, Vec<TcpListener>)> {
+    for port in start_port..=start_port.saturating_add(100) {
+        let Ok(v4) = TcpListener::bind(("127.0.0.1", port)).await else {
+            continue;
+        };
+        match TcpListener::bind(("::1", port)).await {
+            Ok(v6) => return Ok((port, vec![v4, v6])),
+            Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => continue,
+            Err(_) => return Ok((port, vec![v4])),
+        }
+    }
+    Err(AppError::Other(
+        "No free local port for the browser login".to_string(),
+    ))
+}
+
 /// Starts a local HTTP server to listen for OAuth callback.
 /// Returns a oneshot receiver that will receive the authorization code when the callback is received.
-/// 
-/// # Arguments
-/// * `port` - The port to listen on
-/// * `success_html` - HTML content to display on successful authentication
-/// * `error_html` - HTML content to display on authentication error
+/// Only callbacks carrying `expected_state` are accepted; anything else is answered with the error
+/// page and ignored, so a foreign request can neither inject a code nor abort the login.
 pub async fn start_oauth_callback_server(
-    port: u16,
+    listeners: Vec<TcpListener>,
+    expected_state: String,
     success_html: String,
     error_html: String,
 ) -> Result<(tokio::task::JoinHandle<Result<()>>, oneshot::Receiver<Result<String>>)> {
-    info!("[OAuth Server] Starting callback server on port {}", port);
+    info!("[OAuth Server] Starting callback server on {} listener(s)", listeners.len());
 
     let (tx, rx) = oneshot::channel();
     let tx_shared = Arc::new(tokio::sync::Mutex::new(Some(tx)));
     let success_html_shared = Arc::new(success_html);
     let error_html_shared = Arc::new(error_html);
+    let expected_state = Arc::new(expected_state);
 
-    // Create the router with shared state
     let app = Router::new().route(
         "/callback",
         get({
             let tx_shared = tx_shared.clone();
             let success_html_shared = success_html_shared.clone();
             let error_html_shared = error_html_shared.clone();
+            let expected_state = expected_state.clone();
             move |Query(params): Query<HashMap<String, String>>| {
                 let tx_shared = tx_shared.clone();
                 let success_html_shared = success_html_shared.clone();
                 let error_html_shared = error_html_shared.clone();
+                let expected_state = expected_state.clone();
                 async move {
+                    let state_ok = params
+                        .get("state")
+                        .map_or(false, |s| constant_time_eq(s.as_bytes(), expected_state.as_bytes()));
+                    if !state_ok {
+                        log::warn!("[OAuth Server] Ignoring callback with missing or wrong state");
+                        return Html(error_html_shared.as_str().to_string());
+                    }
                     if let Some(code) = params.get("code") {
                         info!("[OAuth Server] Received authorization code");
-                        // Send the code through the channel
                         if let Some(tx) = tx_shared.lock().await.take() {
                             let _ = tx.send(Ok(code.clone()));
                         }
@@ -2423,28 +2489,20 @@ pub async fn start_oauth_callback_server(
                             "[OAuth Server] Received error: {} - {}",
                             error, error_description
                         );
-                        // Send error through the channel
                         if let Some(tx) = tx_shared.lock().await.take() {
                             let _ = tx.send(Err(AppError::AccountError(format!(
                                 "OAuth error: {} - {}",
                                 error, error_description
                             ))));
                         }
-                        // Inject error into HTML template via URL parameters
-                        // The JavaScript in the template will handle displaying the error
-                        let _error_url = format!("?error={}&error_description={}", 
-                            urlencoding::encode(error),
-                            urlencoding::encode(error_description));
                         Html(error_html_shared.as_str().to_string())
                     } else {
                         error!("[OAuth Server] Received callback without code or error");
-                        // Send error through the channel
                         if let Some(tx) = tx_shared.lock().await.take() {
                             let _ = tx.send(Err(AppError::AccountError(
                                 "No authorization code received".to_string(),
                             )));
                         }
-                        // Use error HTML template (error will be handled by JavaScript in the template)
                         Html(error_html_shared.as_str().to_string())
                     }
                 }
@@ -2452,21 +2510,68 @@ pub async fn start_oauth_callback_server(
         }),
     );
 
-    // Bind to the address
-    let addr = format!("127.0.0.1:{}", port);
-    let listener = TcpListener::bind(&addr)
-        .await
-        .map_err(|e| AppError::Other(format!("Failed to bind to {}: {}", addr, e)))?;
+    for listener in &listeners {
+        if let Ok(addr) = listener.local_addr() {
+            info!("[OAuth Server] Listening on http://{}", addr);
+        }
+    }
 
-    info!("[OAuth Server] Listening on http://{}", addr);
-
-    // Spawn the server task using axum's serve
+    // Aborting this handle drops the JoinSet, which stops every listener task.
     let handle = tokio::spawn(async move {
-        axum::serve(listener, app)
-            .await
-            .map_err(|e| AppError::Other(format!("Server error: {}", e)))?;
+        let mut servers = tokio::task::JoinSet::new();
+        for listener in listeners {
+            let app = app.clone();
+            servers.spawn(async move { axum::serve(listener, app).await });
+        }
+        while let Some(result) = servers.join_next().await {
+            if let Ok(Err(e)) = result {
+                return Err(AppError::Other(format!("Server error: {}", e)));
+            }
+        }
         Ok(())
     });
 
     Ok((handle, rx))
+}
+
+/// Vergleich ohne frühen Abbruch (State-Wert soll nicht per Zeitmessung erratbar sein).
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+}
+
+#[cfg(test)]
+mod oauth_server_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn callback_needs_the_flow_state() {
+        let (port, listeners) = bind_oauth_listeners(41785).await.unwrap();
+        let (handle, mut rx) = start_oauth_callback_server(
+            listeners,
+            "expected-state".to_string(),
+            "ok".to_string(),
+            "error".to_string(),
+        )
+        .await
+        .unwrap();
+        let client = reqwest::Client::new();
+        let base = format!("http://127.0.0.1:{port}/callback");
+
+        // Fremde Anfragen: weder Code noch Abbruch werden angenommen
+        let _ = client.get(format!("{base}?code=evil&state=wrong")).send().await.unwrap();
+        let _ = client.get(format!("{base}?error=access_denied")).send().await.unwrap();
+        assert!(rx.try_recv().is_err(), "foreign callback was accepted");
+
+        let body = client
+            .get(format!("{base}?code=good&state=expected-state"))
+            .send()
+            .await
+            .unwrap()
+            .text()
+            .await
+            .unwrap();
+        assert_eq!(body, "ok");
+        assert_eq!(rx.await.unwrap().unwrap(), "good");
+        handle.abort();
+    }
 }

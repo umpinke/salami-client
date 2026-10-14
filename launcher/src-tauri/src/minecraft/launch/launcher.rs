@@ -202,7 +202,8 @@ impl MinecraftLauncher {
                 processed_args.push(game_args_resolver.replace_variables(token));
             }
 
-            info!("Processed old arguments: {:?}", processed_args);
+            // Salami: Argumente enthalten den Zugangstoken – nur die Anzahl loggen
+            log::debug!("Processed old arguments: {} entries", processed_args.len());
             processed_args
         })
     }

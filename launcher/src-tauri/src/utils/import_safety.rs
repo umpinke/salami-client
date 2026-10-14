@@ -60,6 +60,8 @@ impl ImportSecurityReport {
 
 pub fn parse_untrusted_profile(json: &str) -> Result<(Profile, ImportSecurityReport)> {
     let mut profile: Profile = serde_json::from_str(json).map_err(AppError::Json)?;
+    // Salami: die Version wird Teil von Ordnernamen (und von Lösch-Pfaden bei Reparaturen)
+    require_version_like(&profile.game_version)?;
     let report = sanitize_imported_profile(&mut profile);
     Ok((profile, report))
 }
@@ -83,6 +85,10 @@ pub fn safe_relative_path(path: &str) -> Result<PathBuf> {
             (Some(Component::Normal(_)), None) => {}
             _ => return Err(reject("contains a segment that is not a plain name")),
         }
+        // Salami: auch `:` (NTFS-Streams), Punkt/Leerzeichen am Ende und reservierte Namen ablehnen
+        if safe_file_component(segment).is_err() {
+            return Err(reject("contains a name that is not valid on Windows"));
+        }
 
         normalized.push(segment);
     }
@@ -92,6 +98,59 @@ pub fn safe_relative_path(path: &str) -> Result<PathBuf> {
     }
 
     Ok(normalized)
+}
+
+/// Salami: Kanonischer relativer Pfad für Dateien aus Packs (Zip-Einträge, Manifest-Pfade).
+/// Lehnt ab statt zu bereinigen, damit Vorschau, Prüfung und Entpacken garantiert dieselbe Datei
+/// meinen (sonst würde z. B. aus `evil.ja:r` beim Entpacken still `evil.jar`): kein Wurzel- oder
+/// Laufwerkspfad, kein `..`, kein `:`, keine Steuerzeichen, kein Punkt/Leerzeichen am Ende, keine
+/// reservierten Windows-Namen. `\` gilt als Trenner; leere und `.`-Segmente fallen weg.
+pub fn canonical_pack_path(path: &str) -> Result<PathBuf> {
+    let reject = |why: &str| -> AppError {
+        AppError::Other(format!("Unsafe pack path '{}': {}", path, why))
+    };
+    if path.starts_with('/') || path.starts_with('\\') {
+        return Err(reject("is absolute"));
+    }
+
+    let mut canonical = PathBuf::new();
+    for segment in path.split(['/', '\\']) {
+        if segment.is_empty() || segment == "." {
+            continue;
+        }
+        if segment == ".." {
+            return Err(reject("contains '..'"));
+        }
+        if segment.contains(':') {
+            return Err(reject("contains ':'"));
+        }
+        if safe_file_component(segment).is_err() {
+            return Err(reject("contains a name that is not valid on Windows"));
+        }
+        canonical.push(segment);
+    }
+
+    if canonical.as_os_str().is_empty() {
+        return Err(reject("resolves to no path segments"));
+    }
+    Ok(canonical)
+}
+
+/// Liegt ein kanonischer Pack-Pfad im `mods`-Ordner? Groß-/Kleinschreibung egal (Windows).
+pub fn is_in_mods_dir(path: &Path) -> bool {
+    path.components()
+        .next()
+        .map_or(false, |c| c.as_os_str().to_string_lossy().eq_ignore_ascii_case("mods"))
+}
+
+/// Kanonischer Pfad als `/`-getrennter Kleinbuchstaben-Text (für Präfix-Vergleiche).
+pub fn canonical_pack_key(path: &str) -> Option<String> {
+    let canonical = canonical_pack_path(path).ok()?;
+    let parts: Vec<String> = canonical
+        .components()
+        .map(|c| c.as_os_str().to_string_lossy().to_ascii_lowercase())
+        .collect();
+    Some(parts.join("/"))
 }
 
 pub fn safe_file_component(name: &str) -> Result<String> {
@@ -352,6 +411,19 @@ fn inspect_mod(mod_info: &Mod, report: &mut ImportSecurityReport) -> std::result
     Ok(())
 }
 
+/// Salami: Inhalte und Modpack-Archive nur per https von den CDNs von Modrinth/CurseForge laden.
+pub fn require_platform_download(url: &str) -> Result<()> {
+    if require_host(url, MODRINTH_HOSTS, "Modrinth").is_ok()
+        || require_host(url, CURSEFORGE_HOSTS, "CurseForge").is_ok()
+    {
+        return Ok(());
+    }
+    Err(AppError::Other(format!(
+        "Refusing download from an unexpected host: {}",
+        url
+    )))
+}
+
 pub fn check_content_file_name(name: &str) -> std::result::Result<(), String> {
     let cleaned = safe_file_component(name).map_err(|e| e.to_string())?;
     let extension = std::path::Path::new(&cleaned)
@@ -400,10 +472,126 @@ fn is_coordinate_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | '+')
 }
 
+/// Salami: Archiv-Eintrag sicher an einen Zielordner hängen – nur normale Pfadteile, kein
+/// absoluter Pfad, kein Laufwerk, kein `..` (Zip-Slip). `None` heißt: Eintrag überspringen.
+pub fn safe_archive_join(base: &Path, entry: impl AsRef<Path>) -> Option<PathBuf> {
+    let mut joined = base.to_path_buf();
+    let mut any = false;
+    for component in entry.as_ref().components() {
+        match component {
+            Component::Normal(part) => {
+                joined.push(part);
+                any = true;
+            }
+            Component::CurDir => {}
+            _ => return None,
+        }
+    }
+    any.then_some(joined)
+}
+
+/// Salami: Prüft, dass ein relativer Symlink-Ziel innerhalb von `root` bleibt, wenn er im Ordner
+/// `link_parent` (relativ zu `root`) liegt.
+pub fn relative_link_stays_inside(link_parent_in_root: &Path, link_target: &Path) -> bool {
+    let mut depth: i64 = 0;
+    for component in link_parent_in_root.components() {
+        match component {
+            Component::Normal(_) => depth += 1,
+            Component::CurDir => {}
+            _ => return false,
+        }
+    }
+    for component in link_target.components() {
+        match component {
+            Component::Normal(_) => depth += 1,
+            Component::CurDir => {}
+            Component::ParentDir => {
+                depth -= 1;
+                if depth < 0 {
+                    return false;
+                }
+            }
+            _ => return false,
+        }
+    }
+    true
+}
+
+pub fn require_version_like(value: &str) -> Result<()> {
+    if is_version_like(value) {
+        Ok(())
+    } else {
+        Err(AppError::Other(format!("Invalid Minecraft version in pack: {:?}", value)))
+    }
+}
+
 pub fn is_version_like(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 64
         && value
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | '+'))
+}
+
+#[cfg(test)]
+mod canonical_pack_path_tests {
+    use super::*;
+
+    #[test]
+    fn rejects_instead_of_stripping() {
+        assert_eq!(canonical_pack_path("mods/a.jar").unwrap(), PathBuf::from("mods").join("a.jar"));
+        assert_eq!(canonical_pack_path("./mods//a.jar").unwrap(), PathBuf::from("mods").join("a.jar"));
+        assert_eq!(canonical_pack_path("Mods\\a.jar").unwrap(), PathBuf::from("Mods").join("a.jar"));
+        for bad in [
+            "/mods/a.jar",
+            "\\mods\\a.jar",
+            "C:/x/a.jar",
+            "mods/../a.jar",
+            "mods/evil.ja:r",
+            "mods/evil.jar.",
+            "mods/evil.jar ",
+            "mods/CON",
+            "mods/a\u{1}.jar",
+            "",
+            "./",
+        ] {
+            assert!(canonical_pack_path(bad).is_err(), "accepted {bad:?}");
+        }
+    }
+
+    #[test]
+    fn mods_dir_is_case_insensitive() {
+        assert!(is_in_mods_dir(&canonical_pack_path("MODS/x.jar").unwrap()));
+        assert!(is_in_mods_dir(&canonical_pack_path("./mods/x.jar").unwrap()));
+        assert!(!is_in_mods_dir(&canonical_pack_path("config/mods/x.jar").unwrap()));
+        assert_eq!(canonical_pack_key("Overrides\\Mods/X.JAR").as_deref(), Some("overrides/mods/x.jar"));
+    }
+
+    #[test]
+    fn archive_join_blocks_zip_slip() {
+        let base = Path::new("base");
+        assert_eq!(safe_archive_join(base, "a/b.txt"), Some(base.join("a").join("b.txt")));
+        assert_eq!(safe_archive_join(base, "./a"), Some(base.join("a")));
+        assert!(safe_archive_join(base, "../x").is_none());
+        assert!(safe_archive_join(base, "a/../../x").is_none());
+        assert!(safe_archive_join(base, "/etc/passwd").is_none());
+        assert!(safe_archive_join(base, "").is_none());
+        #[cfg(windows)]
+        {
+            assert!(safe_archive_join(base, "..\\x.jar").is_none());
+            assert!(safe_archive_join(base, "C:\\x.jar").is_none());
+        }
+        assert!(relative_link_stays_inside(Path::new("legal/java.base"), Path::new("../java.base/LICENSE")));
+        assert!(!relative_link_stays_inside(Path::new("legal"), Path::new("../../etc/passwd")));
+        assert!(!relative_link_stays_inside(Path::new("a"), Path::new("/etc/passwd")));
+        assert!(require_version_like("1.21.11").is_ok());
+        assert!(require_version_like("../../x").is_err());
+    }
+
+    #[test]
+    fn sync_paths_reject_windows_aliases() {
+        assert!(safe_relative_path("config/a.txt").is_ok());
+        assert!(safe_relative_path("config/a.txt:stream").is_err());
+        assert!(safe_relative_path("mods.").is_err());
+    }
 }

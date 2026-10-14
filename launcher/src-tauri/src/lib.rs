@@ -9,5 +9,6 @@ pub mod friends;
 pub mod integrations;
 pub mod logging;
 pub mod minecraft;
+pub mod nav_guard;
 pub mod state;
 pub mod sync;

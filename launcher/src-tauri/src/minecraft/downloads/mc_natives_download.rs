@@ -315,7 +315,12 @@ impl MinecraftNativesDownloadService {
                 continue;
             }
 
-            let path = natives_path.join(&file_name);
+            // Salami: Zip-Slip verhindern
+            let Some(path) = crate::utils::import_safety::safe_archive_join(&natives_path, &file_name)
+            else {
+                log::warn!("    Skipping unsafe natives entry: {}", file_name);
+                continue;
+            };
             let entry_is_dir = file_name.ends_with('/');
 
             if entry_is_dir {

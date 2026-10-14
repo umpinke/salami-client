@@ -256,6 +256,15 @@
           "'self'",
           "'unsafe-inline'"
         ],
+        "form-action": [
+          "'none'"
+        ],
+        "base-uri": [
+          "'self'"
+        ],
+        "object-src": [
+          "'none'"
+        ],
         "frame-src": [
           "'self'",
           "https://www.youtube.com",
@@ -276,6 +285,10 @@
           "requireLiteralLeadingDot": false,
           "allow": [
             "**/*"
+          ],
+          "deny": [
+            "**/accounts.json",
+            "**/accounts.json.*"
           ]
         }
       }

@@ -1344,6 +1344,7 @@ pub async fn process_curseforge_pack_from_zip(pack_path: &Path) -> Result<(Profi
         Some(&manifest.minecraft.version),
     );
     let game_version = manifest.minecraft.version.clone();
+    crate::utils::import_safety::require_version_like(&game_version)?;
 
     info!(
         "Determined requirements: MC={}, Loader={:?}, LoaderVersion={:?}",
@@ -1562,6 +1563,7 @@ pub async fn resolve_curseforge_manifest_files(manifest: &CurseForgeManifest) ->
     );
 
     let game_version = manifest.minecraft.version.clone();
+    crate::utils::import_safety::require_version_like(&game_version)?;
 
     // Collect all project IDs and file IDs
     let mut project_ids = Vec::new();
@@ -1812,31 +1814,14 @@ pub async fn extract_curseforge_overrides(
                 _ => continue, // Skip if path after prefix is empty (e.g. just "overrides/")
             };
 
-            // Sanitize each component of the path to prevent directory traversal and invalid names
-            let sanitized_relative_path = PathBuf::from(path_after_prefix)
-                .components()
-                .filter_map(|comp| match comp {
-                    // Sanitize normal path components (filenames/directory names)
-                    std::path::Component::Normal(os_str) => {
-                        let sanitized_comp = sanitize_filename::sanitize(os_str.to_string_lossy().as_ref());
-                        // Ensure sanitized component is not empty (e.g. if original was just "..")
-                        if sanitized_comp.is_empty() {
-                            None
-                        } else {
-                            Some(sanitized_comp)
-                        }
-                    }
-                    // Disallow ParentDir components to prevent trivial directory traversal
-                    std::path::Component::ParentDir => {
-                        warn!("Parent directory component '..' found and removed in override path: {}", path_after_prefix);
-                        None
-                    }
-                    // Ignore CurDir, RootDir, Prefix as they shouldn't be in relative archive paths or are handled by join
-                    std::path::Component::CurDir => None,
-                    std::path::Component::RootDir => None, // Should not appear in relative paths
-                    std::path::Component::Prefix(_) => None, // Should not appear in relative paths
-                })
-                .collect::<PathBuf>();
+            // Salami: ablehnen statt bereinigen – sonst würde z. B. aus `evil.ja:r` still `evil.jar`
+            let sanitized_relative_path = match crate::utils::import_safety::canonical_pack_path(path_after_prefix) {
+                Ok(path) => path,
+                Err(e) => {
+                    warn!("Skipping override entry {}: {}", entry_filename_str, e);
+                    continue;
+                }
+            };
 
             // If sanitization results in an empty path (e.g., path was only ".." or similar), skip it.
             if sanitized_relative_path.as_os_str().is_empty() {
@@ -2048,6 +2033,13 @@ pub async fn import_curseforge_pack_as_profile(
 ) -> Result<Uuid> {
     info!("Starting full import process for CurseForge pack: {:?}", pack_path);
 
+    // Salami: unbekannte Programmdateien nur nach nativer Bestätigung
+    crate::integrations::pack_preview::ensure_pack_content_allowed(
+        &pack_path,
+        crate::integrations::pack_preview::PackFormat::Curseforge,
+    )
+    .await?;
+
     let state = crate::state::state_manager::State::get().await?;
 
     // Helper to emit progress if event_id is provided
@@ -2236,6 +2228,10 @@ pub async fn download_and_install_curseforge_modpack(
         AppError::Other(format!("Failed to create temporary directory: {}", e))
     })?;
 
+    // Salami: Dateiname vom Server nie ungeprüft als Pfad verwenden; nur CurseForge-CDN
+    let file_name_zip = crate::utils::import_safety::safe_file_component(&file_name_zip)
+        .unwrap_or_else(|_| "modpack.zip".to_string());
+    crate::utils::import_safety::require_platform_download(&download_url)?;
     let temp_file_path = temp_dir.path().join(&file_name_zip);
 
     info!("Downloading to temporary file: {:?}", temp_file_path);

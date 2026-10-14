@@ -7,7 +7,7 @@ import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 import { useLaunchStateStore, LaunchState } from "../../../store/launch-state-store";
 import { open } from "@tauri-apps/plugin-dialog";
-import { openPath } from "@tauri-apps/plugin-opener";
+import { invoke } from "@tauri-apps/api/core";
 import { useGlobalModal } from "../../../hooks/useGlobalModal";
 import { useConfirmDialog } from "../../../hooks/useConfirmDialog";
 import { SymlinkConfigModal } from "./SymlinkConfigModal";
@@ -201,7 +201,7 @@ export function SymlinkSettingsTab({
         fullPath
       });
       
-      await openPath(fullPath);
+      await invoke("open_directory", { path: fullPath });
     } catch (error) {
       const errorMessage = parseErrorMessage(error);
       logError(`Failed to open internal path for profile ${editedProfile.id}: ${errorMessage}. Path: ${relativePath}`);

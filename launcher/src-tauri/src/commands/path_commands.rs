@@ -35,6 +35,10 @@ pub fn resolve_profile_image(profile_path: &std::path::Path, relative: &str) -> 
         let legacy_dir = profile_path.join(LEGACY_PROFILE_IMAGE_DIR);
         let current_dir = profile_path.join(PROFILE_IMAGE_DIR);
         if legacy_dir.is_dir() && !current_dir.exists() {
+            // Salami: in fremden Spielordnern nichts umbenennen, nur lesen
+            if !crate::utils::legacy_cleanup::uses_own_meta_dir() {
+                return legacy_dir.join(rest);
+            }
             if let Err(e) = std::fs::rename(&legacy_dir, &current_dir) {
                 log::warn!("Could not rename {:?} -> {:?}: {}", legacy_dir, current_dir, e);
             }
@@ -171,6 +175,10 @@ pub async fn upload_profile_images(payload: UploadProfileImagesPayload) -> Resul
 
     let profile_uuid = payload.profile_id;
     let image_type = &payload.image_type; // Get the image type
+    // Salami: der Typ wird Teil des Dateinamens – nur die bekannten Werte zulassen
+    if !matches!(image_type.as_str(), "icon" | "background") {
+        return Err(AppError::Other(format!("Unknown image type: {}", image_type)).into());
+    }
 
     let profile_manager = &state.profile_manager;
     let profile_instance_path = profile_manager
@@ -198,6 +206,11 @@ pub async fn upload_profile_images(payload: UploadProfileImagesPayload) -> Resul
         }
     }
 
+    // Salami: nur Bildformate (verhindert auch, dass beliebige Dateien kopiert werden)
+    let extension = extension.to_ascii_lowercase();
+    if !matches!(extension.as_str(), ".png" | ".jpg" | ".jpeg" | ".gif" | ".webp" | ".bmp" | ".ico") {
+        return Err(AppError::Other(format!("Unsupported image type: {}", extension)).into());
+    }
     let target_image_filename = format!("{}{}", image_type, extension);
 
     let target_dir = profile_instance_path.join(target_sub_dir_name);
@@ -386,4 +399,25 @@ mod profile_image_tests {
         assert_eq!(resolve_profile_image(&profile, "SalamiClient/banner.png"), profile.join("SalamiClient/banner.png"));
         let _ = std::fs::remove_dir_all(&profile);
     }
+}
+
+/// Öffnet einen Ordner im Datei-Explorer. Nur Ordner innerhalb der Launcher-Ordner – Dateien
+/// würden sonst mit ihrem Standardprogramm gestartet.
+#[command]
+pub async fn open_directory(app: tauri::AppHandle, path: String) -> std::result::Result<(), CommandError> {
+    use tauri_plugin_opener::OpenerExt;
+    let dir = crate::utils::path_guard::ensure_allowed(std::path::Path::new(&path))?;
+    if !dir.is_dir() {
+        return Err(AppError::Other(format!("Not a folder: {}", path)).into());
+    }
+    app.opener()
+        .open_path(dunce_display(&dir), None::<&str>)
+        .map_err(|e| AppError::Other(format!("Failed to open folder: {}", e)))?;
+    Ok(())
+}
+
+/// Pfad ohne das `\\?\`-Präfix von `canonicalize` (der Explorer mag das nicht).
+fn dunce_display(path: &std::path::Path) -> String {
+    let s = path.to_string_lossy().to_string();
+    s.strip_prefix(r"\\?\").map(str::to_string).unwrap_or(s)
 }

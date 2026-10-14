@@ -68,10 +68,14 @@ where
     let mut report = ExecutableContentReport::default();
 
     for name in names {
-        if name.ends_with('/') {
+        if name.ends_with('/') || name.ends_with('\\') {
             continue;
         }
-        let lower = name.to_ascii_lowercase();
+        // Salami: dieselben Pfadregeln wie beim Entpacken – was dort abgelehnt wird, landet nie
+        // auf der Platte; alles andere wird unter genau diesem Namen geprüft.
+        let Some(lower) = crate::utils::import_safety::canonical_pack_key(&name) else {
+            continue;
+        };
         let Some(prefix) = lowered_prefixes
             .iter()
             .find(|prefix| lower.starts_with(prefix.as_str()))

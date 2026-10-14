@@ -4,15 +4,39 @@ use crate::error::{AppError, CommandError};
 use crate::minecraft::minecraft_auth::Credentials;
 use crate::state::event_state::{EventPayload, EventType};
 use crate::state::state_manager::State;
-use crate::utils::referral_utils;
 use crate::utils::updater_utils;
 use chrono::{Duration, Utc};
-use log::{error, info, warn};
+use log::{error, info};
 use tauri::plugin::TauriPlugin;
 use tauri::Manager;
 use tauri::{Runtime, UserAttentionType};
 use tauri_plugin_opener::OpenerExt;
 use uuid::Uuid;
+
+/// Account-Daten für die Oberfläche – ohne Token. Die Login-Token bleiben im Backend, damit
+/// selbst ein eingeschleustes Skript in der Oberfläche sie nicht auslesen kann.
+#[derive(serde::Serialize, Clone, Debug)]
+pub struct AccountInfo {
+    pub id: Uuid,
+    pub username: String,
+    pub minecraft_username: String,
+    pub active: bool,
+    pub expires_at: chrono::DateTime<Utc>,
+    pub ignore_child_protection_warning: bool,
+}
+
+impl From<&Credentials> for AccountInfo {
+    fn from(c: &Credentials) -> Self {
+        Self {
+            id: c.id,
+            username: c.username.clone(),
+            minecraft_username: c.username.clone(),
+            active: c.active,
+            expires_at: c.expires,
+            ignore_child_protection_warning: c.ignore_child_protection_warning,
+        }
+    }
+}
 
 //TODO das wäre geiler aber habs noch nicht hinbekommen
 //Error during login: minecraft_auth.begin_login not allowed. Plugin not found
@@ -34,6 +58,12 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
 #[tauri::command]
 pub async fn begin_login<R: Runtime>(
     app: tauri::AppHandle<R>,
+) -> Result<Option<AccountInfo>, CommandError> {
+    Ok(begin_login_inner(app).await?.as_ref().map(AccountInfo::from))
+}
+
+async fn begin_login_inner<R: Runtime>(
+    app: tauri::AppHandle<R>,
 ) -> Result<Option<Credentials>, CommandError> {
     let state = State::get().await?;
     let config = state.config_manager.get_config().await;
@@ -43,35 +73,15 @@ pub async fn begin_login<R: Runtime>(
         // Flatpak: Use external browser with local HTTP server
         info!("[Login] Using external browser flow (Flatpak detected)");
 
-        // Find an available port (try 25585 first, then random)
-        let port = find_available_port(25585).await.unwrap_or_else(|| {
-            // Fallback to random port if 25585 is not available
-            use rand::Rng;
-            let mut rng = rand::thread_rng();
-            rng.gen_range(25565..=25600)
-        });
+        // Salami: Port sofort belegen und halten (kein Wettlauf zwischen Prüfen und Binden) –
+        // auf 127.0.0.1 und, falls vorhanden, [::1], damit kein anderes Programm unter
+        // „localhost“ die Login-Antwort abfängt.
+        let (port, listeners) = crate::minecraft::auth::minecraft_auth::bind_oauth_listeners(25585)
+            .await
+            .map_err(CommandError::from)?;
 
         let redirect_uri = format!("http://localhost:{}/callback", port);
         info!("[Login] Using redirect URI: {}", redirect_uri);
-
-        // Use embedded HTML templates (works on all platforms including Flatpak)
-        let success_html = SUCCESS_HTML.to_string();
-        let error_html = ERROR_HTML.to_string();
-
-        // Start the OAuth callback server
-        let (server_handle, mut code_rx) = crate::minecraft::auth::minecraft_auth::start_oauth_callback_server(
-            port,
-            success_html,
-            error_html,
-        )
-        .await
-        .map_err(|e| CommandError::from(AppError::Other(format!("Failed to start OAuth server: {}", e))))?;
-
-        // Store the server handle in state for cancellation
-        {
-            let mut handle_guard = state.login_server_handle.lock().await;
-            *handle_guard = Some(server_handle);
-        }
 
         // Emit login started event
         let login_event_id = Uuid::new_v4();
@@ -90,6 +100,26 @@ pub async fn begin_login<R: Runtime>(
             .minecraft_account_manager_v2
             .login_begin_direct_oauth(&redirect_uri)
             .await?;
+
+        // Use embedded HTML templates (works on all platforms including Flatpak)
+        let success_html = SUCCESS_HTML.to_string();
+        let error_html = ERROR_HTML.to_string();
+
+        // Start the OAuth callback server (accepts only callbacks carrying this flow's state)
+        let (server_handle, mut code_rx) = crate::minecraft::auth::minecraft_auth::start_oauth_callback_server(
+            listeners,
+            flow.state.clone(),
+            success_html,
+            error_html,
+        )
+        .await
+        .map_err(|e| CommandError::from(AppError::Other(format!("Failed to start OAuth server: {}", e))))?;
+
+        // Store the server handle in state for cancellation
+        {
+            let mut handle_guard = state.login_server_handle.lock().await;
+            *handle_guard = Some(server_handle);
+        }
 
         // Emit waiting for browser event
         state.emit_event(EventPayload {
@@ -166,11 +196,6 @@ pub async fn begin_login<R: Runtime>(
                                 progress: Some(100.0),
                                 error: None,
                             }).await?;
-
-                            // Report referral code with account if available
-                            if let Err(e) = referral_utils::report_referral_after_login(account.id).await {
-                                warn!("[Login] Failed to report referral: {}", e);
-                            }
 
                             return Ok(Some(account));
                         }
@@ -290,10 +315,6 @@ pub async fn begin_login<R: Runtime>(
                             .login_finish(&code, flow)
                             .await?;
 
-                        // Report referral code with account if available
-                        if let Err(e) = referral_utils::report_referral_after_login(account.id).await {
-                            warn!("[Login] Failed to report referral: {}", e);
-                        }
 
                         return Ok(Some(account));
                     }
@@ -306,19 +327,6 @@ pub async fn begin_login<R: Runtime>(
         window.close().map_err(|e| AppError::Other(e.to_string()))?;
         Ok(None)
     }
-}
-
-/// Finds an available port starting from the given port number
-async fn find_available_port(start_port: u16) -> Option<u16> {
-    for port in start_port..=start_port + 100 {
-        if tokio::net::TcpListener::bind(format!("127.0.0.1:{}", port))
-            .await
-            .is_ok()
-        {
-            return Some(port);
-        }
-    }
-    None
 }
 
 /// Remove a Minecraft account
@@ -359,13 +367,13 @@ pub fn is_flatpak() -> bool {
 
 /// Get the currently active Minecraft account
 #[tauri::command]
-pub async fn get_active_account() -> Result<Option<Credentials>, CommandError> {
+pub async fn get_active_account() -> Result<Option<AccountInfo>, CommandError> {
     let state = State::get().await?;
     let account = state
         .minecraft_account_manager_v2
         .get_active_account()
         .await?;
-    Ok(account)
+    Ok(account.as_ref().map(AccountInfo::from))
 }
 
 /// Set the active Minecraft account
@@ -395,11 +403,11 @@ pub async fn set_active_account(account_id: Uuid) -> Result<(), CommandError> {
 
 /// Get all Minecraft accounts
 #[tauri::command]
-pub async fn get_accounts() -> Result<Vec<Credentials>, CommandError> {
+pub async fn get_accounts() -> Result<Vec<AccountInfo>, CommandError> {
     let state = State::get().await?;
     let accounts = state
         .minecraft_account_manager_v2
         .get_all_accounts()
         .await?;
-    Ok(accounts)
+    Ok(accounts.iter().map(AccountInfo::from).collect())
 }

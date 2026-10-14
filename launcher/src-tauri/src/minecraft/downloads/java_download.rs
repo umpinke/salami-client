@@ -98,6 +98,7 @@ impl JavaDownloadService {
         info!("Java Download URL: {}", initial_url);
 
         // For Zulu, we need to make an extra API call to get the actual download URL
+        let mut expected_sha256: Option<String> = None;
         let download_url = if distribution.requires_api_response() {
             info!("Fetching actual download URL from Zulu API...");
             let response = HTTP_CLIENT
@@ -120,6 +121,21 @@ impl JavaDownloadService {
             })?;
 
             info!("Actual download URL: {}", zulu_response.url);
+            // Salami: nur https vom Azul-CDN, Prüfsumme aus der API übernehmen
+            let host_ok = url::Url::parse(&zulu_response.url)
+                .ok()
+                .filter(|u| u.scheme() == "https")
+                .and_then(|u| u.host_str().map(|h| h.eq_ignore_ascii_case("cdn.azul.com")))
+                .unwrap_or(false);
+            if !host_ok {
+                return Err(AppError::JavaDownload(format!(
+                    "Unexpected Java download location: {}",
+                    zulu_response.url
+                )));
+            }
+            expected_sha256 = zulu_response
+                .sha256_hash
+                .filter(|h| h.len() == 64 && h.chars().all(|c| c.is_ascii_hexdigit()));
             zulu_response.url
         } else {
             initial_url
@@ -139,10 +155,13 @@ impl JavaDownloadService {
         let archive_path = version_dir.join(format!("java.{}", OS.get_archive_type()?));
 
         // Download Java archive using the centralized utility (fixes issue #1203)
-        let config = DownloadConfig::new()
+        let mut config = DownloadConfig::new()
             .with_streaming(true)  // Java archives are large files
             .with_retries(3)  // Built-in retry logic for network issues
             .with_force_overwrite(true);  // Always download fresh Java
+        if let Some(sha256) = expected_sha256 {
+            config = config.with_sha256(sha256);
+        }
 
         DownloadUtils::download_file(&download_url, &archive_path, config)
             .await
@@ -239,7 +258,13 @@ impl JavaDownloadService {
                         continue;
                     }
 
-                    let final_dest_path = target_dir.join(relative_path_str);
+                    // Salami: Zip-Slip verhindern
+                    let Some(final_dest_path) =
+                        crate::utils::import_safety::safe_archive_join(&target_dir, &relative_path_str)
+                    else {
+                        log::warn!("Skipping unsafe Java archive entry: {}", full_path_str);
+                        continue;
+                    };
 
                     let task_archive_path = archive_path.clone();
                     let task_io_semaphore = io_semaphore.clone();
@@ -459,7 +484,33 @@ impl JavaDownloadService {
                         continue;
                     }
 
-                    let target_path = target_dir.join(relative_path);
+                    // Salami: kein Zip-Slip, keine Hardlinks, Symlinks nur innerhalb des Ordners
+                    let Some(target_path) =
+                        crate::utils::import_safety::safe_archive_join(target_dir, &relative_path)
+                    else {
+                        log::warn!("Skipping unsafe Java archive entry: {:?}", relative_path);
+                        continue;
+                    };
+                    let entry_type = entry.header().entry_type();
+                    if entry_type.is_hard_link() {
+                        log::warn!("Skipping hard link in Java archive: {:?}", relative_path);
+                        continue;
+                    }
+                    if entry_type.is_symlink() {
+                        let link_ok = entry
+                            .link_name()
+                            .ok()
+                            .flatten()
+                            .map(|target| {
+                                let parent = relative_path.parent().unwrap_or(std::path::Path::new(""));
+                                crate::utils::import_safety::relative_link_stays_inside(parent, &target)
+                            })
+                            .unwrap_or(false);
+                        if !link_ok {
+                            log::warn!("Skipping symlink leaving the Java folder: {:?}", relative_path);
+                            continue;
+                        }
+                    }
 
                     // Create parent directories
                     if let Some(parent) = target_path.parent() {

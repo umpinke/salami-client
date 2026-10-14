@@ -112,8 +112,6 @@ impl Default for PackDetails {
 }
 
 pub async fn preview_pack(pack_path: &Path) -> Result<ImportPackPreview> {
-    let metadata = tokio::fs::metadata(pack_path).await.map_err(AppError::Io)?;
-
     let extension = pack_path
         .extension()
         .and_then(|e| e.to_str())
@@ -124,6 +122,11 @@ pub async fn preview_pack(pack_path: &Path) -> Result<ImportPackPreview> {
         AppError::Other(format!("Unsupported modpack extension: .{}", extension))
     })?;
 
+    preview_pack_as(pack_path, pack_type).await
+}
+
+pub async fn preview_pack_as(pack_path: &Path, pack_type: PackFormat) -> Result<ImportPackPreview> {
+    let metadata = tokio::fs::metadata(pack_path).await.map_err(AppError::Io)?;
     let mut zip = open_archive(pack_path).await?;
     let details = match pack_type {
         PackFormat::Noriskpack => read_noriskpack(&mut zip, pack_path).await?,
@@ -167,6 +170,79 @@ pub async fn preview_pack(pack_path: &Path) -> Result<ImportPackPreview> {
     Ok(preview)
 }
 
+/// Salami: Sperre vor jedem Pack-Import (Datei, Doppelklick, Modrinth/CurseForge). Enthält das
+/// Pack Programmdateien, die nicht per Hash als bekannte Plattform-Mods erkannt wurden (oder
+/// Skripte/native Dateien), muss der Nutzer das in einem nativen Dialog erlauben – den kann
+/// weder ein präpariertes Pack noch ein Skript in der Oberfläche umgehen.
+pub async fn ensure_pack_content_allowed(pack_path: &Path, pack_type: PackFormat) -> Result<()> {
+    let preview = preview_pack_as(pack_path, pack_type).await?;
+    let findings = consent_findings(&preview);
+    if findings.is_empty() {
+        return Ok(());
+    }
+
+    let app = crate::state::state_manager::State::get()
+        .await?
+        .event_state
+        .app_handle()
+        .ok_or_else(|| AppError::Other("Cannot ask for confirmation".to_string()))?;
+
+    const MAX_LINES: usize = 15;
+    let mut listed: Vec<String> = findings.iter().take(MAX_LINES).cloned().collect();
+    if findings.len() > MAX_LINES {
+        listed.push(format!("... +{}", findings.len() - MAX_LINES));
+    }
+    let message = [
+        format!("{}", preview.file_name),
+        String::new(),
+        "Dieses Modpack enthält Dateien, die Code ausführen können und nicht als bekannte Mods geprüft werden konnten:".to_string(),
+        "This modpack contains files that can run code and could not be verified as known mods:".to_string(),
+        String::new(),
+        listed.join("\n"),
+        String::new(),
+        "Nur erlauben, wenn du der Quelle vertraust.".to_string(),
+        "Only allow this if you trust the source.".to_string(),
+    ]
+    .join("\n");
+
+    if crate::utils::launch_guard::confirm_dialog(&*app, message).await {
+        info!("User allowed unverified content in pack '{}'", preview.file_name);
+        Ok(())
+    } else {
+        Err(AppError::Other(
+            "Import cancelled: the pack contains unverified files that can run code".to_string(),
+        ))
+    }
+}
+
+fn consent_findings(preview: &ImportPackPreview) -> Vec<String> {
+    let mut findings: Vec<String> = preview
+        .provenance
+        .unknown
+        .iter()
+        .map(|item| {
+            let reason = match item.reason {
+                UnknownReason::NoHash => "ohne Prüfsumme / no checksum",
+                UnknownReason::NotOnPlatform => "nicht auf Modrinth / not on Modrinth",
+                UnknownReason::BundledFile => "mitgeliefert, unbekannt / bundled, unknown",
+                UnknownReason::LocalSource => "lokale Datei / local file",
+            };
+            format!("{} ({})", item.name, reason)
+        })
+        .collect();
+    let exec = &preview.executable_content;
+    findings.extend(exec.scripts.iter().map(|n| format!("{} (Skript / script)", n)));
+    findings.extend(exec.natives.iter().map(|n| format!("{} (Programm / executable)", n)));
+    let hidden = (exec.script_count + exec.native_count).saturating_sub(exec.scripts.len() + exec.natives.len());
+    if hidden > 0 {
+        findings.push(format!("+{} weitere / more", hidden));
+    }
+    if preview.provenance.incomplete {
+        findings.push("Nicht alle Dateien konnten geprüft werden / Not every file could be checked".to_string());
+    }
+    findings
+}
+
 pub async fn preview_pack_at(path: impl Into<PathBuf>) -> Result<ImportPackPreview> {
     let path = path.into();
     if !path.exists() {
@@ -185,7 +261,7 @@ async fn read_noriskpack(zip: &mut PackZip, pack_path: &Path) -> Result<PackDeta
 
     let mut provenance = ProvenanceReport::default();
     collect_profile_provenance(&profile, &mut provenance).await;
-    collect_bundled_provenance(zip, &mut provenance).await;
+    collect_bundled_provenance(zip, &mut provenance, &["overrides/"]).await;
 
     Ok(PackDetails {
         declared_norisk_pack: profile.selected_norisk_pack_id.clone(),
@@ -237,7 +313,7 @@ async fn read_mrpack(zip: &mut PackZip) -> Result<PackDetails> {
         }
     }
     crate::integrations::provenance::classify_by_modrinth_hash(hashed, UnknownReason::NotOnPlatform, &mut provenance).await;
-    collect_bundled_provenance(zip, &mut provenance).await;
+    collect_bundled_provenance(zip, &mut provenance, &["overrides/", "client-overrides/"]).await;
 
     let mut security = ImportSecurityReport::default();
     security.third_party_download_hosts = collect_third_party_hosts(&index);
@@ -285,7 +361,7 @@ async fn read_curseforge(zip: &mut PackZip) -> Result<PackDetails> {
     );
 
     let mut provenance = ProvenanceReport::default();
-    collect_bundled_provenance(zip, &mut provenance).await;
+    collect_bundled_provenance(zip, &mut provenance, &[overrides_dir.as_str()]).await;
 
     Ok(PackDetails {
         profile_name: Some(manifest.name.clone()),
@@ -359,8 +435,12 @@ async fn collect_profile_provenance(profile: &Profile, report: &mut ProvenanceRe
     crate::integrations::provenance::classify_by_curseforge_fingerprint(curseforge_prints, report).await;
 }
 
-async fn collect_bundled_provenance(zip: &mut PackZip, report: &mut ProvenanceReport) {
-    let bundled = match hash_bundled_mod_jars(zip).await {
+async fn collect_bundled_provenance(
+    zip: &mut PackZip,
+    report: &mut ProvenanceReport,
+    override_prefixes: &[&str],
+) {
+    let bundled = match hash_bundled_mod_jars(zip, override_prefixes).await {
         Ok(bundled) => bundled,
         Err(e) => {
             warn!("Failed to hash bundled jars: {}", e);
@@ -380,7 +460,12 @@ struct BundledJars {
     truncated: bool,
 }
 
-async fn hash_bundled_mod_jars(zip: &mut PackZip) -> Result<BundledJars> {
+async fn hash_bundled_mod_jars(zip: &mut PackZip, override_prefixes: &[&str]) -> Result<BundledJars> {
+    // Salami: kanonische Namen (wie beim Entpacken) und die echten Override-Ordner des Packs
+    let mods_prefixes: Vec<String> = override_prefixes
+        .iter()
+        .map(|prefix| format!("{}mods/", prefix.to_ascii_lowercase()))
+        .collect();
     let candidates: Vec<(usize, String)> = zip
         .file()
         .entries()
@@ -388,9 +473,8 @@ async fn hash_bundled_mod_jars(zip: &mut PackZip) -> Result<BundledJars> {
         .enumerate()
         .filter_map(|(index, entry)| {
             let name = entry.filename().as_str().ok()?;
-            let lower = name.to_ascii_lowercase();
-            let in_mods_dir =
-                lower.starts_with("overrides/mods/") || lower.starts_with("client-overrides/mods/");
+            let lower = crate::utils::import_safety::canonical_pack_key(name)?;
+            let in_mods_dir = mods_prefixes.iter().any(|prefix| lower.starts_with(prefix.as_str()));
             if in_mods_dir && lower.ends_with(".jar") {
                 Some((index, base_name(name)))
             } else {
@@ -531,9 +615,7 @@ fn count_entries_under(zip: &PackZip, prefixes: &[&str]) -> usize {
 }
 
 fn is_mod_path(path: &str) -> bool {
-    path.replace('\\', "/")
-        .trim_start_matches("./")
-        .starts_with("mods/")
+    crate::integrations::mrpack::is_manifest_mod_path(path)
 }
 
 fn base_name(path: &str) -> String {

@@ -80,7 +80,7 @@ use commands::modrinth_commands::{
 
 use commands::file_command::{
     delete_file, get_icons_for_archives, get_icons_for_norisk_mods, list_all_mc_logs,
-    list_crash_reports, list_launcher_logs, list_process_logs, open_file, open_file_directory,
+    list_crash_reports, list_launcher_logs, list_process_logs, open_file_directory,
     read_file_bytes,
     set_file_enabled,
 };
@@ -162,6 +162,8 @@ async fn main() {
     info!("Starting Salami Client...");
 
     tauri::Builder::default()
+        // Salami: Fenster nur auf die eigene Oberfläche (bzw. Microsoft-Login) navigieren lassen
+        .plugin(noriskclient_launcher_v3_lib::nav_guard::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -671,6 +673,7 @@ async fn main() {
             get_launcher_directory,
             resolve_image_path,
             commands::path_commands::upload_profile_images,
+            commands::path_commands::open_directory,
             update_resourcepack_from_modrinth,
             update_shaderpack_from_modrinth,
             update_datapack_from_modrinth,
@@ -726,7 +729,7 @@ async fn main() {
             list_crash_reports,
             list_all_mc_logs,
             list_process_logs,
-            open_file,
+
             read_file_bytes,
             get_app_version,
             get_news_and_changelogs_command,
@@ -763,19 +766,6 @@ async fn main() {
             commands::minecraft_command::get_face_avatar,
             commands::skin_render_command::get_cached_skin_render,
             commands::skin_render_command::store_skin_render,
-            commands::applixir_command::applixir_show_ad,
-            commands::applixir_command::applixir_mint_session,
-            commands::applixir_command::get_afkpoints_balance,
-            commands::applixir_command::afk_shop_catalog,
-            commands::applixir_command::afk_shop_purchase,
-            commands::applixir_command::afk_daily_state,
-            commands::applixir_command::afk_daily_claim,
-            commands::nrc_commands::discord_auth_link,
-            commands::nrc_commands::discord_auth_status,
-            commands::nrc_commands::discord_auth_unlink,
-            commands::nrc_commands::github_auth_link,
-            commands::nrc_commands::github_auth_status,
-            commands::nrc_commands::github_auth_unlink,
             commands::nrc_commands::check_crash_log_command,
             commands::crash_fix_command::apply_crash_fix,
             commands::crash_fix_command::revert_crash_fix,
@@ -797,19 +787,6 @@ async fn main() {
             commands::permission_commands::refresh_permissions,
             commands::permission_commands::get_cached_permissions,
             commands::permission_commands::has_permission,
-            commands::tester_command::fetch_tester_queue_count,
-            commands::tester_command::fetch_tester_queue,
-            commands::tester_command::submit_tester_vote,
-            commands::tester_command::open_tester_window,
-            commands::nrc_commands::get_mobile_app_token,
-            commands::nrc_commands::reset_mobile_app_token,
-            commands::nrc_commands::get_advent_calendar_command,
-            commands::nrc_commands::claim_advent_calendar_day_command,
-            commands::nrc_commands::get_unique_players_24h_command,
-            commands::nrc_commands::get_referral_info,
-            commands::nrc_commands::get_notifications,
-            commands::nrc_commands::mark_all_notifications_read,
-            commands::nrc_commands::mark_notification_read,
             get_capes_by_hashes,
             get_owned_vanilla_capes,
             get_currently_equipped_vanilla_cape,

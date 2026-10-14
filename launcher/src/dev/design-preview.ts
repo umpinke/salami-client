@@ -49,7 +49,6 @@ const sampleAccount = {
   username: "SalamiFan",
   minecraft_username: "SalamiFan",
   active: true,
-  access_token: "preview",
 };
 
 /** Befehle, die eine Liste liefern. */

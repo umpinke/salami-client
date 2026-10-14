@@ -1295,6 +1295,7 @@ async fn extract_modpack_info<T: ModpackManifest>(manifest: &T, pack_name: &str)
 /// Downloads and installs the new version while preserving profile settings
 pub async fn switch_modpack_version(request: ModpackSwitchRequest) -> Result<ModpackSwitchResponse, crate::error::AppError> {
     info!("Switching modpack version - URL: {}, ModPackSource: {:?}", request.download_url, request.modpack_source);
+    crate::utils::import_safety::require_platform_download(&request.download_url)?;
 
     // Create a temporary directory for the download
     let temp_dir = tempfile::tempdir().map_err(|e| {
@@ -1321,6 +1322,15 @@ pub async fn switch_modpack_version(request: ModpackSwitchRequest) -> Result<Mod
     })?;
 
     info!("Successfully downloaded modpack to: {:?}", temp_file_path);
+
+    // Salami: unbekannte Programmdateien nur nach nativer Bestätigung
+    let pack_format = match &request.modpack_source {
+        crate::state::profile_state::ModPackSource::CurseForge { .. } => {
+            crate::integrations::pack_preview::PackFormat::Curseforge
+        }
+        _ => crate::integrations::pack_preview::PackFormat::Mrpack,
+    };
+    crate::integrations::pack_preview::ensure_pack_content_allowed(&temp_file_path, pack_format).await?;
 
     // Get the global state to access ProfileManager
     let state = State::get().await?;

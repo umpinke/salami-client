@@ -302,7 +302,11 @@ async fn resolve_uncached(
             Some(mut entry) => {
                 entry.enabled = jar.enabled;
                 pin_to_profile(&mut entry, instance.loader(), game_version);
-                resolved.provenance.verified_count += 1;
+                // Salami: nur als geprüft zählen, wenn der lokale Jar wirklich die angegebene
+                // Prüfsumme hat – Metadaten allein kann jeder schreiben.
+                if local_jar_matches(&entry, &jar.path).await {
+                    resolved.provenance.verified_count += 1;
+                }
                 resolved.managed.push(entry);
             }
             None => match (declared.curseforge, declared.sha1.clone()) {
@@ -388,6 +392,30 @@ async fn resolve_uncached(
     resolved
 }
 
+/// Stimmt der lokale Jar mit der Prüfsumme der Plattform überein (sha1 oder CurseForge-Fingerprint)?
+async fn local_jar_matches(entry: &Mod, path: &Path) -> bool {
+    let (sha1, fingerprint) = match &entry.source {
+        ModSource::Modrinth { file_hash_sha1, .. } => (file_hash_sha1.clone(), None),
+        ModSource::CurseForge {
+            file_hash_sha1,
+            file_fingerprint,
+            ..
+        } => (file_hash_sha1.clone(), *file_fingerprint),
+        _ => (None, None),
+    };
+    if let Some(expected) = sha1.filter(|h| h.len() == 40) {
+        return crate::utils::hash_utils::calculate_sha1_from_file(path)
+            .await
+            .map_or(false, |actual| actual.eq_ignore_ascii_case(&expected));
+    }
+    if let Some(expected) = fingerprint {
+        return crate::utils::hash_utils::calculate_curseforge_fingerprint(path)
+            .await
+            .map_or(false, |actual| actual == expected);
+    }
+    false
+}
+
 pub async fn seed_mod_cache(managed: &[Mod], jars: &[DiscoveredJar]) -> usize {
     let cache_dir = LAUNCHER_DIRECTORY.meta_dir().join("mod_cache");
     if tokio::fs::create_dir_all(&cache_dir).await.is_err() {
@@ -416,6 +444,12 @@ pub async fn seed_mod_cache(managed: &[Mod], jars: &[DiscoveredJar]) -> usize {
 
         let target = cache_dir.join(&target_name);
         if tokio::fs::try_exists(&target).await.unwrap_or(false) {
+            continue;
+        }
+        // Salami: nur Jars mit passender Plattform-Prüfsumme in den gemeinsamen Cache – sonst
+        // lädt der Launcher die Datei beim Start frisch von Modrinth/CurseForge.
+        if !local_jar_matches(entry, source).await {
+            debug!("Not seeding '{}': local jar does not match the platform hash", target_name);
             continue;
         }
         match tokio::fs::copy(source, &target).await {

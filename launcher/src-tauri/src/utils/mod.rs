@@ -36,6 +36,9 @@ pub mod import_safety; // Strips execution/path primitives out of untrusted impo
 pub mod java_detector; // Java detector to find Java installations
 pub mod log_archive; // Archives per-session game logs centrally
 pub mod legacy_cleanup; // Salami: NoRisk-Reste (Caches) beim Start entfernen
+pub mod path_guard; // Salami: Datei-Befehle der Oberfläche auf Launcher-Ordner begrenzen
+pub mod launch_guard; // Salami: Hooks/Java/JVM-Agenten nur nach nativer Bestätigung
+pub mod secret_store; // Salami: accounts.json per Windows DPAPI verschlüsseln
 pub mod bounded_log_writer;
 pub mod mc_utils; // Utilities for Minecraft-related operations
 pub mod migration_utils; // Migration utilities for profile and config updates
@@ -53,7 +56,6 @@ pub mod world_utils; // <-- Hinzugefügt
 pub mod trash_utils; // <-- New trash module
 pub mod backup_utils; // <-- New backup module for critical files
 pub mod symlink_utils; // <-- Symlink utilities for profile folder sharing
-pub mod referral_utils; // Referral tracking for affiliate/friend links
 pub mod serde_utils; // Serde helpers for flexible deserialization
 pub mod api_utils; // API response parsing helpers with detailed logging
 pub mod http_client; // NrcRequest: fluent request builder over HTTP_CLIENT

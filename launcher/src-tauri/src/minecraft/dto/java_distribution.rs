@@ -40,6 +40,9 @@ impl Default for JavaDistribution {
 #[derive(Deserialize)]
 pub struct ZuluApiResponse {
     pub url: String,
+    /// Salami: Azul liefert die SHA-256 des Archivs mit – wird beim Download geprüft
+    #[serde(default)]
+    pub sha256_hash: Option<String>,
 }
 
 impl JavaDistribution {

@@ -310,7 +310,13 @@ impl ForgeInstallerDownloadService {
                 trace!("Found data file: {}", file_name);
 
                 // Behalte den data/ Ordner im Pfad
-                let target_path = installer_dir.join(file_name);
+                // Salami: Zip-Slip verhindern
+                let Some(target_path) =
+                    crate::utils::import_safety::safe_archive_join(&installer_dir, file_name)
+                else {
+                    log::warn!("Skipping unsafe installer entry: {}", file_name);
+                    continue;
+                };
 
                 trace!("Target path: {}", target_path.display());
                 trace!(
@@ -394,7 +400,13 @@ impl ForgeInstallerDownloadService {
 
                 // Entferne den maven/ Prefix und behalte den Rest des Pfads
                 let relative_path = file_name.trim_start_matches("maven/");
-                let target_path = libraries_dir.join(relative_path);
+                // Salami: Zip-Slip verhindern
+                let Some(target_path) =
+                    crate::utils::import_safety::safe_archive_join(&libraries_dir, relative_path)
+                else {
+                    log::warn!("Skipping unsafe installer entry: {}", relative_path);
+                    continue;
+                };
 
                 trace!("  📍 Target path: {}", target_path.display());
                 trace!(
@@ -485,7 +497,13 @@ impl ForgeInstallerDownloadService {
 
                 // Extrahiere nur den Dateinamen ohne Pfad
                 let file_name = file_name.split('/').last().unwrap();
-                let target_path = installer_dir.join(file_name);
+                // Salami: Zip-Slip verhindern
+                let Some(target_path) =
+                    crate::utils::import_safety::safe_archive_join(&installer_dir, file_name)
+                else {
+                    log::warn!("Skipping unsafe installer entry: {}", file_name);
+                    continue;
+                };
 
                 trace!("  📍 Target path: {}", target_path.display());
 

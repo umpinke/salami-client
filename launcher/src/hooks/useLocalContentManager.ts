@@ -11,7 +11,6 @@ import type { ToggleContentPayload, UninstallContentPayload, SwitchContentVersio
 import UnifiedService from '../services/unified-service';
 import { getLocalContent } from '../services/profile-service';
 import { toggleContentFromProfile, toggleContentsFromProfile, uninstallContentFromProfile, uninstallContentsFromProfile, switchContentVersion, toggleModUpdates, bulkToggleModUpdates } from '../services/content-service';
-import { openPath } from '@tauri-apps/plugin-opener';
 import { revealItemInDir } from '../utils/opener-utils';
 import { getUpdateIdentifier, getContentPlatform } from '../utils/update-identifier-utils';
 import { parseErrorMessage } from "../utils/error-utils";
@@ -831,7 +830,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
     } catch (revealError: any) {
       try {
         const parentPath = item.path.replace(/[\\/][^\\/]+$/, '');
-        await openPath(parentPath || item.path);
+        await invoke('open_directory', { path: parentPath || item.path });
       } catch (openError: any) {
         const errorMsg = openError?.message || revealError?.message || "Failed to open item location.";
         toast.error(i18n.t('content_manager.errors.failed_open_location', { error: errorMsg }));

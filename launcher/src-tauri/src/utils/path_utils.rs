@@ -905,12 +905,23 @@ pub async fn download_and_replace_file(
     download_url: &str,
     sha1_hash: Option<&str>,
 ) -> Result<()> {
-    let current_path = PathBuf::from(current_path_str);
+    // Salami: nur Dateien innerhalb der Launcher-Ordner ersetzen, nur .jar-Namen, nur von
+    // Modrinth/CurseForge laden
+    let current_path =
+        crate::utils::path_guard::ensure_allowed(std::path::Path::new(current_path_str))?;
+    let new_filename = crate::utils::import_safety::safe_file_component(new_filename)?;
+    if !new_filename.to_ascii_lowercase().ends_with(".jar") {
+        return Err(AppError::InvalidInput(format!(
+            "'{}' is not a .jar file",
+            new_filename
+        )));
+    }
+    crate::utils::import_safety::require_platform_download(download_url)?;
     let dir = current_path
         .parent()
         .ok_or_else(|| AppError::InvalidInput("Invalid current item path".to_string()))?;
 
-    let target_path = dir.join(new_filename);
+    let target_path = dir.join(&new_filename);
 
     // Ensure directory exists
     fs::create_dir_all(dir).await.map_err(AppError::Io)?;

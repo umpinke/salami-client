@@ -15,7 +15,6 @@ use crate::state::process_state::{default_processes_path, ProcessManager};
 use crate::state::profile_state::ProfileManager;
 use crate::state::skin_state::{default_skins_path, SkinManager};
 use crate::state::sync_pack_state::SyncPackManager;
-use crate::utils::referral_utils;
 use std::sync::Arc;
 use tokio::sync::{OnceCell, Mutex, Semaphore};
 use tokio::task::JoinHandle;
@@ -143,22 +142,8 @@ impl State {
         ready_step("SyncPackManager", initial_state_arc.sync_pack_manager.on_state_ready(app.clone())).await?;
         ready_step("ProcessManager", initial_state_arc.process_manager.on_state_ready(app.clone())).await?;
 
-        // Apply any token handbacks the in-game client dropped while we were closed, then keep
-        // watching for new ones (mirrors the Discord client-state poller).
-        crate::minecraft::auth::token_handback::consume_pending(
-            &initial_state_arc.minecraft_account_manager_v2,
-        )
-        .await;
-        {
-            let store = initial_state_arc.minecraft_account_manager_v2.clone();
-            tokio::spawn(async move {
-                loop {
-                    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-                    crate::minecraft::auth::token_handback::consume_pending(&store).await;
-                }
-            });
-        }
-        log::trace!("State::init - Auth handback watcher started.");
+        // Salami: Kein Token-Rückkanal aus dem Spiel mehr (NoRisk-Client) – sonst könnte jedes
+        // lokale Programm per Datei die Account-Token austauschen.
 
         ready_step("SkinManager", initial_state_arc.skin_manager.on_state_ready(app.clone())).await?;
         ready_step("ActiveSkinManager", initial_state_arc.active_skin_manager.on_state_ready(app.clone())).await?;
@@ -200,12 +185,6 @@ impl State {
             final_config.enable_discord_presence,
             final_config.concurrent_downloads
         );
-
-        // Check for referral code from installer (affiliate/friend links)
-        if let Err(e) = referral_utils::check_and_process_referral_code().await {
-            log::warn!("State::init - Failed to process referral code: {}", e);
-            // Don't fail initialization, just log the error
-        }
 
         log::info!("State ready in {}ms", init_start.elapsed().as_millis());
 

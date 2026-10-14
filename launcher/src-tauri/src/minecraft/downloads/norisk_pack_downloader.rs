@@ -325,6 +325,12 @@ fn newest_source(explicit: PathBuf, bundled: Option<PathBuf>) -> PathBuf {
     let Some(bundled) = bundled else {
         return explicit;
     };
+    // Salami: In Release-Builds gewinnt immer die mitinstallierte Kopie; eine Datei im
+    // Datenordner (Dev-Build) zählt nur, wenn es keine gibt – sonst könnte jedes Programm
+    // dort dauerhaft eigenen Code ins Spiel schieben.
+    if !cfg!(debug_assertions) && modified(&bundled).is_some() {
+        return bundled;
+    }
     match (modified(&explicit), modified(&bundled)) {
         (Some(e), Some(b)) if b > e => bundled,
         (None, Some(_)) => bundled,

@@ -106,6 +106,11 @@ pub struct EventState {
 }
 
 impl EventState {
+    /// Salami: für native Dialoge aus dem Backend (z. B. Import-Bestätigung)
+    pub fn app_handle(&self) -> Option<Arc<tauri::AppHandle>> {
+        self.app.clone()
+    }
+
     pub fn new(app: Option<Arc<tauri::AppHandle>>) -> Self {
         info!("Initializing EventState...");
         let state = Self {

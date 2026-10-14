@@ -64,6 +64,13 @@ pub fn capes_dir() -> PathBuf {
     LAUNCHER_DIRECTORY.root_dir().join("salami_capes")
 }
 
+/// IDs sind UUIDs; alles andere (z. B. `..\\`) darf nie zu einem Pfad werden.
+fn is_valid_cape_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 64
+        && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
 fn png_path(dir: &Path, id: &str) -> PathBuf {
     dir.join(format!("{id}.png"))
 }
@@ -153,6 +160,9 @@ pub fn save_cape(dir: &Path, id: Option<&str>, name: &str, bytes: &[u8]) -> Resu
             cape
         }
     };
+    if !is_valid_cape_id(&cape.id) {
+        return Err(AppError::Other(format!("Ungültige Cape-ID: {}", cape.id)));
+    }
     std::fs::write(png_path(dir, &cape.id), png)?;
     store.save(dir)?;
     view(dir, &cape).ok_or_else(|| AppError::Other("Cape wurde nicht gespeichert".into()))
@@ -170,7 +180,14 @@ pub fn rename_cape(dir: &Path, id: &str, name: &str) -> Result<()> {
 }
 
 pub fn delete_cape(dir: &Path, id: &str) -> Result<()> {
+    // Salami: nur gespeicherte Capes mit sauberer ID – die ID wird Teil eines Dateinamens
+    if !is_valid_cape_id(id) {
+        return Err(AppError::Other(format!("Ungültige Cape-ID: {id}")));
+    }
     let mut store = CapeStore::load(dir);
+    if store.find(id).is_none() {
+        return Err(AppError::Other(format!("Cape {id} nicht gefunden")));
+    }
     store.capes.retain(|c| c.id != id);
     if store.selected.as_deref() == Some(id) {
         store.selected = Some(DEFAULT_SELECTION.to_string());

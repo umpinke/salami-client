@@ -3,8 +3,7 @@ export interface MinecraftAccount {
   username: string;
   minecraft_username: string;
   active: boolean;
-  access_token: string;
-  refresh_token?: string;
+  /** Login-Token bekommt die Oberfläche bewusst nicht – sie bleiben im Backend. */
   expires_at?: string;
   /** If true, the UI should not show the child-protection multiplayer warning for this account */
   ignore_child_protection_warning?: boolean;

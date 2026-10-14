@@ -496,9 +496,17 @@ async fn modify_level_dat_name(level_dat_path: &Path, new_level_name: &str) -> R
     })?;
 
     // 2. Decompress
-    let mut decoder = GzDecoder::new(&compressed_bytes[..]);
+    // Salami: Obergrenze gegen präparierte (Gzip-Bomben-)level.dat; wer sie erreicht, wird
+    // abgelehnt statt abgeschnitten zurückgeschrieben.
+    const MAX_LEVEL_DAT_BYTES: u64 = 64 * 1024 * 1024;
+    let mut decoder =
+        std::io::Read::take(GzDecoder::new(&compressed_bytes[..]), MAX_LEVEL_DAT_BYTES + 1);
     let mut decompressed_bytes = Vec::new();
-    if let Err(e) = std::io::Read::read_to_end(&mut decoder, &mut decompressed_bytes) {
+    let read_result = std::io::Read::read_to_end(&mut decoder, &mut decompressed_bytes);
+    if read_result.is_ok() && decompressed_bytes.len() as u64 > MAX_LEVEL_DAT_BYTES {
+        return Err(AppError::Other("level.dat is too large".to_string()));
+    }
+    if let Err(e) = read_result {
         error!(
             "Failed to decompress level.dat from '{}': {}",
             level_dat_path.display(),

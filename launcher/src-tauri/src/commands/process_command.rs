@@ -137,7 +137,7 @@ pub async fn fetch_crash_report(profile_id: Uuid, process_id: Option<Uuid>, proc
         .process_manager
         .fetch_latest_crash_report(profile_id, process_id, parsed_start_time)
         .await?;
-    Ok(crash_content)
+    Ok(crash_content.map(|c| crate::utils::security_utils::mask_sensitive_data(&c)))
 }
 
 #[tauri::command]

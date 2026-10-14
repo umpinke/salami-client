@@ -1,4 +1,4 @@
-import { openUrl, openPath } from '@tauri-apps/plugin-opener';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { invoke } from '@tauri-apps/api/core';
 import type { ImagePreviewPayload, ImagePreviewResponse } from '../types/fileSystem';
 
@@ -38,11 +38,12 @@ export const getLauncherDirectory = (): Promise<string> => {
 
 /**
  * Opens the launcher directory in the system's file explorer.
- * Uses openPath to directly open the directory.
+ * Salami: über den Backend-Befehl `open_directory` (öffnet nur Ordner innerhalb der
+ * Launcher-Ordner) – die Oberfläche darf keine beliebigen Pfade mehr öffnen.
  *
- * @throws If the opener plugin fails to open the directory.
+ * @throws If the folder cannot be opened.
  */
 export const openLauncherDirectory = async (): Promise<void> => {
   const launcherPath = await getLauncherDirectory();
-  await openPath(launcherPath);
+  await invoke('open_directory', { path: launcherPath });
 }; 

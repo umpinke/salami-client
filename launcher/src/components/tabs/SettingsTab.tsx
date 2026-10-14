@@ -224,6 +224,17 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
         const updatedConfig =
           await ConfigService.setLauncherConfig(configToSave);
         setConfig(updatedConfig);
+        // Salami: Start-Befehle/JVM-Optionen übernimmt das Backend nur nach nativer
+        // Bestätigung – bei „Abbrechen“ die gespeicherten Werte zurück ins Formular.
+        setTempConfig((prev) =>
+          prev
+            ? {
+                ...prev,
+                hooks: updatedConfig.hooks,
+                global_custom_jvm_args: updatedConfig.global_custom_jvm_args,
+              }
+            : prev,
+        );
         toast.success(t("settings.toast.auto_saved"), {
           duration: 2000,
           position: "bottom-right",

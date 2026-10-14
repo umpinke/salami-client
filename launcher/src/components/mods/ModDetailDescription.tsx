@@ -8,6 +8,7 @@ import remarkGfm from "remark-gfm";
 import { Icon } from "@iconify/react";
 import { ModPlatform } from "../../types/unified";
 import { sanitizeRichHtml } from "../../utils/html-sanitize";
+import { rehypeStrictSanitize } from "../../utils/rehype-strict-sanitize";
 
 interface ModDetailDescriptionProps {
   body: string;
@@ -73,7 +74,7 @@ export function ModDetailDescription({ body, source }: ModDetailDescriptionProps
           <div className="prose prose-invert prose-sm max-w-none font-sans [overflow-wrap:anywhere]">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
-              rehypePlugins={[rehypeRaw]}
+              rehypePlugins={[rehypeRaw, rehypeStrictSanitize]}
               components={{
                 h1: ({ children }) => (
                   <h1 className="text-xl font-bold text-white mb-3 mt-6 first:mt-0 font-sans normal-case tracking-normal">

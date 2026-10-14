@@ -351,11 +351,35 @@ impl DownloadUtils {
         // Get content length for progress tracking
         let content_length = response.content_length();
 
-        if config.use_streaming {
-            Self::download_streaming(response, target_path, config, content_length).await
+        // Salami: erst in eine Teildatei laden und prüfen, dann umbenennen. So liegt am Ziel nie
+        // eine Datei mit falscher Prüfsumme – auch nicht, wenn alle Versuche scheitern.
+        let part_path = Self::part_path(target_path);
+        let result = if config.use_streaming {
+            Self::download_streaming(response, &part_path, config, content_length).await
         } else {
-            Self::download_in_memory(response, target_path, config, url).await
+            Self::download_in_memory(response, &part_path, config, url).await
+        };
+        if let Err(e) = result {
+            let _ = fs::remove_file(&part_path).await;
+            return Err(e);
         }
+        if let Err(e) = fs::rename(&part_path, target_path).await {
+            let _ = fs::remove_file(&part_path).await;
+            return Err(AppError::Download(format!(
+                "Failed to move downloaded file into place {:?}: {}",
+                target_path, e
+            )));
+        }
+        Ok(())
+    }
+
+    /// Teildatei neben dem Ziel (gleicher Ordner, damit das Umbenennen atomar bleibt).
+    fn part_path(target_path: &Path) -> std::path::PathBuf {
+        let name = target_path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "download".to_string());
+        target_path.with_file_name(format!(".{}.salami-part", name))
     }
 
     /// Download using streaming (recommended for large files)

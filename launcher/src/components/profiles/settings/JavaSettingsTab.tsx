@@ -323,19 +323,26 @@ export function JavaSettingsTab({
 
   const handleJavaArgsChange = async (args: string) => {
     if (editedProfile.is_standard_version) {
-      // For standard profiles, save to global settings
-      try {
-        await setGlobalCustomJvmArgs(args || null);
-        setGlobalJvmArgsState(args || null);
-      } catch (error) {
-        console.error("Failed to save global JVM args:", error);
-        toast.error(t('java.save_jvm_failed'));
-      }
+      // Salami: global erst beim Verlassen des Feldes speichern (siehe commitGlobalJvmArgs)
+      setGlobalJvmArgsState(args || null);
     } else {
       // For custom profiles, save to profile settings
       const newSettings = { ...editedProfile.settings };
       newSettings.custom_jvm_args = args;
       updateProfile({ settings: newSettings });
+    }
+  };
+
+  // Code-ladende JVM-Optionen (z. B. -javaagent) übernimmt das Backend nur nach einer nativen
+  // Sicherheitsabfrage – danach den tatsächlich gespeicherten Wert anzeigen.
+  const commitGlobalJvmArgs = async () => {
+    if (!editedProfile.is_standard_version) return;
+    try {
+      await setGlobalCustomJvmArgs(globalJvmArgs || null);
+      setGlobalJvmArgsState(await getGlobalCustomJvmArgs());
+    } catch (error) {
+      console.error("Failed to save global JVM args:", error);
+      toast.error(t('java.save_jvm_failed'));
     }
   };
 
@@ -630,6 +637,7 @@ export function JavaSettingsTab({
                     ? (globalJvmArgs || "")
                     : (editedProfile.settings?.custom_jvm_args || "")}
                   onChange={(e) => handleJavaArgsChange(e.target.value)}
+                  onBlur={() => void commitGlobalJvmArgs()}
                   placeholder={t('profiles.settings.enterJavaArgs')}
                   minHeight="100px"
                 />

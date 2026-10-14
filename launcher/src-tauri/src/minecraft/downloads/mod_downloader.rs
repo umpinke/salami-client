@@ -337,9 +337,10 @@ impl ModDownloadService {
         for name in previous.iter().filter(|n| !wanted_names.contains(n)) {
             let path = root_mods_dir.join(name);
             if is_plain_file_name(name) && path.is_file() {
-                // nur eine Kopie aus dem Mod-Cache – direkt löschen
+                // Salami: nicht endgültig löschen – die Liste liegt in der Instanz und könnte
+                // manipuliert sein; der Papierkorb hält die Datei wiederherstellbar.
                 info!("Removing previously managed Forge mod: {}", name);
-                fs::remove_file(&path).await?;
+                crate::utils::trash_utils::move_path_to_trash(&path, Some("forge-mods")).await?;
             }
         }
 
