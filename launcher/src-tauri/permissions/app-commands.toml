@@ -215,7 +215,6 @@ permissions = [
   "allow-track-analytics-event",
   "allow-get-system-os-info",
   "allow-launch-profile-with-overrides",
-  "allow-launch-temp-profile",
   "allow-add-profile-symlink",
   "allow-remove-profile-symlink",
   "allow-get-profile-symlinks",
