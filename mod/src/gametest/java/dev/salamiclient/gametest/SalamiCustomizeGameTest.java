@@ -15,12 +15,19 @@ import dev.salamiclient.modules.client.SafeModeModule;
 import dev.salamiclient.modules.hud.CpsModule;
 import dev.salamiclient.modules.hud.KeystrokesModule;
 import dev.salamiclient.modules.visual.HitboxModule;
+import dev.salamiclient.modules.utility.PlayerEspModule;
 import dev.salamiclient.modules.visual.InfoHudModule;
+import dev.salamiclient.modules.visual.NameTagsModule;
 import dev.salamiclient.setting.ColorSetting;
 import dev.salamiclient.setting.Setting;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.animal.cow.Cow;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.monster.zombie.Zombie;
+import net.minecraft.world.phys.AABB;
 
 import java.util.List;
 
@@ -45,6 +52,7 @@ public final class SalamiCustomizeGameTest implements FabricClientGameTest {
 			testColorPicker(context, modules);
 			testInterfaceColors(context, modules);
 			testHitboxColors(context, modules);
+			testEspAndNameTags(context, modules, world);
 		}
 	}
 
@@ -214,6 +222,74 @@ public final class SalamiCustomizeGameTest implements FabricClientGameTest {
 			setting(hitbox, "look_line").resetAll();
 			modules.setEnabled(hitbox, false);
 		});
+	}
+
+	private static void testEspAndNameTags(ClientGameTestContext context, ModuleManager modules, TestSingleplayerContext world) {
+		var server = world.getServer();
+		server.runCommand("summon minecraft:zombie 500.5 -60 6.5 {NoAI:1b,PersistenceRequired:1b,CustomName:\"Testzombie\",CustomNameVisible:1b}");
+		server.runCommand("summon minecraft:cow 503.5 -60 6.5 {NoAI:1b,PersistenceRequired:1b}");
+		server.runCommand("summon minecraft:item 497.5 -60 5.5 {Item:{id:\"minecraft:diamond\",count:1},PickupDelay:32767}");
+		server.runCommand("item replace entity @p armor.chest with minecraft:diamond_chestplate");
+		context.waitTicks(20);
+
+		PlayerEspModule esp = modules.get(PlayerEspModule.class);
+		NameTagsModule tags = modules.get(NameTagsModule.class);
+		context.runOnClient(c -> {
+			modules.setEnabled(esp, true);
+			set(esp, "mode", PlayerEspModule.Mode.BOTH);
+			set(esp, "hostile", true);
+			set(esp, "passive", true);
+			set(esp, "items", true);
+			set(esp, "hostile_color", 0xFFFF8C1A);
+			modules.setEnabled(tags, true);
+			set(tags, "mobs", true);
+			c.options.setCameraType(net.minecraft.client.CameraType.THIRD_PERSON_BACK);
+		});
+		check(!setting(esp, "hostile_color").isHidden() && setting(esp, "item_color").isHidden() == false, "ESP colors hidden");
+		AABB area = new AABB(490, -64, -5, 510, -50, 15);
+		boolean espOk = context.computeOnClient(c -> {
+			Zombie zombie = c.level.getEntitiesOfClass(Zombie.class, area).stream().findFirst().orElse(null);
+			Cow cow = c.level.getEntitiesOfClass(Cow.class, area).stream().findFirst().orElse(null);
+			ItemEntity item = c.level.getEntitiesOfClass(ItemEntity.class, area).stream().findFirst().orElse(null);
+			return zombie != null && cow != null && item != null
+				&& PlayerEspModule.glows(zombie) && PlayerEspModule.glows(cow) && PlayerEspModule.glows(item)
+				&& PlayerEspModule.glowColor(zombie, 0) == 0xFF8C1A;
+		});
+		check(espOk, "ESP does not show hostile mobs, passive mobs and items");
+
+		String zombieTag = context.computeOnClient(c -> {
+			Zombie zombie = c.level.getEntitiesOfClass(Zombie.class, area).stream().findFirst().orElseThrow();
+			return NameTagsModule.decorate(Component.literal("Testzombie"), zombie).getString();
+		});
+		// Zombies haben von Natur aus 2 Rüstungspunkte; in der Sonne verlieren sie Leben
+		check(zombieTag.startsWith("Testzombie") && zombieTag.matches(".*heart.* \\d+\\.\\d.*armor.* 2"),
+			"zombie name tag without health/armor: " + zombieTag);
+		String ownTag = context.computeOnClient(c -> NameTagsModule.decorate(Component.literal("Player0"), c.player).getString());
+		check(ownTag.contains(" 8"), "own name tag without armor: " + ownTag);
+		context.runOnClient(c -> {
+			set(tags, "scale", 2.0);
+			set(tags, "distance_scale", true);
+		});
+		check(Math.abs(NameTagsModule.scale(20 * 20) - 5F) < 0.01F && Math.abs(NameTagsModule.scale(4) - 2F) < 0.01F,
+			"name tag scale wrong: " + NameTagsModule.scale(400));
+		context.runOnClient(c -> set(tags, "distance_scale", false));
+		context.waitTicks(5);
+		context.takeScreenshot("salami-63-esp-nametags");
+
+		context.runOnClient(c -> {
+			c.options.setCameraType(net.minecraft.client.CameraType.FIRST_PERSON);
+			for (String id : List.of("mode", "hostile", "passive", "items", "hostile_color")) {
+				setting(esp, id).resetAll();
+			}
+			for (String id : List.of("mobs", "scale", "distance_scale")) {
+				setting(tags, id).resetAll();
+			}
+			modules.setEnabled(esp, false);
+			modules.setEnabled(tags, false);
+		});
+		check(NameTagsModule.scale(400) == 1F, "name tags still scaled while off");
+		server.runCommand("kill @e[type=!player]");
+		server.runCommand("item replace entity @p armor.chest with minecraft:air");
 	}
 
 	// ------------------------------------------------------------------ Helfer

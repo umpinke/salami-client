@@ -45,6 +45,11 @@ public final class HealthIndicatorsModule extends Module {
 		cache.clear();
 	}
 
+	/** Ob die Lebensanzeige gerade läuft (dann zeigt NameTags das Leben nicht noch einmal). */
+	public static boolean active() {
+		return instance != null && instance.isEnabled();
+	}
+
 	/** Für {@code EntityRendererMixin}: Name um die Lebensanzeige erweitern. */
 	public static Component decorate(Component name, Entity entity) {
 		if (instance == null || !instance.isEnabled() || name == null || !(entity instanceof LivingEntity living)) {
