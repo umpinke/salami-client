@@ -73,7 +73,7 @@ export function SingleLogViewer({ instanceId, instanceName, profileId, accountNa
     <div
       className="h-screen flex flex-col"
       style={{
-        background: `linear-gradient(135deg, ${accentColor.value}20 0%, ${accentColor.value}10 50%, ${accentColor.value}18 100%)`,
+        background: `radial-gradient(120% 60% at 50% -10%, ${accentColor.value}26 0%, transparent 60%), #0f0b0b`,
       }}
     >
       <LogWindowTitlebar title={accountName ? `${instanceName} - ${accountName}` : (instanceName || "Logs")} />

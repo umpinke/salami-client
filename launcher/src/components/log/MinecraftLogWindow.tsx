@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { LogEmptyState } from "./salami-log-ui";
 import { useTranslation } from "react-i18next";
-import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useFontStore } from "../../store/font-store";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
@@ -118,7 +118,7 @@ export function MinecraftLogWindow({ crashedProcess }: MinecraftLogWindowProps) 
     <div
       className="h-screen flex flex-col"
       style={{
-        background: `linear-gradient(135deg, ${accentColor.value}20 0%, ${accentColor.value}10 50%, ${accentColor.value}18 100%)`,
+        background: `radial-gradient(120% 60% at 50% -10%, ${accentColor.value}26 0%, transparent 60%), #0f0b0b`,
       }}
     >
       <LogWindowTitlebar />
@@ -126,18 +126,13 @@ export function MinecraftLogWindow({ crashedProcess }: MinecraftLogWindowProps) 
       <div className="flex-1 flex min-h-0 p-3 gap-3">
         <div className="flex-[7] flex flex-col min-w-0">
           {!selectedInstanceId ? (
-            <div className="flex-1 flex items-center justify-center rounded-lg bg-black/60 backdrop-blur-sm text-white/30">
-              <div className="text-center">
-                <Icon icon="solar:monitor-smartphone-bold" className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p className="font-minecraft">{t('logs.select_instance')}</p>
-                <p className="text-xs mt-1 font-sans">{t('logs.select_instance_hint')}</p>
-              </div>
+            <div className="flex-1 rounded-2xl border border-white/[0.06] bg-black/30">
+              <LogEmptyState title={t('logs.select_instance')} hint={t('logs.select_instance_hint')} />
             </div>
           ) : (
             <LogViewerCore
               logs={displayLogs}
               onClear={handleClear}
-              noLogsIcon="solar:document-text-bold"
               noLogsTitle={t('logs.no_logs_yet')}
               noLogsSubtitle={t('logs.waiting_for_output')}
             />

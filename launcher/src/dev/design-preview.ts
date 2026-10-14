@@ -81,6 +81,32 @@ const launcherConfig = {
   salami_theme: true,
 };
 
+/** Beispiel-Log für die Log-Ansichten. */
+const SAMPLE_LOG = [
+  "[21:27:03] [main/INFO]: Loading Minecraft 1.21.11 with Fabric Loader 0.19.5",
+  "[21:27:05] [main/INFO]: Loading 52 mods:",
+  "\t- fabric-api 0.141.6+1.21.11",
+  "\t- salami 0.1.0",
+  "\t- sodium 0.8.13+mc1.21.11",
+  "[21:27:06] [main/WARN]: Mod 'Reese's Sodium Options' recommends version 0.4.2 or later of sodium-extra, which is missing!",
+  "[21:27:08] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot",
+  "[21:27:09] [Render thread/INFO]: [Salami] Salami Client 0.1.0 geladen – 42 Module",
+  "[21:27:10] [Render thread/DEBUG]: Reloading ResourceManager: vanilla, fabric, salami",
+  "[21:27:12] [Render thread/WARN]: Missing sound for event: minecraft:item.goat_horn.play",
+  "[21:27:14] [Render thread/INFO]: Sound engine started",
+  "[21:27:15] [Render thread/INFO]: Created: 1024x1024x4 minecraft:textures/atlas/blocks.png-atlas",
+  "[21:27:20] [Server thread/INFO]: Starting integrated minecraft server version 1.21.11",
+  "[21:27:22] [Server thread/INFO]: Preparing spawn area: 84%",
+  "[21:27:24] [Render thread/ERROR]: Failed to load texture salami:textures/cape/custom.png",
+  "java.io.FileNotFoundException: salami:textures/cape/custom.png",
+  "\tat net.minecraft.client.renderer.texture.SimpleTexture.load(SimpleTexture.java:45)",
+  "\tat dev.salamiclient.modules.visual.CapesModule.loadCustom(CapesModule.java:131)",
+  "[21:27:25] [Render thread/INFO]: Connecting to localhost, 25565",
+  "[21:27:26] [Render thread/INFO]: [CHAT] SalamiFan joined the game",
+  "[21:27:40] [Render thread/WARN]: Received passengers for unknown entity",
+  "[21:28:02] [Render thread/INFO]: [CHAT] Welcome to the server!",
+].join("\n");
+
 /** Cape-Speicher im Speicher (statt salami_capes/ im Launcher-Ordner). */
 const capeStore = {
   selected: "builtin:salami" as string | null,
@@ -114,6 +140,10 @@ mockIPC((cmd, args) => {
       return null;
     case "salami_capes_download_template":
       return "C:\\Users\\Du\\Downloads\\salami_cape_vorlage.png";
+    case "get_profile_log_files":
+      return ["C:/Salami/PVP/logs/latest.log", "C:/Salami/PVP/logs/2026-10-13-2.log.gz", "C:/Salami/PVP/logs/debug.log"];
+    case "get_log_file_content":
+      return SAMPLE_LOG;
     case "get_launcher_config":
       return structuredClone(launcherConfig);
     case "set_launcher_config":

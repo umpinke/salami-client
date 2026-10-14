@@ -1,7 +1,6 @@
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { useThemeStore } from "../../store/useThemeStore";
 
 const appWindow = getCurrentWindow();
 
@@ -11,7 +10,6 @@ interface LogWindowTitlebarProps {
 
 export function LogWindowTitlebar({ title }: LogWindowTitlebarProps) {
   const { t } = useTranslation();
-  const accentColor = useThemeStore((state) => state.accentColor);
   const displayTitle = title || t('logs.window_title');
 
   const handleMinimize = () => {
@@ -28,22 +26,15 @@ export function LogWindowTitlebar({ title }: LogWindowTitlebarProps) {
 
   return (
     <div
-      className="flex items-center justify-between h-10 px-3 select-none"
+      className="flex items-center justify-between h-11 px-3 select-none border-b border-white/[0.06]"
       data-tauri-drag-region
     >
       {/* Left: Title */}
-      <div className="flex items-center gap-2 flex-1 h-full pointer-events-none">
-        <Icon
-          icon="solar:monitor-bold"
-          className="w-5 h-5"
-          style={{ color: accentColor.value }}
-        />
-        <span
-          className="font-minecraft text-sm tracking-wider"
-          style={{ color: accentColor.value }}
-        >
-          {displayTitle}
-        </span>
+      <div className="flex items-center gap-2.5 flex-1 h-full pointer-events-none">
+        <img src="/salami-logo-64.png" alt="" className="w-6 h-6 rounded-full" />
+        <span className="text-sm font-semibold text-white">Salami Client</span>
+        <span className="h-4 w-px bg-white/15" />
+        <span className="text-sm text-white/60 truncate">{displayTitle}</span>
       </div>
 
       {/* Right: Window Controls */}
