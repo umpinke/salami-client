@@ -37,7 +37,7 @@ public final class WatermarkModule extends HudModule {
 		if (showVersion.isOn()) {
 			text.append(SalamiClient.version());
 		}
-		if (SalamiClient.get().theme() == Theme.SALAMI) {
+		if (SalamiClient.get().theme().isSalami()) {
 			text.append("  ").append(I18n.get("salami.theme.tagline"));
 		}
 		rest = text.toString().trim();
@@ -59,18 +59,17 @@ public final class WatermarkModule extends HudModule {
 
 	@Override
 	protected void render(GuiGraphics graphics, DeltaTracker delta) {
-		Theme theme = SalamiClient.get().theme();
 		Font font = mc().font;
 		graphics.blit(RenderPipelines.GUI_TEXTURED, LOGO, 0, 0, 0f, 0f, 12, 12,
 			LOGO_TEXTURE_SIZE, LOGO_TEXTURE_SIZE, LOGO_TEXTURE_SIZE, LOGO_TEXTURE_SIZE);
 		int x = 15;
-		graphics.drawString(font, SalamiClient.NAME, x, 2, theme.accent(), true);
+		graphics.drawString(font, SalamiClient.NAME, x, 2, accentColor(), shadow());
 		x += font.width(SalamiClient.NAME) + 4;
 		if (rest == null) {
 			updateText();
 		}
 		if (!rest.isEmpty()) {
-			graphics.drawString(font, rest, x, 2, theme.textDim(), true);
+			graphics.drawString(font, rest, x, 2, dimColor(), shadow());
 		}
 	}
 }

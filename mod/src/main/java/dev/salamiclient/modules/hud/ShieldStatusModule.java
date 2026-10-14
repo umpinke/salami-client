@@ -63,16 +63,25 @@ public final class ShieldStatusModule extends HudModule {
 	protected void render(GuiGraphics g, DeltaTracker delta) {
 		Theme theme = SalamiClient.get().theme();
 		float progress = mc().player.getCooldowns().getCooldownPercent(shield, delta.getGameTimeDeltaPartialTick(true));
-		g.fill(0, 0, width, 18, 0x80000000);
 		g.renderItem(shield, 1, 1);
 		if (progress > 0) {
 			// Axt-Treffer deaktivieren Schilde für 5 Sekunden (100 Ticks)
 			String text = String.format(Locale.ROOT, "%.1fs", progress * 5.0F);
 			int barWidth = width - 22;
 			g.fill(20, 15, 20 + Math.round(barWidth * progress), 17, theme.warning());
-			g.drawString(mc().font, text, 20, 5, theme.warning(), true);
+			g.drawString(mc().font, text, 20, 5, theme.warning(), shadow());
 		} else {
-			g.drawString(mc().font, ready, 20, 5, theme.accent(), true);
+			g.drawString(mc().font, ready, 20, 5, accentColor(), shadow());
 		}
+	}
+
+	@Override
+	protected boolean defaultBackground() {
+		return true;
+	}
+
+	@Override
+	protected int backgroundPadding() {
+		return 0; // Rand ist schon in der Breite enthalten
 	}
 }

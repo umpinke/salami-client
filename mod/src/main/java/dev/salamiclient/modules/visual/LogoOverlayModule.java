@@ -39,7 +39,7 @@ public final class LogoOverlayModule extends HudModule {
 			WatermarkModule.LOGO_TEXTURE_SIZE, WatermarkModule.LOGO_TEXTURE_SIZE,
 			WatermarkModule.LOGO_TEXTURE_SIZE, WatermarkModule.LOGO_TEXTURE_SIZE, ARGB.white(alpha / 255f));
 		if (showName.isOn()) {
-			int color = ARGB.color(Math.max(alpha, 26), SalamiClient.get().theme().accent());
+			int color = ARGB.color(Math.max(alpha, 26), accentColor());
 			graphics.drawCenteredString(mc().font, SalamiClient.NAME, width() / 2, SIZE + 2, color);
 		}
 	}

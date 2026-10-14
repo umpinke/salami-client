@@ -85,8 +85,8 @@ public final class ItemCounterModule extends HudModule {
 		int y = 0;
 		for (Row row : rows) {
 			graphics.renderItem(row.icon(), 0, y);
-			int color = row.count() == 0 ? 0xFFFF5555 : 0xFFFFFFFF;
-			graphics.drawString(mc().font, String.valueOf(row.count()), 20, y + 4, color, true);
+			int color = row.count() == 0 ? 0xFFFF5555 : textColor();
+			graphics.drawString(mc().font, String.valueOf(row.count()), 20, y + 4, color, shadow());
 			y += ROW;
 		}
 	}

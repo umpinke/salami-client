@@ -1,5 +1,6 @@
 package dev.salamiclient.gui;
 
+import dev.salamiclient.setting.ColorSetting;
 import dev.salamiclient.setting.ModeSetting;
 import dev.salamiclient.setting.Setting;
 import net.minecraft.client.resources.language.I18n;
@@ -33,6 +34,13 @@ public final class SettingText {
 	/** Beschreibung einer Einstellung oder {@code null}. */
 	public static String description(Setting<?> setting) {
 		String key = setting.translationKey() + ".desc";
-		return I18n.exists(key) ? I18n.get(key) : null;
+		if (I18n.exists(key)) {
+			return I18n.get(key);
+		}
+		String generic = "salami.setting." + setting.id() + ".desc";
+		if (I18n.exists(generic)) {
+			return I18n.get(generic);
+		}
+		return setting instanceof ColorSetting ? I18n.get("salami.colorpicker.hint") : null;
 	}
 }

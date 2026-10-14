@@ -42,6 +42,17 @@ public record Theme(
 		0xFFFFB020
 	);
 
+	/** Salami-Look (auch mit eigenen Farben) – z. B. für Texturen und den Slogan im Watermark. */
+	public boolean isSalami() {
+		return id.equals("salami");
+	}
+
+	/** Gleiches Theme mit eigenem Akzent, eigener Kopfzeile und eigenem Hintergrund (Modul „Oberfläche“). */
+	public Theme withColors(int accent, int header, int panel) {
+		return new Theme(id, panel, header, headerText, text, accent, (accent & 0x00FFFFFF) | 0x40000000, hover, textDim,
+			outline, warning);
+	}
+
 	/** Der Salami-Look: Pfeffer-Schwarz, Salami-Rot, Fett-Weiß, Pelle-Braun. */
 	public static final Theme SALAMI = new Theme(
 		"salami",

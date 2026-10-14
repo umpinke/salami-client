@@ -1,6 +1,5 @@
 package dev.salamiclient.modules.hud;
 
-import dev.salamiclient.SalamiClient;
 import dev.salamiclient.module.AttackListener;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.HudModule;
@@ -62,7 +61,16 @@ public final class ReachDisplayModule extends HudModule implements AttackListene
 
 	@Override
 	protected void render(GuiGraphics graphics, DeltaTracker delta) {
-		graphics.fill(0, 0, width, 14, 0x80000000);
-		graphics.drawString(mc().font, text, 4, 3, SalamiClient.get().theme().text(), true);
+		graphics.drawString(mc().font, text, 4, 3, textColor(), shadow());
+	}
+
+	@Override
+	protected boolean defaultBackground() {
+		return true;
+	}
+
+	@Override
+	protected int backgroundPadding() {
+		return 0; // Rand ist schon in der Breite enthalten
 	}
 }

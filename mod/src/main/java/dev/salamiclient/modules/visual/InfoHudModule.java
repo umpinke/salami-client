@@ -77,11 +77,10 @@ public final class InfoHudModule extends HudModule {
 
 	@Override
 	protected void render(GuiGraphics graphics, DeltaTracker delta) {
-		Theme theme = SalamiClient.get().theme();
 		int y = 0;
 		for (Line line : lines) {
-			graphics.drawString(mc().font, line.label(), 0, y, theme.accent(), true);
-			graphics.drawString(mc().font, line.value(), line.valueX(), y, theme.text(), true);
+			graphics.drawString(mc().font, line.label(), 0, y, accentColor(), shadow());
+			graphics.drawString(mc().font, line.value(), line.valueX(), y, textColor(), shadow());
 			y += 10;
 		}
 	}

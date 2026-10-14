@@ -23,6 +23,7 @@ public abstract class Module {
 	private final Category category;
 	private final boolean enabledByDefault;
 	private final List<Setting<?>> settings = new ArrayList<>();
+	private List<Setting<?>> ordered;
 	private boolean enabled;
 	private Runnable changeHook = () -> {};
 
@@ -43,6 +44,7 @@ public abstract class Module {
 	/** Registriert eine Einstellung (Reihenfolge = Anzeige in der ClickGUI). */
 	protected final <S extends Setting<?>> S add(S setting) {
 		settings.add(setting);
+		ordered = null;
 		setting.bind(translationKey(), () -> changeHook.run());
 		return setting;
 	}
@@ -103,8 +105,15 @@ public abstract class Module {
 		return enabledByDefault;
 	}
 
+	/** Einstellungen in Anzeige-Reihenfolge: erst die des Moduls, dann die Darstellung. */
 	public final List<Setting<?>> settings() {
-		return Collections.unmodifiableList(settings);
+		if (ordered == null) {
+			List<Setting<?>> list = new ArrayList<>(settings.size());
+			settings.stream().filter(s -> !s.isAppearance()).forEach(list::add);
+			settings.stream().filter(Setting::isAppearance).forEach(list::add);
+			ordered = Collections.unmodifiableList(list);
+		}
+		return ordered;
 	}
 
 	public final String translationKey() {

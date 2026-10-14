@@ -108,6 +108,6 @@ public final class ToggleSprintModule extends HudModule {
 
 	@Override
 	protected void render(GuiGraphics graphics, DeltaTracker delta) {
-		graphics.drawString(mc().font, text, 0, 0, SalamiClient.get().theme().accent(), true);
+		graphics.drawString(mc().font, text, 0, 0, accentColor(), shadow());
 	}
 }

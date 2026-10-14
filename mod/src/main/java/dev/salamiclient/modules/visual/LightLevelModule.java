@@ -6,6 +6,7 @@ import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.WorldRenderListener;
 import dev.salamiclient.render.WorldLines;
+import dev.salamiclient.setting.ColorSetting;
 import dev.salamiclient.setting.NumberSetting;
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.minecraft.client.renderer.rendertype.RenderType;
@@ -28,6 +29,8 @@ public final class LightLevelModule extends Module implements WorldRenderListene
 	private static final int SCAN_TICKS = 10;
 
 	private final NumberSetting range = add(new NumberSetting("range", 12, 4, 24, 1));
+	private final ColorSetting darkColor = add(new ColorSetting("color_dark", 0xFFFF3B3B));
+	private final ColorSetting nightColor = add(new ColorSetting("color_night", 0xFFFFD23B));
 
 	private record Mark(BlockPos pos, boolean alwaysDark) {}
 
@@ -111,8 +114,10 @@ public final class LightLevelModule extends Module implements WorldRenderListene
 		VertexConsumer lines = context.consumers().getBuffer(type);
 		PoseStack.Pose pose = context.matrices().last();
 		Vec3 cam = mc().gameRenderer.getMainCamera().position();
+		int dark = darkColor.argb();
+		int night = nightColor.argb();
 		for (Mark mark : marks) {
-			int color = mark.alwaysDark() ? 0xFFFF3B3B : 0xFFFFD23B;
+			int color = mark.alwaysDark() ? dark : night;
 			float x0 = (float) (mark.pos().getX() + 0.2 - cam.x);
 			float x1 = (float) (mark.pos().getX() + 0.8 - cam.x);
 			float y = (float) (mark.pos().getY() + 0.02 - cam.y);

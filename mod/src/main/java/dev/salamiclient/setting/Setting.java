@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 /**
@@ -22,6 +23,8 @@ public abstract class Setting<T> {
 	private Runnable changeHook = () -> {};
 	private String translationPrefix = "salami.setting";
 	private boolean hidden;
+	private BooleanSupplier visibleWhen = () -> true;
+	private boolean appearance;
 
 	protected Setting(String id, T defaultValue) {
 		this.id = id;
@@ -47,14 +50,24 @@ public abstract class Setting<T> {
 			return;
 		}
 		value = sanitized;
+		notifyChanged();
+	}
+
+	/** Listener und Speichern auslösen, wenn sich etwas neben dem Wert geändert hat (z. B. Regenbogen). */
+	protected final void notifyChanged() {
 		for (Consumer<T> listener : listeners) {
-			listener.accept(sanitized);
+			listener.accept(value);
 		}
 		changeHook.run();
 	}
 
 	public final void reset() {
 		set(defaultValue);
+	}
+
+	/** Alles auf Standard (Wert und ggf. Zusatz-Zustand wie der Regenbogen einer Farbe). */
+	public void resetAll() {
+		reset();
 	}
 
 	/** Registriert einen Listener, der bei jeder Wertänderung aufgerufen wird. */
@@ -75,8 +88,24 @@ public abstract class Setting<T> {
 		return this;
 	}
 
+	/** Nur anzeigen, solange die Bedingung gilt (z. B. Hintergrundfarbe nur bei angeschaltetem Hintergrund). */
+	public final Setting<T> showIf(BooleanSupplier condition) {
+		visibleWhen = condition;
+		return this;
+	}
+
 	public final boolean isHidden() {
-		return hidden;
+		return hidden || !visibleWhen.getAsBoolean();
+	}
+
+	/** Darstellungs-Einstellung (Farben, Hintergrund …) – wird nach den Modul-Einstellungen angezeigt. */
+	public final Setting<T> appearance() {
+		appearance = true;
+		return this;
+	}
+
+	public final boolean isAppearance() {
+		return appearance;
 	}
 
 	public final String translationKey() {

@@ -3,7 +3,9 @@ package dev.salamiclient.modules.visual;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.setting.BoolSetting;
+import dev.salamiclient.setting.ColorSetting;
 import dev.salamiclient.setting.ModeSetting;
+import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
@@ -17,7 +19,9 @@ public final class ArrowTrailModule extends Module {
 		CRIT,
 		END_ROD,
 		NOTE,
-		CLOUD
+		CLOUD,
+		/** Farbiger Staub in der eigenen Farbe (auch als Regenbogen). */
+		COLOR
 	}
 
 	/** Pfeile weiter weg als das bekommen keine Spur (spart Leistung). */
@@ -25,6 +29,11 @@ public final class ArrowTrailModule extends Module {
 
 	private final ModeSetting<Particle> particle = add(new ModeSetting<>("particle", Particle.FLAME));
 	private final BoolSetting onlyOwn = add(new BoolSetting("only_own", true));
+	private final ColorSetting color = add(new ColorSetting("color", 0xFFB23A3A).noAlpha());
+
+	{
+		color.showIf(() -> particle.get() == Particle.COLOR);
+	}
 
 	public ArrowTrailModule() {
 		super("arrow_trail", Category.VISUAL);
@@ -56,6 +65,7 @@ public final class ArrowTrailModule extends Module {
 			case END_ROD -> ParticleTypes.END_ROD;
 			case NOTE -> ParticleTypes.NOTE;
 			case CLOUD -> ParticleTypes.CLOUD;
+			case COLOR -> new DustParticleOptions(color.argb() & 0x00FFFFFF, 1.0F);
 		};
 	}
 }

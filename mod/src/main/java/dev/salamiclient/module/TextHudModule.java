@@ -1,8 +1,5 @@
 package dev.salamiclient.module;
 
-import dev.salamiclient.SalamiClient;
-import dev.salamiclient.setting.BoolSetting;
-import dev.salamiclient.theme.Theme;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.GuiGraphics;
 
@@ -11,7 +8,6 @@ import net.minecraft.client.gui.GuiGraphics;
  * Text und Breite werden pro Tick berechnet, nicht pro Frame.
  */
 public abstract class TextHudModule extends HudModule {
-	private final BoolSetting background = add(new BoolSetting("background", true));
 	private String prefix = "";
 	private String value;
 	private int prefixWidth;
@@ -19,6 +15,16 @@ public abstract class TextHudModule extends HudModule {
 
 	protected TextHudModule(String id, double defaultX, double defaultY) {
 		super(id, Category.HUD, false, defaultX, defaultY);
+	}
+
+	@Override
+	protected boolean defaultBackground() {
+		return true;
+	}
+
+	@Override
+	protected int backgroundPadding() {
+		return 0; // Rand ist schon in der Breite enthalten
 	}
 
 	/** Bezeichnung (bereits übersetzt) oder leer. */
@@ -53,11 +59,7 @@ public abstract class TextHudModule extends HudModule {
 
 	@Override
 	protected void render(GuiGraphics graphics, DeltaTracker delta) {
-		Theme theme = SalamiClient.get().theme();
-		if (background.isOn()) {
-			graphics.fill(0, 0, width, 14, 0x80000000);
-		}
-		graphics.drawString(mc().font, prefix, 4, 3, theme.accent(), true);
-		graphics.drawString(mc().font, value == null ? "-" : value, 4 + prefixWidth, 3, theme.text(), true);
+		graphics.drawString(mc().font, prefix, 4, 3, accentColor(), shadow());
+		graphics.drawString(mc().font, value == null ? "-" : value, 4 + prefixWidth, 3, textColor(), shadow());
 	}
 }

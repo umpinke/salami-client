@@ -402,6 +402,7 @@ public final class SalamiClient implements ClientModInitializer {
 
 	/** Aktives Farbschema. */
 	public Theme theme() {
-		return modules.get(SalamiThemeModule.class).isEnabled() ? Theme.SALAMI : Theme.DEFAULT;
+		Theme base = modules.get(SalamiThemeModule.class).isEnabled() ? Theme.SALAMI : Theme.DEFAULT;
+		return GuiScaleModule.customize(base);
 	}
 }

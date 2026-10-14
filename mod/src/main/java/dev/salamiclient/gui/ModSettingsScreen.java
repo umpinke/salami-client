@@ -29,7 +29,7 @@ import java.util.List;
 
 /**
  * Einstellungen eines Moduls aus dem Mods-Menü. Linksklick ändert, Rechtsklick ändert
- * rückwärts bzw. setzt zurück – wie in der ClickGUI.
+ * rückwärts bzw. setzt zurück – wie in der ClickGUI. Farben öffnen den {@link ColorPicker}.
  */
 public final class ModSettingsScreen extends Screen {
 	private static final int HEADER = 24;
@@ -48,6 +48,8 @@ public final class ModSettingsScreen extends Screen {
 	/** Gerade bearbeitete Text-Einstellung und der noch nicht übernommene Text. */
 	private TextSetting editingText;
 	private String editBuffer = "";
+	/** Offener Farbwähler oder {@code null}. */
+	private ColorPicker picker;
 
 	private record Row(Setting<?> setting, int y) {}
 
@@ -75,7 +77,25 @@ public final class ModSettingsScreen extends Screen {
 
 	/** {@code true}, wenn der letzte Tastendruck für eine Tastenbelegung verbraucht wurde. */
 	public boolean wasCapturingKey() {
-		return capturedLastKey || listeningKeybind != null || editingText != null;
+		return capturedLastKey || listeningKeybind != null || editingText != null
+			|| (picker != null && picker.isEditingText());
+	}
+
+	/** Öffnet den Farbwähler unter der Zeile dieser Farbe (auch für Tests); {@code null}, wenn sie nicht sichtbar ist. */
+	public ColorPicker openColorPicker(ColorSetting color) {
+		for (Row row : rows()) {
+			if (row.setting() == color) {
+				int[] r = control(row);
+				picker = new ColorPicker(color, r[2], r[3], Math.round(width / uiScale), Math.round(height / uiScale));
+				return picker;
+			}
+		}
+		return null;
+	}
+
+	/** Offener Farbwähler oder {@code null}. */
+	public ColorPicker colorPicker() {
+		return picker;
 	}
 
 	private void commitText() {
@@ -201,11 +221,12 @@ public final class ModSettingsScreen extends Screen {
 
 		int[] c = content();
 		g.enableScissor(c[0], c[1], c[2], c[3]);
+		boolean overPicker = picker != null && picker.contains(mx, my);
 		for (Row row : rows()) {
 			if (row.y() + ROW < c[1] || row.y() > c[3]) {
 				continue;
 			}
-			boolean hovered = mx >= c[0] && mx < c[2] && my >= row.y() && my < row.y() + ROW && my >= c[1] && my < c[3];
+			boolean hovered = !overPicker && mx >= c[0] && mx < c[2] && my >= row.y() && my < row.y() + ROW && my >= c[1] && my < c[3];
 			if (hovered) {
 				g.fill(c[0] - 4, row.y(), c[2] + 4, row.y() + ROW, theme.hover());
 				String desc = SettingText.description(row.setting());
@@ -219,6 +240,9 @@ public final class ModSettingsScreen extends Screen {
 			renderControl(g, theme, row, mx, my);
 		}
 		g.disableScissor();
+		if (picker != null) {
+			picker.render(g, font, theme, mx, my);
+		}
 
 		g.pose().popMatrix();
 		if (tooltip != null) {
@@ -251,8 +275,10 @@ public final class ModSettingsScreen extends Screen {
 			g.renderOutline(r[2] - w, r[1], w, r[3] - r[1], theme.outline());
 			g.drawString(font, value, r[2] - w + (w - font.width(value)) / 2, textY, listeningKeybind == keybind ? 0xFF000000 : theme.text(), false);
 		} else if (setting instanceof ColorSetting color) {
+			String hex = color.isChroma() ? I18n.get("salami.colorpicker.chroma") : ColorSetting.toHex(color.get());
+			g.drawString(font, hex, r[2] - 24 - font.width(hex), textY, theme.textDim(), false);
 			g.fill(r[2] - 20, r[1], r[2], r[3], color.argb());
-			g.renderOutline(r[2] - 20, r[1], 20, r[3] - r[1], theme.outline());
+			g.renderOutline(r[2] - 20, r[1], 20, r[3] - r[1], picker != null && picker.setting() == color ? theme.accent() : theme.outline());
 		} else if (setting instanceof StringListSetting list) {
 			String value = I18n.get("salami.clickgui.entries", list.get().size());
 			g.drawString(font, value, r[2] - font.width(value), textY, theme.textDim(), false);
@@ -295,6 +321,12 @@ public final class ModSettingsScreen extends Screen {
 		boolean back = button == GLFW.GLFW_MOUSE_BUTTON_RIGHT;
 		listeningKeybind = null;
 		commitText();
+		if (picker != null) {
+			if (picker.mouseClicked(font, x, y, button)) {
+				return true;
+			}
+			picker = null; // Klick daneben schließt den Farbwähler
+		}
 
 		if (inside(backButton(), x, y)) {
 			onClose();
@@ -331,7 +363,11 @@ public final class ModSettingsScreen extends Screen {
 					listeningKeybind = keybind;
 				}
 			} else if (setting instanceof ColorSetting color) {
-				color.cyclePalette(back ? -1 : 1);
+				if (back) {
+					color.resetAll();
+				} else {
+					openColorPicker(color);
+				}
 			} else if (setting instanceof ActionSetting action) {
 				action.run();
 			} else if (setting instanceof TextSetting text) {
@@ -355,6 +391,10 @@ public final class ModSettingsScreen extends Screen {
 
 	@Override
 	public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
+		if (picker != null && picker.isDragging()) {
+			picker.mouseDragged(event.x() / uiScale, event.y() / uiScale);
+			return true;
+		}
 		if (draggedSlider != null) {
 			for (Row row : rows()) {
 				if (row.setting() == draggedSlider) {
@@ -369,6 +409,10 @@ public final class ModSettingsScreen extends Screen {
 
 	@Override
 	public boolean mouseReleased(MouseButtonEvent event) {
+		if (picker != null && picker.isDragging()) {
+			picker.mouseReleased();
+			return true;
+		}
 		if (draggedSlider != null) {
 			draggedSlider = null;
 			float next = GuiScaleModule.clickGuiScale();
@@ -382,6 +426,9 @@ public final class ModSettingsScreen extends Screen {
 
 	@Override
 	public boolean charTyped(CharacterEvent event) {
+		if (picker != null && picker.charTyped(event.codepointAsString())) {
+			return true;
+		}
 		if (editingText != null) {
 			if (event.isAllowedChatCharacter() && editBuffer.length() < editingText.maxLength()) {
 				editBuffer += event.codepointAsString();
@@ -399,6 +446,7 @@ public final class ModSettingsScreen extends Screen {
 
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+		picker = null; // Farbwähler hängt an seiner Zeile
 		scroll -= scrollY * ROW * 2;
 		clampScroll();
 		return true;
@@ -406,6 +454,16 @@ public final class ModSettingsScreen extends Screen {
 
 	@Override
 	public boolean keyPressed(KeyEvent event) {
+		if (picker != null) {
+			capturedLastKey = picker.isEditingText();
+			if (picker.keyPressed(event.key())) {
+				return true;
+			}
+			if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
+				picker = null;
+				return true;
+			}
+		}
 		if (editingText != null) {
 			capturedLastKey = true;
 			switch (event.key()) {

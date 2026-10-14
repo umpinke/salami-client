@@ -4,6 +4,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.config.ConfigManager;
+import dev.salamiclient.gui.ColorPicker;
 import dev.salamiclient.gui.HudEditorScreen;
 import dev.salamiclient.gui.ModsScreen;
 import dev.salamiclient.gui.SettingText;
@@ -22,6 +23,7 @@ import dev.salamiclient.setting.StringListSetting;
 import dev.salamiclient.theme.Theme;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.resources.language.I18n;
@@ -135,9 +137,12 @@ public final class ClickGuiScreen extends Screen {
 		renderHudButton(graphics, theme, mx, my);
 		renderModsButton(graphics, theme, mx, my);
 		renderScaleControls(graphics, theme, mx, my);
+		if (picker != null) {
+			picker.render(graphics, font, theme, mx, my);
+		}
 		graphics.pose().popMatrix();
 
-		Component tooltip = tooltipFor(hover);
+		Component tooltip = picker != null && picker.contains(mx, my) ? null : tooltipFor(hover);
 		int tooltipY = mouseY;
 		if (scaleControlAt(mx, my) >= 0) {
 			// unter die Knöpfe, damit die Prozentzahl sichtbar bleibt
@@ -336,7 +341,7 @@ public final class ClickGuiScreen extends Screen {
 		} else if (setting instanceof ColorSetting color) {
 			value = "";
 			g.fill(right - 9, row.y() + 2, right, row.y() + 10, color.argb());
-			g.renderOutline(right - 9, row.y() + 2, 9, 8, theme.outline());
+			g.renderOutline(right - 9, row.y() + 2, 9, 8, picker != null && picker.setting() == color ? theme.accent() : theme.outline());
 			valueRight = right - 12;
 		} else if (setting instanceof StringListSetting list) {
 			value = I18n.get("salami.clickgui.entries", list.get().size());
@@ -370,9 +375,9 @@ public final class ClickGuiScreen extends Screen {
 			String key = row.module().descriptionKey();
 			return I18n.exists(key) ? Component.translatable(key) : null;
 		}
-		String key = row.setting().translationKey() + ".desc";
-		if (I18n.exists(key)) {
-			return Component.translatable(key);
+		String desc = SettingText.description(row.setting());
+		if (desc != null) {
+			return Component.literal(desc);
 		}
 		return row.setting() instanceof StringListSetting ? Component.translatable("salami.clickgui.edit_in_config") : null;
 	}
@@ -449,6 +454,12 @@ public final class ClickGuiScreen extends Screen {
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
 		event = scaled(event);
 		listeningKeybind = null;
+		if (picker != null) {
+			if (picker.mouseClicked(font, event.x(), event.y(), event.button())) {
+				return true;
+			}
+			picker = null; // Klick daneben schließt den Farbwähler
+		}
 		int control = scaleControlAt(event.x(), event.y());
 		if (control >= 0 && event.button() == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
 			stepScale(control - 1); // − = -1, Prozent = zurücksetzen, + = +1
@@ -499,11 +510,12 @@ public final class ClickGuiScreen extends Screen {
 			}
 			return true;
 		}
-		clickSetting(row.setting(), panel, event.x(), button);
+		clickSetting(row, panel, event.x(), button);
 		return true;
 	}
 
-	private void clickSetting(Setting<?> setting, Panel panel, double mouseX, int button) {
+	private void clickSetting(Row row, Panel panel, double mouseX, int button) {
+		Setting<?> setting = row.setting();
 		boolean back = button == GLFW.GLFW_MOUSE_BUTTON_RIGHT;
 		if (setting instanceof BoolSetting bool) {
 			bool.toggle();
@@ -525,7 +537,12 @@ public final class ClickGuiScreen extends Screen {
 				listeningKeybind = keybind;
 			}
 		} else if (setting instanceof ColorSetting color) {
-			color.cyclePalette(back ? -1 : 1);
+			if (back) {
+				color.resetAll();
+			} else {
+				int right = panel.x + PANEL_WIDTH - PADDING;
+				picker = new ColorPicker(color, right, row.y() + row.height(), uiWidth(), uiHeight());
+			}
 		} else if (setting instanceof ActionSetting action && !back) {
 			action.run();
 		}
@@ -538,6 +555,10 @@ public final class ClickGuiScreen extends Screen {
 	@Override
 	public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
 		event = scaled(event);
+		if (picker != null && picker.isDragging()) {
+			picker.mouseDragged(event.x(), event.y());
+			return true;
+		}
 		if (draggedPanel != null) {
 			draggedPanel.x = (int) (event.x() - dragOffsetX);
 			draggedPanel.y = (int) (event.y() - dragOffsetY);
@@ -562,6 +583,10 @@ public final class ClickGuiScreen extends Screen {
 
 	@Override
 	public boolean mouseReleased(MouseButtonEvent event) {
+		if (picker != null && picker.isDragging()) {
+			picker.mouseReleased();
+			return true;
+		}
 		if (draggedPanel != null) {
 			draggedPanel = null;
 			savePanels();
@@ -581,7 +606,25 @@ public final class ClickGuiScreen extends Screen {
 	}
 
 	@Override
+	public boolean charTyped(CharacterEvent event) {
+		if (picker != null && picker.charTyped(event.codepointAsString())) {
+			return true;
+		}
+		return super.charTyped(event);
+	}
+
+	@Override
 	public boolean keyPressed(KeyEvent event) {
+		if (picker != null) {
+			capturedLastKey = picker.isEditingText();
+			if (picker.keyPressed(event.key())) {
+				return true;
+			}
+			if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
+				picker = null;
+				return true;
+			}
+		}
 		capturedLastKey = listeningKeybind != null;
 		if (listeningKeybind != null) {
 			int key = event.key();
@@ -623,6 +666,8 @@ public final class ClickGuiScreen extends Screen {
 
 	/** ClickGUI-Größe aus dem Modul „Oberfläche“; Layout und Maus rechnen in skalierten Koordinaten. */
 	private float uiScale = 1f;
+	/** Offener Farbwähler oder {@code null}. */
+	private ColorPicker picker;
 
 	private int uiWidth() {
 		return Math.round(width / uiScale);

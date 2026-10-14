@@ -23,7 +23,7 @@ import java.util.List;
 public final class GlintColorizerModule extends Module {
 	private static final List<Identifier> GLINTS = List.of(ItemRenderer.ENCHANTED_GLINT_ITEM, ItemRenderer.ENCHANTED_GLINT_ARMOR);
 
-	private final ColorSetting color = add(new ColorSetting("color", 0xFFB23A3A));
+	private final ColorSetting color = add(new ColorSetting("color", 0xFFB23A3A).noChroma().noAlpha());
 
 	/** Zuletzt angewendete Farbe; {@code null} = Originale aktiv. */
 	private Integer applied;

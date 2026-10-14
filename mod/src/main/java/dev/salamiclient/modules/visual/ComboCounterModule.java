@@ -88,7 +88,7 @@ public final class ComboCounterModule extends HudModule implements AttackListene
 	@Override
 	protected void render(GuiGraphics graphics, DeltaTracker delta) {
 		Theme theme = SalamiClient.get().theme();
-		int color = combo >= 5 ? theme.warning() : theme.accent();
-		graphics.drawString(mc().font, text(), 0, 0, color, true);
+		int color = combo >= 5 ? theme.warning() : accentColor();
+		graphics.drawString(mc().font, text(), 0, 0, color, shadow());
 	}
 }

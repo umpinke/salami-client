@@ -21,7 +21,7 @@ public final class SalamiTextures {
 
 	private static boolean active() {
 		SalamiClient client = SalamiClient.get();
-		return client != null && client.modules() != null && client.theme() == Theme.SALAMI;
+		return client != null && client.modules() != null && client.theme().isSalami();
 	}
 
 	/** Titelbild-Logo (auch das "Minceraft"-Easter-Egg). */

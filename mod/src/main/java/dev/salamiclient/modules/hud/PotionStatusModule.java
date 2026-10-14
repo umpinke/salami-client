@@ -106,8 +106,8 @@ public final class PotionStatusModule extends HudModule {
 				g.blitSprite(RenderPipelines.GUI_TEXTURED, row.sprite(), 0, y + 1, 18, 18);
 				x = 22;
 			}
-			g.drawString(mc().font, row.name(), x, y + 1, theme.text(), true);
-			g.drawString(mc().font, row.duration(), x, y + 10, row.ending() ? theme.warning() : theme.textDim(), true);
+			g.drawString(mc().font, row.name(), x, y + 1, textColor(), shadow());
+			g.drawString(mc().font, row.duration(), x, y + 10, row.ending() ? theme.warning() : dimColor(), shadow());
 			y += ROW;
 		}
 	}

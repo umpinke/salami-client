@@ -30,7 +30,7 @@ public final class BlockOutlineModule extends Module {
 		if (!isEnabled()) {
 			return true;
 		}
-		int argb = themeColor.isOn() && SalamiClient.get().theme() == Theme.SALAMI ? 0xFFF3E3D3 : color.argb();
+		int argb = themeColor.isOn() && SalamiClient.get().theme().isSalami() ? 0xFFF3E3D3 : color.argb();
 		WorldLines.shape(context.matrices(), context.consumers(), WorldLines.VISIBLE, state.pos(), state.shape(), argb, width.get().floatValue());
 		return false;
 	}

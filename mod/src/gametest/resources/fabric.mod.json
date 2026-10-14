@@ -12,6 +12,7 @@
 			"dev.salamiclient.gametest.SalamiModsGameTest",
 			"dev.salamiclient.gametest.SalamiModsBatchBGameTest",
 			"dev.salamiclient.gametest.SalamiModsBatchCGameTest",
+			"dev.salamiclient.gametest.SalamiCustomizeGameTest",
 			"dev.salamiclient.gametest.SalamiBenchmarkGameTest"
 		]
 	},
