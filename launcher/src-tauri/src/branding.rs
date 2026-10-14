@@ -62,7 +62,10 @@ pub fn norisk_login_enabled() -> bool {
 /// signiert sein. `None` = Updater aus.
 pub const UPDATE_BASE_URL: Option<&str> =
     Some("https://github.com/umpinke/salami-client/releases/latest/download/latest.json");
-pub const UPDATE_BASE_URL_BETA: Option<&str> = None;
+/// Beta-Kanal: Updatedatei im festen GitHub-Release `beta` (eine Vorab-Version, wird von
+/// `release.mjs --beta` und bei jedem normalen Release aktualisiert). Fehlt sie, gilt die normale.
+pub const UPDATE_BASE_URL_BETA: Option<&str> =
+    Some("https://github.com/umpinke/salami-client/releases/download/beta/latest.json");
 
 /// Discord-Anwendung „Salami Client“ (Application ID aus dem Discord Developer Portal).
 /// Discord zeigt den Namen dieser Anwendung als „Spielt …“ an. `None` = keine

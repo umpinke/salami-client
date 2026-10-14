@@ -73,27 +73,24 @@ fn update_manifest_url(base: &str, platform_specific_target: &str) -> String {
     }
 }
 
-/// Update-Basis-URL für den Kanal aus `branding.rs` (`None` = Updater deaktiviert).
-/// Ohne eigenen Beta-Kanal bekommt auch der Beta-Kanal die normalen Updates
-/// (die Beta-Einstellung kann z. B. aus importierten NoRisk-Einstellungen stammen).
-fn configured_update_base(is_beta_channel: bool) -> Option<&'static str> {
-    pick_update_base(
+/// Update-Adressen für den Kanal aus `branding.rs`, in Abfrage-Reihenfolge (leer = Updater aus).
+/// Der Beta-Kanal fragt zuerst die Beta-Updatedatei ab und fällt auf die normale zurück, falls
+/// sie fehlt oder nicht erreichbar ist (der Tauri-Updater probiert die Adressen der Reihe nach).
+fn configured_update_bases(is_beta_channel: bool) -> Vec<&'static str> {
+    pick_update_bases(
         is_beta_channel,
         crate::branding::UPDATE_BASE_URL,
         crate::branding::UPDATE_BASE_URL_BETA,
     )
 }
 
-fn pick_update_base(
+fn pick_update_bases(
     is_beta_channel: bool,
     stable: Option<&'static str>,
     beta: Option<&'static str>,
-) -> Option<&'static str> {
-    if is_beta_channel {
-        beta.or(stable)
-    } else {
-        stable
-    }
+) -> Vec<&'static str> {
+    let beta = if is_beta_channel { beta } else { None };
+    beta.into_iter().chain(stable).collect()
 }
 
 /// Checks if an update is available and returns detailed information including the updater instance.
@@ -119,14 +116,12 @@ pub async fn check_update_available_detailed(
         current_version, channel
     );
 
-    // Salami: Update-Endpoint kommt aus branding.rs; ohne Endpoint ist der Updater aus.
-    let base_repo_url = match configured_update_base(is_beta_channel) {
-        Some(url) => url,
-        None => {
-            debug!("Updater disabled: no update endpoint configured in branding.rs");
-            return Ok(None);
-        }
-    };
+    // Salami: Update-Endpoints kommen aus branding.rs; ohne Endpoint ist der Updater aus.
+    let bases = configured_update_bases(is_beta_channel);
+    if bases.is_empty() {
+        debug!("Updater disabled: no update endpoint configured in branding.rs");
+        return Ok(None);
+    }
 
     let mut platform_specific_target = "{{target}}".to_string(); // Default: Tauri replaces {{target}}
 
@@ -145,17 +140,19 @@ pub async fn check_update_available_detailed(
         }
     }
 
-    // Construct the final update URL string
-    let update_url_str = update_manifest_url(base_repo_url, &platform_specific_target);
-
-    trace!("Using update endpoint template: {}", update_url_str);
-
-    let update_url = update_url_str.parse()
-        .map_err(|e| AppError::Other(format!("Failed to parse update URL '{}': {}", update_url_str, e)))?;
+    // Construct the final update URLs (in order: beta first, then stable)
+    let mut update_urls = Vec::with_capacity(bases.len());
+    for base in bases {
+        let update_url_str = update_manifest_url(base, &platform_specific_target);
+        trace!("Using update endpoint template: {}", update_url_str);
+        update_urls.push(update_url_str.parse().map_err(|e| {
+            AppError::Other(format!("Failed to parse update URL '{}': {}", update_url_str, e))
+        })?);
+    }
 
     let updater_builder = app_handle.updater_builder()
         .configure_client(|c| c.connect_timeout(HTTP_CONNECT_TIMEOUT))
-        .endpoints(vec![update_url])
+        .endpoints(update_urls)
         .map_err(|e| AppError::Other(format!("Failed to set updater endpoints: {}", e)))?;
 
     let updater = updater_builder
@@ -514,16 +511,14 @@ pub async fn check_for_updates(
         None,
     );
 
-    // Salami: Update-Endpoint kommt aus branding.rs; ohne Endpoint ist der Updater aus.
-    let base_repo_url = match configured_update_base(is_beta_channel) {
-        Some(url) => url,
-        None => {
-            info!("Updater disabled: no update endpoint configured in branding.rs");
-            emit_status(&app_handle, "uptodate", "Application is up to date.".to_string(), None);
-            emit_status(&app_handle, "close", "Application is up to date.".to_string(), None);
-            return;
-        }
-    };
+    // Salami: Update-Endpoints kommen aus branding.rs; ohne Endpoint ist der Updater aus.
+    let bases = configured_update_bases(is_beta_channel);
+    if bases.is_empty() {
+        info!("Updater disabled: no update endpoint configured in branding.rs");
+        emit_status(&app_handle, "uptodate", "Application is up to date.".to_string(), None);
+        emit_status(&app_handle, "close", "Application is up to date.".to_string(), None);
+        return;
+    }
 
     let mut platform_specific_target = "{{target}}".to_string(); // Default: Tauri replaces {{target}}
 
@@ -549,26 +544,27 @@ pub async fn check_for_updates(
     // Tauri will replace {{arch}} and {{current_version}}.
     // {{target}} will also be replaced by Tauri *if* platform_specific_target is "{{target}}".
     // Otherwise, our specific target (e.g., "debian") is used directly.
-    let update_url_str = update_manifest_url(base_repo_url, &platform_specific_target);
-
-    info!("Using update endpoint template: {}", update_url_str);
-
-    let update_url = match update_url_str.parse() {
-        Ok(url) => url,
-        Err(e) => {
-            error!("Failed to parse update URL '{}': {}", update_url_str, e);
-            final_status = "error".to_string();
-            final_message = format!("Failed to parse update URL: {}", e);
-            emit_status(&app_handle, &final_status, final_message.clone(), None);
-            emit_status(&app_handle, "close", final_message.clone(), None);
-            return;
+    let mut update_urls = Vec::with_capacity(bases.len());
+    for base in bases {
+        let update_url_str = update_manifest_url(base, &platform_specific_target);
+        info!("Using update endpoint template: {}", update_url_str);
+        match update_url_str.parse() {
+            Ok(url) => update_urls.push(url),
+            Err(e) => {
+                error!("Failed to parse update URL '{}': {}", update_url_str, e);
+                final_status = "error".to_string();
+                final_message = format!("Failed to parse update URL: {}", e);
+                emit_status(&app_handle, &final_status, final_message.clone(), None);
+                emit_status(&app_handle, "close", final_message.clone(), None);
+                return;
+            }
         }
-    };
+    }
 
     let updater_result = app_handle
         .updater_builder()
         .configure_client(|c| c.connect_timeout(HTTP_CONNECT_TIMEOUT))
-        .endpoints(vec![update_url]);
+        .endpoints(update_urls);
 
     let updater = match updater_result {
         Ok(builder) => match builder.build() {
@@ -673,15 +669,15 @@ pub async fn check_for_updates(
 
 #[cfg(test)]
 mod update_manifest_tests {
-    use super::{pick_update_base, update_manifest_url};
+    use super::{pick_update_bases, update_manifest_url};
 
     #[test]
-    fn beta_channel_falls_back_to_stable() {
+    fn beta_channel_asks_beta_first_then_stable() {
         let stable = Some("https://example.org/latest.json");
-        assert_eq!(pick_update_base(true, stable, None), stable);
-        assert_eq!(pick_update_base(true, stable, Some("beta")), Some("beta"));
-        assert_eq!(pick_update_base(false, stable, Some("beta")), stable);
-        assert_eq!(pick_update_base(false, None, Some("beta")), None);
+        assert_eq!(pick_update_bases(true, stable, None), vec!["https://example.org/latest.json"]);
+        assert_eq!(pick_update_bases(true, stable, Some("beta")), vec!["beta", "https://example.org/latest.json"]);
+        assert_eq!(pick_update_bases(false, stable, Some("beta")), vec!["https://example.org/latest.json"]);
+        assert!(pick_update_bases(false, None, Some("beta")).is_empty());
     }
 
     #[test]

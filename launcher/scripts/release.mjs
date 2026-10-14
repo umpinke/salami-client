@@ -4,6 +4,12 @@
 //   node scripts/release.mjs --notes-file notes.md            (Notizen aus Datei)
 //   node scripts/release.mjs --notes "..." --skip-build       (vorhandenen Build hochladen)
 //   node scripts/release.mjs --dry-run                        (nur bauen + latest.json schreiben)
+//   node scripts/release.mjs --beta --notes "..."             (Beta, Version z. B. 1.1.0-beta.1)
+//
+// Kanäle: Normale Releases sind „latest“ → .../releases/latest/download/latest.json.
+// Betas sind Vorab-Versionen; ihre Updatedatei liegt zusätzlich im festen Release `beta`
+// → .../releases/download/beta/latest.json (branding.rs: UPDATE_BASE_URL_BETA). Ein normales
+// Release aktualisiert die Beta-Updatedatei mit, sobald es neuer ist als die letzte Beta.
 //
 // Voraussetzungen: Version in src-tauri/tauri.conf.json erhöht, `gh auth login` erledigt,
 // Signaturschlüssel in %USERPROFILE%\.salami-client\updater.key (oder TAURI_SIGNING_PRIVATE_KEY).
@@ -39,6 +45,40 @@ function capture(command) {
 
 const version = JSON.parse(readFileSync(join(tauriDir, "tauri.conf.json"), "utf8")).version;
 const tag = `v${version}`;
+const beta = flag("--beta");
+const BETA_CHANNEL_TAG = "beta";
+if (beta !== version.includes("-")) {
+  console.error(
+    beta
+      ? `Beta braucht eine Vorab-Version wie 1.1.0-beta.1 (tauri.conf.json: ${version}).`
+      : `${version} ist eine Vorab-Version – mit --beta veröffentlichen.`,
+  );
+  process.exit(1);
+}
+
+/** Semver-Vergleich inkl. Vorab-Teil (1.1.0-beta.2 < 1.1.0). */
+function compareVersions(a, b) {
+  const parse = (v) => {
+    const [core, pre] = v.split("-", 2);
+    return { core: core.split(".").map(Number), pre: pre ? pre.split(".") : [] };
+  };
+  const x = parse(a);
+  const y = parse(b);
+  for (let i = 0; i < 3; i++) if (x.core[i] !== y.core[i]) return x.core[i] - y.core[i];
+  if (!x.pre.length || !y.pre.length) return y.pre.length - x.pre.length;
+  for (let i = 0; i < Math.max(x.pre.length, y.pre.length); i++) {
+    const p = x.pre[i];
+    const q = y.pre[i];
+    if (p === undefined || q === undefined) return p === undefined ? -1 : 1;
+    if (p === q) continue;
+    const pn = /^\d+$/.test(p);
+    const qn = /^\d+$/.test(q);
+    if (pn && qn) return Number(p) - Number(q);
+    if (pn !== qn) return pn ? -1 : 1;
+    return p < q ? -1 : 1;
+  }
+  return 0;
+}
 const notesFileArg = option("--notes-file");
 const notes = notesFileArg
   ? readFileSync(notesFileArg, "utf8").trim()
@@ -114,7 +154,37 @@ const notesFile = join(outDir, "notes.md");
 writeFileSync(notesFile, `${notes}\n`);
 run("gh", [
   "release", "create", tag, asset, manifestFile,
-  "--title", `Salami Client ${version}`,
+  "--title", beta ? `Salami Client ${version} (Beta)` : `Salami Client ${version}`,
   "--notes-file", notesFile,
+  beta ? "--prerelease" : "--latest",
 ]);
 console.log(`Veröffentlicht: https://github.com/${repo}/releases/tag/${tag}`);
+
+// Beta-Kanal: Updatedatei im festen Release `beta` (Vorab-Version, nie „latest“)
+if (!capture(`gh release view ${BETA_CHANNEL_TAG} --json tagName`)) {
+  const channelNotes = join(outDir, "beta-channel.md");
+  writeFileSync(
+    channelNotes,
+    "Updatedatei für den Beta-Kanal (Einstellungen → Beta Updates). Die Installer stehen bei den Vorab-Versionen.\n",
+  );
+  run("gh", [
+    "release", "create", BETA_CHANNEL_TAG,
+    "--prerelease", "--target", "main",
+    "--title", "Beta-Kanal",
+    "--notes-file", channelNotes,
+  ]);
+}
+const channelManifest = capture(`gh release download ${BETA_CHANNEL_TAG} --pattern latest.json --output -`);
+const channelVersion = (() => {
+  try {
+    return channelManifest ? JSON.parse(channelManifest).version : null;
+  } catch {
+    return null;
+  }
+})();
+if (!channelVersion || compareVersions(version, channelVersion) >= 0) {
+  run("gh", ["release", "upload", BETA_CHANNEL_TAG, manifestFile, "--clobber"]);
+  console.log(`Beta-Kanal zeigt jetzt auf ${version}.`);
+} else {
+  console.log(`Beta-Kanal bleibt bei ${channelVersion} (neuer als ${version}).`);
+}
