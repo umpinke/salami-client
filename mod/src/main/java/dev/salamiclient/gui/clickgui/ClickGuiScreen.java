@@ -5,6 +5,7 @@ import com.google.gson.JsonObject;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.config.ConfigManager;
 import dev.salamiclient.gui.ColorPicker;
+import dev.salamiclient.gui.ConfigsScreen;
 import dev.salamiclient.gui.HudEditorScreen;
 import dev.salamiclient.gui.ModsScreen;
 import dev.salamiclient.gui.SettingText;
@@ -136,6 +137,7 @@ public final class ClickGuiScreen extends Screen {
 		graphics.drawCenteredString(font, I18n.get("salami.clickgui.hint"), uiWidth() / 2, uiHeight() - 12, theme.textDim());
 		renderHudButton(graphics, theme, mx, my);
 		renderModsButton(graphics, theme, mx, my);
+		renderConfigsButton(graphics, theme, mx, my);
 		renderScaleControls(graphics, theme, mx, my);
 		if (picker != null) {
 			picker.render(graphics, font, theme, mx, my);
@@ -214,6 +216,22 @@ public final class ClickGuiScreen extends Screen {
 		g.fill(b[0], b[1], b[2], b[3], hovered ? theme.accent() : theme.header());
 		g.renderOutline(b[0], b[1], b[2] - b[0], b[3] - b[1], theme.accent());
 		g.drawString(font, I18n.get("salami.clickgui.mods"), b[0] + 8, b[1] + 3, hovered ? theme.panel() | 0xFF000000 : theme.headerText(), false);
+	}
+
+	// ------------------------------------------------------------------ Configs-Knopf (neben Mods)
+
+	private int[] configsButton() {
+		int left = modsButton()[2] + 4;
+		int w = font.width(I18n.get("salami.clickgui.configs")) + 12;
+		return new int[] {left, 4, left + w, 18};
+	}
+
+	private void renderConfigsButton(GuiGraphics g, Theme theme, int mouseX, int mouseY) {
+		int[] b = configsButton();
+		boolean hovered = mouseX >= b[0] && mouseX < b[2] && mouseY >= b[1] && mouseY < b[3];
+		g.fill(b[0], b[1], b[2], b[3], hovered ? theme.header() : theme.panel());
+		g.renderOutline(b[0], b[1], b[2] - b[0], b[3] - b[1], theme.outline());
+		g.drawString(font, I18n.get("salami.clickgui.configs"), b[0] + 6, b[1] + 3, theme.headerText(), false);
 	}
 
 	// ------------------------------------------------------------------ Größe (− 100 % +)
@@ -473,6 +491,11 @@ public final class ClickGuiScreen extends Screen {
 		int[] m = modsButton();
 		if (event.x() >= m[0] && event.x() < m[2] && event.y() >= m[1] && event.y() < m[3]) {
 			minecraft.setScreen(new ModsScreen(modules, this));
+			return true;
+		}
+		int[] c = configsButton();
+		if (event.x() >= c[0] && event.x() < c[2] && event.y() >= c[1] && event.y() < c[3]) {
+			minecraft.setScreen(new ConfigsScreen(this));
 			return true;
 		}
 		Hit hit = hitTest(event.x(), event.y());

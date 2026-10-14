@@ -16,7 +16,8 @@ import net.minecraft.world.phys.EntityHitResult;
 /**
  * Auto Shield Break: Blockt das Ziel mit einem Schild, wechselt das Modul für den Schlag
  * auf eine Axt (die den Schild für einige Sekunden ausschaltet) und danach zurück.
- * Optional schlägt es dabei selbst zu, sobald ein blockender Spieler im Fadenkreuz ist.
+ * Optional schlägt es dabei selbst zu, sobald ein blockender Spieler im Fadenkreuz ist,
+ * und setzt nach dem Zurückwechseln mit der eigenen Waffe nach (der Schild ist dann aus).
  */
 public final class AutoShieldBreakModule extends Module implements AttackListener {
 	/** Mindestabstand zwischen automatischen Schlägen. */
@@ -25,10 +26,14 @@ public final class AutoShieldBreakModule extends Module implements AttackListene
 	private final BoolSetting autoHit = add(new BoolSetting("auto_hit", true));
 	/** 0 = auf der Axt bleiben. */
 	private final NumberSetting swapBack = add(new NumberSetting("swap_back", 2, 0, 10, 1));
+	/** Nur mit Zurückwechseln: einen Tick danach mit der eigenen Waffe nachschlagen. */
+	private final BoolSetting followUp = add(new BoolSetting("follow_up", false));
 
 	private int previousSlot = InventoryUtil.NOT_FOUND;
 	private int swapBackIn;
 	private int hitCooldown;
+	private Player followUpTarget;
+	private int followUpIn;
 
 	public AutoShieldBreakModule() {
 		super("auto_shield_break", Category.UTILITY);
@@ -37,12 +42,17 @@ public final class AutoShieldBreakModule extends Module implements AttackListene
 	@Override
 	protected void onDisable() {
 		restoreSlot();
+		followUpTarget = null;
+		followUpIn = 0;
 	}
 
 	@Override
 	public void beforeAttack(Entity target) {
 		if (target instanceof Player player && player.isBlocking()) {
 			holdAxe();
+			if (swapBackIn > 0) {
+				followUpTarget = player;
+			}
 		}
 	}
 
@@ -51,8 +61,16 @@ public final class AutoShieldBreakModule extends Module implements AttackListene
 		if (hitCooldown > 0) {
 			hitCooldown--;
 		}
+		if (followUpIn > 0 && --followUpIn == 0) {
+			followUp();
+		}
 		if (swapBackIn > 0 && --swapBackIn == 0) {
 			restoreSlot();
+			if (followUp.isOn() && followUpTarget != null) {
+				followUpIn = 1;
+			} else {
+				followUpTarget = null;
+			}
 		}
 		if (!autoHit.isOn() || mc().screen != null || hitCooldown > 0) {
 			return;
@@ -82,6 +100,16 @@ public final class AutoShieldBreakModule extends Module implements AttackListene
 		swapBackIn = swapBack.intValue();
 		if (swapBackIn == 0) {
 			previousSlot = InventoryUtil.NOT_FOUND;
+		}
+	}
+
+	/** Folgeschlag mit der eigenen Waffe auf das Ziel, dessen Schild gerade ausgeschaltet wurde. */
+	private void followUp() {
+		Player target = followUpTarget;
+		followUpTarget = null;
+		if (target != null && target.isAlive() && mc().screen == null && mc().player.isWithinEntityInteractionRange(target, 0)) {
+			InteractUtil.attack(target);
+			hitCooldown = AUTO_HIT_INTERVAL;
 		}
 	}
 

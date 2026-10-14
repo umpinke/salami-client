@@ -26,6 +26,22 @@ public final class InteractUtil {
 		return false;
 	}
 
+	/** Rechtsklick mit der Haupthand in die Luft (Enderperle, Windkugel, Erfahrungsflasche …). */
+	public static boolean use() {
+		Minecraft mc = Minecraft.getInstance();
+		LocalPlayer player = mc.player;
+		if (mc.gameMode == null || player == null) {
+			return false;
+		}
+		if (mc.gameMode.useItem(player, InteractionHand.MAIN_HAND) instanceof InteractionResult.Success success) {
+			if (success.swingSource() == InteractionResult.SwingSource.CLIENT) {
+				player.swing(InteractionHand.MAIN_HAND);
+			}
+			return true;
+		}
+		return false;
+	}
+
 	/** Linksklick auf ein Entity. */
 	public static void attack(Entity target) {
 		Minecraft mc = Minecraft.getInstance();

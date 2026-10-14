@@ -10,6 +10,11 @@ import dev.salamiclient.modules.utility.AutoElytraModule;
 import dev.salamiclient.modules.utility.AutoMaceModule;
 import dev.salamiclient.modules.utility.BlockEspModule;
 import dev.salamiclient.modules.utility.BreachSwapModule;
+import dev.salamiclient.modules.utility.CobwebPlacerModule;
+import dev.salamiclient.modules.utility.FastXpModule;
+import dev.salamiclient.modules.utility.KeyPearlModule;
+import dev.salamiclient.modules.utility.LungeMacroModule;
+import dev.salamiclient.modules.utility.SpeedBridgeModule;
 import dev.salamiclient.modules.utility.SpeedLungeModule;
 import dev.salamiclient.modules.visual.ArmorHudModule;
 import dev.salamiclient.modules.visual.BlockOutlineModule;
@@ -24,11 +29,13 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.core.BlockPos;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.monster.zombie.Zombie;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.Blocks;
 import org.apache.commons.lang3.function.FailableFunction;
 import org.lwjgl.glfw.GLFW;
 
@@ -51,6 +58,11 @@ public final class SalamiCombatGameTest implements FabricClientGameTest {
 			testAutoMace(context, server, modules);
 			testAutoElytra(context, server, modules);
 			testSpeedLunge(context, server, modules);
+			testKeyPearl(context, server, modules);
+			testCobwebPlacer(context, server, modules);
+			testFastXp(context, server, modules);
+			testSpeedBridge(context, server, modules);
+			testLungeMacro(context, server, modules);
 			testKits(context, server, modules);
 			testVisuals(context, server, modules);
 		}
@@ -158,6 +170,107 @@ public final class SalamiCombatGameTest implements FabricClientGameTest {
 		context.getInput().releaseKey(options -> options.keyUp);
 		context.runOnClient(c -> modules.setEnabled(lunge, false));
 		check(jabbed, "Speed Lunge: no lunge jab happened (spear took no damage)");
+	}
+
+	// ------------------------------------------------------------------ Makros mit Auslöse-Taste
+
+	private static void testKeyPearl(ClientGameTestContext context, TestServerContext server, ModuleManager modules) {
+		server.runCommand("clear @a");
+		server.runCommand("item replace entity @p hotbar.0 with minecraft:diamond_sword");
+		server.runCommand("item replace entity @p hotbar.3 with minecraft:ender_pearl 4");
+		server.runCommand("tp @p 150.5 " + FEET_Y + " 0.5 180 -30");
+		context.waitTicks(5);
+		context.runOnClient(c -> c.player.getInventory().setSelectedSlot(0));
+
+		Module pearl = modules.get(KeyPearlModule.class); // Standard-Taste: R
+		context.runOnClient(c -> modules.setEnabled(pearl, true));
+		context.getInput().holdKeyFor(GLFW.GLFW_KEY_R, 2);
+		boolean thrown = waitFor(context, 10, c -> c.player.getInventory().countItem(Items.ENDER_PEARL) == 3);
+		context.runOnClient(c -> modules.setEnabled(pearl, false));
+		check(thrown, "Key Pearl: no pearl was thrown");
+		check(context.computeOnClient(c -> c.player.getInventory().getSelectedSlot() == 0), "Key Pearl: did not switch back");
+		context.waitTicks(40); // Perle landen lassen (teleportiert)
+	}
+
+	private static void testCobwebPlacer(ClientGameTestContext context, TestServerContext server, ModuleManager modules) {
+		server.runCommand("clear @a");
+		server.runCommand("item replace entity @p hotbar.0 with minecraft:diamond_sword");
+		server.runCommand("item replace entity @p hotbar.5 with minecraft:cobweb 4");
+		server.runCommand("fill 158 " + FEET_Y + " -2 162 " + (FEET_Y + 2) + " 2 minecraft:air");
+		server.runCommand("tp @p 160.5 " + FEET_Y + " 0.5 180 0");
+		context.waitTicks(5);
+		context.runOnClient(c -> c.player.getInventory().setSelectedSlot(0));
+
+		Module web = modules.get(CobwebPlacerModule.class);
+		set(web, "trigger_key", GLFW.GLFW_KEY_J);
+		context.runOnClient(c -> modules.setEnabled(web, true));
+		context.getInput().holdKeyFor(GLFW.GLFW_KEY_J, 2);
+		BlockPos feet = new BlockPos(160, FEET_Y, 0);
+		boolean placed = waitFor(context, 10, c -> c.level.getBlockState(feet).is(Blocks.COBWEB));
+		context.runOnClient(c -> modules.setEnabled(web, false));
+		server.runCommand("setblock 160 " + FEET_Y + " 0 minecraft:air");
+		check(placed, "Cobweb Placer: no cobweb at the player's feet");
+		check(context.computeOnClient(c -> c.player.getInventory().getSelectedSlot() == 0), "Cobweb Placer: did not switch back");
+	}
+
+	private static void testFastXp(ClientGameTestContext context, TestServerContext server, ModuleManager modules) {
+		server.runCommand("clear @a");
+		server.runCommand("item replace entity @p hotbar.0 with minecraft:experience_bottle 64");
+		server.runCommand("tp @p 170.5 " + FEET_Y + " 0.5 180 -60");
+		context.waitTicks(5);
+		context.runOnClient(c -> c.player.getInventory().setSelectedSlot(0));
+
+		Module xp = modules.get(FastXpModule.class);
+		context.runOnClient(c -> modules.setEnabled(xp, true));
+		context.getInput().holdKeyFor(options -> options.keyUse, 20);
+		int thrown = context.computeOnClient(c -> 64 - c.player.getInventory().countItem(Items.EXPERIENCE_BOTTLE));
+		context.runOnClient(c -> modules.setEnabled(xp, false));
+		// Vanilla wirft beim Halten nur alle 4 Ticks (~5 in 20 Ticks)
+		check(thrown >= 12, "Fast XP: only " + thrown + " bottles thrown in 20 ticks");
+	}
+
+	private static void testSpeedBridge(ClientGameTestContext context, TestServerContext server, ModuleManager modules) {
+		server.runCommand("clear @a");
+		// ein einzelner Stein, der Spieler steht mit der Mitte schon über der Kante
+		server.runCommand("fill 178 " + (FEET_Y - 1) + " -2 184 " + (FEET_Y - 1) + " 2 minecraft:air");
+		server.runCommand("setblock 180 " + (FEET_Y - 1) + " 0 minecraft:stone");
+		server.runCommand("tp @p 181.2 " + FEET_Y + " 0.5 90 0");
+		context.waitTicks(5);
+		check(context.computeOnClient(c -> c.player.onGround() && !c.player.isShiftKeyDown()), "Test setup: player not standing on the edge");
+
+		Module bridge = modules.get(SpeedBridgeModule.class);
+		context.runOnClient(c -> modules.setEnabled(bridge, true));
+		boolean sneaking = waitFor(context, 5, c -> c.player.isShiftKeyDown());
+		context.runOnClient(c -> modules.setEnabled(bridge, false));
+		boolean released = waitFor(context, 5, c -> !c.player.isShiftKeyDown());
+		check(sneaking, "Speed Bridge: did not sneak over the edge");
+		check(released, "Speed Bridge: still sneaking after turning it off");
+	}
+
+	private static void testLungeMacro(ClientGameTestContext context, TestServerContext server, ModuleManager modules) {
+		server.runCommand("clear @a");
+		server.runCommand("item replace entity @p hotbar.0 with minecraft:stick");
+		server.runCommand("item replace entity @p hotbar.2 with minecraft:mace");
+		server.runCommand("fill 188 " + (FEET_Y - 1) + " -4 192 " + (FEET_Y - 1) + " 2 minecraft:stone");
+		server.runCommand("tp @p 190.5 " + FEET_Y + " 0.5 180 0");
+		summonDummy(server, "190.5 " + FEET_Y + " -1.5", false);
+		context.waitTicks(10);
+		context.runOnClient(c -> c.player.getInventory().setSelectedSlot(0));
+		check(context.computeOnClient(c -> c.hitResult instanceof net.minecraft.world.phys.EntityHitResult), "Lunge Macro: zombie not targeted");
+
+		Module lunge = modules.get(LungeMacroModule.class);
+		set(lunge, "trigger_key", GLFW.GLFW_KEY_J);
+		set(lunge, "swap_delay", 5.0);
+		context.runOnClient(c -> modules.setEnabled(lunge, true));
+		context.getInput().holdKeyFor(GLFW.GLFW_KEY_J, 2);
+		boolean swapped = context.computeOnClient(c -> c.player.getInventory().getSelectedSlot() == 2);
+		boolean hurt = waitFor(context, 10, c -> zombieHurt(c));
+		boolean back = waitFor(context, 10, c -> c.player.getInventory().getSelectedSlot() == 0);
+		context.runOnClient(c -> modules.setEnabled(lunge, false));
+		server.runCommand("kill @e[type=minecraft:zombie]");
+		check(swapped, "Lunge Macro: did not swap to the mace");
+		check(hurt, "Lunge Macro: zombie was not hit");
+		check(back, "Lunge Macro: did not swap back");
 	}
 
 	// ------------------------------------------------------------------ Kits

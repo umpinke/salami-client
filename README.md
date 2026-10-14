@@ -171,7 +171,7 @@ Der Test startet Minecraft mit einer Testwelt und prüft:
 - Klicks auf Module und Einstellungen,
 - Easy Leave und die Safe-Mode-Sperre,
 - den Salami-Look,
-- Auto Totem, Double Hand Totem, Auto Crystal, Anchor Macro (inkl. Safe Anchor), Ghost Spear, Live Tracker, Breach Swap, Auto Mace, Auto Elytra, Speed Lunge und Kits in echten Testszenen,
+- Auto Totem, Double Hand Totem, Crystal Macro (inkl. Obsidian setzen), Anchor Macro (inkl. Safe Anchor), Ghost Spear, Live Tracker, Breach Swap, Auto Mace, Auto Elytra, Speed Lunge, Key Pearl, Cobweb Placer, Fast XP, Speed Bridge, Lunge Macro und Kits in echten Testszenen,
 - Screenshots aller Visuals und des HUD-Editors.
 
 Screenshots: `mod/build/run/clientGameTest/screenshots/`.
@@ -187,19 +187,26 @@ Screenshots: `mod/build/run/clientGameTest/screenshots/`.
 | Visuals | Block Outline | farbiger Umriss für den anvisierten Block |
 | Visuals | Live Tracker | Rüstung (mit Haltbarkeit) und Hand-Items über dem Namen von Gegnern |
 | Sonstiges | Kits | Inventar-Layouts für Crystal, Anchor, Mace, Spear, Sword, Axe, SMP, NethPot, UHC und 3 eigene; Taste K sortiert das Inventar |
+| Sonstiges | Panic Disconnect | eigene Taste trennt sofort die Verbindung, ohne Menü und Rückfrage |
 | Utility | Auto Totem · Hover Totem · Double Hand Totem | Totems in Offhand/Hotbar |
-| Utility | Auto Crystal | Kristall setzen/zerstören am Fadenkreuz, Selbstschutz-Grenze |
+| Utility | Crystal Macro | bei gehaltenem Rechtsklick Kristall setzen/zerstören am Fadenkreuz; Min/Max-CPS, Loot-Schutz, Stopp nach Kill, optional erst Obsidian setzen |
+| Utility | Crystal Tweaks | wechselt automatisch auf Kristalle (optional nur beim Zielen auf Obsidian/Kristalle) |
 | Utility | Anchor Macro | Seelenanker laden/zünden; **Safe Anchor** setzt vorher Glowstone als Schutz |
 | Utility | Breach Swap · Attribute Swap | im Schlag-Tick auf Bresche-Streitkolben bzw. andere Waffe wechseln, danach zurück |
 | Utility | Auto Mace · Auto Elytra | Smash-Treffer im Fall; Elytra beim Fallen an, vor dem Boden/Treffer zurück zum Brustpanzer |
 | Utility | Speed Lunge · Ghost Spear | automatische Ausfall-Stöße mit dem Speer; Drop → Offhand → Slot-Makro |
 | Utility | Block ESP | Blöcke (CPvP, Kisten, Erze, Spawner) hervorheben, optional durch Wände |
+| Utility | Key Pearl · Pearl Catch | Enderperle per Taste werfen; Perle + Windkugel als Kombo |
+| Utility | Stun Slam · Lunge Macro | in der Luft Axt → Streitkolben; per Taste zu Streitkolben/Dreizack wechseln, schlagen, zurück |
+| Utility | Cobweb Placer · Tap Reset · Speed Bridge · Fast XP | Netz an die Füße; W-/S-Tap nach Sprint-Treffern; Schleichen an Kanten; XP-Flaschen in jedem Tick |
 
 Easy Leave (Taste Ende) schaltet alle Utility-Module sofort aus.
 
+Über *ClickGUI → Configs* lassen sich alle Einstellungen als JSON-Datei exportieren, importieren oder auf Standard zurücksetzen. Ein aktiver Safe Mode bleibt dabei an.
+
 ## Hinweis zu Utility-Modulen
 
-Kampf-Automatisierung (Auto Totem, Auto Crystal, Anchors …) ist auf den meisten Servern verboten und führt dort zum Bann. Diese Module sind in der ClickGUI klar als *Utility* markiert. Gedacht sind sie für Singleplayer, eigene Server und Server, die so etwas ausdrücklich erlauben.
+Kampf-Automatisierung (Auto Totem, Crystal Macro, Anchors …) ist auf den meisten Servern verboten und führt dort zum Bann. Diese Module sind in der ClickGUI klar als *Utility* markiert. Gedacht sind sie für Singleplayer, eigene Server und Server, die so etwas ausdrücklich erlauben.
 
 Der Salami Client enthält **keine** Funktionen, um Anti-Cheat oder Server-Moderation zu umgehen oder zu täuschen.
 

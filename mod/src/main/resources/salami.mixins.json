@@ -23,6 +23,7 @@
 		"ItemEntityRendererMixin",
 		"ItemInHandRendererMixin",
 		"ItemStackMixin",
+		"KeyboardInputMixin",
 		"LevelMixin",
 		"LightTextureMixin",
 		"LivingEntityRendererMixin",

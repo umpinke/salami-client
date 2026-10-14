@@ -9,7 +9,7 @@ import dev.salamiclient.modules.client.GuiScaleModule;
 import dev.salamiclient.modules.client.SafeModeModule;
 import dev.salamiclient.modules.utility.AimAssistModule;
 import dev.salamiclient.modules.utility.AnchorMacroModule;
-import dev.salamiclient.modules.utility.AutoCrystalModule;
+import dev.salamiclient.modules.utility.CrystalMacroModule;
 import dev.salamiclient.modules.utility.AutoDTapModule;
 import dev.salamiclient.modules.utility.BowAimModule;
 import dev.salamiclient.modules.utility.BowSpamModule;
@@ -67,7 +67,7 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 
 			testAutoTotem(context, server, modules);
 			testDoubleHandTotem(context, server, modules);
-			testAutoCrystal(context, server, modules);
+			testCrystalMacro(context, server, modules);
 			testAnchorMacro(context, server, modules);
 			testGhostSpear(context, server, modules);
 			testLiveTracker(context, server, modules);
@@ -417,19 +417,23 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 
 	// ------------------------------------------------------------------ Kristalle
 
-	private static void testAutoCrystal(ClientGameTestContext context, TestServerContext server, ModuleManager modules) {
+	private static void testCrystalMacro(ClientGameTestContext context, TestServerContext server, ModuleManager modules) {
 		server.runCommand("gamemode creative @a");
 		server.runCommand("clear @a");
-		server.runCommand("give @a minecraft:end_crystal 16");
+		server.runCommand("item replace entity @p hotbar.0 with minecraft:end_crystal 16");
+		server.runCommand("item replace entity @p hotbar.1 with minecraft:obsidian 16");
 		// Bereich bei x=0: Spieler mittig, Blick nach Norden auf die Obsidian-Oberseite
 		server.runCommand("tp @p 0.5 " + FEET_Y + " 0.5 180 39");
 		server.runCommand("setblock 0 " + (FEET_Y - 1) + " -2 minecraft:obsidian");
 		context.waitTicks(5);
+		context.runOnClient(c -> c.player.getInventory().setSelectedSlot(0));
 
-		Module crystal = modules.get(AutoCrystalModule.class);
-		set(crystal, "auto_switch", true);
+		Module crystal = modules.get(CrystalMacroModule.class);
 		context.runOnClient(c -> modules.setEnabled(crystal, true));
+		context.waitTicks(10);
+		check(context.computeOnClient(SalamiModulesGameTest::crystalCount) == 0, "Crystal Macro: acted without right-click held");
 
+		context.getInput().holdKey(options -> options.keyUse);
 		boolean placed = false;
 		boolean broken = false;
 		for (int i = 0; i < 60 && !(placed && broken); i++) {
@@ -441,11 +445,34 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 			}
 			context.waitTick();
 		}
-		context.takeScreenshot("salami-07-auto-crystal");
-		context.runOnClient(c -> modules.setEnabled(crystal, false));
-		check(placed, "Auto Crystal: no crystal was placed");
-		check(broken, "Auto Crystal: placed crystal was not broken");
+		context.getInput().releaseKey(options -> options.keyUse);
+		context.takeScreenshot("salami-07-crystal-macro");
+		check(placed, "Crystal Macro: no crystal was placed");
+		check(broken, "Crystal Macro: placed crystal was not broken");
 		server.runCommand("kill @e[type=minecraft:end_crystal]");
+
+		// Obsidian setzen: Blick auf Stein – erst Obsidian aus der Hotbar, dann der Kristall darauf
+		set(crystal, "place_obsidian", true);
+		server.runCommand("fill -12 " + (FEET_Y - 1) + " -4 -8 " + (FEET_Y - 1) + " 2 minecraft:stone");
+		server.runCommand("fill -12 " + FEET_Y + " -4 -8 " + (FEET_Y + 3) + " 2 minecraft:air");
+		server.runCommand("tp @p -9.5 " + FEET_Y + " 0.5 180 39");
+		context.waitTicks(5);
+		context.runOnClient(c -> c.player.getInventory().setSelectedSlot(0));
+		BlockPos obsidian = new BlockPos(-10, FEET_Y, -2);
+		context.getInput().holdKey(options -> options.keyUse);
+		boolean obsidianPlaced = false;
+		boolean crystalSeen = false;
+		for (int i = 0; i < 60 && !(obsidianPlaced && crystalSeen); i++) {
+			obsidianPlaced |= context.computeOnClient(c -> c.level.getBlockState(obsidian).is(Blocks.OBSIDIAN));
+			crystalSeen |= context.computeOnClient(SalamiModulesGameTest::crystalCount) > 0;
+			context.waitTick();
+		}
+		context.getInput().releaseKey(options -> options.keyUse);
+		context.runOnClient(c -> modules.setEnabled(crystal, false));
+		set(crystal, "place_obsidian", false);
+		server.runCommand("kill @e[type=minecraft:end_crystal]");
+		check(obsidianPlaced, "Crystal Macro: no obsidian was placed");
+		check(crystalSeen, "Crystal Macro: no crystal was placed on the new obsidian");
 	}
 
 	private static int crystalCount(Minecraft client) {

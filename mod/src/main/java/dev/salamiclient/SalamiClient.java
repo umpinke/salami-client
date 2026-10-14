@@ -18,6 +18,7 @@ import dev.salamiclient.modules.misc.StreamerModeModule;
 import dev.salamiclient.modules.misc.NoAdvancementModule;
 import dev.salamiclient.modules.misc.AutoReconnectModule;
 import dev.salamiclient.modules.misc.ConfirmDisconnectModule;
+import dev.salamiclient.modules.misc.PanicDisconnectModule;
 import dev.salamiclient.modules.misc.ChatTweaksModule;
 import dev.salamiclient.modules.misc.TabTweaksModule;
 import dev.salamiclient.modules.misc.WaypointsModule;
@@ -63,7 +64,16 @@ import dev.salamiclient.modules.client.SafeModeModule;
 import dev.salamiclient.modules.client.GuiScaleModule;
 import dev.salamiclient.modules.client.SalamiThemeModule;
 import dev.salamiclient.modules.utility.AnchorMacroModule;
-import dev.salamiclient.modules.utility.AutoCrystalModule;
+import dev.salamiclient.modules.utility.CobwebPlacerModule;
+import dev.salamiclient.modules.utility.CrystalMacroModule;
+import dev.salamiclient.modules.utility.CrystalTweaksModule;
+import dev.salamiclient.modules.utility.FastXpModule;
+import dev.salamiclient.modules.utility.KeyPearlModule;
+import dev.salamiclient.modules.utility.LungeMacroModule;
+import dev.salamiclient.modules.utility.PearlCatchModule;
+import dev.salamiclient.modules.utility.SpeedBridgeModule;
+import dev.salamiclient.modules.utility.StunSlamModule;
+import dev.salamiclient.modules.utility.TapResetModule;
 import dev.salamiclient.modules.utility.AutoTotemModule;
 import dev.salamiclient.modules.utility.DoubleHandTotemModule;
 import dev.salamiclient.modules.utility.GhostSpearModule;
@@ -121,6 +131,9 @@ import net.minecraft.resources.Identifier;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.nio.file.Path;
 
 /**
  * Einstiegspunkt von salami-core.
@@ -245,6 +258,7 @@ public final class SalamiClient implements ClientModInitializer {
 		modules.register(new NoAdvancementModule());
 		modules.register(new AutoReconnectModule());
 		modules.register(new ConfirmDisconnectModule());
+		modules.register(new PanicDisconnectModule());
 		modules.register(new ChatTweaksModule());
 		modules.register(new TabTweaksModule());
 		modules.register(new WaypointsModule());
@@ -252,7 +266,8 @@ public final class SalamiClient implements ClientModInitializer {
 		modules.register(new AutoTotemModule());
 		modules.register(new HoverTotemModule());
 		modules.register(new DoubleHandTotemModule());
-		modules.register(new AutoCrystalModule());
+		modules.register(new CrystalMacroModule());
+		modules.register(new CrystalTweaksModule());
 		modules.register(new AnchorMacroModule());
 		modules.register(new GhostSpearModule());
 		modules.register(new BreachSwapModule());
@@ -268,6 +283,14 @@ public final class SalamiClient implements ClientModInitializer {
 		modules.register(new AutoShieldBreakModule());
 		modules.register(new BowSpamModule());
 		modules.register(new BowAimModule());
+		modules.register(new CobwebPlacerModule());
+		modules.register(new TapResetModule());
+		modules.register(new KeyPearlModule());
+		modules.register(new PearlCatchModule());
+		modules.register(new StunSlamModule());
+		modules.register(new LungeMacroModule());
+		modules.register(new SpeedBridgeModule());
+		modules.register(new FastXpModule());
 	}
 
 	private void registerKeybinds() {
@@ -371,6 +394,34 @@ public final class SalamiClient implements ClientModInitializer {
 		if (modules.get(SafeModeModule.class).isEnabled()) {
 			modules.disableCategory(Category.UTILITY);
 		}
+	}
+
+	/** Configs-Menü: Config aus einer Datei übernehmen und speichern. */
+	public void importConfig(Path file) throws IOException {
+		boolean safeMode = modules.get(SafeModeModule.class).isEnabled();
+		config.importFrom(file);
+		afterConfigReplaced(safeMode);
+	}
+
+	/** Configs-Menü: alles auf Standard zurücksetzen und speichern. */
+	public void resetConfig() {
+		boolean safeMode = modules.get(SafeModeModule.class).isEnabled();
+		config.resetToDefaults();
+		afterConfigReplaced(safeMode);
+	}
+
+	/**
+	 * Ein aktiver Safe Mode lässt sich nicht per Import oder Zurücksetzen abschalten, und
+	 * auf einem gelisteten Server greift er sofort wieder.
+	 */
+	private void afterConfigReplaced(boolean safeModeBefore) {
+		SafeModeModule safeMode = modules.get(SafeModeModule.class);
+		if (safeModeBefore) {
+			modules.restoreState(safeMode, true);
+		}
+		enforceSafeModeAfterLoad();
+		safeMode.onJoin(Minecraft.getInstance().getCurrentServer());
+		config.saveNow();
 	}
 
 	/** Brücke zum Launcher: {@code -Dsalami.theme=salami|default} überschreibt die Config. */

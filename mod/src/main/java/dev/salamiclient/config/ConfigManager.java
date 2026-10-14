@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.module.Module;
@@ -24,6 +25,9 @@ import java.nio.file.StandardCopyOption;
  * <p>Änderungen markieren die Config nur als "dirty"; gespeichert wird gebündelt
  * frühestens {@link #SAVE_DELAY_MS} nach der letzten Änderung (und beim Beenden),
  * damit z. B. Slider-Ziehen nicht hunderte Schreibvorgänge auslöst.
+ *
+ * <p>Über das Configs-Menü lässt sich die Config als Datei exportieren, wieder
+ * importieren oder auf Standard zurücksetzen.
  */
 public final class ConfigManager {
 	private static final int VERSION = 1;
@@ -45,6 +49,17 @@ public final class ConfigManager {
 
 	public void load() {
 		JsonObject root = readRoot();
+		applyModules(root);
+		JsonObject savedGui = object(root, "gui", "gui");
+		if (savedGui != null) {
+			gui = savedGui;
+		}
+		dirtySince = -1;
+		SalamiClient.LOG.info("Config loaded ({} modules)", modules.all().size());
+	}
+
+	/** Übernimmt Modulzustände und Einstellungen aus {@code root}; was dort fehlt, bleibt unverändert. */
+	private void applyModules(JsonObject root) {
 		// Typen prüfen statt blind getAsJsonObject()/getAsBoolean(): ein falscher Typ wird
 		// übersprungen (Standardwert), statt den Start abstürzen zu lassen.
 		JsonObject moduleStates = object(root, "modules", "modules");
@@ -69,12 +84,46 @@ public final class ConfigManager {
 			}
 			modules.restoreState(module, enabled);
 		}
-		JsonObject savedGui = object(root, "gui", "gui");
-		if (savedGui != null) {
-			gui = savedGui;
+	}
+
+	/** Alle Module auf Standard: Einstellungen (inklusive Tasten) und an/aus. Speichern übernimmt der Aufrufer. */
+	public void resetToDefaults() {
+		for (Module module : modules.all()) {
+			module.settings().forEach(Setting::resetAll);
+			modules.restoreState(module, module.enabledByDefault());
 		}
-		dirtySince = -1;
-		SalamiClient.LOG.info("Config loaded ({} modules)", modules.all().size());
+	}
+
+	/** Schreibt die aktuelle Config als Kopie nach {@code target}. */
+	public void exportTo(Path target) throws IOException {
+		Files.writeString(target, GSON.toJson(toJson()), StandardCharsets.UTF_8);
+	}
+
+	/**
+	 * Übernimmt eine exportierte Config: erst alles auf Standard, dann die Werte aus der
+	 * Datei. Die Panel-Positionen der ClickGUI bleiben. Speichern übernimmt der Aufrufer.
+	 *
+	 * @throws IOException wenn die Datei unlesbar, zu groß oder keine Salami-Config ist
+	 *                     (dann bleibt die aktuelle Config unverändert)
+	 */
+	public void importFrom(Path source) throws IOException {
+		if (Files.size(source) > MAX_FILE_BYTES) {
+			throw new IOException("File is larger than " + MAX_FILE_BYTES + " bytes");
+		}
+		JsonElement parsed;
+		try {
+			parsed = JsonParser.parseString(Files.readString(source, StandardCharsets.UTF_8));
+		} catch (JsonParseException e) {
+			throw new IOException("Not valid JSON", e);
+		}
+		if (!parsed.isJsonObject() || !(parsed.getAsJsonObject().get("modules") instanceof JsonObject)) {
+			throw new IOException("Not a Salami config");
+		}
+		for (Module module : modules.all()) {
+			module.settings().forEach(Setting::resetAll);
+		}
+		applyModules(parsed.getAsJsonObject());
+		SalamiClient.LOG.info("Config imported from {}", source);
 	}
 
 	/**
@@ -136,6 +185,24 @@ public final class ConfigManager {
 	}
 
 	public void saveNow() {
+		JsonObject root = toJson();
+
+		try {
+			Files.createDirectories(file.getParent());
+			Path tmp = file.resolveSibling("config.json.tmp");
+			Files.writeString(tmp, GSON.toJson(root), StandardCharsets.UTF_8);
+			try {
+				Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+			} catch (AtomicMoveNotSupportedException e) {
+				Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
+			}
+			dirtySince = -1;
+		} catch (IOException e) {
+			SalamiClient.LOG.error("Could not save config {}", file, e);
+		}
+	}
+
+	private JsonObject toJson() {
 		JsonObject root = new JsonObject();
 		root.addProperty("version", VERSION);
 		JsonObject moduleStates = new JsonObject();
@@ -152,20 +219,7 @@ public final class ConfigManager {
 		}
 		root.add("modules", moduleStates);
 		root.add("gui", gui);
-
-		try {
-			Files.createDirectories(file.getParent());
-			Path tmp = file.resolveSibling("config.json.tmp");
-			Files.writeString(tmp, GSON.toJson(root), StandardCharsets.UTF_8);
-			try {
-				Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-			} catch (AtomicMoveNotSupportedException e) {
-				Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
-			}
-			dirtySince = -1;
-		} catch (IOException e) {
-			SalamiClient.LOG.error("Could not save config {}", file, e);
-		}
+		return root;
 	}
 
 	/**
