@@ -88,7 +88,8 @@ def salami() -> Image.Image:
     draw.rectangle((22 * S, 0, 46 * S - 1, 22 * S - 1), fill=CASING)  # Kanten der Elytra-Box
     for area in (CAPE_FRONT, ELYTRA_FRONT, ELYTRA_BACK):
         meat(draw, area, rng)
-        border(draw, area, CASING_DARK, CASING)
+        if area is CAPE_FRONT:  # Elytra: Rand folgt der Flügelform (elytra_wing_shape)
+            border(draw, area, CASING_DARK, CASING)
     meat(draw, CAPE_BACK, rng, base=RED_DARK, spots=FAT_DIM)
     return img
 
@@ -112,7 +113,8 @@ def pepperoni() -> Image.Image:
                     for _ in range(3):
                         px, py = cx + rng.randint(-r + 3, r - 3), cy + rng.randint(-r + 3, r - 3)
                         draw.rectangle((px, py, px + 1, py + 1), fill=PEPPERONI_DARK)
-        border(draw, area, PEPPERONI_DARK, PEPPERONI, width=S // 2)
+        if area not in (ELYTRA_FRONT, ELYTRA_BACK):
+            border(draw, area, PEPPERONI_DARK, PEPPERONI, width=S // 2)
     return img
 
 
@@ -128,7 +130,8 @@ def board() -> Image.Image:
             if rng.random() < 0.55:
                 start = rng.randint(x0, x1 - 6)
                 draw.line((start, y, min(x1, start + rng.randint(6, 24)), y), fill=rng.choice((WOOD_DARK, WOOD_LIGHT)))
-        border(draw, area, WOOD_DARK, WOOD_LIGHT, width=S // 2)
+        if area not in (ELYTRA_FRONT, ELYTRA_BACK):
+            border(draw, area, WOOD_DARK, WOOD_LIGHT, width=S // 2)
     for area, radius in ((CAPE_FRONT, 4 * S), (ELYTRA_FRONT, 4 * S), (ELYTRA_BACK, 4 * S)):
         x0, y0, x1, y1 = box(area)
         slice_disc(draw, (x0 + x1) // 2, (y0 + y1) // 2, radius, rng)
@@ -230,11 +233,38 @@ def template() -> Image.Image:
     return img
 
 
+def elytra_wing_shape(img: Image.Image, outline) -> Image.Image:
+    """Elytra-Bereich (22..46 x 0..22) auf die Original-Flügelform zuschneiden, mit Rand.
+
+    Minecraft zeichnet jedes deckende Pixel der Elytra-Box. Ein voll bemalter Bereich ergibt
+    deshalb rechteckige Platten statt Flügeln – so behält die Elytra ihre normale Form und
+    bekommt nur ein anderes Design.
+    """
+    s = img.width // 64
+    draw = ImageDraw.Draw(img)
+
+    def cell(x, y, color):
+        draw.rectangle((x * s, y * s, (x + 1) * s - 1, (y + 1) * s - 1), fill=color)
+
+    inside = lambda x, y: elytra_part(x, y) is not None
+    for y in range(22):
+        for x in range(22, 46):
+            if not inside(x, y):
+                cell(x, y, (0, 0, 0, 0))
+            elif not all(inside(nx, ny) for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1))):
+                cell(x, y, outline)
+    return img
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     LAUNCHER_CAPES.mkdir(parents=True, exist_ok=True)
-    for name, make in (("salami", salami), ("pepperoni", pepperoni), ("board", board)):
-        image = make()
+    for name, make, outline in (
+        ("salami", salami, CASING_DARK),
+        ("pepperoni", pepperoni, PEPPERONI_DARK),
+        ("board", board, WOOD_DARK),
+    ):
+        image = elytra_wing_shape(make(), outline)
         for target in (OUT / f"{name}.png", LAUNCHER_CAPES / f"{name}.png"):
             image.save(target)
             print(target.relative_to(ROOT))

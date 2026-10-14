@@ -72,7 +72,7 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 			testGhostSpear(context, server, modules);
 			testLiveTracker(context, server, modules);
 			testParticles(context, server, modules);
-			testCapes(context, modules);
+			testCapes(context, server, modules);
 			testPlayerEsp(context, modules);
 			testTriggerBot(context, server, modules);
 			testAimAssist(context, server, modules);
@@ -265,7 +265,7 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 
 	// ------------------------------------------------------------------ Capes
 
-	private static void testCapes(ClientGameTestContext context, ModuleManager modules) {
+	private static void testCapes(ClientGameTestContext context, TestServerContext server, ModuleManager modules) {
 		Module capes = modules.get(CapesModule.class);
 		set(capes, "cape", CapesModule.Cape.SALAMI);
 		context.runOnClient(c -> modules.setEnabled(capes, true));
@@ -276,6 +276,24 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 		context.runOnClient(c -> c.options.setCameraType(CameraType.THIRD_PERSON_BACK));
 		context.waitTicks(5);
 		context.takeScreenshot("salami-10-cape");
+
+		// Elytra mit Cape-Design: normale Elytra-Form, nur andere Textur
+		server.runCommand("item replace entity @p armor.chest with minecraft:elytra");
+		context.waitTicks(5);
+		check(context.computeOnClient(c -> c.player.getSkin().elytra() != null
+				&& c.player.getSkin().elytra().texturePath().equals(Identifier.fromNamespaceAndPath("salami", "textures/cape/salami.png"))),
+			"Capes: elytra does not use the cape texture");
+		context.takeScreenshot("salami-10b-elytra-salami");
+		// eigenes HD-Cape (512x256) – hier die Vorlage aus dem Launcher
+		java.nio.file.Path template = java.nio.file.Path.of(System.getProperty("user.dir"))
+			.resolve("../../../../launcher/src-tauri/assets/salami_cape_template.png").normalize();
+		set(capes, "cape", CapesModule.Cape.LAUNCHER);
+		System.setProperty("salami.cape", template.toString());
+		context.waitTicks(5);
+		context.takeScreenshot("salami-10c-elytra-template");
+		System.clearProperty("salami.cape");
+		set(capes, "cape", CapesModule.Cape.SALAMI);
+		server.runCommand("item replace entity @p armor.chest with minecraft:air");
 		context.runOnClient(c -> c.options.setCameraType(CameraType.FIRST_PERSON));
 
 		// Auswahl aus dem Launcher (-Dsalami.cape)
