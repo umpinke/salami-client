@@ -5,6 +5,8 @@ import com.google.gson.JsonObject;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.config.ConfigManager;
 import dev.salamiclient.gui.HudEditorScreen;
+import dev.salamiclient.gui.ModsScreen;
+import dev.salamiclient.gui.SettingText;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.modules.client.GuiScaleModule;
@@ -130,6 +132,7 @@ public final class ClickGuiScreen extends Screen {
 		}
 		graphics.drawCenteredString(font, I18n.get("salami.clickgui.hint"), uiWidth() / 2, uiHeight() - 12, theme.textDim());
 		renderHudButton(graphics, theme, mx, my);
+		renderModsButton(graphics, theme, mx, my);
 		renderScaleControls(graphics, theme, mx, my);
 		graphics.pose().popMatrix();
 
@@ -190,6 +193,21 @@ public final class ClickGuiScreen extends Screen {
 		g.fill(b[0], b[1], b[2], b[3], hovered ? theme.header() : theme.panel());
 		g.renderOutline(b[0], b[1], b[2] - b[0], b[3] - b[1], theme.outline());
 		g.drawString(font, I18n.get("salami.clickgui.hud_editor"), b[0] + 6, b[1] + 3, theme.headerText(), false);
+	}
+
+	// ------------------------------------------------------------------ Mods-Knopf (oben links)
+
+	private int[] modsButton() {
+		int w = font.width(I18n.get("salami.clickgui.mods")) + 16;
+		return new int[] {6, 4, 6 + w, 18};
+	}
+
+	private void renderModsButton(GuiGraphics g, Theme theme, int mouseX, int mouseY) {
+		int[] b = modsButton();
+		boolean hovered = mouseX >= b[0] && mouseX < b[2] && mouseY >= b[1] && mouseY < b[3];
+		g.fill(b[0], b[1], b[2], b[3], hovered ? theme.accent() : theme.header());
+		g.renderOutline(b[0], b[1], b[2] - b[0], b[3] - b[1], theme.accent());
+		g.drawString(font, I18n.get("salami.clickgui.mods"), b[0] + 8, b[1] + 3, hovered ? theme.panel() | 0xFF000000 : theme.headerText(), false);
 	}
 
 	// ------------------------------------------------------------------ Größe (− 100 % +)
@@ -355,24 +373,12 @@ public final class ClickGuiScreen extends Screen {
 		return row.setting() instanceof StringListSetting ? Component.translatable("salami.clickgui.edit_in_config") : null;
 	}
 
-	/** Anzeigename des gewählten Modus: modulspezifisch, sonst generisch, sonst Enum-Name. */
 	private static String modeLabel(ModeSetting<?> mode) {
-		String specific = mode.valueTranslationKey();
-		if (I18n.exists(specific)) {
-			return I18n.get(specific);
-		}
-		String generic = "salami.setting." + mode.id() + "." + mode.get().name().toLowerCase(java.util.Locale.ROOT);
-		return I18n.exists(generic) ? I18n.get(generic) : mode.get().name();
+		return SettingText.modeLabel(mode);
 	}
 
-	/** Modulspezifischer Name, sonst generischer ("salami.setting.keybind"). */
 	private static String label(Setting<?> setting) {
-		String specific = setting.translationKey();
-		if (I18n.exists(specific)) {
-			return I18n.get(specific);
-		}
-		String generic = "salami.setting." + setting.id();
-		return I18n.exists(generic) ? I18n.get(generic) : setting.id();
+		return SettingText.label(setting);
 	}
 
 	// ------------------------------------------------------------------ Layout
@@ -447,6 +453,11 @@ public final class ClickGuiScreen extends Screen {
 		int[] b = hudButton();
 		if (event.x() >= b[0] && event.x() < b[2] && event.y() >= b[1] && event.y() < b[3]) {
 			minecraft.setScreen(new HudEditorScreen(this));
+			return true;
+		}
+		int[] m = modsButton();
+		if (event.x() >= m[0] && event.x() < m[2] && event.y() >= m[1] && event.y() < m[3]) {
+			minecraft.setScreen(new ModsScreen(modules, this));
 			return true;
 		}
 		Hit hit = hitTest(event.x(), event.y());

@@ -24,7 +24,7 @@ public final class InfoHudModule extends HudModule {
 	private final List<String[]> lines = new ArrayList<>();
 
 	public InfoHudModule() {
-		super("info_hud", Category.VISUAL, false, 0.005, 0.11); // unter dem Watermark
+		super("info_hud", Category.HUD, false, 0.005, 0.11); // unter dem Watermark
 	}
 
 	@Override

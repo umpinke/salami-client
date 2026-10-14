@@ -18,7 +18,7 @@ public final class ArmorHudModule extends HudModule {
 	private final BoolSetting mainHand = add(new BoolSetting("main_hand", true));
 
 	public ArmorHudModule() {
-		super("armor_hud", Category.VISUAL, false, 0.72, 0.62); // rechts neben der Hotbar, nicht im Chat
+		super("armor_hud", Category.HUD, false, 0.72, 0.62); // rechts neben der Hotbar, nicht im Chat
 	}
 
 	@Override

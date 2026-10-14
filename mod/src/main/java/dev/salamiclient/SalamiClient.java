@@ -3,6 +3,23 @@ package dev.salamiclient;
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.config.ConfigManager;
 import dev.salamiclient.gui.clickgui.ClickGuiScreen;
+import dev.salamiclient.gui.ModSettingsScreen;
+import dev.salamiclient.gui.ModsScreen;
+import dev.salamiclient.modules.hud.CpsModule;
+import dev.salamiclient.modules.hud.KeystrokesModule;
+import dev.salamiclient.modules.hud.PotionStatusModule;
+import dev.salamiclient.modules.hud.ReachDisplayModule;
+import dev.salamiclient.modules.hud.ShieldStatusModule;
+import dev.salamiclient.modules.hud.ToggleSprintModule;
+import dev.salamiclient.modules.visual.FullBrightModule;
+import dev.salamiclient.modules.visual.HideArmorModule;
+import dev.salamiclient.modules.visual.HitColorModule;
+import dev.salamiclient.modules.visual.HitboxModule;
+import dev.salamiclient.modules.visual.LowFireModule;
+import dev.salamiclient.modules.visual.NameTagsModule;
+import dev.salamiclient.modules.visual.NoHurtCamModule;
+import dev.salamiclient.modules.visual.SideShieldModule;
+import dev.salamiclient.modules.visual.ZoomModule;
 import dev.salamiclient.mixin.RecipeBookComponentAccessor;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.ModuleManager;
@@ -137,8 +154,25 @@ public final class SalamiClient implements ClientModInitializer {
 		modules.register(new LogoOverlayModule());
 		modules.register(new ParticlesModule());
 		modules.register(new CapesModule());
+		// Mods (Batch A): Optik
+		modules.register(new SideShieldModule());
+		modules.register(new HideArmorModule());
+		modules.register(new LowFireModule());
+		modules.register(new NoHurtCamModule());
+		modules.register(new HitColorModule());
+		modules.register(new HitboxModule());
+		modules.register(new FullBrightModule());
+		modules.register(new ZoomModule());
+		modules.register(new NameTagsModule());
+		// Mods (Batch A): HUD
+		modules.register(new KeystrokesModule());
+		modules.register(new CpsModule());
+		modules.register(new PotionStatusModule());
+		modules.register(new ReachDisplayModule());
+		modules.register(new ShieldStatusModule());
 		// Misc
 		modules.register(new KitsModule());
+		modules.register(new ToggleSprintModule());
 		// Utility (Kampf-Automatisierung – von Safe Mode / Easy Leave gesperrt)
 		modules.register(new AutoTotemModule());
 		modules.register(new HoverTotemModule());
@@ -219,7 +253,10 @@ public final class SalamiClient implements ClientModInitializer {
 			|| screen instanceof AbstractSignEditScreen
 			|| screen.getFocused() instanceof EditBox
 			|| hasFocusedTextField(screen)
-			|| (screen instanceof ClickGuiScreen gui && gui.wasCapturingKey());
+			|| (screen instanceof ClickGuiScreen gui && gui.wasCapturingKey())
+			// Mods-Menü: Tippen geht immer in die Suche
+			|| screen instanceof ModsScreen
+			|| (screen instanceof ModSettingsScreen settings && settings.wasCapturingKey());
 	}
 
 	/** Sucht ein fokussiertes Textfeld im Screen – auch Creative-Suche, Buch und Rezeptbuch-Suche. */

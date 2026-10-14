@@ -9,12 +9,22 @@
 		"ClientLevelMixin",
 		"EntityRendererMixin",
 		"GameRendererMixin",
+		"GameRendererTweaksMixin",
+		"GuiMixin",
+		"HumanoidArmorLayerMixin",
+		"ItemInHandRendererMixin",
+		"LightTextureMixin",
+		"LivingEntityRendererMixin",
 		"LogoRendererMixin",
 		"MinecraftAccessor",
 		"MinecraftMixin",
+		"MouseHandlerMixin",
 		"MultiPlayerGameModeMixin",
+		"NameTagStorageMixin",
+		"OverlayTextureMixin",
 		"ParticleEngineMixin",
-		"RecipeBookComponentAccessor"
+		"RecipeBookComponentAccessor",
+		"ScreenEffectRendererMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

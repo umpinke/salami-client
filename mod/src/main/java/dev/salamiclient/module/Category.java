@@ -6,6 +6,8 @@ package dev.salamiclient.module;
 public enum Category {
 	CLIENT("client", false),
 	VISUAL("visual", false),
+	/** Verschiebbare Anzeigen (Overlay-System, HUD-Editor). */
+	HUD("hud", false),
 	MISC("misc", false),
 	/**
 	 * Kampf-Automatisierung (Auto Totem, Auto Crystal, Anchors …).

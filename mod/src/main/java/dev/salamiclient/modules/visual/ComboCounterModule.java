@@ -25,7 +25,7 @@ public final class ComboCounterModule extends HudModule implements AttackListene
 	private long lastHitMillis;
 
 	public ComboCounterModule() {
-		super("combo_counter", Category.VISUAL, false, 0.47, 0.60);
+		super("combo_counter", Category.HUD, false, 0.47, 0.60);
 	}
 
 	@Override

@@ -29,7 +29,7 @@ public final class ItemCounterModule extends HudModule {
 	private final List<Row> rows = new ArrayList<>();
 
 	public ItemCounterModule() {
-		super("item_counter", Category.VISUAL, false, 0.94, 0.45);
+		super("item_counter", Category.HUD, false, 0.94, 0.45);
 	}
 
 	@Override

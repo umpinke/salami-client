@@ -18,7 +18,7 @@ public final class LogoOverlayModule extends HudModule {
 	private final BoolSetting showName = add(new BoolSetting("show_name", true));
 
 	public LogoOverlayModule() {
-		super("logo_overlay", Category.VISUAL, false, 0.90, 0.02);
+		super("logo_overlay", Category.HUD, false, 0.90, 0.02);
 	}
 
 	@Override

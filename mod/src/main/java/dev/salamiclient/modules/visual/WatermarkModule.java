@@ -20,7 +20,7 @@ public final class WatermarkModule extends HudModule {
 	private final BoolSetting showVersion = add(new BoolSetting("show_version", true));
 
 	public WatermarkModule() {
-		super("watermark", Category.VISUAL, true, 0.005, 0.008);
+		super("watermark", Category.HUD, true, 0.005, 0.008);
 	}
 
 	private String text() {
