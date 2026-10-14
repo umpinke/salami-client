@@ -25,7 +25,8 @@ import java.util.UUID;
 /**
  * Salami Capes: ein eigenes Cape (und auf Wunsch dieselbe Textur auf den Elytren) für
  * den eigenen Spieler. {@code LAUNCHER} nimmt das im Launcher gewählte Cape
- * ({@code -Dsalami.cape=builtin:<name> | <pfad> | none}); daneben die mitgelieferten
+ * ({@code -Dsalami.cape=builtin:<name> | <pfad> | none}) – beim Start aus dem Launcher
+ * ist das immer die Ausgangseinstellung; daneben die mitgelieferten
  * Salami-Designs und {@code CUSTOM} = {@code config/salami/cape.png} (Cape-Layout 64x32
  * oder ein Vielfaches).
  *
@@ -49,6 +50,8 @@ public final class CapesModule extends Module {
 	private final Map<Cape, ClientAsset.Texture> builtIn = new EnumMap<>(Cape.class);
 	private PlayerSkin lastBase;
 	private PlayerSkin lastResult;
+	/** Zuletzt übernommene Launcher-Auswahl (siehe {@link #texture()}). */
+	private String appliedLauncherSelection;
 
 	public CapesModule() {
 		super("capes", Category.VISUAL, true);
@@ -86,6 +89,14 @@ public final class CapesModule extends Module {
 	}
 
 	private ClientAsset.Texture texture() {
+		// Aus dem Launcher gestartet: dessen Auswahl gilt ab Spielstart – auch wenn in der
+		// Config noch ein anderes Cape steht (sonst sieht man immer z. B. das Salami-Cape).
+		// Im Spiel umstellen geht danach weiterhin, bis zum nächsten Start.
+		String launcher = System.getProperty(LAUNCHER_PROPERTY);
+		if (launcher != null && !launcher.isBlank() && !launcher.equals(appliedLauncherSelection)) {
+			appliedLauncherSelection = launcher;
+			cape.set(Cape.LAUNCHER);
+		}
 		Cape selected = cape.get();
 		if (selected == Cape.LAUNCHER) {
 			return fromLauncher(System.getProperty(LAUNCHER_PROPERTY));

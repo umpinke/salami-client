@@ -288,7 +288,24 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 		check(context.computeOnClient(c -> c.player.getSkin().cape() == null
 				|| !c.player.getSkin().cape().texturePath().getNamespace().equals("salami")),
 			"Capes: launcher selection none still shows a salami cape");
+
+		// Alte Config mit festem Cape: die Launcher-Auswahl muss trotzdem gelten …
+		set(capes, "cape", CapesModule.Cape.SALAMI);
+		System.setProperty("salami.cape", "builtin:board");
+		check(capeIs(context, "board"), "Capes: config cape SALAMI overrides the launcher selection");
+		check(context.computeOnClient(c -> capes.settings().stream()
+				.anyMatch(s -> s.id().equals("cape") && s.get() == CapesModule.Cape.LAUNCHER)),
+			"Capes: mode was not switched to LAUNCHER");
+		// … und im Spiel umstellen geht danach weiterhin
+		set(capes, "cape", CapesModule.Cape.PEPPERONI);
+		check(capeIs(context, "pepperoni"), "Capes: changing the cape in game after launch has no effect");
+		set(capes, "cape", CapesModule.Cape.LAUNCHER);
 		System.clearProperty("salami.cape");
+	}
+
+	private static boolean capeIs(ClientGameTestContext context, String name) {
+		return context.computeOnClient(c -> c.player.getSkin().cape() != null
+			&& c.player.getSkin().cape().texturePath().equals(Identifier.fromNamespaceAndPath("salami", "textures/cape/" + name + ".png")));
 	}
 
 	// ------------------------------------------------------------------ Player ESP
