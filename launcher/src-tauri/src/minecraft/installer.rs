@@ -602,15 +602,10 @@ pub async fn install_minecraft_version(
             pack_id
         );
         if !crate::branding::NORISK_SERVICES_ENABLED {
-            // Salami: Packs kommen aus integrations::salami_packs. Das NoRisk-Token braucht es nur
-            // für „NoRisk Client im Spiel“ (NoRisk-Mod aus NoRisks Pack-Liste).
-            let norisk_token = credentials
-                .as_ref()
-                .and_then(|c| c.norisk_credentials.get_token_for_mode(is_experimental_mode).ok())
-                .unwrap_or_default();
+            // Salami: Packs kommen ohne Token aus integrations::salami_packs.
             if let Err(update_err) = state
                 .norisk_pack_manager
-                .fetch_and_update_config(&norisk_token, is_experimental_mode)
+                .fetch_and_update_config("", is_experimental_mode)
                 .await
             {
                 warn!(
@@ -882,40 +877,12 @@ pub async fn install_minecraft_version(
         launch_params = launch_params.with_additional_jvm_args(current_jvm_args);
         info!("Configured Fabric addMods meta file for profile '{}'", profile.name);
     } else if modloader_enum == ModLoader::Forge || modloader_enum == ModLoader::NeoForge {
-        let loader_str = if modloader_enum == ModLoader::NeoForge { "neoforge" } else { "forge" };
-        let is_legacy_forge = modloader_enum == ModLoader::Forge
-            && ["1.7.10", "1.8.9", "1.12.2"].contains(&version_id);
-
-        // Early services go through the meta file like everything else: the loader registers an
-        // ITransformerDiscoveryService, and ModLauncher puts what it reports into Layer.SERVICE.
-        // Handing those jars to the class path instead made BootstrapLauncher own them from
-        // MC-BOOTSTRAP, which a class-transforming mod rejects.
-        let meta_path = crate::minecraft::downloads::mod_resolver::build_forge_add_mods_meta(
-            profile.id,
-            version_id,
-            &target_mods,
-        )
-        .await?;
-
-        let forge_libs = crate::minecraft::downloads::forge_libraries_download::ForgeLibrariesDownload::new();
-        let loader_path = forge_libs.resolve_forgeloader(version_id, loader_str).await?;
-
-        let mut current_jvm_args = launch_params.additional_jvm_args.clone();
-        let meta_path_str = meta_path.to_string_lossy().replace("\\", "/");
-        current_jvm_args.push(format!("-Dnrc.addMods=@{}", meta_path_str));
-
-        if is_legacy_forge {
-            current_jvm_args.push("-Dfml.coreMods.load=gg.norisk.forgeloader.forge.ForgeModLoader".to_string());
-        }
-        launch_params = launch_params.with_additional_jvm_args(current_jvm_args);
-
-        let mut libs = launch_params.additional_libraries.clone();
-        libs.push(loader_path);
-        launch_params = launch_params.with_additional_libraries(libs);
-
+        // Salami: Forge/NeoForge bekommen ihre Mods im Sync-Schritt direkt nach <instanz>/mods
+        // kopiert (mod_downloader::sync_forge_mods) – ohne zusätzlichen Mod-Lader.
         info!(
-            "Configured {} ForgeModLoader for profile '{}' ({} mods)",
-            loader_str, profile.name, target_mods.len()
+            "Forge/NeoForge profile '{}': {} mods will be copied to mods/",
+            profile.name,
+            target_mods.len()
         );
     }
 
@@ -928,8 +895,17 @@ pub async fn install_minecraft_version(
         } else {
             async_fs::create_dir_all(&profile_mods_path).await?;
             if modloader_enum == ModLoader::Fabric || modloader_enum == ModLoader::Forge || modloader_enum == ModLoader::NeoForge {
-                info!("Cleaning managed mods from mods/ folder (all mods loaded via meta file from cache).");
+                info!("Cleaning managed mods from the profile mods folder (they are loaded from the cache).");
                 mod_downloader_service.clean_managed_mods(&target_mods, &profile_mods_path).await?;
+                if modloader_enum == ModLoader::Forge || modloader_enum == ModLoader::NeoForge {
+                    let root_mods = state
+                        .profile_manager
+                        .calculate_instance_path_for_profile(profile)?
+                        .join("mods");
+                    mod_downloader_service
+                        .sync_forge_mods(&target_mods, &profile_mods_path, &root_mods)
+                        .await?;
+                }
             } else {
                 mod_downloader_service.sync_mods_to_profile(&target_mods, &profile_mods_path).await?;
             }

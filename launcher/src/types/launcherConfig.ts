@@ -154,8 +154,6 @@ export interface LauncherConfig {
   log_level: LogLevel;
   /** Salami-Modus, wird als -Dsalami.theme an salami-core übergeben. */
   salami_theme?: boolean;
-  /** NoRisk Client im Spiel: NoRisk-Login und NoRisk-Mod zusätzlich laden. */
-  norisk_ingame?: boolean;
 }
 
 export type LogLevel = "error" | "warn" | "info" | "debug" | "trace";

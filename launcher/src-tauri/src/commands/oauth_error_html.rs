@@ -143,8 +143,8 @@ pub const ERROR_HTML: &str = r#"<!DOCTYPE html>
 <body>
     <div class="container">
         <div class="branding">
-            <span>NORISK</span>
-            <span class="branding-bolt">⚡</span>
+            <span>SALAMI</span>
+            <span class="branding-bolt">●</span>
             <span>CLIENT</span>
         </div>
         <div class="icon-wrapper">

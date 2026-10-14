@@ -298,8 +298,8 @@ impl MinecraftLauncher {
         // Create JVM arguments processor
         let jvm_args = JvmArguments::new(
             natives_path.clone(),
-            "noriskclient-launcher".to_string(),
-            "3.0.0".to_string(),
+            "salami-client".to_string(),
+            env!("CARGO_PKG_VERSION").to_string(),
             classpath.clone(),
         );
 
@@ -350,21 +350,6 @@ impl MinecraftLauncher {
             command.arg("-XX:G1HeapRegionSize=32M");
         }
 
-        // Add NoRisk client specific parameters
-        // Only add token if we have credentials AND a NoRisk pack is selected in the profile
-        let has_norisk_pack = profile.as_ref().and_then(|p| p.selected_norisk_pack_id.as_ref()).is_some();
-
-        // Add profile name for ingame display
-        if let Some(p) = &profile {
-            command.arg(format!("-Dnorisk.profile.name={}", p.name));
-            if let Some(pack_id) = p.selected_norisk_pack_id.as_ref() {
-                command.arg(format!("-Dnorisk.pack={}", pack_id));
-            }
-        }
-
-        // Pass meta dir to game client for shared Discord state file
-        command.arg(format!("-Dnorisk.meta.dir={}", crate::config::LAUNCHER_DIRECTORY.meta_dir().display()));
-
         // Salami: Theme-Brücke – salami-core übernimmt den Salami-Modus des Launchers.
         command.arg(format!(
             "-Dsalami.theme={}",
@@ -376,96 +361,11 @@ impl MinecraftLauncher {
             crate::integrations::salami_capes::launch_arg(&crate::integrations::salami_capes::capes_dir())
         ));
 
-        // Hand off asset management to the in-game client only for packs whose
-        // client owns asset management (see `client_managed_assets`). Every
-        // other pack runs the legacy launcher-side asset pipeline — passing the
-        // props there would double-write the cache alongside it.
-        let effective_pack = match &profile {
-            Some(p) => p.effective_norisk_pack_id().await,
-            None => None,
-        };
-        if effective_pack
-            .as_deref()
-            .map(crate::minecraft::downloads::client_managed_assets)
-            .unwrap_or(false)
-        {
-            let pack_id = effective_pack.as_deref().unwrap();
-
-            // Layout matches norisk_assets_download.rs
-            // (`<meta>/assets/noriskclient/<bucket>/objects/...`) so any blob
-            // we've already downloaded is reusable as-is.
-            let assets_root = crate::config::LAUNCHER_DIRECTORY
-                .meta_dir()
-                .join("assets")
-                .join("noriskclient");
-            command.arg(format!("-Dnrc.assets.dir={}", assets_root.display()));
-
-            // Bucket list comes from the resolved pack's `assets` field
-            // (norisk_modpacks.json). Order is base→priority — client overlays
-            // the last entry on top, falling back per-asset.
-            let packs_config = state.norisk_pack_manager.get_config().await;
-            match packs_config.get_resolved_pack_definition(pack_id) {
-                Ok(pack_def) if !pack_def.assets.is_empty() => {
-                    command.arg(format!("-Dnrc.assets.bucket={}", pack_def.assets.join(",")));
-                }
-                Ok(_) => {}
-                Err(e) => log::warn!("[launcher] Resolving pack '{}' for nrc.assets.bucket failed: {}", pack_id, e),
-            }
-        } else {
-            info!("[launcher] pack not client-managed — running legacy asset pipeline, omitting -Dnrc.assets.* JVM args");
-        }
-
-        if let Some(creds) = &self.credentials {
-            if has_norisk_pack {
-                // Salami: Das NoRisk-Token gehört nur ins Spiel, wenn der NoRisk-Mod mitläuft –
-                // sonst könnte jede andere Mod es aus den System-Properties lesen.
-                let norisk_token_value = if crate::branding::norisk_login_enabled() {
-                    if params.is_experimental_mode {
-                        info!("[NoRisk Launcher] Using experimental mode token");
-                        creds.norisk_credentials.experimental.as_ref().map(|t| &t.value)
-                    } else {
-                        info!("[NoRisk Launcher] Using production mode token");
-                        creds.norisk_credentials.production.as_ref().map(|t| &t.value)
-                    }
-                } else {
-                    None
-                };
-                if let Some(norisk_token) = norisk_token_value {
-                    info!("[NoRisk Launcher] Adding NoRisk token to launch parameters");
-                    command.arg(format!("-Dnorisk.token={}", norisk_token));
-                } else {
-                    info!("[NoRisk Launcher] No NoRisk token available for the selected mode");
-                }
-
-                // Add experimental mode parameter
-                info!(
-                    "[NoRisk Launcher] Setting experimental mode: {}",
-                    params.is_experimental_mode
-                );
-                command.arg(format!(
-                    "-Dnorisk.experimental={}",
-                    params.is_experimental_mode
-                ));
-
-                // Forward the launcher's analytics opt-in (config flag) to the in-game client.
-                let enable_analytics = state.config_manager.get_config().await.enable_analytics;
-                command.arg(format!("-Dnorisk.analytics.enabled={}", enable_analytics));
-            } else {
-                info!("[NoRisk Launcher] No NoRisk pack selected, skipping NoRisk token and experimental mode parameters");
-            }
-        } else {
-            info!("[NoRisk Launcher] No credentials available, skipping NoRisk parameters");
-        }
-
-        // Add per-loader mods-folder JVM argument so the loader picks up jars from the
-        // launcher-managed per-version directory (analogous to fabric.modsFolder, mirrored
-        // for Forge/NeoForge via nrc-forgeloader's -Dnrc.modsFolder).
-        // Note: complementary to addMods=@<meta>, both sources are merged by the loader.
+        // Fabric lädt die Mods des Profils aus dem launcher-verwalteten Ordner (zusätzlich zu
+        // addMods=@<meta>). Forge/NeoForge bekommen sie stattdessen nach mods/ kopiert.
         if let Some(p_ref) = &profile {
             let prop: Option<&str> = match p_ref.loader {
                 crate::state::profile_state::ModLoader::Fabric => Some("fabric.modsFolder"),
-                crate::state::profile_state::ModLoader::Forge
-                | crate::state::profile_state::ModLoader::NeoForge => Some("nrc.modsFolder"),
                 _ => None,
             };
             if let Some(prop) = prop {

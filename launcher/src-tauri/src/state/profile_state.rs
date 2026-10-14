@@ -629,6 +629,34 @@ fn apply_unified_version_to_mod(
     Ok(())
 }
 
+/// Unterordner-Name des Loaders für die launcher-verwalteten Mods eines Profils.
+fn loader_mods_dir_name(loader: &ModLoader) -> Option<&'static str> {
+    match loader {
+        ModLoader::Fabric => Some("fabric"),
+        ModLoader::Forge => Some("forge"),
+        ModLoader::NeoForge => Some("neoforge"),
+        _ => None,
+    }
+}
+
+/// `mods/salami-<suffix>`; ein vorhandener alter Ordner `mods/nrc-<suffix>` (aus der Zeit als
+/// NoRisk-Fork) wird beim ersten Zugriff umbenannt. Klappt das nicht (z. B. Spiel läuft), bleibt
+/// der alte Ordner in Gebrauch.
+pub(crate) fn migrated_mods_dir(mods_root: &std::path::Path, suffix: &str) -> PathBuf {
+    let current = mods_root.join(format!("salami-{}", suffix));
+    let legacy = mods_root.join(format!("nrc-{}", suffix));
+    if !current.exists() && legacy.is_dir() {
+        match std::fs::rename(&legacy, &current) {
+            Ok(()) => log::info!("Renamed mods folder {:?} -> {:?}", legacy, current),
+            Err(e) => {
+                log::warn!("Could not rename mods folder {:?} -> {:?}: {}", legacy, current, e);
+                return legacy;
+            }
+        }
+    }
+    current
+}
+
 impl ProfileManager {
     pub fn new(profiles_path: PathBuf, db: crate::state::db::DbHandle) -> Result<Self> {
         trace!(
@@ -2428,17 +2456,12 @@ impl ProfileManager {
     /// This always uses the standard single profile logic.
     pub fn get_profile_mods_path_single(&self, profile: &Profile) -> Result<PathBuf> {
         let instance_path = self.calculate_instance_path_for_profile(profile)?;
-        let mods_path = match profile.loader {
-            ModLoader::Fabric => instance_path
-                .join("mods")
-                .join(format!("nrc-{}-fabric", profile.game_version)),
-            ModLoader::Forge => instance_path
-                .join("mods")
-                .join(format!("nrc-{}-forge", profile.game_version)),
-            ModLoader::NeoForge => instance_path
-                .join("mods")
-                .join(format!("nrc-{}-neoforge", profile.game_version)),
-            _ => instance_path.join("mods"),
+        let mods_path = match loader_mods_dir_name(&profile.loader) {
+            Some(loader) => migrated_mods_dir(
+                &instance_path.join("mods"),
+                &format!("{}-{}", profile.game_version, loader),
+            ),
+            None => instance_path.join("mods"),
         };
         log::debug!(
             "Calculated single mods path for profile '{}': {:?}",
@@ -2461,17 +2484,12 @@ impl ProfileManager {
             uuid_str[0..4.min(uuid_str.len())].to_string()
         };
         
-        let mods_path = match profile.loader {
-            ModLoader::Fabric => instance_path
-                .join("mods")
-                .join(format!("nrc-{}-fabric-{}", profile.game_version, uuid_short)),
-            ModLoader::Forge => instance_path
-                .join("mods")
-                .join(format!("nrc-{}-forge-{}", profile.game_version, uuid_short)),
-            ModLoader::NeoForge => instance_path
-                .join("mods")
-                .join(format!("nrc-{}-neoforge-{}", profile.game_version, uuid_short)),
-            _ => instance_path.join("mods"),
+        let mods_path = match loader_mods_dir_name(&profile.loader) {
+            Some(loader) => migrated_mods_dir(
+                &instance_path.join("mods"),
+                &format!("{}-{}-{}", profile.game_version, loader, uuid_short),
+            ),
+            None => instance_path.join("mods"),
         };
         log::debug!(
             "Calculated shared mods path for profile '{}': {:?}",
@@ -3852,5 +3870,26 @@ impl Default for WindowSize {
             width: 854,
             height: 480,
         }
+    }
+}
+
+#[cfg(test)]
+mod mods_dir_migration_tests {
+    use super::migrated_mods_dir;
+
+    #[test]
+    fn renames_legacy_nrc_mods_folder_once() {
+        let root = std::env::temp_dir().join(format!("salami-mods-migrate-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("nrc-1.21.11-fabric")).unwrap();
+        std::fs::write(root.join("nrc-1.21.11-fabric").join("x.jar"), "x").unwrap();
+
+        let dir = migrated_mods_dir(&root, "1.21.11-fabric");
+        assert_eq!(dir, root.join("salami-1.21.11-fabric"));
+        assert!(dir.join("x.jar").exists());
+        assert!(!root.join("nrc-1.21.11-fabric").exists());
+        // ohne alten Ordner: einfach der neue Name
+        assert_eq!(migrated_mods_dir(&root, "1.20.1-forge"), root.join("salami-1.20.1-forge"));
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

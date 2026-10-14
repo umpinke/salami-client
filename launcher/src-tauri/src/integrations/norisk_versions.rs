@@ -11,9 +11,9 @@ use tokio::fs;
 /// Helper to compute versions file path based on experimental flag
 fn norisk_versions_path_for(is_experimental: bool) -> PathBuf {
     let filename = if is_experimental {
-        "norisk_versions_exp.json"
+        "salami_versions_exp.json"
     } else {
-        "norisk_versions.json"
+        "salami_versions.json"
     };
     LAUNCHER_DIRECTORY.root_dir().join(filename)
 }
@@ -38,7 +38,7 @@ pub async fn load_local_standard_profiles() -> Result<NoriskVersionsConfig> {
         let is_exp = state.config_manager.is_experimental_mode().await;
         norisk_versions_path_for(is_exp)
     } else {
-        LAUNCHER_DIRECTORY.root_dir().join("norisk_versions.json")
+        LAUNCHER_DIRECTORY.root_dir().join("salami_versions.json")
     };
 
     info!(
@@ -91,7 +91,7 @@ pub async fn load_dummy_versions() -> Result<()> {
         let is_exp = state.config_manager.is_experimental_mode().await;
         norisk_versions_path_for(is_exp)
     } else {
-        target_dir.join("norisk_versions.json")
+        target_dir.join("salami_versions.json")
     };
 
     if target_file.exists() {

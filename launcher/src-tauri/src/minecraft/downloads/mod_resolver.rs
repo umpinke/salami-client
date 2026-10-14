@@ -714,7 +714,7 @@ pub async fn create_fabric_add_mods_meta(
     fs::create_dir_all(&runtime_dir).await?;
 
     let meta_file_path = runtime_dir.join(format!(
-        "nrc_fabric_mods_{}_{}.txt",
+        "salami_fabric_mods_{}_{}.txt",
         profile_id, minecraft_version
     ));
 
@@ -755,31 +755,6 @@ pub async fn build_fabric_add_mods_arg(
     ))
 }
 
-/// Creates a Forge addMods meta file listing ALL mod JARs (absolute paths, one per line).
-/// ForgeModLoader reads this via `-Dnrc.addMods=@<meta>` and registers each JAR with ModListHelper.
-pub async fn build_forge_add_mods_meta(
-    profile_id: Uuid,
-    minecraft_version: &str,
-    target_mods: &[TargetMod],
-) -> crate::error::Result<PathBuf> {
-    let runtime_dir = LAUNCHER_DIRECTORY.meta_dir().join("runtime");
-    fs::create_dir_all(&runtime_dir).await?;
-
-    let meta_file_path = runtime_dir.join(format!(
-        "nrc_forge_mods_{}_{}.txt",
-        profile_id, minecraft_version
-    ));
-
-    let mut meta_contents = String::new();
-    for tm in target_mods {
-        let p = tm.cache_path.to_string_lossy().replace("\\", "/");
-        meta_contents.push_str(&p);
-        meta_contents.push('\n');
-    }
-
-    fs::write(&meta_file_path, meta_contents).await?;
-    Ok(meta_file_path)
-}
 
 
 

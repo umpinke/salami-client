@@ -69,7 +69,7 @@ impl NrcRequest {
         let request = self.builder.try_clone().and_then(|b| b.build().ok());
         // Salami: zentraler Kill-Switch – keine Requests an NoRisk-Server (siehe branding.rs).
         if let Some(req) = request.as_ref() {
-            if crate::branding::is_blocked_host(req.url().host_str(), req.url().path()) {
+            if crate::branding::is_blocked_host(req.url().host_str()) {
                 debug!("[HTTP] {} blocked: NoRisk services disabled ({})", ctx, req.url());
                 return Err(AppError::RequestError(format!(
                     "{} skipped: NoRisk online services are disabled in {}",

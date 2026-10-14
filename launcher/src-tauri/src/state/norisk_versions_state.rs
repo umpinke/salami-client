@@ -16,12 +16,12 @@ use uuid::Uuid;
 use super::profile_state::Profile;
 
 // Default filename for the Norisk versions configuration
-const NORISK_VERSIONS_FILENAME: &str = "norisk_versions.json";
+const NORISK_VERSIONS_FILENAME: &str = "salami_versions.json";
 
 /// Returns the path for the norisk versions config depending on experimental mode
 pub fn norisk_versions_path_for(is_experimental: bool) -> PathBuf {
     let filename = if is_experimental {
-        "norisk_versions_exp.json"
+        "salami_versions_exp.json"
     } else {
         NORISK_VERSIONS_FILENAME
     };

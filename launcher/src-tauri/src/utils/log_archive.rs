@@ -10,6 +10,23 @@ use uuid::Uuid;
 const MAX_SESSIONS: usize = 10;
 const STARTUP_PURGE_THRESHOLD: u64 = 500 * 1024 * 1024;
 
+
+/// Spiel-Log einer Sitzung (stdout/stderr des Spiels).
+pub const PROCESS_LOG_FILE_NAME: &str = "game-process.log";
+/// Name aus der Zeit als NoRisk-Fork – ältere Sitzungen heißen noch so.
+pub const LEGACY_PROCESS_LOG_FILE_NAME: &str = "nrc-process.log";
+
+/// Spiel-Log einer Sitzung: der neue Name, bei älteren Sitzungen der alte.
+pub fn process_log_in(session_dir: &std::path::Path) -> std::path::PathBuf {
+    let current = session_dir.join(PROCESS_LOG_FILE_NAME);
+    let legacy = session_dir.join(LEGACY_PROCESS_LOG_FILE_NAME);
+    if !current.exists() && legacy.exists() {
+        legacy
+    } else {
+        current
+    }
+}
+
 pub struct SessionInfo<'a> {
     pub process_id: Uuid,
     pub profile_id: Uuid,
@@ -91,7 +108,7 @@ pub fn create_session(info: &SessionInfo) -> std::io::Result<(String, PathBuf)> 
         let _ = std::fs::write(session_dir.join("session.json"), json);
     }
 
-    Ok((session_id, session_dir.join("nrc-process.log")))
+    Ok((session_id, session_dir.join(PROCESS_LOG_FILE_NAME)))
 }
 
 pub async fn finalize_game_session(session_id: &str, exit_code: Option<i32>, success: bool) {
@@ -132,9 +149,12 @@ pub async fn cleanup_oversized_logs() {
         }
         let session_path = entry.path();
 
-        let mut candidates: Vec<String> = vec!["nrc-process.log".to_string()];
-        for i in 1..=crate::utils::bounded_log_writer::ROTATED_BACKUP_COUNT {
-            candidates.push(format!("nrc-process.log.{}.gz", i));
+        let mut candidates: Vec<String> = Vec::new();
+        for base in [PROCESS_LOG_FILE_NAME, LEGACY_PROCESS_LOG_FILE_NAME] {
+            candidates.push(base.to_string());
+            for i in 1..=crate::utils::bounded_log_writer::ROTATED_BACKUP_COUNT {
+                candidates.push(format!("{}.{}.gz", base, i));
+            }
         }
         for log_name in candidates {
             let log_path = session_path.join(log_name);
@@ -153,7 +173,7 @@ pub async fn cleanup_oversized_logs() {
                 size_mb
             );
             let marker = format!(
-                "[NRC] log was {} MB on launcher start -- contents purged to recover disk space.\n\
+                "[Salami] log was {} MB on launcher start -- contents purged to recover disk space.\n\
                  A mod spammed stdout/stderr during a previous session. Check installed mods for log spam.\n",
                 size_mb
             );

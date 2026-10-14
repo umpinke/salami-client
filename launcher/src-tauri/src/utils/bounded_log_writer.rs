@@ -10,7 +10,7 @@ use tokio::sync::Mutex;
 
 pub const MAX_LOG_BYTES: u64 = 10 * 1024 * 1024;
 pub const ROTATED_BACKUP_COUNT: u32 = 5;
-const ROTATE_MARKER: &[u8] = b"[NRC] log rotated -- previous chunk gzipped to nrc-process.log.N.gz; cap is 10 MB per segment, 5 backups.\n";
+const ROTATE_MARKER: &[u8] = b"[Salami] log rotated -- previous chunk gzipped to game-process.log.N.gz; cap is 10 MB per segment, 5 backups.\n";
 const FORWARD_BUF_BYTES: usize = 8 * 1024;
 const WRITE_RETRY_COOLDOWN: Duration = Duration::from_secs(30);
 

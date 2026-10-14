@@ -31,7 +31,7 @@ pub fn create(app: &AppHandle) -> Result<()> {
         OVERLAY_LABEL,
         WebviewUrl::App("index.html?overlay=clip".into()),
     )
-    .title("NoRiskClient Clip")
+    .title("Salami Client Clip")
     .inner_size(WIDTH, HEIGHT)
     .resizable(false)
     .decorations(false)

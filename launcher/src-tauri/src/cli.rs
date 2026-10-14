@@ -145,7 +145,7 @@ pub fn dispatch_cold_start(app: &AppHandle) -> bool {
 
     match sub.name.as_str() {
         "version" => {
-            println!("nrc-launcher {}", env!("CARGO_PKG_VERSION"));
+            println!("salami-client {}", env!("CARGO_PKG_VERSION"));
             app.exit(0);
             true
         }

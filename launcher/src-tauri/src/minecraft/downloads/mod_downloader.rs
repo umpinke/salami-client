@@ -15,6 +15,13 @@ use tokio::io::AsyncWriteExt;
 const DEFAULT_CONCURRENT_MOD_DOWNLOADS: usize = 4;
 const HASH_CONCURRENCY: usize = 8;
 const MOD_CACHE_DIR_NAME: &str = "mod_cache";
+/// Liste der vom Launcher in `<instanz>/mods` kopierten Forge/NeoForge-Mods.
+pub const FORGE_MANAGED_LIST: &str = ".salami-managed-mods.json";
+
+/// Nur ein Dateiname, kein Pfad (schützt vor `..`/Unterordnern aus einer manipulierten Liste).
+fn is_plain_file_name(name: &str) -> bool {
+    !name.is_empty() && name != "." && name != ".." && !name.contains(['/', '\\', ':'])
+}
 
 pub struct ModDownloadService {
     concurrent_downloads: usize,
@@ -289,6 +296,80 @@ impl ModDownloadService {
         Ok(())
     }
 
+    /// Forge/NeoForge laden Mods nur aus `<instanz>/mods`. Kopiert die vom Launcher verwalteten
+    /// Mods (`target_mods`) und die eigenen Mods des Profils (`*.jar` in `local_dir`) dorthin.
+    /// Die Liste [`FORGE_MANAGED_LIST`] merkt sich, welche Dateien vom Launcher stammen: nur diese
+    /// werden beim nächsten Start ersetzt oder entfernt – selbst in `mods/` gelegte Mods bleiben.
+    pub async fn sync_forge_mods(
+        &self,
+        target_mods: &[TargetMod],
+        local_dir: &std::path::Path,
+        root_mods_dir: &std::path::Path,
+    ) -> Result<()> {
+        fs::create_dir_all(root_mods_dir).await?;
+
+        let mut wanted: Vec<(String, PathBuf)> = target_mods
+            .iter()
+            .map(|tm| (tm.filename.clone(), tm.cache_path.clone()))
+            .collect();
+        if local_dir != root_mods_dir && local_dir.is_dir() {
+            let mut entries = read_dir(local_dir).await?;
+            while let Some(entry) = entries.next_entry().await? {
+                let path = entry.path();
+                let is_jar = path.extension().is_some_and(|e| e.eq_ignore_ascii_case("jar"));
+                if path.is_file() && is_jar {
+                    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                        wanted.push((name.to_string(), path.clone()));
+                    }
+                }
+            }
+        }
+        let mut seen = HashSet::new();
+        wanted.retain(|(name, _)| seen.insert(name.clone()));
+
+        let list_path = root_mods_dir.join(FORGE_MANAGED_LIST);
+        let previous: HashSet<String> = match fs::read_to_string(&list_path).await {
+            Ok(text) => serde_json::from_str::<Vec<String>>(&text).unwrap_or_default().into_iter().collect(),
+            Err(_) => HashSet::new(),
+        };
+        let wanted_names: HashSet<&String> = wanted.iter().map(|(n, _)| n).collect();
+
+        for name in previous.iter().filter(|n| !wanted_names.contains(n)) {
+            let path = root_mods_dir.join(name);
+            if is_plain_file_name(name) && path.is_file() {
+                // nur eine Kopie aus dem Mod-Cache – direkt löschen
+                info!("Removing previously managed Forge mod: {}", name);
+                fs::remove_file(&path).await?;
+            }
+        }
+
+        let mut managed = Vec::new();
+        for (name, source) in &wanted {
+            if !is_plain_file_name(name) {
+                warn!("Skipping mod with unexpected file name: {:?}", name);
+                continue;
+            }
+            let target = root_mods_dir.join(name);
+            if target.exists() {
+                if !previous.contains(name) {
+                    debug!("Keeping user-placed mod in mods/: {}", name);
+                    continue;
+                }
+                if Self::is_file_valid(&target, source).await {
+                    managed.push(name.clone());
+                    continue;
+                }
+            }
+            Self::robust_copy_file(source, &target).await?;
+            managed.push(name.clone());
+        }
+
+        managed.sort();
+        fs::write(&list_path, serde_json::to_string_pretty(&managed)?).await?;
+        info!("Forge mods synced to {:?}: {} managed", root_mods_dir, managed.len());
+        Ok(())
+    }
+
     /// Removes managed mods from the profile mods directory.
     /// Uses SHA1 matching when available (Modrinth/CurseForge), falls back to filename for mods
     /// without a known hash (Maven/URL/local). User-added mods are left untouched.
@@ -470,4 +551,60 @@ impl ModDownloadService {
         true
     }
 
+}
+
+#[cfg(test)]
+mod forge_sync_tests {
+    use super::*;
+
+    fn target(dir: &std::path::Path, name: &str, content: &str) -> TargetMod {
+        let cache_path = dir.join(name);
+        std::fs::write(&cache_path, content).unwrap();
+        TargetMod { mod_id: name.to_string(), filename: name.to_string(), cache_path, sha1: None }
+    }
+
+    #[tokio::test]
+    async fn forge_sync_copies_tracks_and_keeps_user_mods() {
+        let base = std::env::temp_dir().join(format!("salami-forge-sync-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let cache = base.join("cache");
+        let local = base.join("mods").join("salami-1.20.1-forge");
+        let root = base.join("mods");
+        std::fs::create_dir_all(&cache).unwrap();
+        std::fs::create_dir_all(&local).unwrap();
+        std::fs::write(root.join("user-mod.jar"), "mine").unwrap();
+        std::fs::write(local.join("local-mod.jar"), "local").unwrap();
+        std::fs::write(local.join("off-mod.jar.disabled"), "off").unwrap();
+
+        let service = ModDownloadService::with_concurrency(1);
+        let a = target(&cache, "a.jar", "A");
+        let b = target(&cache, "b.jar", "B");
+        service.sync_forge_mods(&[a.clone(), b], &local, &root).await.unwrap();
+        assert_eq!(std::fs::read_to_string(root.join("a.jar")).unwrap(), "A");
+        assert_eq!(std::fs::read_to_string(root.join("b.jar")).unwrap(), "B");
+        assert_eq!(std::fs::read_to_string(root.join("local-mod.jar")).unwrap(), "local");
+        assert!(!root.join("off-mod.jar.disabled").exists());
+
+        // b.jar fällt weg → wird entfernt; die selbst abgelegte Mod bleibt
+        service.sync_forge_mods(&[a], &local, &root).await.unwrap();
+        assert!(!root.join("b.jar").exists());
+        assert!(root.join("a.jar").exists());
+        assert_eq!(std::fs::read_to_string(root.join("user-mod.jar")).unwrap(), "mine");
+
+        // eine manipulierte Liste kann nichts außerhalb von mods/ löschen
+        std::fs::write(base.join("outside.jar"), "x").unwrap();
+        std::fs::write(root.join(FORGE_MANAGED_LIST), r#"["../outside.jar"]"#).unwrap();
+        service.sync_forge_mods(&[], &local, &root).await.unwrap();
+        assert!(base.join("outside.jar").exists());
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn plain_file_names_only() {
+        assert!(is_plain_file_name("sodium-0.6.jar"));
+        assert!(!is_plain_file_name("../x.jar"));
+        assert!(!is_plain_file_name("sub/x.jar"));
+        assert!(!is_plain_file_name("C:x.jar"));
+        assert!(!is_plain_file_name(".."));
+    }
 }

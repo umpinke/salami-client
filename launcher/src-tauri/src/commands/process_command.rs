@@ -6,7 +6,6 @@ use std::path::PathBuf;
 use tauri::Manager;
 use uuid::Uuid;
 
-const PROCESS_LOG_FILE_NAME: &str = "nrc-process.log";
 pub const MAX_LOG_CURSOR_BYTES: u64 = 512 * 1024;
 
 #[tauri::command]
@@ -64,9 +63,7 @@ pub fn validate_log_session_id(session_id: &str) -> Result<(), CommandError> {
 }
 
 fn process_log_path(session_id: &str) -> PathBuf {
-    crate::utils::log_archive::archive_root()
-        .join(session_id)
-        .join(PROCESS_LOG_FILE_NAME)
+    crate::utils::log_archive::process_log_in(&crate::utils::log_archive::archive_root().join(session_id))
 }
 
 pub fn clamp_log_read_len(requested: Option<u64>) -> u64 {

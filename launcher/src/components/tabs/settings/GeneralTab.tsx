@@ -13,36 +13,21 @@ import { SettingRow } from "../../ui/settings/SettingRow";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { useGlobalModal } from "../../../hooks/useGlobalModal";
 import { useLauncherTheme } from "../../../hooks/useLauncherTheme";
-import { usePermission } from "../../../hooks/usePermission";
-import { PERMISSION } from "../../../constants/permissions";
-import { invalidateAnalyticsCache } from "../../../services/analytics-service";
 import { LANGUAGE_OPTIONS, type SupportedLanguage } from "../../../i18n";
 import { useSettingsConfig, useSettingsKeywords } from "./settings-context";
 import { isWindows } from "../../../utils/platform";
 import { useEffect, useRef, useState } from "react";
-import { useConfirmDialog } from "../../../hooks/useConfirmDialog";
-import { openExternalUrl } from "../../../services/tauri-service";
-import { refreshNoriskPacks } from "../../../services/nrc-service";
 import { UI_SCALE_MAX, UI_SCALE_MIN, UI_SCALE_STEP, useUiScaleStore } from "../../../store/ui-scale-store";
-
-const NORISK_TERMS_URL = "https://norisk.gg/tos";
 
 export function GeneralTab() {
   const { t } = useTranslation();
   const kw = useSettingsKeywords();
-  const { config, tempConfig, setTempConfig, saving } = useSettingsConfig();
-  const { language, setLanguage, accentColor, borderRadius, setBorderRadius, setAnalyticsConsent } =
-    useThemeStore();
+  const { tempConfig, setTempConfig, saving } = useSettingsConfig();
+  const { language, setLanguage, accentColor, borderRadius, setBorderRadius } = useThemeStore();
   const { showModal, hideModal } = useGlobalModal();
   const { isThemeActive } = useLauncherTheme();
   const isAccentColorDisabled = isThemeActive;
 
-  const canShowExperimental =
-    usePermission(PERMISSION.EXPERIMENTAL_MODE) ||
-    !!tempConfig?.is_experimental ||
-    !!config?.is_experimental;
-
-  const { confirm, confirmDialog } = useConfirmDialog();
   const uiScale = useUiScaleStore((s) => s.scale);
   const setUiScale = useUiScaleStore((s) => s.setScale);
   const resetUiScale = useUiScaleStore((s) => s.reset);
@@ -64,31 +49,6 @@ export function GeneralTab() {
     if (uiScaleTimer.current) clearTimeout(uiScaleTimer.current);
   }, []);
 
-  // Nach dem Speichern die Pack-Liste neu laden, damit der NoRisk-Mod sofort (nicht) dabei ist.
-  const savedNoriskIngame = !!config?.norisk_ingame;
-  const lastNoriskIngame = useRef<boolean | null>(null);
-  useEffect(() => {
-    if (!config) return;
-    if (lastNoriskIngame.current !== null && lastNoriskIngame.current !== savedNoriskIngame) {
-      refreshNoriskPacks().catch((err) => console.error("Failed to refresh packs:", err));
-    }
-    lastNoriskIngame.current = savedNoriskIngame;
-  }, [config, savedNoriskIngame]);
-
-  const handleNoriskIngameChange = async (checked: boolean) => {
-    if (!tempConfig) return;
-    if (checked) {
-      const ok = await confirm({
-        title: t("settings.norisk_ingame.confirm_title"),
-        message: t("settings.norisk_ingame.confirm_message"),
-        confirmText: t("settings.norisk_ingame.confirm_button"),
-        type: "warning",
-      });
-      if (!ok) return;
-    }
-    setTempConfig({ ...tempConfig, norisk_ingame: checked });
-  };
-
   const handleConcurrentDownloadsChange = (value: number) => {
     if (tempConfig) setTempConfig({ ...tempConfig, concurrent_downloads: value });
   };
@@ -98,7 +58,6 @@ export function GeneralTab() {
 
   return (
     <div className="space-y-6">
-      {confirmDialog}
       <SettingsSection
         id="settings-section-language"
         title={t("settings.language")}
@@ -225,30 +184,6 @@ export function GeneralTab() {
           </SettingRow>
         )}
         <SettingRow
-          label={t("settings.norisk_ingame")}
-          description={
-            <>
-              {t("settings.norisk_ingame.tooltip")}{" "}
-              <button
-                type="button"
-                className="underline text-white/70 hover:text-white"
-                onClick={() => openExternalUrl(NORISK_TERMS_URL)}
-              >
-                {t("settings.norisk_ingame.terms")}
-              </button>
-            </>
-          }
-          searchKeywords={kw("settings.norisk_ingame", "norisk", "nrc", "cosmetics", "emotes", "menü", "menu")}
-          disabled={saving}
-        >
-          <ToggleSwitch
-            checked={tempConfig?.norisk_ingame || false}
-            onChange={(checked) => void handleNoriskIngameChange(checked)}
-            disabled={saving}
-            size="md"
-          />
-        </SettingRow>
-        <SettingRow
           label={t("settings.discord_presence")}
           description={t("settings.discord_presence.tooltip")}
           searchKeywords={kw("settings.discord_presence", "discord", "presence", "status", "rich")}
@@ -274,21 +209,6 @@ export function GeneralTab() {
             size="md"
           />
         </SettingRow>
-        {canShowExperimental && (
-          <SettingRow
-            label={t("settings.experimental_mode")}
-            description={t("settings.experimental_mode.tooltip")}
-            searchKeywords={kw("settings.experimental_mode", "experimental", "experimentell", "beta")}
-            disabled={saving}
-          >
-            <ToggleSwitch
-              checked={tempConfig?.is_experimental || false}
-              onChange={(checked) => tempConfig && setTempConfig({ ...tempConfig, is_experimental: checked })}
-              disabled={saving}
-              size="md"
-            />
-          </SettingRow>
-        )}
         <SettingRow
           label={t("settings.open_logs")}
           description={t("settings.open_logs.tooltip")}
@@ -311,28 +231,6 @@ export function GeneralTab() {
           <ToggleSwitch
             checked={tempConfig?.hide_on_process_start || false}
             onChange={(checked) => tempConfig && setTempConfig({ ...tempConfig, hide_on_process_start: checked })}
-            disabled={saving}
-            size="md"
-          />
-        </SettingRow>
-        <SettingRow
-          label={t("analytics.settings.label")}
-          description={t("analytics.settings.tooltip")}
-          searchKeywords={kw("analytics.settings.label", "analytics", "analyse", "telemetry", "telemetrie", "tracking")}
-          disabled={saving}
-        >
-          <ToggleSwitch
-            checked={tempConfig?.enable_analytics || false}
-            onChange={(checked) => {
-              if (tempConfig) {
-                setTempConfig({ ...tempConfig, enable_analytics: checked });
-                setAnalyticsConsent({
-                  hasMadeDecision: true,
-                  decision: checked ? 'accepted' : 'declined',
-                });
-                invalidateAnalyticsCache();
-              }
-            }}
             disabled={saving}
             size="md"
           />

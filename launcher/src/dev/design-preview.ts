@@ -79,7 +79,6 @@ const launcherConfig = {
   clips: { enabled: false },
   log_level: "info",
   salami_theme: true,
-  norisk_ingame: false,
 };
 
 /** Cape-Speicher im Speicher (statt salami_capes/ im Launcher-Ordner). */

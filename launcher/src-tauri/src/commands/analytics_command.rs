@@ -1,10 +1,9 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use log::{debug, warn};
+use log::debug;
 use std::collections::HashMap;
 use tauri::command;
-use crate::state::state_manager;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnalyticsEvent {
@@ -29,8 +28,6 @@ pub struct TrackEventResponse {
     pub message: Option<String>,
 }
 
-const ANALYTICS_URL: &str = "https://analytics-api-staging.norisk.gg/api/track";
-
 pub fn tenths(value: f64) -> f64 {
     (value * 10.0).round() / 10.0
 }
@@ -47,60 +44,10 @@ pub fn track(event_type: impl Into<String>, properties: Value) {
     track_event(event_type, map);
 }
 
-/// Fire-and-forget analytics from Rust call sites.
-/// Spawns the HTTP request — returns immediately so callers never block on telemetry.
-pub fn track_event(event_type: impl Into<String>, properties: HashMap<String, Value>) {
-    let event_type = event_type.into();
-    tokio::spawn(async move {
-        let event = AnalyticsEvent {
-            event_type: event_type.clone(),
-            timestamp: Utc::now(),
-            // Backend-originated events have no session/user context.
-            session_id: String::new(),
-            user_id: String::new(),
-            properties: Some(properties),
-        };
-        if let Err(e) = send_event(event).await {
-            warn!("[Analytics] {} failed: {}", event_type, e);
-        }
-    });
-}
-
-async fn send_event(event: AnalyticsEvent) -> Result<(), String> {
-    match state_manager::State::get().await {
-        Ok(state) => {
-            if !state.config_manager.get_config().await.enable_analytics {
-                debug!("[Analytics] Disabled - skipping {}", event.event_type);
-                return Ok(());
-            }
-        }
-        Err(e) => {
-            debug!("[Analytics] State unavailable - skipping {}: {}", event.event_type, e);
-            return Ok(());
-        }
-    }
-
-    let request_body = TrackEventRequest { events: vec![event] };
-
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
-        .map_err(|e| format!("client build: {}", e))?;
-
-    let response = client
-        .post(ANALYTICS_URL)
-        .json(&request_body)
-        .send()
-        .await
-        .map_err(|e| format!("send: {}", e))?;
-
-    let status = response.status();
-    if status.is_success() {
-        debug!("[Analytics] Tracked (status {})", status);
-        Ok(())
-    } else {
-        Err(format!("status {}", status))
-    }
+/// Salami: Analytics sind ausgebaut – es werden keine Nutzungsdaten verschickt (früher an
+/// NoRisk). Die Aufrufstellen bleiben, das Ereignis landet nur im Debug-Log.
+pub fn track_event(event_type: impl Into<String>, _properties: HashMap<String, Value>) {
+    debug!("[Analytics] disabled, not sent: {}", event_type.into());
 }
 
 #[derive(Debug, Serialize)]
@@ -129,15 +76,8 @@ pub async fn track_analytics_event(event: AnalyticsEvent) -> Result<TrackEventRe
         "[Analytics] Frontend event: type={} session={} user={}",
         event.event_type, event.session_id, event.user_id
     );
-    let event_type = event.event_type.clone();
-    // Spawn so the frontend invoke returns immediately (no UI block on slow analytics server).
-    tokio::spawn(async move {
-        if let Err(e) = send_event(event).await {
-            warn!("[Analytics] {} failed: {}", event_type, e);
-        }
-    });
     Ok(TrackEventResponse {
-        success: true,
-        message: None,
+        success: false,
+        message: Some("analytics disabled".to_string()),
     })
 }

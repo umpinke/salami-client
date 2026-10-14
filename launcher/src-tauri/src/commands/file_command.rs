@@ -937,7 +937,7 @@ pub async fn list_process_logs() -> Result<Vec<FileInfo>, CommandError> {
             continue;
         }
         let session_name = session.file_name().to_string_lossy().to_string();
-        let process_log = session_path.join("nrc-process.log");
+        let process_log = crate::utils::log_archive::process_log_in(&session_path);
         if !process_log.is_file() {
             continue;
         }

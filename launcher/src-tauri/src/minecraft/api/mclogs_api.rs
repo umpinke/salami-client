@@ -10,7 +10,7 @@ const REQUEST_TIMEOUT_SECONDS: u64 = 30;
 
 // Static HTTP Client using once_cell
 static HTTP_CLIENT: Lazy<Client> = Lazy::new(|| {
-    Client::builder()
+    crate::config::http_client_builder()
         .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECONDS))
         .build()
         .expect("Failed to build static HTTP client") // Should not fail in practice

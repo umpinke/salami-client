@@ -35,6 +35,7 @@ pub mod hotkey_manager;
 pub mod import_safety; // Strips execution/path primitives out of untrusted imported packs
 pub mod java_detector; // Java detector to find Java installations
 pub mod log_archive; // Archives per-session game logs centrally
+pub mod legacy_cleanup; // Salami: NoRisk-Reste (Caches) beim Start entfernen
 pub mod bounded_log_writer;
 pub mod mc_utils; // Utilities for Minecraft-related operations
 pub mod migration_utils; // Migration utilities for profile and config updates

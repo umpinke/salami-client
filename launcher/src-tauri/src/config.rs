@@ -20,18 +20,45 @@ pub static LAUNCHER_DIRECTORY: Lazy<ProjectDirs> =
 pub static CUSTOM_GAME_DIR_CACHE: Lazy<RwLock<Option<Option<PathBuf>>>> = 
     Lazy::new(|| RwLock::new(None));
 
-static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
+/// Wird bei allen Anfragen mitgeschickt (Modrinth & Co. wünschen Name, Version und Kontakt).
+static APP_USER_AGENT: &str = concat!(
+    "SalamiClient/",
+    env!("CARGO_PKG_VERSION"),
+    " (+https://github.com/umpinke/salami-client)"
+);
 
 pub const HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// Namensauflösung mit Sperre: Server, die `branding::is_blocked_host` sperrt (NoRisk), sind
+/// für alle Anfragen über diese Clients unerreichbar – egal, welche Stelle im Launcher sie baut.
+pub struct BlockingResolver;
+
+impl reqwest::dns::Resolve for BlockingResolver {
+    fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
+        let host = name.as_str().to_string();
+        Box::pin(async move {
+            if crate::branding::is_blocked_host(Some(&host)) {
+                return Err(format!("{} is blocked in {}", host, crate::branding::PRODUCT_NAME).into());
+            }
+            let addrs: Vec<std::net::SocketAddr> = tokio::net::lookup_host((host.as_str(), 0)).await?.collect();
+            Ok(Box::new(addrs.into_iter()) as reqwest::dns::Addrs)
+        })
+    }
+}
+
+/// Basis für alle HTTP-Clients des Launchers: User-Agent und gesperrte Hosts.
+pub fn http_client_builder() -> reqwest::ClientBuilder {
+    reqwest::ClientBuilder::new()
+        .user_agent(APP_USER_AGENT)
+        .dns_resolver(std::sync::Arc::new(BlockingResolver))
+}
+
 /// HTTP Client with launcher agent
 pub static HTTP_CLIENT: Lazy<Client> = Lazy::new(|| {
-    let client = reqwest::ClientBuilder::new()
-        .user_agent(APP_USER_AGENT)
+    http_client_builder()
         .connect_timeout(HTTP_CONNECT_TIMEOUT)
         .build()
-        .unwrap_or_else(|_| Client::new());
-    client
+        .expect("Failed to build HTTP client")
 });
 
 // Extension trait for ProjectDirs to add meta_dir functionality
@@ -80,5 +107,19 @@ pub fn standard_meta_dir() -> PathBuf {
 pub fn update_custom_game_dir(path: Option<PathBuf>) {
     if let Ok(mut guard) = CUSTOM_GAME_DIR_CACHE.write() {
         *guard = Some(path);
+    }
+}
+
+#[cfg(test)]
+mod blocking_resolver_tests {
+    use super::HTTP_CLIENT;
+
+    #[tokio::test]
+    async fn norisk_hosts_are_unreachable() {
+        for url in ["https://api.norisk.gg/api/v1/launcher/modpacks-v3", "https://cdn.norisk.gg/x.png"] {
+            let err = HTTP_CLIENT.get(url).send().await.expect_err("request must fail");
+            let text = format!("{:?}", err);
+            assert!(text.contains("blocked"), "{}: {}", url, text);
+        }
     }
 }

@@ -1063,13 +1063,13 @@ impl NoriskModpacksConfig {
 
 /// Copies a dummy/test `test_norisk_modpacks.json` from the project's source directory
 /// (assuming a development environment structure) to the launcher's root directory
-/// as `norisk_modpacks.json` if it doesn't already exist.
+/// as `salami_packs.json` if it doesn't already exist.
 ///
 /// Note: This path resolution using CARGO_MANIFEST_DIR might not work correctly
 /// in a packaged production build. Consider using Tauri's resource resolver for that.
 pub async fn load_dummy_modpacks() -> Result<()> {
     let target_dir = LAUNCHER_DIRECTORY.root_dir();
-    let target_file = target_dir.join("norisk_modpacks.json");
+    let target_file = target_dir.join("salami_packs.json");
 
     // Only copy if the target file doesn't exist
     if target_file.exists() {

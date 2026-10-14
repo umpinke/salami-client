@@ -159,7 +159,7 @@ async fn main() {
         eprintln!("FEHLER: Logging konnte nicht initialisiert werden: {}", e);
     }
 
-    info!("Starting NoRiskClient Launcher...");
+    info!("Starting Salami Client...");
 
     tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
@@ -207,14 +207,14 @@ async fn main() {
             }
 
             // --- Initialize System Tray (Tauri 2.0) ---
-            let show_item = MenuItem::with_id(app, "show", "Show NoRisk Launcher", true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let show_item = MenuItem::with_id(app, "show", "Salami Client öffnen", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "quit", "Beenden", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
 
             let _tray = TrayIconBuilder::new()
                 .menu(&menu)
                 .show_menu_on_left_click(false)
-                .tooltip("NoRisk Client Launcher")
+                .tooltip("Salami Client")
                 .icon(app.default_window_icon().unwrap().clone())
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
@@ -379,7 +379,7 @@ async fn main() {
                             .dialog()
                             .message(
                                 [
-                                    "The NoRisk Launcher could not start.".to_string(),
+                                    "Salami Client could not start.".to_string(),
                                     String::new(),
                                     e.to_string(),
                                     String::new(),
@@ -391,12 +391,12 @@ async fn main() {
                                     )
                                     .to_string(),
                                     String::new(),
-                                    "Support: https://discord.norisk.gg".to_string(),
+                                    "Support: https://github.com/umpinke/salami-client/issues".to_string(),
                                 ]
                                 .join("\n"),
                             )
                             .kind(MessageDialogKind::Error)
-                            .title("NoRisk Launcher - Startup Failed")
+                            .title("Salami Client - Startup Failed")
                             .buttons(MessageDialogButtons::OkCancelCustom(
                                 "Reset database and restart".to_string(),
                                 "Quit".to_string(),
@@ -415,7 +415,7 @@ async fn main() {
                                         .dialog()
                                         .message(format!("{}", err))
                                         .kind(MessageDialogKind::Error)
-                                        .title("NoRisk Launcher - Reset Failed")
+                                        .title("Salami Client - Reset Failed")
                                         .blocking_show();
                                 }
                             }
@@ -447,6 +447,7 @@ async fn main() {
 
                 // Issue #242: drop stale/orphan cached jars (debounced, best-effort).
                 tauri::async_runtime::spawn(async {
+                    utils::legacy_cleanup::remove_norisk_leftovers().await;
                     utils::mod_cache_cleanup::run_startup_cleanup().await;
                 });
 
@@ -511,11 +512,11 @@ async fn main() {
                                 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
                                 let _ = state_init_app_handle
                                     .dialog()
-                                    .message("The NoRisk Launcher encountered a critical error.\n\n\
-                                        Please join our Discord for support:\n\
-                                        https://discord.norisk.gg")
+                                    .message("Salami Client encountered a critical error.\n\n\
+                                        Support:\n\
+                                        https://github.com/umpinke/salami-client/issues")
                                     .kind(MessageDialogKind::Error)
-                                    .title("NoRisk Launcher - Critical Error")
+                                    .title("Salami Client - Critical Error")
                                     .blocking_show();
                             }
 
@@ -530,11 +531,11 @@ async fn main() {
                         use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
                         let _ = state_init_app_handle
                             .dialog()
-                            .message("The NoRisk Launcher encountered a critical error.\n\n\
-                                Please join our Discord for support:\n\
-                                https://discord.norisk.gg")
+                            .message("Salami Client encountered a critical error.\n\n\
+                                Support:\n\
+                                https://github.com/umpinke/salami-client/issues")
                             .kind(MessageDialogKind::Error)
-                            .title("NoRisk Launcher - Critical Error")
+                            .title("Salami Client - Critical Error")
                             .blocking_show();
                     }
 

@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use tokio::fs;
 
 const LOGGING_DIR: &str = "assets/log_configs";
-const PATCHED_PREFIX: &str = "nrc-";
+const PATCHED_PREFIX: &str = "salami-";
 pub const PATTERN_LAYOUT: &str =
     "<PatternLayout pattern=\"[%d{HH:mm:ss}] [%t/%level]: %msg{nolookups}%n\" />";
 

@@ -13,12 +13,12 @@ use tokio::sync::Mutex;
 use tokio::sync::RwLock;
 
 // Default filename for the Norisk packs configuration
-const NORISK_PACKS_FILENAME: &str = "norisk_modpacks.json";
+const NORISK_PACKS_FILENAME: &str = "salami_packs.json";
 
 /// Returns the path for the norisk packs config depending on experimental mode
 pub fn norisk_packs_path_for(is_experimental: bool) -> PathBuf {
     let filename = if is_experimental {
-        "norisk_modpacks_exp.json"
+        "salami_packs_exp.json"
     } else {
         NORISK_PACKS_FILENAME
     };
