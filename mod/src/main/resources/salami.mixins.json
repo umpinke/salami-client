@@ -6,13 +6,19 @@
 		"AbstractButtonMixin",
 		"AbstractClientPlayerMixin",
 		"AbstractContainerScreenAccessor",
+		"CameraMixin",
+		"ClientLevelDataMixin",
 		"ClientLevelMixin",
 		"EntityRendererMixin",
+		"FogRendererMixin",
 		"GameRendererMixin",
 		"GameRendererTweaksMixin",
 		"GuiMixin",
 		"HumanoidArmorLayerMixin",
+		"ItemEntityRendererMixin",
 		"ItemInHandRendererMixin",
+		"ItemStackMixin",
+		"LevelMixin",
 		"LightTextureMixin",
 		"LivingEntityRendererMixin",
 		"LogoRendererMixin",
@@ -24,7 +30,8 @@
 		"OverlayTextureMixin",
 		"ParticleEngineMixin",
 		"RecipeBookComponentAccessor",
-		"ScreenEffectRendererMixin"
+		"ScreenEffectRendererMixin",
+		"ScreenMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

@@ -49,6 +49,14 @@ public final class ZoomModule extends Module {
 		return (float) (fov / instance.frameZoom());
 	}
 
+	/** Für {@code MouseHandlerMixin}: Maus beim Zoomen langsamer, damit man nicht übers Ziel schwenkt. */
+	public static double sensitivityScale() {
+		if (instance == null || !instance.isEnabled() || instance.currentZoom <= 1.0) {
+			return 1.0;
+		}
+		return 1.0 / instance.currentZoom;
+	}
+
 	/** Für {@code MouseHandlerMixin}: {@code true}, wenn das Mausrad den Zoom verstellt hat. */
 	public static boolean onScroll(double amount) {
 		if (instance == null || !instance.isEnabled() || !instance.zooming || !instance.scroll.isOn() || amount == 0) {
