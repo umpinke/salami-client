@@ -33,6 +33,13 @@ public final class ModuleManager {
 	private Runnable changeListener = () -> {};
 	private BooleanSupplier safeModeActive = () -> false;
 	private boolean utilityWarningShown;
+	/** Gemessene Zeit der Module (für den Benchmark-Test und zur Fehlersuche). */
+	private long hudNanos;
+	private long hudFrames;
+	private long tickNanos;
+	private long tickCount;
+	private long worldNanos;
+	private long worldFrames;
 
 	public <M extends Module> M register(M module) {
 		if (byId.putIfAbsent(module.id(), module) != null) {
@@ -143,6 +150,7 @@ public final class ModuleManager {
 		if (client.screen == null) {
 			handleKeybinds(client);
 		}
+		long start = System.nanoTime();
 		for (Module module : active) {
 			try {
 				module.onTick();
@@ -150,9 +158,12 @@ public final class ModuleManager {
 				crash(module, "tick", t);
 			}
 		}
+		tickNanos += System.nanoTime() - start;
+		tickCount++;
 	}
 
 	public void renderHud(GuiGraphics graphics, DeltaTracker delta) {
+		long start = System.nanoTime();
 		for (Module module : active) {
 			try {
 				module.onHud(graphics, delta);
@@ -160,6 +171,8 @@ public final class ModuleManager {
 				crash(module, "hud", t);
 			}
 		}
+		hudNanos += System.nanoTime() - start;
+		hudFrames++;
 	}
 
 	/** Vor jedem Angriff (siehe {@link AttackListener}). */
@@ -177,6 +190,13 @@ public final class ModuleManager {
 
 	/** Weltrendering (siehe {@link WorldRenderListener}). */
 	public void renderWorld(WorldRenderContext context) {
+		long start = System.nanoTime();
+		renderWorldListeners(context);
+		worldNanos += System.nanoTime() - start;
+		worldFrames++;
+	}
+
+	private void renderWorldListeners(WorldRenderContext context) {
 		for (Module module : active) {
 			if (module instanceof WorldRenderListener listener) {
 				try {
@@ -186,6 +206,28 @@ public final class ModuleManager {
 				}
 			}
 		}
+	}
+
+	// --- Messung ---
+
+	/** Setzt die Zeitmessung zurück. */
+	public void resetTimings() {
+		hudNanos = hudFrames = tickNanos = tickCount = worldNanos = worldFrames = 0;
+	}
+
+	/** Durchschnittliche Zeit pro Frame im HUD aller Module (ms). */
+	public double averageHudMillis() {
+		return hudFrames == 0 ? 0 : hudNanos / 1_000_000.0 / hudFrames;
+	}
+
+	/** Durchschnittliche Zeit pro Frame beim Zeichnen in die Welt (ms). */
+	public double averageWorldMillis() {
+		return worldFrames == 0 ? 0 : worldNanos / 1_000_000.0 / worldFrames;
+	}
+
+	/** Durchschnittliche Zeit pro Client-Tick aller Module (ms). */
+	public double averageTickMillis() {
+		return tickCount == 0 ? 0 : tickNanos / 1_000_000.0 / tickCount;
 	}
 
 	private void handleKeybinds(Minecraft client) {

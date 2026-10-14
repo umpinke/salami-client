@@ -3,6 +3,7 @@ package dev.salamiclient.mixin;
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import dev.salamiclient.modules.misc.StreamerModeModule;
 import dev.salamiclient.modules.misc.TabTweaksModule;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.PlayerTabOverlay;
 import net.minecraft.client.multiplayer.PlayerInfo;
@@ -17,7 +18,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class PlayerTabOverlayMixin {
 	@ModifyReturnValue(method = "getNameForDisplay", at = @At("RETURN"))
 	private Component salami$streamerName(Component name, PlayerInfo info) {
-		return StreamerModeModule.hideName(name);
+		// nur der eigene Eintrag – andere Namen nicht pro Frame durchsuchen
+		var player = Minecraft.getInstance().player;
+		return player != null && info.getProfile().id().equals(player.getUUID()) ? StreamerModeModule.hideName(name) : name;
 	}
 
 	@Inject(method = "renderPingIcon", at = @At("HEAD"), cancellable = true)

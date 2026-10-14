@@ -10,6 +10,7 @@ import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffectUtil;
 
@@ -17,7 +18,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-/** Potion Status: aktive Effekte mit Symbol, Stufe und Restzeit. Läuft ein Effekt aus, blinkt er. */
+/**
+ * Potion Status: aktive Effekte mit Symbol, Stufe und Restzeit. Läuft ein Effekt aus, blinkt er.
+ * Zeilen werden einmal pro Tick gebaut; das Zeichnen pro Frame liest nur noch den Zwischenspeicher.
+ */
 public final class PotionStatusModule extends HudModule {
 	private static final int ROW = 20;
 
@@ -25,6 +29,11 @@ public final class PotionStatusModule extends HudModule {
 	private final BoolSetting hideVanilla = add(new BoolSetting("hide_vanilla", false));
 
 	private static PotionStatusModule instance;
+
+	private record Row(Identifier sprite, Component name, Component duration, boolean ending) {}
+
+	private List<Row> rows = List.of();
+	private int textWidth = 60;
 
 	public PotionStatusModule() {
 		super("potion_status", Category.HUD, false, 0.005, 0.38);
@@ -36,22 +45,30 @@ public final class PotionStatusModule extends HudModule {
 		return instance != null && instance.isEnabled() && instance.hideVanilla.isOn();
 	}
 
-	private List<MobEffectInstance> effects() {
+	@Override
+	public void onTick() {
 		var player = mc().player;
-		if (player == null) {
-			return List.of();
-		}
-		List<MobEffectInstance> list = new ArrayList<>();
+		List<MobEffectInstance> effects = new ArrayList<>();
 		for (MobEffectInstance effect : player.getActiveEffects()) {
 			if (effect.showIcon()) {
-				list.add(effect);
+				effects.add(effect);
 			}
 		}
-		list.sort(Comparator.comparingInt((MobEffectInstance e) -> e.isInfiniteDuration() ? Integer.MAX_VALUE : e.getDuration()).reversed());
-		return list;
+		effects.sort(Comparator.comparingInt((MobEffectInstance e) -> e.isInfiniteDuration() ? Integer.MAX_VALUE : e.getDuration()).reversed());
+		float tickRate = mc().level.tickRateManager().tickrate();
+		List<Row> built = new ArrayList<>(effects.size());
+		int width = 60;
+		for (MobEffectInstance effect : effects) {
+			Component name = name(effect);
+			Component duration = MobEffectUtil.formatDuration(effect, 1.0F, tickRate);
+			width = Math.max(width, Math.max(mc().font.width(name), mc().font.width(duration)));
+			built.add(new Row(Gui.getMobEffectSprite(effect.getEffect()), name, duration, effect.endsWithin(200)));
+		}
+		rows = built;
+		textWidth = width;
 	}
 
-	private Component name(MobEffectInstance effect) {
+	private static Component name(MobEffectInstance effect) {
 		Component name = effect.getEffect().value().getDisplayName();
 		if (effect.getAmplifier() <= 0) {
 			return name;
@@ -59,47 +76,38 @@ public final class PotionStatusModule extends HudModule {
 		return Component.empty().append(name).append(" ").append(Component.translatable("enchantment.level." + (effect.getAmplifier() + 1)));
 	}
 
-	private Component duration(MobEffectInstance effect) {
-		float tickRate = mc().level != null ? mc().level.tickRateManager().tickrate() : 20.0F;
-		return MobEffectUtil.formatDuration(effect, 1.0F, tickRate);
-	}
-
 	@Override
 	public boolean hasContent() {
-		return !effects().isEmpty();
+		return !rows.isEmpty();
 	}
 
 	@Override
 	public int width() {
-		int text = 60;
-		for (MobEffectInstance effect : effects()) {
-			text = Math.max(text, Math.max(mc().font.width(name(effect)), mc().font.width(duration(effect))));
-		}
-		return (icons.isOn() ? 22 : 2) + text + 4;
+		return (icons.isOn() ? 22 : 2) + textWidth + 4;
 	}
 
 	@Override
 	public int height() {
-		return Math.max(ROW, effects().size() * ROW);
+		return Math.max(ROW, rows.size() * ROW);
 	}
 
 	@Override
 	protected void render(GuiGraphics g, DeltaTracker delta) {
 		Theme theme = SalamiClient.get().theme();
+		boolean blinkOff = (mc().gui.getGuiTicks() / 5) % 2 == 0;
 		int y = 0;
-		for (MobEffectInstance effect : effects()) {
-			boolean ending = effect.endsWithin(200);
-			if (ending && (mc().gui.getGuiTicks() / 5) % 2 == 0) {
+		for (Row row : rows) {
+			if (row.ending() && blinkOff) {
 				y += ROW;
 				continue; // blinken in den letzten 10 Sekunden
 			}
 			int x = 2;
 			if (icons.isOn()) {
-				g.blitSprite(RenderPipelines.GUI_TEXTURED, Gui.getMobEffectSprite(effect.getEffect()), 0, y + 1, 18, 18);
+				g.blitSprite(RenderPipelines.GUI_TEXTURED, row.sprite(), 0, y + 1, 18, 18);
 				x = 22;
 			}
-			g.drawString(mc().font, name(effect), x, y + 1, theme.text(), true);
-			g.drawString(mc().font, duration(effect), x, y + 10, ending ? theme.warning() : theme.textDim(), true);
+			g.drawString(mc().font, row.name(), x, y + 1, theme.text(), true);
+			g.drawString(mc().font, row.duration(), x, y + 10, row.ending() ? theme.warning() : theme.textDim(), true);
 			y += ROW;
 		}
 	}

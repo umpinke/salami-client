@@ -73,12 +73,13 @@ public final class TargetUtil {
 				continue;
 			}
 			AABB box = lerpedBox(entity, partial);
-			if (closestPoint(eye, box).distanceTo(eye) > range || !player.hasLineOfSight(entity)) {
+			if (closestPoint(eye, box).distanceTo(eye) > range) {
 				continue;
 			}
 			Vec3 toTarget = box.getCenter().subtract(eye).normalize();
 			double angle = Math.toDegrees(Math.acos(Mth.clamp(look.dot(toTarget), -1, 1)));
-			if (angle <= maxAngle && angle < bestAngle) {
+			// Raycast (teuer) erst, wenn das Ziel überhaupt besser wäre
+			if (angle <= maxAngle && angle < bestAngle && player.hasLineOfSight(entity)) {
 				best = entity;
 				bestAngle = angle;
 			}

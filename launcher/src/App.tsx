@@ -40,6 +40,7 @@ import {
 } from "./services/launcher-config-service";
 import * as ConfigService from "./services/launcher-config-service";
 import { useGlobalDragAndDrop } from './hooks/useGlobalDragAndDrop';
+import { useWindowFocus } from './hooks/useWindowFocus';
 import { loadIcons } from '@iconify/react';
 import { trackEvent } from "./services/analytics-service";
 
@@ -539,6 +540,13 @@ export function App() {
   };
 
   useGlobalDragAndDrop();
+
+  // Salami: Ist der Launcher im Hintergrund (z. B. während Minecraft läuft), alle CSS-Animationen
+  // anhalten – 3D-Figur, Effekte und Videos pausieren schon selbst. Spart GPU/CPU fürs Spiel.
+  const isWindowFocused = useWindowFocus();
+  useEffect(() => {
+    document.documentElement.classList.toggle("salami-inactive", !isWindowFocused);
+  }, [isWindowFocused]);
 
   return (
     <FlagsmithProvider flagsmith={flagsmith}>

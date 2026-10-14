@@ -7,9 +7,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.item.PrimedTnt;
 import net.minecraft.world.phys.AABB;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * TNT Timer: zeigt über gezündetem TNT die Zeit bis zur Explosion. Der Name wird nur auf deinem
@@ -18,7 +17,8 @@ import java.util.Locale;
 public final class TntTimerModule extends Module {
 	private static final double RANGE = 48.0;
 
-	private final List<PrimedTnt> labelled = new ArrayList<>();
+	/** Beschriftetes TNT → zuletzt angezeigter Wert (in Zehntelsekunden). */
+	private final Map<PrimedTnt, Integer> labelled = new HashMap<>();
 
 	public TntTimerModule() {
 		super("tnt_timer", Category.VISUAL);
@@ -27,21 +27,23 @@ public final class TntTimerModule extends Module {
 	@Override
 	public void onTick() {
 		var player = mc().player;
-		labelled.removeIf(tnt -> tnt.isRemoved());
+		labelled.keySet().removeIf(tnt -> tnt.isRemoved());
 		for (PrimedTnt tnt : mc().level.getEntitiesOfClass(PrimedTnt.class, player.getBoundingBox().inflate(RANGE))) {
 			int fuse = Math.max(0, tnt.getFuse());
-			ChatFormatting color = fuse > 40 ? ChatFormatting.GREEN : fuse > 20 ? ChatFormatting.GOLD : ChatFormatting.RED;
-			tnt.setCustomName(Component.literal(String.format(Locale.ROOT, "%.1fs", fuse / 20.0)).withStyle(color));
-			tnt.setCustomNameVisible(true);
-			if (!labelled.contains(tnt)) {
-				labelled.add(tnt);
+			int tenths = fuse / 2; // 1 Tick = 0,05 s
+			Integer shown = labelled.put(tnt, tenths);
+			if (shown != null && shown == tenths) {
+				continue;
 			}
+			ChatFormatting color = fuse > 40 ? ChatFormatting.GREEN : fuse > 20 ? ChatFormatting.GOLD : ChatFormatting.RED;
+			tnt.setCustomName(Component.literal(tenths / 10 + "." + tenths % 10 + "s").withStyle(color));
+			tnt.setCustomNameVisible(true);
 		}
 	}
 
 	@Override
 	protected void onDisable() {
-		for (PrimedTnt tnt : labelled) {
+		for (PrimedTnt tnt : labelled.keySet()) {
 			tnt.setCustomName(null);
 			tnt.setCustomNameVisible(false);
 		}

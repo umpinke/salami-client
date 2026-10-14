@@ -15,7 +15,9 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.phys.AABB;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,13 +27,14 @@ import java.util.function.Predicate;
  * Block ESP: hebt bestimmte Blöcke in der Nähe mit Rahmen hervor – optional durch Wände.
  * Steht unter "Utility", weil Sicht durch Wände auf den meisten Servern verboten ist.
  *
- * <p>Gesucht wird nur alle {@code SCAN_INTERVAL} Ticks und mit Obergrenze, gezeichnet
- * wird jedes Frame aus der gemerkten Liste.
+ * <p>Ein Suchdurchlauf ist auf {@code SCAN_TICKS} Ticks verteilt (pro Tick ein paar
+ * x-Spalten) und überspringt Chunk-Abschnitte, deren Palette keinen passenden Block enthält.
+ * Gezeichnet wird jedes Frame aus der zuletzt fertigen Liste.
  */
 public final class BlockEspModule extends Module implements WorldRenderListener {
 	public enum Preset { CPVP, STORAGE, ORES, SPAWNERS }
 
-	private static final int SCAN_INTERVAL = 20;
+	private static final int SCAN_TICKS = 20;
 	private static final int MAX_BLOCKS = 512;
 
 	private final ModeSetting<Preset> preset = add(new ModeSetting<>("preset", Preset.CPVP));
@@ -39,8 +42,13 @@ public final class BlockEspModule extends Module implements WorldRenderListener 
 	private final BoolSetting throughWalls = add(new BoolSetting("through_walls", true));
 	private final ColorSetting color = add(new ColorSetting("color", 0xFFFFAA00));
 
-	private final List<BlockPos> found = new ArrayList<>();
-	private int scanIn;
+	private List<BlockPos> found = List.of();
+	private List<BlockPos> pending = new ArrayList<>();
+	/** Mitte des laufenden Durchlaufs; {@code null} = nächster Tick beginnt einen neuen. */
+	private BlockPos scanCenter;
+	private int scanX;
+	private Predicate<BlockState> scanMatcher;
+	private final BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
 
 	public BlockEspModule() {
 		super("block_esp", Category.UTILITY);
@@ -48,37 +56,55 @@ public final class BlockEspModule extends Module implements WorldRenderListener 
 
 	@Override
 	protected void onEnable() {
-		scanIn = 0;
+		scanCenter = null;
 	}
 
 	@Override
 	protected void onDisable() {
-		found.clear();
+		found = List.of();
+		pending = new ArrayList<>();
+		scanCenter = null;
 	}
 
 	@Override
 	public void onTick() {
-		if (--scanIn > 0) {
-			return;
-		}
-		scanIn = SCAN_INTERVAL;
-		found.clear();
-		ClientLevel level = mc().level;
-		BlockPos center = mc().player.blockPosition();
 		int r = range.intValue();
-		int minY = Math.max(level.getMinY(), center.getY() - r);
-		int maxY = Math.min(level.getMaxY(), center.getY() + r);
-		Predicate<BlockState> matcher = matcher(preset.get());
-		BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-		for (int x = center.getX() - r; x <= center.getX() + r && found.size() < MAX_BLOCKS; x++) {
-			for (int z = center.getZ() - r; z <= center.getZ() + r && found.size() < MAX_BLOCKS; z++) {
-				for (int y = minY; y <= maxY; y++) {
-					pos.set(x, y, z);
-					if (matcher.test(level.getBlockState(pos))) {
-						found.add(pos.immutable());
-						if (found.size() >= MAX_BLOCKS) {
-							break;
-						}
+		if (scanCenter == null) {
+			scanCenter = mc().player.blockPosition();
+			scanX = -r;
+			scanMatcher = matcher(preset.get());
+			pending = new ArrayList<>();
+		}
+		int columnsPerTick = (2 * r + 1 + SCAN_TICKS - 1) / SCAN_TICKS;
+		for (int i = 0; i < columnsPerTick && scanX <= r && pending.size() < MAX_BLOCKS; i++, scanX++) {
+			scanColumn(mc().level, scanCenter.getX() + scanX, r);
+		}
+		if (scanX > r || pending.size() >= MAX_BLOCKS) {
+			found = pending;
+			scanCenter = null;
+		}
+	}
+
+	private void scanColumn(ClientLevel level, int x, int r) {
+		int minY = Math.max(level.getMinY(), scanCenter.getY() - r);
+		int maxY = Math.min(level.getMaxY(), scanCenter.getY() + r);
+		for (int z = scanCenter.getZ() - r; z <= scanCenter.getZ() + r; z++) {
+			LevelChunk chunk = level.getChunkSource().getChunk(x >> 4, z >> 4, false);
+			if (chunk == null) {
+				continue;
+			}
+			for (int y = minY; y <= maxY; y++) {
+				LevelChunkSection section = chunk.getSection(chunk.getSectionIndex(y));
+				if (section.hasOnlyAir() || !section.maybeHas(scanMatcher)) {
+					// ganzer 16er-Abschnitt ohne passenden Block – zum nächsten springen
+					y = (y | 15);
+					continue;
+				}
+				pos.set(x, y, z);
+				if (scanMatcher.test(section.getBlockState(x & 15, y & 15, z & 15))) {
+					pending.add(pos.immutable());
+					if (pending.size() >= MAX_BLOCKS) {
+						return;
 					}
 				}
 			}
@@ -91,8 +117,9 @@ public final class BlockEspModule extends Module implements WorldRenderListener 
 			return;
 		}
 		RenderType type = throughWalls.isOn() ? WorldLines.THROUGH_WALLS : WorldLines.VISIBLE;
+		int argb = color.argb();
 		for (BlockPos pos : found) {
-			WorldLines.shape(context.matrices(), context.consumers(), type, pos, Shapes.block(), color.argb(), 2f);
+			WorldLines.box(context.matrices(), context.consumers(), type, new AABB(pos), argb, 2f);
 		}
 		WorldLines.flush(context.consumers(), type);
 	}

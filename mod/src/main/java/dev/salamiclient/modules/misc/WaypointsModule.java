@@ -28,6 +28,8 @@ import org.lwjgl.glfw.GLFW;
 
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -50,6 +52,11 @@ public final class WaypointsModule extends Module implements WorldRenderListener
 	private boolean menuWasDown;
 	private boolean wasDead;
 	private final float[] screenPos = new float[2];
+
+	/** Sichtbare Wegpunkte dieser Dimension samt fertiger Beschriftung – pro Tick gebaut. */
+	private record Shown(Waypoint waypoint, Vec3 labelAt, String text, int width) {}
+
+	private final List<Shown> shown = new ArrayList<>();
 
 	public WaypointsModule() {
 		super("waypoints", Category.MISC);
@@ -102,6 +109,26 @@ public final class WaypointsModule extends Module implements WorldRenderListener
 			addHere(I18n.get("salami.module.waypoints.death_name", LocalTime.now().format(TIME)), 0xFF8A8A95);
 		}
 		wasDead = dead;
+		updateShown();
+	}
+
+	@Override
+	protected void onDisable() {
+		shown.clear();
+	}
+
+	private void updateShown() {
+		shown.clear();
+		String dimension = dimension();
+		Vec3 eyes = mc().player.getEyePosition();
+		for (Waypoint waypoint : store().current()) {
+			if (!waypoint.visible || !waypoint.dimension.equals(dimension)) {
+				continue;
+			}
+			Vec3 center = waypoint.center();
+			String text = waypoint.name + " (" + Math.round(eyes.distanceTo(center)) + "m)";
+			shown.add(new Shown(waypoint, center.add(0, 1.2, 0), text, mc().font.width(text)));
+		}
 	}
 
 	private String dimension() {
@@ -110,17 +137,14 @@ public final class WaypointsModule extends Module implements WorldRenderListener
 
 	@Override
 	public void renderWorld(WorldRenderContext context) {
-		if (!beams.isOn() || mc().level == null) {
+		if (!beams.isOn() || mc().level == null || shown.isEmpty()) {
 			return;
 		}
 		RenderType type = throughWalls.isOn() ? WorldLines.THROUGH_WALLS : WorldLines.VISIBLE;
-		String dimension = dimension();
 		int minY = mc().level.getMinY();
 		int maxY = mc().level.getMaxY();
-		for (Waypoint waypoint : store().current()) {
-			if (!waypoint.visible || !waypoint.dimension.equals(dimension)) {
-				continue;
-			}
+		for (Shown entry : shown) {
+			Waypoint waypoint = entry.waypoint();
 			AABB beam = new AABB(waypoint.x + 0.45, minY, waypoint.z + 0.45, waypoint.x + 0.55, maxY, waypoint.z + 0.55);
 			WorldLines.box(context.matrices(), context.consumers(), type, beam, waypoint.color, 2f);
 			WorldLines.box(context.matrices(), context.consumers(), type,
@@ -131,27 +155,20 @@ public final class WaypointsModule extends Module implements WorldRenderListener
 
 	@Override
 	public void onHud(GuiGraphics graphics, DeltaTracker delta) {
-		if (mc().level == null || mc().options.hideGui || !Projection.begin()) {
+		if (shown.isEmpty() || mc().level == null || mc().options.hideGui || !Projection.begin()) {
 			return;
 		}
-		String dimension = dimension();
-		Vec3 eyes = mc().player.getEyePosition();
 		var font = mc().font;
-		for (Waypoint waypoint : store().current()) {
-			if (!waypoint.visible || !waypoint.dimension.equals(dimension)) {
+		for (Shown entry : shown) {
+			if (!Projection.toGui(entry.labelAt(), graphics.guiWidth(), graphics.guiHeight(), screenPos)) {
 				continue;
 			}
-			Vec3 at = waypoint.center().add(0, 1.2, 0);
-			if (!Projection.toGui(at, graphics.guiWidth(), graphics.guiHeight(), screenPos)) {
-				continue;
-			}
-			String text = String.format(Locale.ROOT, "%s (%dm)", waypoint.name, Math.round(eyes.distanceTo(waypoint.center())));
-			int w = font.width(text);
+			int w = entry.width();
 			int x = Math.round(screenPos[0]) - w / 2;
 			int y = Math.round(screenPos[1]) - 5;
 			graphics.fill(x - 2, y - 2, x + w + 2, y + 10, 0x90000000);
-			graphics.fill(x - 2, y - 2, x - 1, y + 10, waypoint.color | 0xFF000000);
-			graphics.drawString(font, text, x, y, 0xFFFFFFFF, false);
+			graphics.fill(x - 2, y - 2, x - 1, y + 10, entry.waypoint().color | 0xFF000000);
+			graphics.drawString(font, entry.text(), x, y, 0xFFFFFFFF, false);
 		}
 	}
 }

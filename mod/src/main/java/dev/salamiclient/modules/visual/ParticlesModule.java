@@ -62,7 +62,11 @@ public final class ParticlesModule extends Module {
 
 	/** Für die Mixins: soll ein Partikel dieses Typs gar nicht erst entstehen? */
 	public static boolean hides(ParticleType<?> type) {
-		return hides(KINDS.getOrDefault(type, Kind.OTHER));
+		ParticlesModule module = instance;
+		if (module == null || !module.isEnabled()) {
+			return false; // häufigster Fall, ohne Nachschlagen
+		}
+		return module.hidden.get(KINDS.getOrDefault(type, Kind.OTHER)).isOn();
 	}
 
 	public static boolean hides(Kind kind) {

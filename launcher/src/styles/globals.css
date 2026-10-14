@@ -594,3 +594,10 @@ nav button:not(.no-radius),
 .animate-claim-glow {
     animation: nrc-claim-glow 1.6s ease-in-out infinite;
 }
+
+/* Salami: Launcher im Hintergrund (Spiel läuft) – Animationen anhalten, mehr FPS fürs Spiel */
+.salami-inactive *,
+.salami-inactive *::before,
+.salami-inactive *::after {
+  animation-play-state: paused !important;
+}

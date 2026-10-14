@@ -12,6 +12,14 @@ import net.minecraft.resources.Identifier;
  */
 public final class MotionBlurModule extends Module {
 	/** Stufe 1 … 9 = Anteil des vorherigen Bildes 10 … 90 % ({@code post_effect/motion_blur_1..9}). */
+	private static final Identifier[] STEPS = new Identifier[10];
+
+	static {
+		for (int i = 1; i < STEPS.length; i++) {
+			STEPS[i] = PostEffects.id("motion_blur_" + i);
+		}
+	}
+
 	private final NumberSetting strength = add(new NumberSetting("strength", 5, 1, 9, 1));
 
 	public MotionBlurModule() {
@@ -20,6 +28,6 @@ public final class MotionBlurModule extends Module {
 	}
 
 	private Identifier effect() {
-		return isEnabled() ? PostEffects.id("motion_blur_" + strength.intValue()) : null;
+		return isEnabled() ? STEPS[Math.max(1, Math.min(9, strength.intValue()))] : null;
 	}
 }

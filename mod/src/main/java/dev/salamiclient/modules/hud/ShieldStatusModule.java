@@ -17,38 +17,41 @@ import java.util.Locale;
  * Shield Status: zeigt, ob dein Schild gerade durch eine Axt deaktiviert ist und wie lange noch.
  */
 public final class ShieldStatusModule extends HudModule {
+	/** Für die Anzeige, wenn „nur mit Schild in der Hand“ aus ist. */
+	private static final ItemStack SHIELD = new ItemStack(Items.SHIELD);
+
 	private final BoolSetting onlyWhenHolding = add(new BoolSetting("only_holding", true));
+
+	private ItemStack shield = ItemStack.EMPTY;
+	private String ready = "";
+	private int width = 60;
 
 	public ShieldStatusModule() {
 		super("shield_status", Category.HUD, false, 0.53, 0.60);
 	}
 
-	private ItemStack shield() {
+	@Override
+	public void onTick() {
 		var player = mc().player;
-		if (player == null) {
-			return ItemStack.EMPTY;
-		}
 		if (player.getOffhandItem().is(Items.SHIELD)) {
-			return player.getOffhandItem();
+			shield = player.getOffhandItem();
+		} else if (player.getMainHandItem().is(Items.SHIELD)) {
+			shield = player.getMainHandItem();
+		} else {
+			shield = onlyWhenHolding.isOn() ? ItemStack.EMPTY : SHIELD;
 		}
-		if (player.getMainHandItem().is(Items.SHIELD)) {
-			return player.getMainHandItem();
-		}
-		return onlyWhenHolding.isOn() ? ItemStack.EMPTY : new ItemStack(Items.SHIELD);
-	}
-
-	private float cooldown(ItemStack shield, float partialTick) {
-		return mc().player.getCooldowns().getCooldownPercent(shield, partialTick);
+		ready = I18n.get("salami.module.shield_status.ready");
+		width = 22 + mc().font.width(ready) + 4;
 	}
 
 	@Override
 	public boolean hasContent() {
-		return !shield().isEmpty();
+		return !shield.isEmpty();
 	}
 
 	@Override
 	public int width() {
-		return 22 + mc().font.width(I18n.get("salami.module.shield_status.ready")) + 4;
+		return width;
 	}
 
 	@Override
@@ -58,23 +61,18 @@ public final class ShieldStatusModule extends HudModule {
 
 	@Override
 	protected void render(GuiGraphics g, DeltaTracker delta) {
-		ItemStack shield = shield();
 		Theme theme = SalamiClient.get().theme();
-		float progress = cooldown(shield, delta.getGameTimeDeltaPartialTick(true));
-		g.fill(0, 0, width(), height(), 0x80000000);
+		float progress = mc().player.getCooldowns().getCooldownPercent(shield, delta.getGameTimeDeltaPartialTick(true));
+		g.fill(0, 0, width, 18, 0x80000000);
 		g.renderItem(shield, 1, 1);
-		String text;
-		int color;
 		if (progress > 0) {
 			// Axt-Treffer deaktivieren Schilde für 5 Sekunden (100 Ticks)
-			text = String.format(Locale.ROOT, "%.1fs", progress * 5.0F);
-			color = theme.warning();
-			int barWidth = width() - 22;
-			g.fill(20, height() - 3, 20 + Math.round(barWidth * progress), height() - 1, theme.warning());
+			String text = String.format(Locale.ROOT, "%.1fs", progress * 5.0F);
+			int barWidth = width - 22;
+			g.fill(20, 15, 20 + Math.round(barWidth * progress), 17, theme.warning());
+			g.drawString(mc().font, text, 20, 5, theme.warning(), true);
 		} else {
-			text = I18n.get("salami.module.shield_status.ready");
-			color = theme.accent();
+			g.drawString(mc().font, ready, 20, 5, theme.accent(), true);
 		}
-		g.drawString(mc().font, text, 20, 5, color, true);
 	}
 }

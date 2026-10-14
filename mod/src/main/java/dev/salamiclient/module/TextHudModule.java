@@ -8,12 +8,14 @@ import net.minecraft.client.gui.GuiGraphics;
 
 /**
  * Einzeilige HUD-Anzeige „Bezeichnung: Wert“ im einheitlichen Salami-Look (wie CPS und Reach).
- * Der Text wird pro Tick berechnet, nicht pro Frame.
+ * Text und Breite werden pro Tick berechnet, nicht pro Frame.
  */
 public abstract class TextHudModule extends HudModule {
 	private final BoolSetting background = add(new BoolSetting("background", true));
-	private String label = "";
-	private String value = "";
+	private String prefix = "";
+	private String value;
+	private int prefixWidth;
+	private int width = 20;
 
 	protected TextHudModule(String id, double defaultX, double defaultY) {
 		super(id, Category.HUD, false, defaultX, defaultY);
@@ -27,8 +29,11 @@ public abstract class TextHudModule extends HudModule {
 
 	@Override
 	public void onTick() {
-		label = label();
+		String label = label();
+		prefix = label.isEmpty() ? "" : label + ": ";
 		value = value();
+		prefixWidth = mc().font.width(prefix);
+		width = prefixWidth + mc().font.width(value == null ? "-" : value) + 8;
 	}
 
 	@Override
@@ -36,13 +41,9 @@ public abstract class TextHudModule extends HudModule {
 		return value != null;
 	}
 
-	private String prefix() {
-		return label.isEmpty() ? "" : label + ": ";
-	}
-
 	@Override
 	public int width() {
-		return mc().font.width(prefix() + (value == null ? "-" : value)) + 8;
+		return width;
 	}
 
 	@Override
@@ -54,10 +55,9 @@ public abstract class TextHudModule extends HudModule {
 	protected void render(GuiGraphics graphics, DeltaTracker delta) {
 		Theme theme = SalamiClient.get().theme();
 		if (background.isOn()) {
-			graphics.fill(0, 0, width(), height(), 0x80000000);
+			graphics.fill(0, 0, width, 14, 0x80000000);
 		}
-		String prefix = prefix();
 		graphics.drawString(mc().font, prefix, 4, 3, theme.accent(), true);
-		graphics.drawString(mc().font, value == null ? "-" : value, 4 + mc().font.width(prefix), 3, theme.text(), true);
+		graphics.drawString(mc().font, value == null ? "-" : value, 4 + prefixWidth, 3, theme.text(), true);
 	}
 }

@@ -13,7 +13,6 @@ import net.minecraft.client.player.LocalPlayer;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 /** Info HUD: FPS, Ping, Koordinaten und Blickrichtung – Zeilen einzeln abschaltbar. */
 public final class InfoHudModule extends HudModule {
@@ -22,7 +21,11 @@ public final class InfoHudModule extends HudModule {
 	private final BoolSetting coords = add(new BoolSetting("coords", true));
 	private final BoolSetting direction = add(new BoolSetting("direction", false));
 
-	private final List<String[]> lines = new ArrayList<>();
+	/** Zeilen samt Breiten – einmal pro Tick gebaut, pro Frame nur gezeichnet. */
+	private record Line(String label, String value, int valueX) {}
+
+	private final List<Line> lines = new ArrayList<>();
+	private int width = 40;
 
 	public InfoHudModule() {
 		super("info_hud", Category.HUD, false, 0.005, 0.11); // unter dem Watermark
@@ -33,18 +36,28 @@ public final class InfoHudModule extends HudModule {
 		lines.clear();
 		LocalPlayer player = mc().player;
 		if (fps.isOn()) {
-			lines.add(new String[] {"FPS", String.valueOf(mc().getFps())});
+			add("FPS", String.valueOf(mc().getFps()));
 		}
 		if (ping.isOn() && mc().getConnection() != null) {
 			PlayerInfo info = mc().getConnection().getPlayerInfo(player.getUUID());
-			lines.add(new String[] {"Ping", info == null ? "-" : info.getLatency() + " ms"});
+			add("Ping", info == null ? "-" : info.getLatency() + " ms");
 		}
 		if (coords.isOn() && !StreamerModeModule.hidesCoords()) {
-			lines.add(new String[] {"XYZ", String.format(Locale.ROOT, "%d %d %d", player.getBlockX(), player.getBlockY(), player.getBlockZ())});
+			add("XYZ", player.getBlockX() + " " + player.getBlockY() + " " + player.getBlockZ());
 		}
 		if (direction.isOn()) {
-			lines.add(new String[] {"Dir", player.getDirection().getName()});
+			add("Dir", player.getDirection().getName());
 		}
+		int max = 40;
+		for (Line line : lines) {
+			max = Math.max(max, line.valueX() + mc().font.width(line.value()));
+		}
+		width = max;
+	}
+
+	private void add(String name, String value) {
+		String label = name + ": ";
+		lines.add(new Line(label, value, mc().font.width(label)));
 	}
 
 	@Override
@@ -54,11 +67,7 @@ public final class InfoHudModule extends HudModule {
 
 	@Override
 	public int width() {
-		int max = 40;
-		for (String[] line : lines) {
-			max = Math.max(max, mc().font.width(line[0] + ": " + line[1]));
-		}
-		return max;
+		return width;
 	}
 
 	@Override
@@ -70,10 +79,9 @@ public final class InfoHudModule extends HudModule {
 	protected void render(GuiGraphics graphics, DeltaTracker delta) {
 		Theme theme = SalamiClient.get().theme();
 		int y = 0;
-		for (String[] line : lines) {
-			String label = line[0] + ": ";
-			graphics.drawString(mc().font, label, 0, y, theme.accent(), true);
-			graphics.drawString(mc().font, line[1], mc().font.width(label), y, theme.text(), true);
+		for (Line line : lines) {
+			graphics.drawString(mc().font, line.label(), 0, y, theme.accent(), true);
+			graphics.drawString(mc().font, line.value(), line.valueX(), y, theme.text(), true);
 			y += 10;
 		}
 	}

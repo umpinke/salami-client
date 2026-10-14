@@ -60,13 +60,24 @@ public final class ComboCounterModule extends HudModule implements AttackListene
 		return combo > 0;
 	}
 
+	/** Anzeigetext, nur neu gebaut, wenn sich die Combo ändert. */
+	private int shownCombo = -1;
+	private String text = "";
+	private int width;
+
 	private String text() {
-		return I18n.get("salami.module.combo_counter.label", Math.max(combo, 0));
+		if (shownCombo != combo) {
+			shownCombo = combo;
+			text = I18n.get("salami.module.combo_counter.label", Math.max(combo, 0));
+			width = mc().font.width(text) + 2;
+		}
+		return text;
 	}
 
 	@Override
 	public int width() {
-		return mc().font.width(text()) + 2;
+		text();
+		return width;
 	}
 
 	@Override

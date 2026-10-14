@@ -19,6 +19,8 @@ public final class ReachDisplayModule extends HudModule implements AttackListene
 
 	private double lastReach = -1;
 	private long lastHitMillis;
+	private String text = "";
+	private int width = 40;
 
 	public ReachDisplayModule() {
 		super("reach_display", Category.HUD, false, 0.005, 0.25);
@@ -40,18 +42,17 @@ public final class ReachDisplayModule extends HudModule implements AttackListene
 		return lastReach;
 	}
 
-	private boolean recent() {
-		return lastReach >= 0 && System.currentTimeMillis() - lastHitMillis <= showSeconds.get() * 1000;
-	}
-
-	private String text() {
-		String value = recent() ? String.format(Locale.ROOT, "%.2f", lastReach) : "-";
-		return I18n.get("salami.module.reach_display.label", value);
+	@Override
+	public void onTick() {
+		boolean recent = lastReach >= 0 && System.currentTimeMillis() - lastHitMillis <= showSeconds.get() * 1000;
+		String value = recent ? String.format(Locale.ROOT, "%.2f", lastReach) : "-";
+		text = I18n.get("salami.module.reach_display.label", value);
+		width = mc().font.width(text) + 8;
 	}
 
 	@Override
 	public int width() {
-		return mc().font.width(text()) + 8;
+		return width;
 	}
 
 	@Override
@@ -61,7 +62,7 @@ public final class ReachDisplayModule extends HudModule implements AttackListene
 
 	@Override
 	protected void render(GuiGraphics graphics, DeltaTracker delta) {
-		graphics.fill(0, 0, width(), height(), 0x80000000);
-		graphics.drawString(mc().font, text(), 4, 3, SalamiClient.get().theme().text(), true);
+		graphics.fill(0, 0, width, 14, 0x80000000);
+		graphics.drawString(mc().font, text, 4, 3, SalamiClient.get().theme().text(), true);
 	}
 }

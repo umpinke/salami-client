@@ -51,6 +51,7 @@ public final class ToggleSprintModule extends HudModule {
 				releaseForced();
 			}
 		}
+		updateText();
 	}
 
 	@Override
@@ -73,25 +74,31 @@ public final class ToggleSprintModule extends HudModule {
 		}
 	}
 
-	private String text() {
+	/** Anzeigetext, einmal pro Tick berechnet (siehe {@link #updateText()}). */
+	private String text = "";
+	private int width = 40;
+
+	private void updateText() {
 		var player = mc().player;
 		if (player == null || !player.isSprinting()) {
-			return "";
+			text = "";
+		} else {
+			String key = mode.get() == Mode.ALWAYS || mc().options.keySprint.isDown()
+				? "salami.module.toggle_sprint.label.toggled"
+				: "salami.module.toggle_sprint.label.held";
+			text = I18n.get(key);
 		}
-		String key = mode.get() == Mode.ALWAYS || mc().options.keySprint.isDown()
-			? "salami.module.toggle_sprint.label.toggled"
-			: "salami.module.toggle_sprint.label.held";
-		return I18n.get(key);
+		width = Math.max(40, mc().font.width(text) + 2);
 	}
 
 	@Override
 	public boolean hasContent() {
-		return showText.isOn() && !text().isEmpty();
+		return showText.isOn() && !text.isEmpty();
 	}
 
 	@Override
 	public int width() {
-		return Math.max(40, mc().font.width(text()) + 2);
+		return width;
 	}
 
 	@Override
@@ -101,6 +108,6 @@ public final class ToggleSprintModule extends HudModule {
 
 	@Override
 	protected void render(GuiGraphics graphics, DeltaTracker delta) {
-		graphics.drawString(mc().font, text(), 0, 0, SalamiClient.get().theme().accent(), true);
+		graphics.drawString(mc().font, text, 0, 0, SalamiClient.get().theme().accent(), true);
 	}
 }

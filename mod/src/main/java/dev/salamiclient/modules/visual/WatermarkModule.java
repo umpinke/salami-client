@@ -23,20 +23,33 @@ public final class WatermarkModule extends HudModule {
 		super("watermark", Category.HUD, true, 0.005, 0.008);
 	}
 
-	private String text() {
-		StringBuilder text = new StringBuilder(SalamiClient.NAME);
+	/** Text hinter dem Namen und Gesamtbreite – einmal pro Tick statt in jedem Frame gebaut. */
+	private String rest;
+	private int width;
+
+	@Override
+	public void onTick() {
+		updateText();
+	}
+
+	private void updateText() {
+		StringBuilder text = new StringBuilder();
 		if (showVersion.isOn()) {
-			text.append(' ').append(SalamiClient.version());
+			text.append(SalamiClient.version());
 		}
 		if (SalamiClient.get().theme() == Theme.SALAMI) {
 			text.append("  ").append(I18n.get("salami.theme.tagline"));
 		}
-		return text.toString();
+		rest = text.toString().trim();
+		width = 15 + mc().font.width(SalamiClient.NAME) + (rest.isEmpty() ? 0 : 4 + mc().font.width(rest));
 	}
 
 	@Override
 	public int width() {
-		return 15 + mc().font.width(text());
+		if (rest == null) {
+			updateText();
+		}
+		return width;
 	}
 
 	@Override
@@ -53,7 +66,9 @@ public final class WatermarkModule extends HudModule {
 		int x = 15;
 		graphics.drawString(font, SalamiClient.NAME, x, 2, theme.accent(), true);
 		x += font.width(SalamiClient.NAME) + 4;
-		String rest = text().substring(SalamiClient.NAME.length()).trim();
+		if (rest == null) {
+			updateText();
+		}
 		if (!rest.isEmpty()) {
 			graphics.drawString(font, rest, x, 2, theme.textDim(), true);
 		}

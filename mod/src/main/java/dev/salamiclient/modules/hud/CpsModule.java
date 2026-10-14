@@ -8,23 +8,28 @@ import dev.salamiclient.util.ClickTracker;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.GuiGraphics;
 
-/** CPS: Klicks pro Sekunde (links, optional auch rechts). */
+/** CPS: Klicks pro Sekunde (links, optional auch rechts). Text wird pro Tick neu gebaut. */
 public final class CpsModule extends HudModule {
 	private final BoolSetting showRight = add(new BoolSetting("show_right", true));
 	private final BoolSetting background = add(new BoolSetting("background", true));
+
+	private String text = "0 CPS";
+	private int width = 40;
 
 	public CpsModule() {
 		super("cps", Category.HUD, false, 0.005, 0.30);
 	}
 
-	private String text() {
+	@Override
+	public void onTick() {
 		String left = String.valueOf(ClickTracker.left());
-		return showRight.isOn() ? left + " | " + ClickTracker.right() + " CPS" : left + " CPS";
+		text = showRight.isOn() ? left + " | " + ClickTracker.right() + " CPS" : left + " CPS";
+		width = mc().font.width(text) + 8;
 	}
 
 	@Override
 	public int width() {
-		return mc().font.width(text()) + 8;
+		return width;
 	}
 
 	@Override
@@ -35,8 +40,8 @@ public final class CpsModule extends HudModule {
 	@Override
 	protected void render(GuiGraphics graphics, DeltaTracker delta) {
 		if (background.isOn()) {
-			graphics.fill(0, 0, width(), height(), 0x80000000);
+			graphics.fill(0, 0, width, 14, 0x80000000);
 		}
-		graphics.drawString(mc().font, text(), 4, 3, SalamiClient.get().theme().text(), true);
+		graphics.drawString(mc().font, text, 4, 3, SalamiClient.get().theme().text(), true);
 	}
 }
