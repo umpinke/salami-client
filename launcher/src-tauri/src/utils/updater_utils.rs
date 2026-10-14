@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use std::time::Instant;
 use tauri::{AppHandle, Emitter, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_updater::UpdaterExt;
-use tokio::time::{sleep, Duration};
+use tokio::time::Duration;
 
 const UPDATE_CHECK_TIMEOUT: Duration = Duration::from_secs(20);
 const UPDATE_CHECK_CACHE_TTL: Duration = Duration::from_secs(60);
@@ -364,7 +364,7 @@ async fn handle_update(
     #[cfg(debug_assertions)]
     {
         info!("DEBUG: Pausing after 'pending' status...");
-        sleep(Duration::from_secs(2)).await;
+        tokio::time::sleep(Duration::from_secs(2)).await;
     }
     // --- End Debug Delay ---
 
@@ -431,7 +431,7 @@ async fn handle_update(
     #[cfg(debug_assertions)]
     {
         info!("DEBUG: Pausing after download completed...");
-        sleep(Duration::from_secs(2)).await;
+        tokio::time::sleep(Duration::from_secs(2)).await;
     }
     // --- End Debug Delay ---
 
@@ -451,7 +451,7 @@ async fn handle_update(
     if true {
         // Change to check if install block IS commented out if needed
         info!("DEBUG: Simulating installation time...");
-        sleep(Duration::from_secs(2)).await;
+        tokio::time::sleep(Duration::from_secs(2)).await;
         info!("DEBUG: Simulated installation finished.");
     } else {
         info!("DEBUG: Installation block active (no extra delay added here).");
