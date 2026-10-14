@@ -4,6 +4,7 @@ import dev.salamiclient.SalamiClient;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.ModuleManager;
 import dev.salamiclient.modules.client.GuiScaleModule;
+import dev.salamiclient.setting.ActionSetting;
 import dev.salamiclient.setting.BoolSetting;
 import dev.salamiclient.setting.ColorSetting;
 import dev.salamiclient.setting.KeybindSetting;
@@ -11,9 +12,11 @@ import dev.salamiclient.setting.ModeSetting;
 import dev.salamiclient.setting.NumberSetting;
 import dev.salamiclient.setting.Setting;
 import dev.salamiclient.setting.StringListSetting;
+import dev.salamiclient.setting.TextSetting;
 import dev.salamiclient.theme.Theme;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.resources.language.I18n;
@@ -42,6 +45,9 @@ public final class ModSettingsScreen extends Screen {
 	private NumberSetting draggedSlider;
 	private KeybindSetting listeningKeybind;
 	private boolean capturedLastKey;
+	/** Gerade bearbeitete Text-Einstellung und der noch nicht übernommene Text. */
+	private TextSetting editingText;
+	private String editBuffer = "";
 
 	private record Row(Setting<?> setting, int y) {}
 
@@ -69,7 +75,14 @@ public final class ModSettingsScreen extends Screen {
 
 	/** {@code true}, wenn der letzte Tastendruck für eine Tastenbelegung verbraucht wurde. */
 	public boolean wasCapturingKey() {
-		return capturedLastKey || listeningKeybind != null;
+		return capturedLastKey || listeningKeybind != null || editingText != null;
+	}
+
+	private void commitText() {
+		if (editingText != null) {
+			editingText.set(editBuffer);
+			editingText = null;
+		}
 	}
 
 	// ------------------------------------------------------------------ Layout
@@ -243,6 +256,22 @@ public final class ModSettingsScreen extends Screen {
 		} else if (setting instanceof StringListSetting list) {
 			String value = I18n.get("salami.clickgui.entries", list.get().size());
 			g.drawString(font, value, r[2] - font.width(value), textY, theme.textDim(), false);
+		} else if (setting instanceof ActionSetting) {
+			boolean hovered = inside(r, mx, my);
+			g.fill(r[0], r[1], r[2], r[3], hovered ? theme.accent() : theme.header());
+			String label = I18n.get("salami.mods.open");
+			g.drawString(font, label, r[0] + (r[2] - r[0] - font.width(label)) / 2, textY, hovered ? 0xFF000000 : theme.headerText(), false);
+		} else if (setting instanceof TextSetting text) {
+			boolean editing = editingText == text;
+			g.fill(r[0], r[1], r[2], r[3], 0xFF0B0B0E);
+			g.renderOutline(r[0], r[1], r[2] - r[0], r[3] - r[1], editing ? theme.accent() : theme.outline());
+			String value = editing ? editBuffer : text.get();
+			String shown = font.plainSubstrByWidth(value, r[2] - r[0] - 8, editing);
+			g.drawString(font, shown, r[0] + 3, textY, value.isEmpty() && !editing ? theme.textDim() : theme.text(), false);
+			if (editing && (System.currentTimeMillis() / 500) % 2 == 0) {
+				int cx = r[0] + 3 + font.width(shown);
+				g.fill(cx, r[1] + 2, cx + 1, r[3] - 2, theme.text());
+			}
 		} else {
 			String value = String.valueOf(setting.get());
 			g.drawString(font, value, r[2] - font.width(value), textY, theme.text(), false);
@@ -265,6 +294,7 @@ public final class ModSettingsScreen extends Screen {
 		int button = event.button();
 		boolean back = button == GLFW.GLFW_MOUSE_BUTTON_RIGHT;
 		listeningKeybind = null;
+		commitText();
 
 		if (inside(backButton(), x, y)) {
 			onClose();
@@ -302,6 +332,15 @@ public final class ModSettingsScreen extends Screen {
 				}
 			} else if (setting instanceof ColorSetting color) {
 				color.cyclePalette(back ? -1 : 1);
+			} else if (setting instanceof ActionSetting action) {
+				action.run();
+			} else if (setting instanceof TextSetting text) {
+				if (back) {
+					text.reset();
+				} else {
+					editingText = text;
+					editBuffer = text.get();
+				}
 			}
 			return true;
 		}
@@ -342,6 +381,23 @@ public final class ModSettingsScreen extends Screen {
 	}
 
 	@Override
+	public boolean charTyped(CharacterEvent event) {
+		if (editingText != null) {
+			if (event.isAllowedChatCharacter() && editBuffer.length() < editingText.maxLength()) {
+				editBuffer += event.codepointAsString();
+			}
+			return true;
+		}
+		return super.charTyped(event);
+	}
+
+	@Override
+	public void removed() {
+		commitText();
+		super.removed();
+	}
+
+	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
 		scroll -= scrollY * ROW * 2;
 		clampScroll();
@@ -350,6 +406,21 @@ public final class ModSettingsScreen extends Screen {
 
 	@Override
 	public boolean keyPressed(KeyEvent event) {
+		if (editingText != null) {
+			capturedLastKey = true;
+			switch (event.key()) {
+				case GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER -> commitText();
+				case GLFW.GLFW_KEY_ESCAPE -> editingText = null;
+				case GLFW.GLFW_KEY_BACKSPACE -> {
+					if (!editBuffer.isEmpty()) {
+						editBuffer = editBuffer.substring(0, editBuffer.length() - 1);
+					}
+				}
+				default -> {
+				}
+			}
+			return true;
+		}
 		capturedLastKey = listeningKeybind != null;
 		if (listeningKeybind != null) {
 			int key = event.key();

@@ -3,6 +3,7 @@ package dev.salamiclient.modules.visual;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.HudModule;
+import dev.salamiclient.modules.misc.StreamerModeModule;
 import dev.salamiclient.setting.BoolSetting;
 import dev.salamiclient.theme.Theme;
 import net.minecraft.client.DeltaTracker;
@@ -38,7 +39,7 @@ public final class InfoHudModule extends HudModule {
 			PlayerInfo info = mc().getConnection().getPlayerInfo(player.getUUID());
 			lines.add(new String[] {"Ping", info == null ? "-" : info.getLatency() + " ms"});
 		}
-		if (coords.isOn()) {
+		if (coords.isOn() && !StreamerModeModule.hidesCoords()) {
 			lines.add(new String[] {"XYZ", String.format(Locale.ROOT, "%d %d %d", player.getBlockX(), player.getBlockY(), player.getBlockZ())});
 		}
 		if (direction.isOn()) {

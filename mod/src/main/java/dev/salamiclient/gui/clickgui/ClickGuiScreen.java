@@ -11,6 +11,7 @@ import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.modules.client.GuiScaleModule;
 import dev.salamiclient.module.ModuleManager;
+import dev.salamiclient.setting.ActionSetting;
 import dev.salamiclient.setting.BoolSetting;
 import dev.salamiclient.setting.ColorSetting;
 import dev.salamiclient.setting.KeybindSetting;
@@ -339,6 +340,9 @@ public final class ClickGuiScreen extends Screen {
 			valueRight = right - 12;
 		} else if (setting instanceof StringListSetting list) {
 			value = I18n.get("salami.clickgui.entries", list.get().size());
+		} else if (setting instanceof ActionSetting) {
+			value = I18n.get("salami.mods.open");
+			valueColor = theme.accent();
 		} else {
 			value = String.valueOf(setting.get());
 		}
@@ -522,6 +526,8 @@ public final class ClickGuiScreen extends Screen {
 			}
 		} else if (setting instanceof ColorSetting color) {
 			color.cyclePalette(back ? -1 : 1);
+		} else if (setting instanceof ActionSetting action && !back) {
+			action.run();
 		}
 	}
 

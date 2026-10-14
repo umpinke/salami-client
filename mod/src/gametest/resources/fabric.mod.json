@@ -10,7 +10,8 @@
 			"dev.salamiclient.gametest.SalamiModulesGameTest",
 			"dev.salamiclient.gametest.SalamiCombatGameTest",
 			"dev.salamiclient.gametest.SalamiModsGameTest",
-			"dev.salamiclient.gametest.SalamiModsBatchBGameTest"
+			"dev.salamiclient.gametest.SalamiModsBatchBGameTest",
+			"dev.salamiclient.gametest.SalamiModsBatchCGameTest"
 		]
 	},
 	"depends": {

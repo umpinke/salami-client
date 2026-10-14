@@ -7,8 +7,11 @@
 		"AbstractClientPlayerMixin",
 		"AbstractContainerScreenAccessor",
 		"CameraMixin",
+		"ChatComponentMixin",
 		"ClientLevelDataMixin",
 		"ClientLevelMixin",
+		"ClientPacketListenerMixin",
+		"DisconnectedScreenMixin",
 		"EntityRendererMixin",
 		"FogRendererMixin",
 		"GameRendererMixin",
@@ -29,9 +32,13 @@
 		"NameTagStorageMixin",
 		"OverlayTextureMixin",
 		"ParticleEngineMixin",
+		"PauseScreenMixin",
+		"PlayerTabOverlayMixin",
 		"RecipeBookComponentAccessor",
 		"ScreenEffectRendererMixin",
-		"ScreenMixin"
+		"ScreenMixin",
+		"ToastManagerMixin",
+		"WindowMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

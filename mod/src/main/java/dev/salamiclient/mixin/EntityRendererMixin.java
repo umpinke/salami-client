@@ -2,6 +2,7 @@ package dev.salamiclient.mixin;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.sugar.Local;
+import dev.salamiclient.modules.misc.StreamerModeModule;
 import dev.salamiclient.modules.utility.PlayerEspModule;
 import dev.salamiclient.modules.visual.HealthIndicatorsModule;
 import net.minecraft.client.renderer.entity.EntityRenderer;
@@ -22,6 +23,6 @@ public abstract class EntityRendererMixin {
 	@ModifyExpressionValue(method = "extractRenderState",
 		at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/entity/EntityRenderer;getNameTag(Lnet/minecraft/world/entity/Entity;)Lnet/minecraft/network/chat/Component;"))
 	private Component salami$healthIndicator(Component name, @Local(argsOnly = true) Entity entity) {
-		return HealthIndicatorsModule.decorate(name, entity);
+		return HealthIndicatorsModule.decorate(StreamerModeModule.hideName(name), entity);
 	}
 }

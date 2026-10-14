@@ -6,6 +6,23 @@ import dev.salamiclient.gui.clickgui.ClickGuiScreen;
 import dev.salamiclient.gui.ModSettingsScreen;
 import dev.salamiclient.gui.ModsScreen;
 import dev.salamiclient.modules.hud.CpsModule;
+import dev.salamiclient.modules.hud.ClockModule;
+import dev.salamiclient.modules.hud.SpeedometerModule;
+import dev.salamiclient.modules.hud.UptimeModule;
+import dev.salamiclient.modules.hud.DayCounterModule;
+import dev.salamiclient.modules.hud.TpsModule;
+import dev.salamiclient.modules.hud.ResourcePackDisplayModule;
+import dev.salamiclient.modules.hud.JumpResetModule;
+import dev.salamiclient.modules.misc.AutoTextModule;
+import dev.salamiclient.modules.misc.StreamerModeModule;
+import dev.salamiclient.modules.misc.NoAdvancementModule;
+import dev.salamiclient.modules.misc.AutoReconnectModule;
+import dev.salamiclient.modules.misc.ConfirmDisconnectModule;
+import dev.salamiclient.modules.misc.ChatTweaksModule;
+import dev.salamiclient.modules.misc.TabTweaksModule;
+import dev.salamiclient.modules.misc.WaypointsModule;
+import dev.salamiclient.modules.client.BorderlessFullscreenModule;
+import dev.salamiclient.gui.WaypointsScreen;
 import dev.salamiclient.modules.visual.FreeLookModule;
 import dev.salamiclient.modules.visual.FovChangerModule;
 import dev.salamiclient.modules.visual.NoFogModule;
@@ -161,6 +178,7 @@ public final class SalamiClient implements ClientModInitializer {
 		modules.register(new SalamiThemeModule());
 		modules.register(new SafeModeModule());
 		modules.register(new GuiScaleModule());
+		modules.register(new BorderlessFullscreenModule());
 		// Visual (Overlay-System: alle HudModule sind im HUD-Editor verschiebbar)
 		modules.register(new WatermarkModule());
 		modules.register(new LiveTrackerModule());
@@ -210,9 +228,26 @@ public final class SalamiClient implements ClientModInitializer {
 		// Mods (Batch B): Vanilla-HUD anpassen
 		modules.register(new ScoreboardModule());
 		modules.register(new TitlesModule());
+		// Mods (Batch C): HUD-Infos
+		modules.register(new ClockModule());
+		modules.register(new SpeedometerModule());
+		modules.register(new UptimeModule());
+		modules.register(new DayCounterModule());
+		modules.register(new TpsModule());
+		modules.register(new ResourcePackDisplayModule());
+		modules.register(new JumpResetModule());
 		// Misc
 		modules.register(new KitsModule());
 		modules.register(new ToggleSprintModule());
+		// Mods (Batch C): Chat, Verbindung, Wegpunkte
+		modules.register(new AutoTextModule());
+		modules.register(new StreamerModeModule());
+		modules.register(new NoAdvancementModule());
+		modules.register(new AutoReconnectModule());
+		modules.register(new ConfirmDisconnectModule());
+		modules.register(new ChatTweaksModule());
+		modules.register(new TabTweaksModule());
+		modules.register(new WaypointsModule());
 		// Utility (Kampf-Automatisierung – von Safe Mode / Easy Leave gesperrt)
 		modules.register(new AutoTotemModule());
 		modules.register(new HoverTotemModule());
@@ -258,8 +293,11 @@ public final class SalamiClient implements ClientModInitializer {
 		WorldRenderEvents.BEFORE_BLOCK_OUTLINE.register((context, state) -> modules.get(BlockOutlineModule.class).render(context, state));
 		WorldRenderEvents.END_MAIN.register(modules::renderWorld);
 		WorldLines.init();
-		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) ->
-			modules.get(SafeModeModule.class).onJoin(client.getCurrentServer()));
+		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
+			modules.get(SafeModeModule.class).onJoin(client.getCurrentServer());
+			TpsModule.reset();
+			AutoReconnectModule.rememberServer(client.getCurrentServer());
+		});
 		// Kits: ein halb angewendetes Kit nicht in die nächste Verbindung/Welt mitnehmen
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> modules.get(KitsModule.class).cancel());
 		ClientWorldEvents.AFTER_CLIENT_WORLD_CHANGE.register((client, world) -> modules.get(KitsModule.class).cancel());
@@ -296,7 +334,8 @@ public final class SalamiClient implements ClientModInitializer {
 			|| (screen instanceof ClickGuiScreen gui && gui.wasCapturingKey())
 			// Mods-Menü: Tippen geht immer in die Suche
 			|| screen instanceof ModsScreen
-			|| (screen instanceof ModSettingsScreen settings && settings.wasCapturingKey());
+			|| (screen instanceof ModSettingsScreen settings && settings.wasCapturingKey())
+			|| (screen instanceof WaypointsScreen waypoints && waypoints.isEditing());
 	}
 
 	/** Sucht ein fokussiertes Textfeld im Screen – auch Creative-Suche, Buch und Rezeptbuch-Suche. */

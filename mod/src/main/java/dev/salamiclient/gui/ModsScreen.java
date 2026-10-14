@@ -36,17 +36,21 @@ public final class ModsScreen extends Screen {
 	private static final int GAP = 6;
 	private static final int PAD = 8;
 
-	/** Gewählter Reiter bleibt während der Sitzung erhalten ({@code null} = alle). */
-	private static Category lastTab;
+	/** Reiter für die mitgelieferten Mods (Wavey Capes, 3D Skin Layers …). */
+	private static final Object EXTRAS = new Object();
+
+	/** Gewählter Reiter bleibt während der Sitzung erhalten ({@code null} = alle, sonst Kategorie oder {@link #EXTRAS}). */
+	private static Object lastTab;
 
 	private final ModuleManager modules;
 	private final Screen parent;
-	private Category tab = lastTab;
+	private Object tab = lastTab;
 	private String query = "";
 	private double scroll;
 	private float uiScale = 1f;
 
-	private record Card(Module module, int x, int y) {}
+	/** Eine Karte zeigt entweder ein Salami-Modul oder eine mitgelieferte Mod. */
+	private record Card(Module module, ExternalMods.Entry external, int x, int y) {}
 
 	public ModsScreen(ModuleManager modules, Screen parent) {
 		super(Component.translatable("salami.mods.title"));
@@ -105,16 +109,19 @@ public final class ModsScreen extends Screen {
 		return new int[] {f[2] - 18, f[1] + 5, f[2] - 4, f[1] + 19};
 	}
 
-	/** Reiter: {@code null} (Alle) und alle Kategorien, jeweils {x0, x1}. */
+	/** Reiter: {@code null} (Alle), alle Kategorien und ggf. Extras, jeweils {key, x0, y0, x1, y1}. */
 	private List<Object[]> tabs() {
 		int[] f = frame();
 		List<Object[]> result = new ArrayList<>();
 		int x = f[0] + PAD;
 		int y = f[1] + HEADER;
-		List<Category> entries = new ArrayList<>();
+		List<Object> entries = new ArrayList<>();
 		entries.add(null);
 		entries.addAll(List.of(Category.values()));
-		for (Category category : entries) {
+		if (!ExternalMods.installed().isEmpty()) {
+			entries.add(EXTRAS);
+		}
+		for (Object category : entries) {
 			String label = tabLabel(category);
 			int w = font.width(label) + 12;
 			result.add(new Object[] {category, x, y, x + w, y + TABS - 2});
@@ -123,21 +130,34 @@ public final class ModsScreen extends Screen {
 		return result;
 	}
 
-	private String tabLabel(Category category) {
-		return category == null ? I18n.get("salami.mods.tab.all") : I18n.get(category.translationKey());
+	private String tabLabel(Object tab) {
+		if (tab == null) {
+			return I18n.get("salami.mods.tab.all");
+		}
+		return tab instanceof Category category ? I18n.get(category.translationKey()) : I18n.get("salami.mods.tab.extras");
 	}
 
-	private List<Module> visibleModules() {
+	/** Sichtbare Einträge: {@link Module} und {@link ExternalMods.Entry} gemischt. */
+	private List<Object> visibleEntries() {
 		String q = query.trim().toLowerCase(Locale.ROOT);
-		List<Module> list = new ArrayList<>();
-		for (Module module : modules.all()) {
-			if (tab != null && module.category() != tab) {
-				continue;
+		List<Object> list = new ArrayList<>();
+		if (tab != EXTRAS) {
+			for (Module module : modules.all()) {
+				if (tab != null && module.category() != tab) {
+					continue;
+				}
+				if (!q.isEmpty() && !matches(module, q)) {
+					continue;
+				}
+				list.add(module);
 			}
-			if (!q.isEmpty() && !matches(module, q)) {
-				continue;
+		}
+		if (tab == null || tab == EXTRAS) {
+			for (ExternalMods.Entry entry : ExternalMods.installed()) {
+				if (q.isEmpty() || I18n.get(entry.nameKey()).toLowerCase(Locale.ROOT).contains(q) || entry.modId().contains(q)) {
+					list.add(entry);
+				}
 			}
-			list.add(module);
 		}
 		return list;
 	}
@@ -160,19 +180,20 @@ public final class ModsScreen extends Screen {
 		int gridWidth = cols * CARD_W + (cols - 1) * GAP;
 		int left = c[0] + (c[2] - c[0] - 6 - gridWidth) / 2;
 		List<Card> cards = new ArrayList<>();
-		List<Module> list = visibleModules();
+		List<Object> list = visibleEntries();
 		for (int i = 0; i < list.size(); i++) {
 			int col = i % cols;
 			int row = i / cols;
 			int x = left + col * (CARD_W + GAP);
 			int y = c[1] + row * (CARD_H + GAP) - (int) Math.round(scroll);
-			cards.add(new Card(list.get(i), x, y));
+			Object entry = list.get(i);
+			cards.add(entry instanceof Module module ? new Card(module, null, x, y) : new Card(null, (ExternalMods.Entry) entry, x, y));
 		}
 		return cards;
 	}
 
 	private int contentHeight() {
-		int rows = (visibleModules().size() + columns() - 1) / columns();
+		int rows = (visibleEntries().size() + columns() - 1) / columns();
 		return Math.max(0, rows * (CARD_H + GAP) - GAP);
 	}
 
@@ -231,14 +252,14 @@ public final class ModsScreen extends Screen {
 		g.drawString(font, "x", close[0] + 5, close[1] + 3, theme.headerText(), false);
 
 		for (Object[] t : tabs()) {
-			Category category = (Category) t[0];
+			Object key = t[0];
 			int[] r = {(int) t[1], (int) t[2], (int) t[3], (int) t[4]};
-			boolean selected = category == tab;
+			boolean selected = key == tab;
 			boolean hovered = inside(r, mx, my);
 			g.fill(r[0], r[1], r[2], r[3], selected ? theme.accent() : hovered ? theme.hover() : theme.header());
 			int color = selected ? 0xFF000000 : theme.text();
-			g.drawString(font, tabLabel(category), r[0] + 6, r[1] + 4, color, false);
-			if (category != null && category.isRestricted()) {
+			g.drawString(font, tabLabel(key), r[0] + 6, r[1] + 4, color, false);
+			if (key instanceof Category category && category.isRestricted()) {
 				g.drawString(font, "!", r[2] - 5, r[1] + 4, theme.warning(), false);
 				if (hovered) {
 					tooltip = Component.translatable("salami.category.utility.warning");
@@ -289,6 +310,10 @@ public final class ModsScreen extends Screen {
 	}
 
 	private void renderCard(GuiGraphics g, Theme theme, Card card, boolean hovered, int mx, int my) {
+		if (card.external() != null) {
+			renderExternalCard(g, theme, card, hovered);
+			return;
+		}
 		Module module = card.module();
 		int x = card.x();
 		int y = card.y();
@@ -337,7 +362,35 @@ public final class ModsScreen extends Screen {
 		}
 	}
 
+	/** Karte einer mitgelieferten Mod: kein An/Aus, ein Klick öffnet ihre Einstellungen. */
+	private void renderExternalCard(GuiGraphics g, Theme theme, Card card, boolean hovered) {
+		ExternalMods.Entry entry = card.external();
+		int x = card.x();
+		int y = card.y();
+		g.fill(x, y, x + CARD_W, y + CARD_H, 0xFF101014);
+		if (hovered) {
+			g.fill(x, y, x + CARD_W, y + CARD_H, theme.hover());
+		}
+		g.renderOutline(x, y, CARD_W, CARD_H, hovered ? theme.accent() : theme.outline());
+		g.drawString(font, font.plainSubstrByWidth(I18n.get(entry.nameKey()), CARD_W - 12), x + 6, y + 6, theme.text(), false);
+		if (I18n.exists(entry.descriptionKey())) {
+			List<FormattedCharSequence> lines = font.split(Component.translatable(entry.descriptionKey()), (int) ((CARD_W - 12) / 0.75f));
+			g.pose().pushMatrix();
+			g.pose().translate(x + 6, y + 18);
+			g.pose().scale(0.75f, 0.75f);
+			for (int i = 0; i < Math.min(3, lines.size()); i++) {
+				g.drawString(font, lines.get(i), 0, i * 10, theme.textDim(), false);
+			}
+			g.pose().popMatrix();
+		}
+		String open = I18n.get("salami.mods.open_settings");
+		g.drawString(font, open, x + 6, y + CARD_H - 14, hovered ? theme.accent() : theme.textDim(), false);
+	}
+
 	private Component cardTooltip(Card card, int mx, int my) {
+		if (card.external() != null) {
+			return null;
+		}
 		if (hasSettings(card.module()) && inside(gear(card), mx, my)) {
 			return Component.translatable("salami.mods.settings");
 		}
@@ -374,7 +427,7 @@ public final class ModsScreen extends Screen {
 		}
 		for (Object[] t : tabs()) {
 			if (inside(new int[] {(int) t[1], (int) t[2], (int) t[3], (int) t[4]}, x, y)) {
-				tab = (Category) t[0];
+				tab = t[0];
 				scroll = 0;
 				return true;
 			}
@@ -387,6 +440,13 @@ public final class ModsScreen extends Screen {
 			for (Card card : cards()) {
 				if (x < card.x() || x >= card.x() + CARD_W || y < card.y() || y >= card.y() + CARD_H) {
 					continue;
+				}
+				if (card.external() != null) {
+					Screen settings = ExternalMods.configScreen(card.external(), this);
+					if (settings != null) {
+						minecraft.setScreen(settings);
+					}
+					return true;
 				}
 				Module module = card.module();
 				boolean wantsSettings = button == GLFW.GLFW_MOUSE_BUTTON_RIGHT || inside(gear(card), x, y);
