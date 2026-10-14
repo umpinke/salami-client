@@ -85,7 +85,7 @@
 	"salami.module.capes.setting.cape.desc": "„Vom Launcher“ nimmt das Cape, das du im Launcher unter Capes gewählt hast. „Eigenes“ lädt config/salami/cape.png im Profilordner.",
 	"salami.module.capes.setting.elytra": "Auch auf Elytren",
 	"salami.capes.custom_missing": "Salami Capes: Kein eigenes Cape gefunden. Lege es hier ab: %s",
-	"salami.capes.custom_invalid": "Salami Capes: cape.png ist kein gültiges Cape-Bild (Breite muss doppelt so groß wie die Höhe sein).",
+	"salami.capes.custom_invalid": "Salami Capes: cape.png ist kein gültiges Cape-Bild (PNG bis 4 MiB, Breite doppelt so groß wie die Höhe, 64–2048 px breit in 64er-Schritten).",
 	"salami.module.particles": "Partikel",
 	"salami.module.particles.desc": "Blendet Partikel nach Quelle aus – z. B. Explosionen beim Crystal-PvP oder die Totem-Wolke.",
 	"salami.module.particles.setting.explosions": "Explosionen ausblenden",
@@ -287,5 +287,6 @@
 	"salami.module.kits.setting.save_current": "Inventar speichern",
 	"salami.module.kits.setting.save_current.desc": "Speichert dein aktuelles Inventar als eigenes Kit (das gewählte eigene Kit, sonst Eigenes 1).",
 	"salami.kits.applied": "Kit %s angewendet (%s Verschiebungen).",
+	"salami.kits.aborted": "Kit %s abgebrochen: zu viele Verschiebungen (%s).",
 	"salami.kits.saved": "Inventar als Kit %s gespeichert."
 }

@@ -29,6 +29,15 @@ public final class KeybindSetting extends Setting<Integer> {
 		return InputConstants.Type.KEYSYM.getOrCreate(get()).getDisplayName().getString();
 	}
 
+	/** Nur gültige GLFW-Tastencodes (Leertaste bis {@code GLFW_KEY_LAST}); alles andere = keine Taste. */
+	@Override
+	protected Integer sanitize(Integer raw) {
+		if (raw == null) {
+			return defaultValue();
+		}
+		return raw < GLFW.GLFW_KEY_SPACE || raw > GLFW.GLFW_KEY_LAST ? NONE : raw;
+	}
+
 	@Override
 	public JsonElement toJson() {
 		return new JsonPrimitive(get());
@@ -37,7 +46,9 @@ public final class KeybindSetting extends Setting<Integer> {
 	@Override
 	public void fromJson(JsonElement json) {
 		if (json != null && json.isJsonPrimitive() && json.getAsJsonPrimitive().isNumber()) {
-			set(json.getAsInt());
+			double raw = json.getAsDouble();
+			// Kommazahlen/NaN -> keine Taste; zu große Werte landen über sanitize() ebenfalls bei NONE
+			set(raw == Math.rint(raw) ? (int) raw : NONE);
 		}
 	}
 }

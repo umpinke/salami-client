@@ -1,6 +1,7 @@
 package dev.salamiclient.modules.misc;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import dev.salamiclient.SalamiClient;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.setting.BoolSetting;
@@ -10,7 +11,6 @@ import dev.salamiclient.setting.NumberSetting;
 import dev.salamiclient.setting.StringListSetting;
 import dev.salamiclient.util.Chat;
 import dev.salamiclient.util.InventoryUtil;
-import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -43,6 +43,8 @@ public final class KitsModule extends Module {
 	private static final int SIZE = 37;
 	private static final int OFFHAND = 36;
 	private static final String AIR = "minecraft:air";
+	/** Obergrenze pro Anwenden: ein Kit braucht höchstens {@link #SIZE} Züge, ein kaputtes darf nicht endlos klicken. */
+	private static final int MAX_MOVES = 64;
 
 	private final ModeSetting<Kit> kit = add(new ModeSetting<>("kit", Kit.CRYSTAL));
 	private final KeybindSetting applyKey = add(new KeybindSetting("apply_key", GLFW.GLFW_KEY_K));
@@ -87,17 +89,31 @@ public final class KitsModule extends Module {
 		return applying;
 	}
 
+	/** Bricht ein laufendes Anwenden ab (Verbindung getrennt, Weltwechsel). */
+	public void cancel() {
+		applying = false;
+		keyWasDown = false;
+		moves = 0;
+		cooldown = 0;
+	}
+
 	@Override
 	public void onTick() {
 		boolean down = applyKey.isBound()
-			&& !(mc().screen instanceof ChatScreen)
 			&& InputConstants.isKeyDown(mc().getWindow(), applyKey.key());
-		if (down && !keyWasDown) {
+		// In Textfeldern (Chat, Schilder, Suche …) gehört die Taste dem Feld
+		if (down && !keyWasDown && (mc().screen == null || !SalamiClient.isTyping(mc().screen))) {
 			apply();
 		}
 		keyWasDown = down;
 
 		if (!applying) {
+			return;
+		}
+		if (moves >= MAX_MOVES) {
+			applying = false;
+			SalamiClient.LOG.warn("Kit {} aborted after {} moves (limit reached)", kit.get(), moves);
+			Chat.warn("salami.kits.aborted", label(kit.get()), moves);
 			return;
 		}
 		if (onlyInventory.isOn() && !(mc().screen instanceof InventoryScreen)) {

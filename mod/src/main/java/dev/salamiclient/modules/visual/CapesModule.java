@@ -11,16 +11,19 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.core.ClientAsset;
 import net.minecraft.resources.Identifier;
+import net.minecraft.util.PngInfo;
 import net.minecraft.world.entity.player.PlayerSkin;
 
-import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.FileSystemException;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.EnumMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 /**
  * Salami Capes: ein eigenes Cape (und auf Wunsch dieselbe Textur auf den Elytren) für
@@ -39,6 +42,10 @@ public final class CapesModule extends Module {
 	private static final String LAUNCHER_PROPERTY = "salami.cape";
 
 	private static final Identifier CUSTOM_TEXTURE = Identifier.fromNamespaceAndPath(SalamiClient.MOD_ID, "cape/custom");
+	/** Eigene Capes: nur PNG bis 4 MiB, Breite = 2 × Höhe, 64–2048 px breit in 64er-Schritten (wie im Launcher). */
+	private static final int MAX_FILE_BYTES = 4 * 1024 * 1024;
+	private static final int MIN_WIDTH = 64;
+	private static final int MAX_WIDTH = 2048;
 	private static CapesModule instance;
 
 	private final ModeSetting<Cape> cape = add(new ModeSetting<>("cape", Cape.LAUNCHER));
@@ -102,7 +109,7 @@ public final class CapesModule extends Module {
 			return fromLauncher(System.getProperty(LAUNCHER_PROPERTY));
 		}
 		if (selected == Cape.CUSTOM) {
-			return customFrom(customCapeFile());
+			return customFrom(CapesModule::customCapeFile);
 		}
 		return builtIn(selected);
 	}
@@ -128,35 +135,109 @@ public final class CapesModule extends Module {
 				return builtIn(Cape.SALAMI);
 			}
 		}
-		return customFrom(Path.of(selection));
+		return customFrom(() -> launcherPath(selection));
 	}
 
-	private ClientAsset.Texture customFrom(Path file) {
+	/** Pfad aus {@code -Dsalami.cape}; ungültig oder Netzwerkpfad → {@code null}. */
+	private static Path launcherPath(String selection) {
+		// \\server\share bzw. //server/share: Netzwerkpfade werden nie angefasst (kein SMB-Zugriff)
+		if (selection.length() >= 2 && isSeparator(selection.charAt(0)) && isSeparator(selection.charAt(1))) {
+			SalamiClient.LOG.warn("Eigenes Cape abgelehnt: Netzwerkpfade werden nicht geladen");
+			return null;
+		}
+		try {
+			return Path.of(selection);
+		} catch (InvalidPathException e) {
+			SalamiClient.LOG.warn("Eigenes Cape abgelehnt: ungültiger Pfad");
+			return null;
+		}
+	}
+
+	private static boolean isSeparator(char c) {
+		return c == '\\' || c == '/';
+	}
+
+	/** Lädt das eigene Cape einmal pro Auswahl (der Pfad wird erst dann ermittelt). */
+	private ClientAsset.Texture customFrom(Supplier<Path> file) {
 		if (!customTried) {
 			customTried = true;
-			custom = loadCustom(file);
+			Path path = file.get();
+			custom = path == null ? null : loadCustom(path);
 		}
 		return custom;
 	}
 
 	private static ClientAsset.Texture loadCustom(Path file) {
-		if (!Files.isRegularFile(file)) {
-			Chat.warn("salami.capes.custom_missing", file.toString());
-			return null;
-		}
-		try (InputStream in = Files.newInputStream(file)) {
-			NativeImage image = NativeImage.read(in);
-			if (image.getWidth() != image.getHeight() * 2) {
-				image.close();
-				Chat.warn("salami.capes.custom_invalid");
+		// In Log und Chat nie den vollen Pfad – er enthält den Windows-Benutzernamen
+		String name = String.valueOf(file.getFileName());
+		NativeImage image = null;
+		try {
+			if (!Files.isRegularFile(file)) {
+				Chat.warn("salami.capes.custom_missing", shownPath(file));
 				return null;
 			}
+			if (!name.toLowerCase(Locale.ROOT).endsWith(".png")) {
+				return reject(name, "keine .png-Datei");
+			}
+			if (Files.size(file) > MAX_FILE_BYTES) {
+				return reject(name, "größer als 4 MiB");
+			}
+			byte[] data;
+			try (InputStream in = Files.newInputStream(file)) {
+				data = in.readNBytes(MAX_FILE_BYTES + 1);
+			}
+			if (data.length > MAX_FILE_BYTES) {
+				return reject(name, "größer als 4 MiB");
+			}
+			// Signatur und Maße aus dem PNG-Kopf prüfen, bevor das Bild dekodiert wird
+			PngInfo info = PngInfo.fromBytes(data);
+			if (!validCapeSize(info.width(), info.height())) {
+				return reject(name, "ungültige Größe " + info.width() + "x" + info.height());
+			}
+			image = NativeImage.read(data);
+			if (!validCapeSize(image.getWidth(), image.getHeight())) {
+				return reject(name, "ungültige Größe " + image.getWidth() + "x" + image.getHeight());
+			}
 			mc().getTextureManager().register(CUSTOM_TEXTURE, new DynamicTexture(() -> "salami custom cape", image));
+			image = null; // gehört jetzt der Textur
 			return new ClientAsset.ResourceTexture(CUSTOM_TEXTURE, CUSTOM_TEXTURE);
-		} catch (IOException e) {
-			SalamiClient.LOG.warn("Eigenes Cape konnte nicht geladen werden: {}", file, e);
+		} catch (Exception e) {
+			// Exception statt nur IOException: ein kaputtes Bild darf das Spiel nie abstürzen lassen
+			SalamiClient.LOG.warn("Eigenes Cape {} konnte nicht geladen werden: {}", name, describe(e));
 			Chat.warn("salami.capes.custom_invalid");
 			return null;
+		} finally {
+			if (image != null) {
+				image.close();
+			}
 		}
+	}
+
+	/** Cape-Layout: Breite = 2 × Höhe, 64–2048 px breit, Vielfaches von 64. */
+	private static boolean validCapeSize(int width, int height) {
+		return width == height * 2 && width >= MIN_WIDTH && width <= MAX_WIDTH && width % MIN_WIDTH == 0;
+	}
+
+	private static ClientAsset.Texture reject(String name, String reason) {
+		SalamiClient.LOG.warn("Eigenes Cape {} abgelehnt: {}", name, reason);
+		Chat.warn("salami.capes.custom_invalid");
+		return null;
+	}
+
+	/** Pfad für die Chat-Meldung: relativ zum Spielordner, sonst nur der Dateiname. */
+	private static String shownPath(Path file) {
+		Path gameDir = FabricLoader.getInstance().getGameDir();
+		if (file.isAbsolute() && file.startsWith(gameDir)) {
+			return gameDir.relativize(file).toString();
+		}
+		return String.valueOf(file.getFileName());
+	}
+
+	/** Fehlertext ohne Pfad (Dateisystem-Fehlermeldungen enthalten den vollen Pfad). */
+	private static String describe(Exception e) {
+		if (e instanceof FileSystemException fs) {
+			return fs.getClass().getSimpleName() + (fs.getReason() != null ? ": " + fs.getReason() : "");
+		}
+		return e.toString();
 	}
 }

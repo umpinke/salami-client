@@ -3,6 +3,7 @@ package dev.salamiclient;
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.config.ConfigManager;
 import dev.salamiclient.gui.clickgui.ClickGuiScreen;
+import dev.salamiclient.mixin.RecipeBookComponentAccessor;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.ModuleManager;
 import dev.salamiclient.modules.client.SafeModeModule;
@@ -44,6 +45,7 @@ import dev.salamiclient.theme.Theme;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientWorldEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
@@ -55,8 +57,13 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.MultiLineEditBox;
+import net.minecraft.client.gui.components.events.ContainerEventHandler;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractSignEditScreen;
+import net.minecraft.client.gui.screens.recipebook.RecipeBookComponent;
 import net.minecraft.resources.Identifier;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
@@ -179,6 +186,9 @@ public final class SalamiClient implements ClientModInitializer {
 		WorldLines.init();
 		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) ->
 			modules.get(SafeModeModule.class).onJoin(client.getCurrentServer()));
+		// Kits: ein halb angewendetes Kit nicht in die nächste Verbindung/Welt mitnehmen
+		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> modules.get(KitsModule.class).cancel());
+		ClientWorldEvents.AFTER_CLIENT_WORLD_CHANGE.register((client, world) -> modules.get(KitsModule.class).cancel());
 		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> config.saveNow());
 		// Keybinds feuern nur ohne offenes Menü – Easy Leave soll aber auch im
 		// Inventar, Chat oder in der ClickGUI sofort greifen.
@@ -204,10 +214,35 @@ public final class SalamiClient implements ClientModInitializer {
 	}
 
 	/** In Textfeldern (Chat, Schilder, Suche) oder beim Tastenbelegen gehört die Taste dem Feld. */
-	private static boolean isTyping(Screen screen) {
+	public static boolean isTyping(Screen screen) {
 		return screen instanceof ChatScreen
+			|| screen instanceof AbstractSignEditScreen
 			|| screen.getFocused() instanceof EditBox
+			|| hasFocusedTextField(screen)
 			|| (screen instanceof ClickGuiScreen gui && gui.wasCapturingKey());
+	}
+
+	/** Sucht ein fokussiertes Textfeld im Screen – auch Creative-Suche, Buch und Rezeptbuch-Suche. */
+	private static boolean hasFocusedTextField(ContainerEventHandler parent) {
+		for (GuiEventListener child : parent.children()) {
+			if (child instanceof RecipeBookComponent<?> book) {
+				EditBox search = ((RecipeBookComponentAccessor) book).salami$getSearchBox();
+				if (book.isVisible() && search != null && search.isVisible() && search.isFocused()) {
+					return true;
+				}
+			} else if (child instanceof EditBox box) {
+				if (box.isVisible() && box.isFocused()) {
+					return true;
+				}
+			} else if (child instanceof MultiLineEditBox box) {
+				if (box.isFocused()) {
+					return true;
+				}
+			} else if (child instanceof ContainerEventHandler nested && hasFocusedTextField(nested)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/** Easy Leave: alle Kampfmodule sofort aus und gesperrt (Safe Mode). */

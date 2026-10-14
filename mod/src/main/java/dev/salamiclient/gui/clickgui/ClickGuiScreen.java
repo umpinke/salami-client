@@ -660,12 +660,21 @@ public final class ClickGuiScreen extends Screen {
 			JsonElement entry = state.get(category.id());
 			if (entry != null && entry.isJsonObject()) {
 				JsonObject obj = entry.getAsJsonObject();
-				if (obj.has("x")) panel.x = obj.get("x").getAsInt();
-				if (obj.has("y")) panel.y = obj.get("y").getAsInt();
-				if (obj.has("open")) panel.open = obj.get("open").getAsBoolean();
+				// Falsche Typen (z. B. "x": "abc") überspringen; die Position klemmt init() ein
+				if (isNumber(obj.get("x"))) panel.x = (int) obj.get("x").getAsDouble();
+				if (isNumber(obj.get("y"))) panel.y = (int) obj.get("y").getAsDouble();
+				if (isBoolean(obj.get("open"))) panel.open = obj.get("open").getAsBoolean();
 			}
 			panels.add(panel);
 		}
+	}
+
+	private static boolean isNumber(JsonElement value) {
+		return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isNumber();
+	}
+
+	private static boolean isBoolean(JsonElement value) {
+		return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isBoolean();
 	}
 
 	private void savePanels() {

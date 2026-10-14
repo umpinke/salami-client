@@ -28,6 +28,8 @@ import java.nio.file.StandardCopyOption;
 public final class ConfigManager {
 	private static final int VERSION = 1;
 	private static final long SAVE_DELAY_MS = 1500;
+	/** Größere Dateien sind kaputt oder manipuliert – sie werden gar nicht erst gelesen. */
+	private static final long MAX_FILE_BYTES = 1024 * 1024;
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
 	private final Path file;
@@ -42,20 +44,14 @@ public final class ConfigManager {
 	}
 
 	public void load() {
-		JsonObject root = null;
-		if (Files.exists(file)) {
-			try {
-				root = JsonParser.parseString(Files.readString(file, StandardCharsets.UTF_8)).getAsJsonObject();
-			} catch (Exception e) {
-				SalamiClient.LOG.error("Config {} is unreadable – using defaults (backup kept)", file, e);
-				backupBrokenFile();
-			}
-		}
-		JsonObject moduleStates = root != null && root.has("modules") ? root.getAsJsonObject("modules") : new JsonObject();
+		JsonObject root = readRoot();
+		// Typen prüfen statt blind getAsJsonObject()/getAsBoolean(): ein falscher Typ wird
+		// übersprungen (Standardwert), statt den Start abstürzen zu lassen.
+		JsonObject moduleStates = object(root, "modules", "modules");
 		for (Module module : modules.all()) {
-			JsonObject state = moduleStates.has(module.id()) ? moduleStates.getAsJsonObject(module.id()) : null;
-			if (state != null && state.has("settings")) {
-				JsonObject settings = state.getAsJsonObject("settings");
+			JsonObject state = object(moduleStates, module.id(), "modules." + module.id());
+			JsonObject settings = object(state, "settings", module.id() + ".settings");
+			if (settings != null) {
 				for (Setting<?> setting : module.settings()) {
 					try {
 						setting.fromJson(settings.get(setting.id()));
@@ -64,16 +60,62 @@ public final class ConfigManager {
 					}
 				}
 			}
-			boolean enabled = state != null && state.has("enabled")
-				? state.get("enabled").getAsBoolean()
-				: module.enabledByDefault();
+			JsonElement enabledJson = state != null ? state.get("enabled") : null;
+			boolean enabled = module.enabledByDefault();
+			if (enabledJson != null && enabledJson.isJsonPrimitive() && enabledJson.getAsJsonPrimitive().isBoolean()) {
+				enabled = enabledJson.getAsBoolean();
+			} else if (enabledJson != null) {
+				SalamiClient.LOG.warn("Ignoring invalid value for {}.enabled", module.id());
+			}
 			modules.restoreState(module, enabled);
 		}
-		if (root != null && root.has("gui") && root.get("gui").isJsonObject()) {
-			gui = root.getAsJsonObject("gui");
+		JsonObject savedGui = object(root, "gui", "gui");
+		if (savedGui != null) {
+			gui = savedGui;
 		}
 		dirtySince = -1;
 		SalamiClient.LOG.info("Config loaded ({} modules)", modules.all().size());
+	}
+
+	/**
+	 * Liest die Config-Datei; {@code null} = keine Datei oder unbrauchbar. Unbrauchbare
+	 * Dateien (zu groß, kein gültiges JSON-Objekt) werden vor dem nächsten Speichern als
+	 * Backup beiseitegelegt, es gelten die Standardwerte.
+	 */
+	private JsonObject readRoot() {
+		if (!Files.exists(file)) {
+			return null;
+		}
+		try {
+			long size = Files.size(file);
+			if (size > MAX_FILE_BYTES) {
+				SalamiClient.LOG.warn("Config {} is too large ({} bytes, max {}) – using defaults (backup kept)", file, size, MAX_FILE_BYTES);
+				backupBrokenFile();
+				return null;
+			}
+			JsonElement parsed = JsonParser.parseString(Files.readString(file, StandardCharsets.UTF_8));
+			if (parsed.isJsonObject()) {
+				return parsed.getAsJsonObject();
+			}
+			SalamiClient.LOG.error("Config {} is not a JSON object – using defaults (backup kept)", file);
+		} catch (Exception e) {
+			SalamiClient.LOG.error("Config {} is unreadable – using defaults (backup kept)", file, e);
+		}
+		backupBrokenFile();
+		return null;
+	}
+
+	/** {@code parent.key} als Objekt; fehlt es oder hat es einen anderen Typ: {@code null}. */
+	private static JsonObject object(JsonObject parent, String key, String path) {
+		JsonElement value = parent != null ? parent.get(key) : null;
+		if (value == null || value.isJsonNull()) {
+			return null;
+		}
+		if (!value.isJsonObject()) {
+			SalamiClient.LOG.warn("Ignoring invalid config entry {} (expected an object)", path);
+			return null;
+		}
+		return value.getAsJsonObject();
 	}
 
 	public void markDirty() {
@@ -126,11 +168,17 @@ public final class ConfigManager {
 		}
 	}
 
+	/**
+	 * Legt die unbrauchbare Datei als {@code config.broken.json} beiseite, bevor sie beim
+	 * nächsten Speichern mit Standardwerten überschrieben wird. Verschieben statt Kopieren:
+	 * geht auch bei übergroßen Dateien sofort.
+	 */
 	private void backupBrokenFile() {
 		try {
-			Files.copy(file, file.resolveSibling("config.broken.json"), StandardCopyOption.REPLACE_EXISTING);
-		} catch (IOException ignored) {
+			Files.move(file, file.resolveSibling("config.broken.json"), StandardCopyOption.REPLACE_EXISTING);
+		} catch (IOException e) {
 			// Backup ist best effort
+			SalamiClient.LOG.warn("Could not back up broken config {}", file, e);
 		}
 	}
 }

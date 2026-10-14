@@ -13,7 +13,8 @@
 		"MinecraftAccessor",
 		"MinecraftMixin",
 		"MultiPlayerGameModeMixin",
-		"ParticleEngineMixin"
+		"ParticleEngineMixin",
+		"RecipeBookComponentAccessor"
 	],
 	"injectors": {
 		"defaultRequire": 1
