@@ -556,19 +556,26 @@ pub fn require_version_like(value: &str) -> Result<()> {
     if is_version_like(value) {
         Ok(())
     } else {
-        Err(AppError::Other(format!("Invalid Minecraft version in pack: {:?}", value)))
+        Err(AppError::Other(format!("Invalid version: {:?}", value)))
     }
 }
 
+/// Salami: Versionsangaben (Minecraft, Loader) werden Teil von Ordnernamen und Download-Adressen.
+/// Erlaubt ist alles, was echte Versionen enthalten – auch „0.19.3 (stable)“, wie Profil-Assistent
+/// und Launcher Fabric/Quilt-Versionen speichern, oder „3D Shareware v1.34“ –, aber nichts, was
+/// einen Pfad oder eine Adresse verbiegen kann: keine Trenner, kein `..`, keine unter Windows
+/// verbotenen Zeichen, keine URL-Sonderzeichen, kein Punkt/Leerzeichen am Anfang oder Ende.
 pub fn is_version_like(value: &str) -> bool {
+    let edge = |c: char| c == '.' || c == ' ';
     !value.is_empty()
         && value.len() <= 64
-        // Salami: wird Teil von Ordnernamen und URLs – `.`/`..` wären Pfad-Sprünge
-        && !value.starts_with('.')
+        && !value.starts_with(edge)
+        && !value.ends_with(edge)
         && !value.contains("..")
-        && value
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | '+'))
+        && value.chars().all(|c| {
+            !c.is_control()
+                && !matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' | '%' | '#' | '&' | '=')
+        })
 }
 
 #[cfg(test)]
@@ -646,6 +653,13 @@ mod canonical_pack_path_tests {
         assert!(require_version_like("..").is_err());
         assert!(require_version_like("1.20.1-47.2.0").is_ok());
         assert!(require_version_like("0.16.10+build.1").is_ok());
+        // so speichern Profil-Assistent und Launcher Fabric/Quilt-Versionen
+        assert!(require_version_like("0.19.3 (stable)").is_ok());
+        assert!(require_version_like("1.21.11-pre1").is_ok());
+        assert!(require_version_like("3D Shareware v1.34").is_ok());
+        for bad in ["a/b", "a\\b", "..", "../x", "C:x", "x?y", "x%2e", "x#y", " x", "x.", ""] {
+            assert!(require_version_like(bad).is_err(), "{bad:?}");
+        }
     }
 
     #[test]
