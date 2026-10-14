@@ -72,7 +72,6 @@ export async function launch(
       overrides,
       quickPlaySingleplayer,
       quickPlayMultiplayer,
-      localMods: [],
       account: null,
     });
   }

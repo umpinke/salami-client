@@ -9,8 +9,9 @@ const MAX_LISTED_EXECUTABLE_FILES: usize = 40;
 const SCRIPT_EXTENSIONS: &[&str] = &["js", "zs", "groovy", "lua", "py", "rhai", "kts"];
 
 const NATIVE_EXTENSIONS: &[&str] = &[
-    "exe", "bat", "cmd", "com", "scr", "msi", "ps1", "vbs", "wsf", "sh", "bash", "dll", "so",
-    "dylib", "app", "jar",
+    "exe", "bat", "cmd", "com", "scr", "msi", "ps1", "psm1", "vbs", "vbe", "wsf", "wsh",
+    "jse", "hta", "lnk", "url", "reg", "cpl", "msc", "pif", "scf", "sh", "bash", "command", "dll",
+    "so", "dylib", "app", "jar", "jnlp",
 ];
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
@@ -54,6 +55,22 @@ pub struct ExecutableContentReport {
     pub script_count: usize,
     pub native_count: usize,
     pub truncated: bool,
+}
+
+impl ExecutableContentReport {
+    /// Salami: zweiten Bericht (z. B. Manifest-Downloads) hinzunehmen.
+    pub fn merge(&mut self, other: ExecutableContentReport) {
+        self.script_count += other.script_count;
+        self.native_count += other.native_count;
+        self.truncated |= other.truncated;
+        self.scripts.extend(other.scripts);
+        self.natives.extend(other.natives);
+        if self.scripts.len() > MAX_LISTED_EXECUTABLE_FILES || self.natives.len() > MAX_LISTED_EXECUTABLE_FILES {
+            self.truncated = true;
+        }
+        self.scripts.truncate(MAX_LISTED_EXECUTABLE_FILES);
+        self.natives.truncate(MAX_LISTED_EXECUTABLE_FILES);
+    }
 }
 
 pub fn classify_executable_entries<I>(names: I, override_prefixes: &[&str]) -> ExecutableContentReport

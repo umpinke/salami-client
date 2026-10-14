@@ -186,6 +186,9 @@ pub async fn process_mrpack(pack_path: PathBuf) -> Result<(Profile, ModrinthInde
     crate::utils::import_safety::require_version_like(&game_version)?;
 
     let (loader, loader_version) = determine_loader_from_dependencies(&manifest.dependencies);
+    if let Some(version) = loader_version.as_deref() {
+        crate::utils::import_safety::require_version_like(version)?;
+    }
 
     info!(
         "Determined requirements: MC={}, Loader={:?}, LoaderVersion={:?}",
@@ -431,10 +434,8 @@ pub async fn resolve_manifest_files(manifest: &ModrinthIndex) -> Result<Vec<Mod>
                     project_id: version_info.project_id.clone(),
                     version_id: version_info.id.clone(),
                     file_name: file_details.filename.clone(),
-                    download_url: original_file_info.downloads.first().cloned().unwrap_or_else(|| {
-                         warn!("Missing download URL in manifest for file: {}. Using API URL as fallback.", original_file_info.path);
-                         file_details.url.clone()
-                    }),
+                    // Salami: Adresse von der Modrinth-API (dort passt die Prüfsumme), nicht die aus dem Pack
+                    download_url: file_details.url.clone(),
                     file_hash_sha1: Some(hash.clone()),
                 };
 

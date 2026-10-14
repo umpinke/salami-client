@@ -318,6 +318,18 @@ async fn read_mrpack(zip: &mut PackZip) -> Result<PackDetails> {
     let mut security = ImportSecurityReport::default();
     security.third_party_download_hosts = collect_third_party_hosts(&index);
 
+    // Salami: Dateien außerhalb von mods/ lädt der Launcher aus dem Manifest herunter (z. B. von
+    // GitHub) – Programme und Skripte darunter brauchen genauso eine Zustimmung wie im Archiv.
+    let mut executable_content = scan_executable_content(zip, &["overrides/", "client-overrides/"]);
+    executable_content.merge(crate::integrations::provenance::classify_executable_entries(
+        index
+            .files
+            .iter()
+            .filter(|file| !is_mod_path(&file.path))
+            .map(|file| file.path.clone()),
+        &[""],
+    ));
+
     Ok(PackDetails {
         security,
         profile_name: Some(index.name.clone()),
@@ -327,7 +339,7 @@ async fn read_mrpack(zip: &mut PackZip) -> Result<PackDetails> {
         loader_version,
         mod_count: mod_files.len(),
         override_file_count: count_entries_under(zip, &["overrides/", "client-overrides/"]),
-        executable_content: scan_executable_content(zip, &["overrides/", "client-overrides/"]),
+        executable_content,
         provenance,
         ..Default::default()
     })
@@ -351,14 +363,9 @@ async fn read_curseforge(zip: &mut PackZip) -> Result<PackDetails> {
         );
     }
 
-    let overrides_dir = format!(
-        "{}/",
-        manifest
-            .overrides
-            .as_deref()
-            .unwrap_or("overrides")
-            .trim_end_matches('/')
-    );
+    // Salami: geprüfter, kanonischer Ordner – dieselbe Regel wie beim Entpacken
+    let overrides_dir =
+        crate::utils::import_safety::curseforge_overrides_prefix(manifest.overrides.as_deref())?;
 
     let mut provenance = ProvenanceReport::default();
     collect_bundled_provenance(zip, &mut provenance, &[overrides_dir.as_str()]).await;
@@ -475,7 +482,9 @@ async fn hash_bundled_mod_jars(zip: &mut PackZip, override_prefixes: &[&str]) ->
             let name = entry.filename().as_str().ok()?;
             let lower = crate::utils::import_safety::canonical_pack_key(name)?;
             let in_mods_dir = mods_prefixes.iter().any(|prefix| lower.starts_with(prefix.as_str()));
-            if in_mods_dir && lower.ends_with(".jar") {
+            // Salami: auch abgeschaltete Mods (später aktivierbar) und .zip-Mods (alte Forge-Versionen)
+            let loadable = lower.ends_with(".jar") || lower.ends_with(".jar.disabled") || lower.ends_with(".zip");
+            if in_mods_dir && loadable {
                 Some((index, base_name(name)))
             } else {
                 None
@@ -608,7 +617,10 @@ fn count_entries_under(zip: &PackZip, prefixes: &[&str]) -> usize {
         .iter()
         .filter(|entry| {
             entry.filename().as_str().map_or(false, |name| {
-                !name.ends_with('/') && prefixes.iter().any(|prefix| name.starts_with(prefix))
+                !name.ends_with('/')
+                    && prefixes
+                        .iter()
+                        .any(|prefix| crate::utils::import_safety::canonical_path_under(name, prefix).is_some())
             })
         })
         .count()

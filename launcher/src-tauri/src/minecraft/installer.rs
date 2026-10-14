@@ -140,6 +140,17 @@ pub async fn install_minecraft_version(
         &profile_owned
     };
 
+    // Salami: Versionen werden Teil von Download-Adressen und Ordnernamen – nur echte Versionsangaben
+    crate::utils::import_safety::require_version_like(version_id)?;
+    for loader_version in profile
+        .loader_version
+        .iter()
+        .chain(profile.settings.overwrite_loader_version.iter())
+        .chain(profile.settings.overwrite_loader_versions.values())
+    {
+        crate::utils::import_safety::require_version_like(loader_version)?;
+    }
+
     info!(
         "[Launch] Setting experimental mode: {}",
         is_experimental_mode

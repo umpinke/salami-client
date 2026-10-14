@@ -126,6 +126,7 @@ impl ModDownloadService {
                     ModSource::CurseForge {
                         download_url,
                         file_hash_sha1,
+                        file_fingerprint,
                         ..
                     } => {
                         trace!(
@@ -142,7 +143,23 @@ impl ModDownloadService {
                         .map_err(|e| {
                             error!("Failed cache mod {}: {}", display_name, e);
                             e
-                        })
+                        })?;
+                        // Salami: ohne SHA1 wenigstens den CurseForge-Fingerabdruck prüfen – sonst
+                        // könnte ein Pack einen bekannten Fingerabdruck mit einer anderen Datei paaren
+                        if let (None, Some(expected)) = (file_hash_sha1.as_deref(), file_fingerprint) {
+                            let actual = crate::utils::hash_utils::calculate_curseforge_fingerprint(&target_path)
+                                .await
+                                .map_err(AppError::Io)?;
+                            if actual != expected {
+                                let _ = fs::remove_file(&target_path).await;
+                                error!("CurseForge mod {} does not match its fingerprint", display_name);
+                                return Err(AppError::Other(format!(
+                                    "Downloaded file for {} does not match its CurseForge fingerprint",
+                                    display_name
+                                )));
+                            }
+                        }
+                        Ok(())
                     }
                     ModSource::Url { url, .. } => {
                         trace!("Preparing URL mod for cache: {} ({})", display_name, filename);

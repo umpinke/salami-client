@@ -39,6 +39,11 @@ pub struct FileInfo {
 #[tauri::command]
 pub async fn set_file_enabled(file_path: String, enabled: bool) -> Result<(), CommandError> {
     let input_path = PathBuf::from(&file_path);
+    // Salami: nur innerhalb der Launcher-Ordner, nie geschützte Dateien
+    if crate::utils::path_guard::is_protected(&input_path) {
+        return Err(CommandError::from(AppError::Other("Changing this file is not allowed".to_string())));
+    }
+    crate::utils::path_guard::ensure_allowed(input_path.parent().unwrap_or_else(|| Path::new(".")))?;
 
     let input_filename_cow = input_path.file_name().unwrap_or_default().to_string_lossy();
     let input_filename = input_filename_cow.as_ref();
@@ -233,15 +238,10 @@ pub async fn open_file_directory(
     app_handle: tauri::AppHandle,
     file_path: String,
 ) -> Result<(), CommandError> {
-    let path = PathBuf::from(&file_path);
+    // Salami: kanonisch und nur innerhalb der Launcher-Ordner – sonst würde z. B. aus
+    // `C:\x\programm.exe\..` der „Ordner“ `programm.exe`, und Öffnen würde ihn starten.
+    let path = crate::utils::path_guard::ensure_allowed(Path::new(&file_path))?;
     info!("Opening directory for file: {}", path.display());
-
-    if !path.exists() {
-        return Err(CommandError::from(AppError::Other(format!(
-            "File not found: {}",
-            path.display()
-        ))));
-    }
 
     // Get the parent directory
     let parent_dir = match path.parent() {
@@ -253,6 +253,12 @@ pub async fn open_file_directory(
         }
     };
 
+    if !parent_dir.is_dir() {
+        return Err(CommandError::from(AppError::Other(format!(
+            "Not a directory: {}",
+            parent_dir.display()
+        ))));
+    }
     debug!("Opening directory: {}", parent_dir.display());
 
     // Open the directory with the system file browser

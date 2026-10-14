@@ -719,6 +719,18 @@ impl ProfileManager {
     /// Restores a user-chosen backup over `profiles.json` and reloads the
     /// in-memory map so the change is live without a restart.
     pub async fn restore_profile_backup(&self, backup_path: PathBuf) -> Result<()> {
+        // Salami: nur Dateien aus der eigenen Backup-Liste – sonst könnte die Oberfläche beliebige
+        // Dateien als Profile (mit eigenem Java, JVM-Optionen, Mod-Adressen) einspielen lassen.
+        let requested = std::fs::canonicalize(&backup_path)
+            .map_err(|_| AppError::Other(format!("Backup not found: {}", backup_path.display())))?;
+        let known = backup_utils::list_backups(&self.profiles_path, Some("profiles")).await?;
+        let is_known = known
+            .iter()
+            .any(|(path, _)| std::fs::canonicalize(path).map_or(false, |p| p == requested));
+        if !is_known {
+            return Err(AppError::Other("Only launcher profile backups can be restored".to_string()));
+        }
+
         let _guard = self.save_lock.lock().await;
 
         let raw = fs::read_to_string(&backup_path).await?;
@@ -1447,6 +1459,11 @@ impl ProfileManager {
     ) -> Result<()> {
         use crate::integrations::unified_mod::ModPlatform;
 
+        // Salami: nur Dateien von Modrinth/CurseForge mit sauberem Namen – die Oberfläche könnte
+        // sonst jede Adresse schicken, und der Mod-Downloader würde sie laden.
+        crate::utils::import_safety::require_platform_download(&payload.download_url)?;
+        crate::utils::import_safety::check_content_file_name(&payload.file_name).map_err(AppError::Other)?;
+
         let display_name_log = payload.content_name.as_deref().unwrap_or(&payload.project_id);
         let platform_name = match payload.source {
             ModPlatform::Modrinth => "Modrinth",
@@ -1624,6 +1641,9 @@ impl ProfileManager {
         game_versions: Option<Vec<String>>,
         add_dependencies: bool, // Allow caller to decide
     ) -> Result<()> {
+        // Salami: nur Dateien von Modrinth/CurseForge mit sauberem Namen
+        crate::utils::import_safety::require_platform_download(&download_url)?;
+        crate::utils::import_safety::check_content_file_name(&file_name).map_err(AppError::Other)?;
            // Always use the same behavior for all profiles (add to profile mods + optional deps)
            // if profile.is_standard_version {
            //     let mods_dir = self.get_profile_mods_path(&profile)?;

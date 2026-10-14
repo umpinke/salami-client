@@ -62,6 +62,9 @@ pub fn parse_untrusted_profile(json: &str) -> Result<(Profile, ImportSecurityRep
     let mut profile: Profile = serde_json::from_str(json).map_err(AppError::Json)?;
     // Salami: die Version wird Teil von Ordnernamen (und von Lösch-Pfaden bei Reparaturen)
     require_version_like(&profile.game_version)?;
+    if let Some(loader_version) = profile.loader_version.as_deref() {
+        require_version_like(loader_version)?;
+    }
     let report = sanitize_imported_profile(&mut profile);
     Ok((profile, report))
 }
@@ -134,6 +137,38 @@ pub fn canonical_pack_path(path: &str) -> Result<PathBuf> {
         return Err(reject("resolves to no path segments"));
     }
     Ok(canonical)
+}
+
+/// Salami: `overrides` aus einem CurseForge-Manifest als kanonischer Präfix (`ordner/`, klein).
+/// Nur ein schlichter relativer Ordner – `.`, leer, `..`, Laufwerke usw. werden abgelehnt. Vorschau
+/// (Prüfung der Mod-Dateien) und Entpacken nutzen genau diesen Wert, damit ein Pack nicht mit
+/// z. B. `"overrides": "."` Dateien an der Prüfung vorbei in `mods/` legen kann.
+pub fn curseforge_overrides_prefix(raw: Option<&str>) -> Result<String> {
+    let raw = raw.unwrap_or("overrides");
+    let key = canonical_pack_key(raw).ok_or_else(|| {
+        AppError::Other(format!("Invalid overrides folder '{}' in manifest.json", raw))
+    })?;
+    Ok(format!("{}/", key))
+}
+
+/// Salami: Kanonischer Pfad eines Archiv-Eintrags unterhalb von `prefix` (aus
+/// [`curseforge_overrides_prefix`] oder z. B. `"overrides/"`); `None`, wenn der Eintrag nicht darunter
+/// liegt, nur der Ordner selbst ist oder einen unsicheren Namen hat.
+pub fn canonical_path_under(entry: &str, prefix: &str) -> Option<PathBuf> {
+    let canonical = canonical_pack_path(entry).ok()?;
+    let depth = prefix.trim_end_matches('/').split('/').count();
+    let parts: Vec<Component> = canonical.components().collect();
+    if parts.len() <= depth {
+        return None;
+    }
+    let head: Vec<String> = parts[..depth]
+        .iter()
+        .map(|c| c.as_os_str().to_string_lossy().to_ascii_lowercase())
+        .collect();
+    if format!("{}/", head.join("/")) != prefix.to_ascii_lowercase() {
+        return None;
+    }
+    Some(parts[depth..].iter().collect())
 }
 
 /// Liegt ein kanonischer Pack-Pfad im `mods`-Ordner? Groß-/Kleinschreibung egal (Windows).
@@ -528,6 +563,9 @@ pub fn require_version_like(value: &str) -> Result<()> {
 pub fn is_version_like(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 64
+        // Salami: wird Teil von Ordnernamen und URLs – `.`/`..` wären Pfad-Sprünge
+        && !value.starts_with('.')
+        && !value.contains("..")
         && value
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | '+'))
@@ -536,6 +574,25 @@ pub fn is_version_like(value: &str) -> bool {
 #[cfg(test)]
 mod canonical_pack_path_tests {
     use super::*;
+
+    #[test]
+    fn curseforge_overrides_must_be_a_plain_folder() {
+        assert_eq!(curseforge_overrides_prefix(None).unwrap(), "overrides/");
+        assert_eq!(curseforge_overrides_prefix(Some("Overrides/")).unwrap(), "overrides/");
+        for bad in [".", "", "./", "..", "/", "C:", "a/../b"] {
+            assert!(curseforge_overrides_prefix(Some(bad)).is_err(), "{bad}");
+        }
+        let prefix = curseforge_overrides_prefix(Some("overrides")).unwrap();
+        let jar = PathBuf::from("mods").join("a.jar");
+        assert_eq!(canonical_path_under("overrides/mods/a.jar", &prefix), Some(jar.clone()));
+        assert_eq!(canonical_path_under("./OVERRIDES//mods/a.jar", &prefix), Some(jar));
+        assert_eq!(canonical_path_under("overrides/", &prefix), None);
+        assert_eq!(canonical_path_under("mods/a.jar", &prefix), None);
+        assert_eq!(canonical_path_under("overrides/mods/evil.ja:r", &prefix), None);
+        let nested = curseforge_overrides_prefix(Some("pack/overrides")).unwrap();
+        assert_eq!(canonical_path_under("pack/overrides/config/x.json", &nested), Some(PathBuf::from("config").join("x.json")));
+        assert_eq!(canonical_path_under("pack/config/x.json", &nested), None);
+    }
 
     #[test]
     fn rejects_instead_of_stripping() {
@@ -586,6 +643,9 @@ mod canonical_pack_path_tests {
         assert!(!relative_link_stays_inside(Path::new("a"), Path::new("/etc/passwd")));
         assert!(require_version_like("1.21.11").is_ok());
         assert!(require_version_like("../../x").is_err());
+        assert!(require_version_like("..").is_err());
+        assert!(require_version_like("1.20.1-47.2.0").is_ok());
+        assert!(require_version_like("0.16.10+build.1").is_ok());
     }
 
     #[test]

@@ -182,8 +182,9 @@ pub async fn apply_crash_fix(profile_id: Uuid, action: CrashActionDto) -> Result
 
         "update_loader" => {
             let target = match &action.target_version {
-                Some(v) => v.clone(),
-                None => return Ok(skip(&action.target)),
+                // Salami: nur echte Versionsangaben (landen in Download-Adressen und Ordnernamen)
+                Some(v) if crate::utils::import_safety::is_version_like(v) => v.clone(),
+                _ => return Ok(skip(&action.target)),
             };
             // Use the per-loader OVERRIDE (highest priority) — setting loader_version alone is
             // outranked by a pack policy or an existing override. Mirrors saveLoaderVersion.

@@ -1345,6 +1345,9 @@ pub async fn process_curseforge_pack_from_zip(pack_path: &Path) -> Result<(Profi
     );
     let game_version = manifest.minecraft.version.clone();
     crate::utils::import_safety::require_version_like(&game_version)?;
+    if let Some(version) = loader_version.as_deref() {
+        crate::utils::import_safety::require_version_like(version)?;
+    }
 
     info!(
         "Determined requirements: MC={}, Loader={:?}, LoaderVersion={:?}",
@@ -1704,7 +1707,9 @@ pub async fn extract_curseforge_overrides(
     progress_offset: f64,
     progress_scale: f64,
 ) -> Result<()> {
-    let overrides_dir = manifest.overrides.as_deref().unwrap_or("overrides");
+    // Salami: geprüfter, kanonischer Override-Ordner (gleiche Regel wie die Vorschau)
+    let overrides_dir =
+        crate::utils::import_safety::curseforge_overrides_prefix(manifest.overrides.as_deref())?;
 
     info!(
         "Extracting overrides for profile '{}' from CurseForge pack {:?} using concurrent streaming (overrides dir: '{}')...",
@@ -1756,12 +1761,13 @@ pub async fn extract_curseforge_overrides(
     );
 
     // Count override files for progress tracking
-    let overrides_prefix_for_count = format!("{}/", overrides_dir);
     let mut override_file_count = 0usize;
     for index in 0..num_entries {
         if let Some(entry) = zip_lister.file().entries().get(index) {
             if let Ok(name) = entry.filename().as_str() {
-                if name.starts_with(&overrides_prefix_for_count) && !name.ends_with('/') {
+                if !name.ends_with('/')
+                    && crate::utils::import_safety::canonical_path_under(name, &overrides_dir).is_some()
+                {
                     override_file_count += 1;
                 }
             }
@@ -1804,28 +1810,13 @@ pub async fn extract_curseforge_overrides(
             entry_uncompressed_size = entry.uncompressed_size();
         }
 
-        // Check if this is an override file (starts with the overrides directory)
-        let overrides_prefix = format!("{}/", overrides_dir);
-        let is_override_type = entry_filename_str.starts_with(&overrides_prefix);
+        // Salami: Eintrag und Override-Ordner kanonisch vergleichen – genau wie die Vorschau, die die
+        // Dateien vor dem Import prüft. Unsichere Namen (z. B. `evil.ja:r`) werden abgelehnt, nicht bereinigt.
+        let override_path =
+            crate::utils::import_safety::canonical_path_under(&entry_filename_str, &overrides_dir);
 
-        if is_override_type {
-            let path_after_prefix = match entry_filename_str.strip_prefix(&overrides_prefix) {
-                Some(p_str) if !p_str.is_empty() => p_str,
-                _ => continue, // Skip if path after prefix is empty (e.g. just "overrides/")
-            };
-
-            // Salami: ablehnen statt bereinigen – sonst würde z. B. aus `evil.ja:r` still `evil.jar`
-            let sanitized_relative_path = match crate::utils::import_safety::canonical_pack_path(path_after_prefix) {
-                Ok(path) => path,
-                Err(e) => {
-                    warn!("Skipping override entry {}: {}", entry_filename_str, e);
-                    continue;
-                }
-            };
-
-            // If sanitization results in an empty path (e.g., path was only ".." or similar), skip it.
+        if let Some(sanitized_relative_path) = override_path {
             if sanitized_relative_path.as_os_str().is_empty() {
-                warn!("Skipping empty sanitized relative path for override entry: {} (original relative: {})", entry_filename_str, path_after_prefix);
                 continue;
             }
 

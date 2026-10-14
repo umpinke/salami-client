@@ -28,10 +28,17 @@ pub async fn set_launcher_config(app: AppHandle, mut config: LauncherConfig) -> 
     if !new_jvm.is_empty() {
         risky.push(format!("JVM: {}", new_jvm.join(" ")));
     }
+    if let Some(dir) = launch_guard::changed_game_directory(
+        current.custom_game_directory.as_deref(),
+        config.custom_game_directory.as_deref(),
+    ) {
+        risky.push(format!("Spielordner / Game folder: {dir}"));
+    }
     if !risky.is_empty() && !launch_guard::confirm(&app, &risky).await {
-        warn!("[Config] Launch hook / JVM change was not confirmed, keeping previous values");
+        warn!("[Config] Launch hook / JVM / game folder change was not confirmed, keeping previous values");
         config.hooks = current.hooks.clone();
         config.global_custom_jvm_args = current.global_custom_jvm_args.clone();
+        config.custom_game_directory = current.custom_game_directory.clone();
     }
 
     // Validate concurrent downloads value

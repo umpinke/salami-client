@@ -555,11 +555,16 @@ async fn guard_launch_settings(
     if !new_jvm.is_empty() {
         risky.push(format!("JVM: {}", new_jvm.join(" ")));
     }
+    let new_game_args = launch_guard::changed_game_args(&current.extra_game_args, &new_settings.extra_game_args);
+    if !new_game_args.is_empty() {
+        risky.push(format!("Spiel / Game: {}", new_game_args.join(" ")));
+    }
     if !risky.is_empty() && !launch_guard::confirm(app, &risky).await {
-        warn!("[CMD] Java/JVM change for profile {} was not confirmed, keeping previous values", id);
+        warn!("[CMD] Java/JVM/game-arg change for profile {} was not confirmed, keeping previous values", id);
         new_settings.java_path = current.java_path.clone();
         new_settings.use_custom_java_path = current.use_custom_java_path;
         new_settings.custom_jvm_args = current.custom_jvm_args.clone();
+        new_settings.extra_game_args = current.extra_game_args.clone();
     }
     Ok(())
 }
@@ -2734,7 +2739,33 @@ async fn resolve_local_mod_paths(entries: &[String]) -> Result<Vec<PathBuf>, App
 /// Launch a profile with optional runtime overrides. Does NOT mutate
 /// profiles.json — the override values live only in the clone passed to the
 /// installer. Used primarily by the CLI dispatcher (see `crate::cli`).
-#[tauri::command]
+/// Salami: Aufruf aus der Oberfläche – ohne lokale Mod-Pfade. Die gibt es nur über die
+/// Kommandozeile (`cli.rs`), sonst könnte ein eingeschleustes Skript beliebige Jars (auch von
+/// Netzwerkfreigaben) ungeprüft ins Spiel laden.
+pub mod ipc {
+    use super::{CommandError, LaunchOverrides};
+
+    #[tauri::command]
+    pub async fn launch_profile_with_overrides(
+        profile_ref: String,
+        overrides: LaunchOverrides,
+        quick_play_singleplayer: Option<String>,
+        quick_play_multiplayer: Option<String>,
+        account: Option<String>,
+    ) -> Result<(), CommandError> {
+        super::launch_profile_with_overrides(
+            profile_ref,
+            overrides,
+            quick_play_singleplayer,
+            quick_play_multiplayer,
+            Vec::new(),
+            account,
+        )
+        .await
+    }
+}
+
+/// Start mit Überschreibungen (Kommandozeile und [`ipc::launch_profile_with_overrides`]).
 pub async fn launch_profile_with_overrides(
     profile_ref: String,
     overrides: LaunchOverrides,
@@ -2871,6 +2902,10 @@ async fn resolve_profile_ref(state: &State, profile_ref: &str) -> Result<Profile
 
 /// Apply runtime overrides to a (cloned) profile struct.
 fn apply_overrides(profile: &mut Profile, ov: LaunchOverrides) -> Result<(), CommandError> {
+    // Salami: Versionen landen in Download-Adressen und Ordnernamen
+    for version in ov.game_version.iter().chain(ov.loader_version.iter()) {
+        crate::utils::import_safety::require_version_like(version)?;
+    }
     if let Some(v) = ov.game_version {
         profile.game_version = v;
     }
@@ -3027,7 +3062,7 @@ pub struct TempLaunchArgs {
 /// at `<root>/profiles/noriskclient/temp/<uuid>/` and is swept into the trash
 /// on the next launcher start by `utils::trash_utils::reap_temp_profiles`; the
 /// trash's own 30-day retention then deletes it for good.
-#[tauri::command]
+/// Salami: nur für die Kommandozeile (`cli.rs`), nicht aus der Oberfläche aufrufbar.
 pub async fn launch_temp_profile(args: TempLaunchArgs) -> Result<(), CommandError> {
     let state = State::get().await?;
     let id = Uuid::new_v4();
