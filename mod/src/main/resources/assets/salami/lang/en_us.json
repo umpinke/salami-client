@@ -521,6 +521,7 @@
 	"salami.module.waypoints.setting.through_walls": "Through walls",
 	"salami.module.waypoints.setting.manage": "Manage waypoints",
 	"salami.module.waypoints.added": "Waypoint \"%s\" set (%s %s %s).",
+	"salami.module.waypoints.added_hidden": "Waypoint \"%s\" set.",
 	"salami.module.waypoints.full": "Too many waypoints in this world (max. 500).",
 	"salami.module.waypoints.default_name": "Waypoint",
 	"salami.module.waypoints.death_name": "Death %s",

@@ -5,6 +5,7 @@ import dev.salamiclient.modules.client.GuiScaleModule;
 import dev.salamiclient.modules.misc.WaypointsModule;
 import dev.salamiclient.setting.ColorSetting;
 import dev.salamiclient.theme.Theme;
+import dev.salamiclient.modules.misc.StreamerModeModule;
 import dev.salamiclient.waypoints.Waypoint;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
@@ -177,8 +178,10 @@ public final class WaypointsScreen extends Screen {
 				int cx = cells[1][0] + Math.min(font.width(name), cells[1][1] - cells[1][0]);
 				g.fill(cx, y + 5, cx + 1, y + 15, theme.text());
 			}
-			String coords = String.format(Locale.ROOT, "%d %d %d  %dm", waypoint.x, waypoint.y, waypoint.z,
-				Math.round(eyes.distanceTo(waypoint.center())));
+			long distance = Math.round(eyes.distanceTo(waypoint.center()));
+			String coords = StreamerModeModule.hidesCoords()
+				? distance + "m"
+				: String.format(Locale.ROOT, "%d %d %d  %dm", waypoint.x, waypoint.y, waypoint.z, distance);
 			g.drawString(font, coords, cells[1][1] + 6, y + 6, theme.textDim(), false);
 			g.drawString(font, waypoint.visible ? "◉" : "○", cells[2][0] + 4, y + 6, waypoint.visible ? theme.accent() : theme.textDim(), false);
 			g.drawString(font, "x", cells[3][0] + 5, y + 6, theme.warning(), false);

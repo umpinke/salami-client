@@ -521,6 +521,7 @@
 	"salami.module.waypoints.setting.through_walls": "Durch Wände",
 	"salami.module.waypoints.setting.manage": "Wegpunkte verwalten",
 	"salami.module.waypoints.added": "Wegpunkt „%s“ gesetzt (%s %s %s).",
+	"salami.module.waypoints.added_hidden": "Wegpunkt „%s“ gesetzt.",
 	"salami.module.waypoints.full": "Zu viele Wegpunkte in dieser Welt (max. 500).",
 	"salami.module.waypoints.default_name": "Wegpunkt",
 	"salami.module.waypoints.death_name": "Tod %s",

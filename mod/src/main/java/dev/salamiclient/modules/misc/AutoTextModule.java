@@ -34,8 +34,9 @@ public final class AutoTextModule extends Module {
 		var mc = mc();
 		ClientPacketListener connection = mc.getConnection();
 		for (int i = 0; i < SLOTS; i++) {
-			boolean down = mc.screen == null && keys[i].isBound() && InputConstants.isKeyDown(mc.getWindow(), keys[i].key());
-			if (down && !wasDown[i] && connection != null) {
+			// Zustand immer merken – sonst zählt eine beim Schließen eines Menüs gehaltene Taste als neuer Druck
+			boolean down = keys[i].isBound() && InputConstants.isKeyDown(mc.getWindow(), keys[i].key());
+			if (down && !wasDown[i] && mc.screen == null && connection != null) {
 				send(connection, i);
 			}
 			wasDown[i] = down;

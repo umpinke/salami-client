@@ -82,7 +82,11 @@ public final class WaypointsModule extends Module implements WorldRenderListener
 		BlockPos pos = player.blockPosition();
 		Waypoint waypoint = new Waypoint(name, pos.getX(), pos.getY(), pos.getZ(), player.level().dimension().identifier().toString(), argb);
 		if (store().add(waypoint)) {
-			Chat.info("salami.module.waypoints.added", waypoint.name, pos.getX(), pos.getY(), pos.getZ());
+			if (StreamerModeModule.hidesCoords()) {
+				Chat.info("salami.module.waypoints.added_hidden", waypoint.name);
+			} else {
+				Chat.info("salami.module.waypoints.added", waypoint.name, pos.getX(), pos.getY(), pos.getZ());
+			}
 		} else {
 			Chat.warn("salami.module.waypoints.full");
 		}
@@ -91,15 +95,16 @@ public final class WaypointsModule extends Module implements WorldRenderListener
 	@Override
 	public void onTick() {
 		var mc = mc();
-		boolean addDown = mc.screen == null && addKey.isBound() && InputConstants.isKeyDown(mc.getWindow(), addKey.key());
-		if (addDown && !addWasDown) {
+		// Tastenzustand immer merken, ausgelöst wird nur ohne offenes Menü
+		boolean addDown = addKey.isBound() && InputConstants.isKeyDown(mc.getWindow(), addKey.key());
+		if (addDown && !addWasDown && mc.screen == null) {
 			addHere(String.format(Locale.ROOT, "%s %d", I18n.get("salami.module.waypoints.default_name"),
 				store().current().size() + 1), color.argb());
 		}
 		addWasDown = addDown;
 
-		boolean menuDown = mc.screen == null && menuKey.isBound() && InputConstants.isKeyDown(mc.getWindow(), menuKey.key());
-		if (menuDown && !menuWasDown) {
+		boolean menuDown = menuKey.isBound() && InputConstants.isKeyDown(mc.getWindow(), menuKey.key());
+		if (menuDown && !menuWasDown && mc.screen == null) {
 			openScreen();
 		}
 		menuWasDown = menuDown;

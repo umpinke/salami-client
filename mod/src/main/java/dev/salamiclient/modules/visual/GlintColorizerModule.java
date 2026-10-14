@@ -63,6 +63,7 @@ public final class GlintColorizerModule extends Module {
 				textures.register(id, new TintedTexture(id, image, current));
 			} catch (Exception e) {
 				SalamiClient.LOG.warn("Glint Colorizer: could not tint {}", id, e);
+				applied = argb; // erst bei einer anderen Farbe oder nach Aus/An erneut versuchen
 				return;
 			}
 		}

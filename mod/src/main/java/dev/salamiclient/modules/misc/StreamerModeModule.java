@@ -39,7 +39,14 @@ public final class StreamerModeModule extends Module {
 			return text;
 		}
 		String alias = instance.alias.get().isBlank() ? "Salami" : instance.alias.get();
-		return ComponentText.replace(text, ownName(), alias);
+		String name = ownName();
+		if (name == null || name.equalsIgnoreCase(alias)) {
+			return text;
+		}
+		// UUID mitgeben: Hover-Infos zu deinem Namen (show_entity) enthalten sie
+		Minecraft mc = Minecraft.getInstance();
+		String uuid = mc.getUser() != null && mc.getUser().getProfileId() != null ? mc.getUser().getProfileId().toString() : null;
+		return ComponentText.replace(text, name, alias, uuid);
 	}
 
 	/** Für das Info-HUD: Koordinaten ausblenden. */

@@ -27,7 +27,8 @@ public final class TntTimerModule extends Module {
 	@Override
 	public void onTick() {
 		var player = mc().player;
-		labelled.keySet().removeIf(tnt -> tnt.isRemoved());
+		// entfernt oder aus einer alten Welt (nach Weltwechsel) – nicht festhalten
+		labelled.keySet().removeIf(tnt -> tnt.isRemoved() || tnt.level() != mc().level);
 		for (PrimedTnt tnt : mc().level.getEntitiesOfClass(PrimedTnt.class, player.getBoundingBox().inflate(RANGE))) {
 			int fuse = Math.max(0, tnt.getFuse());
 			int tenths = fuse / 2; // 1 Tick = 0,05 s

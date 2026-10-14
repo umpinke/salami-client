@@ -14,15 +14,32 @@ import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.TranslatableContents;
 
 /**
  * Auto Reconnect: nach einem Verbindungsabbruch ein „Neu verbinden“-Knopf, optional mit
- * Countdown, der sich selbst wieder verbindet. Nur für Server, nicht für Einzelspieler-Welten.
+ * Countdown, der sich selbst wieder verbindet. Nur für Server, nicht für Einzelspieler-Welten
+ * oder Realms.
+ *
+ * <p>Ziel ist immer der Server, mit dem du dich zuletzt selbst verbinden wolltest (gemerkt beim
+ * Verbindungsaufbau, nicht erst beim Beitritt) – nie ein älterer. Automatisch höchstens
+ * {@link #MAX_AUTO_ATTEMPTS}-mal mit wachsender Wartezeit, und nie nach Bann, Kick durch einen
+ * Operator oder „von einem anderen Ort eingeloggt“ (sonst werfen sich zwei Clients ewig raus).
  */
 public final class AutoReconnectModule extends Module {
+	private static final int MAX_AUTO_ATTEMPTS = 3;
+	/** So lange verbunden gilt als stabil – danach zählen die Versuche wieder von vorn. */
+	private static final long STABLE_MILLIS = 30_000;
+
 	private static AutoReconnectModule instance;
-	/** Zuletzt betretener Server (bei jedem Beitritt gemerkt). */
+	/** Server der letzten selbst gestarteten Verbindung; {@code null} = nichts anbieten. */
 	private static ServerData lastServer;
+	/** Neu-Verbinden-Versuche seit der letzten stabilen Verbindung. */
+	private static int attempts;
+	/** Zeitpunkt des Beitritts, 0 = (noch) nicht beigetreten. */
+	private static long connectedAt;
+	/** {@code true}, während dieses Modul selbst die Verbindung startet. */
+	private static boolean reconnecting;
 
 	private final BoolSetting auto = add(new BoolSetting("auto", true));
 	private final NumberSetting delay = add(new NumberSetting("delay", 5, 2, 30, 1));
@@ -32,26 +49,68 @@ public final class AutoReconnectModule extends Module {
 		instance = this;
 	}
 
-	/** Bei jedem Server-Beitritt (siehe {@code SalamiClient}). */
-	public static void rememberServer(ServerData server) {
-		if (server != null) {
-			lastServer = server;
+	/** Für {@code ConnectScreenMixin}: jeder Verbindungsaufbau zu einem Server. */
+	public static void onConnectStart(ServerData server) {
+		if (!reconnecting) {
+			attempts = 0; // neue, selbst gewählte Verbindung
 		}
+		lastServer = server != null && server.type() != ServerData.Type.REALM ? server : null;
+		connectedAt = 0;
+	}
+
+	/** Einzelspieler oder Realms: nichts zum Neu-Verbinden anbieten. */
+	public static void forget() {
+		lastServer = null;
+		attempts = 0;
+		connectedAt = 0;
+	}
+
+	/** Bei jedem Beitritt (siehe {@code SalamiClient}). */
+	public static void onJoin(ServerData current) {
+		if (current == null || current.type() == ServerData.Type.REALM) {
+			forget();
+			return;
+		}
+		connectedAt = System.currentTimeMillis();
 	}
 
 	/** Für {@code DisconnectedScreenMixin}: Knopf oder {@code null}, wenn nicht passend. */
-	public static Button createButton() {
+	public static Button createButton(Component reason) {
 		if (instance == null || !instance.isEnabled() || lastServer == null) {
 			return null;
 		}
-		ServerData server = lastServer;
-		long deadline = instance.auto.isOn() ? System.currentTimeMillis() + instance.delay.intValue() * 1000L : -1;
-		return new ReconnectButton(server, deadline);
+		if (connectedAt > 0) {
+			if (System.currentTimeMillis() - connectedAt >= STABLE_MILLIS) {
+				attempts = 0;
+			}
+			connectedAt = 0;
+		}
+		boolean automatic = instance.auto.isOn() && attempts < MAX_AUTO_ATTEMPTS && !refusesAutomatic(reason);
+		// 1., 2., 3. Versuch: einfache, doppelte, vierfache Wartezeit
+		long deadline = automatic ? System.currentTimeMillis() + (instance.delay.intValue() * 1000L << attempts) : -1;
+		return new ReconnectButton(lastServer, deadline);
+	}
+
+	/** Gründe, bei denen automatisches Neu-Verbinden nur schadet. */
+	static boolean refusesAutomatic(Component reason) {
+		if (reason != null && reason.getContents() instanceof TranslatableContents translatable) {
+			String key = translatable.getKey();
+			return key.startsWith("multiplayer.disconnect.banned")
+				|| key.equals("multiplayer.disconnect.duplicate_login")
+				|| key.equals("multiplayer.disconnect.kicked");
+		}
+		return false;
 	}
 
 	private static void reconnect(ServerData server) {
 		Minecraft mc = Minecraft.getInstance();
-		ConnectScreen.startConnecting(new JoinMultiplayerScreen(new TitleScreen()), mc, ServerAddress.parseString(server.ip), server, false, null);
+		attempts++;
+		reconnecting = true;
+		try {
+			ConnectScreen.startConnecting(new JoinMultiplayerScreen(new TitleScreen()), mc, ServerAddress.parseString(server.ip), server, false, null);
+		} finally {
+			reconnecting = false;
+		}
 	}
 
 	/** Knopf mit Countdown im Text; verbindet beim Klick oder wenn der Countdown abläuft. */

@@ -102,6 +102,29 @@ public final class SalamiModsBatchCGameTest implements FabricClientGameTest {
 		String own = context.computeOnClient(c -> c.getUser().getName());
 		String hidden = context.computeOnClient(c -> StreamerModeModule.hideName(Component.literal("<" + own + "> hallo")).getString());
 		check(!hidden.contains(own) && hidden.contains("Salami"), "Streamer Mode: own name still visible: " + hidden);
+		// andere Schreibweise, Name über mehrere Teile verteilt, Hover/Klick mit dem Namen
+		String lower = context.computeOnClient(c -> StreamerModeModule.hideName(
+			Component.literal("hi " + own.toLowerCase(java.util.Locale.ROOT) + "!")).getString());
+		check(!lower.toLowerCase(java.util.Locale.ROOT).contains(own.toLowerCase(java.util.Locale.ROOT)), "Streamer Mode: lower-case name visible: " + lower);
+		String split = context.computeOnClient(c -> {
+			var message = Component.literal("<");
+			for (char ch : own.toCharArray()) {
+				message.append(Component.literal(String.valueOf(ch)).withStyle(net.minecraft.ChatFormatting.GOLD));
+			}
+			return StreamerModeModule.hideName(message.append("> hi")).getString();
+		});
+		check(!split.contains(own), "Streamer Mode: split name visible: " + split);
+		boolean eventsGone = context.computeOnClient(c -> {
+			Component message = Component.literal(own).withStyle(s -> s
+				.withClickEvent(new net.minecraft.network.chat.ClickEvent.SuggestCommand("/tell " + own + " "))
+				.withHoverEvent(new net.minecraft.network.chat.HoverEvent.ShowText(Component.literal(own)))
+				.withInsertion(own));
+			var style = StreamerModeModule.hideName(message).getStyle();
+			return style.getClickEvent() == null && style.getHoverEvent() == null && style.getInsertion() == null;
+		});
+		check(eventsGone, "Streamer Mode: hover/click still reveals the name");
+		String other = context.computeOnClient(c -> StreamerModeModule.hideName(Component.literal(own + "x hallo")).getString());
+		check(other.equals(own + "x hallo"), "Streamer Mode: replaced inside another name: " + other);
 		String stamped = context.computeOnClient(c -> ChatTweaksModule.decorate(Component.literal("x")).getString());
 		check(stamped.matches("\\[\\d\\d:\\d\\d] x"), "Chat Tweaks: no timestamp: " + stamped);
 		context.takeScreenshot("salami-41-chat");
@@ -164,7 +187,7 @@ public final class SalamiModsBatchCGameTest implements FabricClientGameTest {
 		Module reconnect = modules.get(AutoReconnectModule.class);
 		set(reconnect, "auto", false);
 		context.runOnClient(c -> modules.setEnabled(reconnect, true));
-		context.runOnClient(c -> AutoReconnectModule.rememberServer(new ServerData("Test", "localhost:25565", ServerData.Type.OTHER)));
+		context.runOnClient(c -> AutoReconnectModule.onConnectStart(new ServerData("Test", "localhost:25565", ServerData.Type.OTHER)));
 		context.setScreen(() -> new DisconnectedScreen(new TitleScreen(), Component.literal("Verbindung verloren"), Component.literal("Test")));
 		context.waitTicks(2);
 		check(context.computeOnClient(c -> c.screen.children().stream().anyMatch(w -> w instanceof Button b
@@ -172,8 +195,26 @@ public final class SalamiModsBatchCGameTest implements FabricClientGameTest {
 			"Auto Reconnect: no reconnect button");
 		context.takeScreenshot("salami-45-auto-reconnect");
 		context.setScreen(() -> null);
-		context.runOnClient(c -> modules.setEnabled(reconnect, false));
+
+		// automatisch an, aber „von einem anderen Ort eingeloggt“: nur der Knopf, kein Countdown
 		set(reconnect, "auto", true);
+		context.setScreen(() -> new DisconnectedScreen(new TitleScreen(), Component.literal("Verbindung verloren"),
+			Component.translatable("multiplayer.disconnect.duplicate_login")));
+		context.waitTicks(2);
+		check(context.computeOnClient(c -> c.screen.children().stream().anyMatch(w -> w instanceof Button b
+			&& b.getMessage().getString().equals(Component.translatable("salami.module.auto_reconnect.button").getString()))),
+			"Auto Reconnect: countdown after duplicate login");
+		context.setScreen(() -> null);
+
+		// Einzelspieler-Beitritt vergisst den Server: kein Knopf mehr
+		context.runOnClient(c -> AutoReconnectModule.onJoin(null));
+		context.setScreen(() -> new DisconnectedScreen(new TitleScreen(), Component.literal("Verbindung verloren"), Component.literal("Test")));
+		context.waitTicks(2);
+		check(context.computeOnClient(c -> c.screen.children().stream().noneMatch(w -> w instanceof Button b
+			&& b.getMessage().getString().startsWith(Component.translatable("salami.module.auto_reconnect.button").getString()))),
+			"Auto Reconnect: offered a stale server");
+		context.setScreen(() -> null);
+		context.runOnClient(c -> modules.setEnabled(reconnect, false));
 	}
 
 	// ------------------------------------------------------------------ Helfer

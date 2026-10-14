@@ -296,7 +296,7 @@ public final class SalamiClient implements ClientModInitializer {
 		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
 			modules.get(SafeModeModule.class).onJoin(client.getCurrentServer());
 			TpsModule.reset();
-			AutoReconnectModule.rememberServer(client.getCurrentServer());
+			AutoReconnectModule.onJoin(client.getCurrentServer());
 		});
 		// Kits: ein halb angewendetes Kit nicht in die nächste Verbindung/Welt mitnehmen
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> modules.get(KitsModule.class).cancel());

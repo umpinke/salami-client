@@ -65,7 +65,8 @@ public final class ExternalMods {
 			}
 		} catch (ClassNotFoundException e) {
 			// Mod Menu fehlt – dann gibt es auch keine Einstellungsseite
-		} catch (Exception e) {
+		} catch (Exception | LinkageError e) {
+			// Fehler im fremden Mod (z. B. fehlende Klasse) – nicht das Spiel abstürzen lassen
 			SalamiClient.LOG.warn("Could not open the settings of {}: {}", entry.modId(), e.toString());
 		}
 		return null;

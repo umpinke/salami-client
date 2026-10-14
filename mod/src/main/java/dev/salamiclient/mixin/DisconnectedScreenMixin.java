@@ -5,6 +5,7 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.layouts.LinearLayout;
 import net.minecraft.client.gui.screens.DisconnectedScreen;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.DisconnectionDetails;
 import net.minecraft.network.chat.Component;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -20,13 +21,17 @@ public abstract class DisconnectedScreenMixin extends Screen {
 	@Final
 	private LinearLayout layout;
 
+	@Shadow
+	@Final
+	private DisconnectionDetails details;
+
 	protected DisconnectedScreenMixin(Component title) {
 		super(title);
 	}
 
 	@Inject(method = "init", at = @At("TAIL"))
 	private void salami$addReconnect(CallbackInfo ci) {
-		Button button = AutoReconnectModule.createButton();
+		Button button = AutoReconnectModule.createButton(details.reason());
 		if (button == null) {
 			return;
 		}
