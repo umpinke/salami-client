@@ -7,6 +7,7 @@ import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import { useProfileStore } from "../../store/profile-store";
 import { useThemeStore } from "../../store/useThemeStore";
 import { SalamiPlayView } from "../launcher/SalamiPlayView";
+import { OnlineCountBadge } from "../launcher/OnlineCountBadge";
 import { RetroGridEffect } from "../effects/RetroGridEffect";
 import {
   BACKGROUND_EFFECTS,
@@ -87,8 +88,9 @@ export function PlayTab() {
           />
         )}
 
-        {/* 3D Render Toggle - Top Right */}
+        {/* Online-Zähler + 3D Render Toggle - Top Right */}
         <div className="absolute top-6 right-6 z-20 flex flex-col items-end gap-3">
+          <OnlineCountBadge />
           <div className="flex items-center gap-2">
             <span className="text-sm text-white/70 font-minecraft">{t("settings.background.skin_animation")}</span>
             <ToggleSwitch

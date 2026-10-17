@@ -7,6 +7,7 @@ Minecraft-Client für **1.21.11 (Fabric)** mit eigenem Launcher, Modul-System un
 | Launcher | [`launcher/`](launcher/) | Fork des [NoRisk-Launchers](https://github.com/NoRiskClient/noriskclient-launcher) (Tauri 2, React, Rust) |
 | In-Game-Mod `salami-core` | [`mod/`](mod/) | Fabric, Java 21, Mojang-Mappings |
 | Pack-Definitionen | [`packs/`](packs/) | JSON, im Launcher eingebettet |
+| Online-Zähler | [`server/online-counter/`](server/online-counter/) | Node.js, ohne Abhängigkeiten, auf eigenem Server |
 | Logo & Branding | [`branding/`](branding/) | `generate_logo.py` (Pillow) |
 | Plan & Roadmap | [`docs/PLAN.md`](docs/PLAN.md) | |
 

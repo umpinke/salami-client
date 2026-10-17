@@ -44,6 +44,11 @@ pub const DISCORD_LARGE_IMAGE: &str = "logo";
 /// Knopf unter der Discord-Anzeige: (Beschriftung, Link).
 pub const DISCORD_BUTTON: (&str, &str) = ("Download", "https://github.com/umpinke/salami-client/releases/latest");
 
+/// Eigener Online-Zähler (`server/online-counter/`), z. B. `Some("https://online.example.de")`.
+/// Der Launcher meldet sich dort alle 30 s anonym (zufällige ID pro Start) und zeigt im
+/// Spielen-Tab, wie viele Launcher gerade offen sind. `None` = Zähler und Anzeige aus.
+pub const ONLINE_COUNTER_URL: Option<&str> = Some("https://salami-client-zaehler.umpinke.de");
+
 /// Pack für Profile, die auf unbekannte Packs verweisen (z. B. aus importierten Profilen
 /// anderer Launcher).
 pub const FALLBACK_PACK_ID: &str = "salami";

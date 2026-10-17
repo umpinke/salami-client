@@ -170,6 +170,8 @@ mockIPC((cmd, args) => {
       return null;
     case "refresh_standard_versions":
       return [];
+    case "get_online_count":
+      return 42;
   }
   if (cmd.startsWith("plugin:")) return null;
   if (LIST_COMMANDS.test(cmd)) return [];

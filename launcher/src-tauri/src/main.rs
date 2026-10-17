@@ -238,6 +238,7 @@ async fn main() {
                         }
                     }
                     "quit" => {
+                        utils::online_counter::leave_blocking();
                         app.exit(0);
                     }
                     _ => {}
@@ -453,6 +454,9 @@ async fn main() {
                     utils::mod_cache_cleanup::run_startup_cleanup().await;
                 });
 
+                // Salami: anonym beim Online-Zähler melden (Anzeige im Spielen-Tab).
+                utils::online_counter::start(state_init_app_handle.clone());
+
                 #[cfg(windows)]
                 commands::clip_commands::start_on_launch(state_init_app_handle.clone());
 
@@ -574,6 +578,7 @@ async fn main() {
                 // --- Handle window close request (from taskbar, etc.) ---
                 main_window.listen("tauri://close-requested", move |_event| {
                     info!("Window close requested via system (taskbar, etc.). Exiting application.");
+                    utils::online_counter::leave_blocking();
                     std::process::exit(0);
                 });
             } else {
@@ -883,6 +888,7 @@ async fn main() {
             commands::clip_commands::clip_prepare_preview,
             commands::clip_commands::clip_rename,
             commands::clip_commands::clip_open_folder,
+            utils::online_counter::get_online_count,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

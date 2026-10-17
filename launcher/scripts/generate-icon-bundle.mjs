@@ -23,6 +23,7 @@ const NOT_ICONS = new Set([
   "visibility", "overflow",
   "node", // Salami: Node-Modul-Specifier in Unit-Tests ("node:test")
   "builtin", // Salami: Cape-Auswahl "builtin:<name>"
+  "categories", // Salami: Modrinth-Suchfacetten in der Website-Demo ("categories:datapack")
 ]);
 
 const ICON_RE = /["'`]([a-z][a-z0-9-]*):([a-z0-9][a-z0-9-]*)["'`]/g;

@@ -302,4 +302,5 @@ permissions = [
   "allow-clip-prepare-preview",
   "allow-clip-rename",
   "allow-clip-open-folder",
+  "allow-get-online-count",
 ]

@@ -25,6 +25,9 @@ const SALAMI_UI_STRINGS: Record<string, Strings> = {
     "salami.play.no_profile": "Kein Profil",
     "salami.play.version": "Minecraft {{version}} · {{loader}}",
     "salami.play.recent": "Zuletzt gespielt",
+    "salami.play.online_one": "{{count}} Spieler online",
+    "salami.play.online_other": "{{count}} Spieler online",
+    "salami.play.online_hint": "So viele Salami-Launcher sind gerade offen",
   },
   en: {
     "salami.mode.title": "Salami Mode",
@@ -38,6 +41,9 @@ const SALAMI_UI_STRINGS: Record<string, Strings> = {
     "salami.play.no_profile": "No profile",
     "salami.play.version": "Minecraft {{version}} · {{loader}}",
     "salami.play.recent": "Recently played",
+    "salami.play.online_one": "{{count}} player online",
+    "salami.play.online_other": "{{count}} players online",
+    "salami.play.online_hint": "Salami launchers open right now",
   },
 };
 

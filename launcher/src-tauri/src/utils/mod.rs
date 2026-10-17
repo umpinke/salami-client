@@ -38,6 +38,7 @@ pub mod log_archive; // Archives per-session game logs centrally
 pub mod legacy_cleanup; // Salami: NoRisk-Reste (Caches) beim Start entfernen
 pub mod path_guard; // Salami: Datei-Befehle der Oberfläche auf Launcher-Ordner begrenzen
 pub mod launch_guard; // Salami: Hooks/Java/JVM-Agenten nur nach nativer Bestätigung
+pub mod online_counter; // Salami: anonymer Online-Zähler (wie viele Launcher gerade offen sind)
 pub mod secret_store; // Salami: accounts.json per Windows DPAPI verschlüsseln
 pub mod bounded_log_writer;
 pub mod mc_utils; // Utilities for Minecraft-related operations

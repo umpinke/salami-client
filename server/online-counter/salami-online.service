@@ -1,0 +1,25 @@
+[Unit]
+Description=Salami Client Online-Zaehler
+After=network.target
+
+[Service]
+Type=simple
+User=salami
+WorkingDirectory=/opt/salami-online
+ExecStart=/usr/bin/node /opt/salami-online/server.mjs
+Environment=PORT=8787
+Environment=HOST=0.0.0.0
+# Hinter Caddy/nginx: HOST=127.0.0.1 und TRUST_PROXY=1 setzen.
+Environment=TRUST_PROXY=0
+Restart=always
+RestartSec=5
+
+# Abschotten: der Dienst braucht nur Netzwerk.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+
+[Install]
+WantedBy=multi-user.target
