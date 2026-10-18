@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Salami Capes – Prüfung</title>
+  <link rel="stylesheet" href="app.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="bar">
+    <div class="brand">
+      <span class="slice" aria-hidden="true"></span>
+      <span>Salami Capes <small>Prüfung</small></span>
+    </div>
+    <div class="who" id="who" hidden>
+      <span id="admin-name"></span>
+      <button type="button" class="ghost" id="logout">Abmelden</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="login" id="login" hidden>
+      <h1>Anmelden</h1>
+      <p>Eigene Capes sind für andere Spieler erst sichtbar, wenn ein Admin sie hier freigibt.</p>
+      <form id="login-form">
+        <label for="token">Admin-Schlüssel</label>
+        <input id="token" type="password" autocomplete="current-password" required>
+        <button type="submit" class="primary">Anmelden</button>
+        <p class="error" id="login-error" role="alert"></p>
+      </form>
+    </section>
+
+    <section id="review" hidden>
+      <nav class="tabs" role="tablist">
+        <button type="button" role="tab" data-status="pending">Wartet <span class="count" data-count="pending">0</span></button>
+        <button type="button" role="tab" data-status="approved">Freigegeben <span class="count" data-count="approved">0</span></button>
+        <button type="button" role="tab" data-status="rejected">Abgelehnt <span class="count" data-count="rejected">0</span></button>
+      </nav>
+      <p class="hint" id="hint"></p>
+      <p class="error" id="list-error" role="alert"></p>
+      <div class="grid" id="grid"></div>
+      <p class="empty" id="empty" hidden></p>
+    </section>
+  </main>
+
+  <template id="card-template">
+    <article class="card">
+      <div class="previews">
+        <figure><canvas class="px" data-part="outside"></canvas><figcaption>Cape</figcaption></figure>
+        <figure><canvas class="px" data-part="inside"></canvas><figcaption>Innen</figcaption></figure>
+        <figure><canvas class="px" data-part="elytra"></canvas><figcaption>Elytra</figcaption></figure>
+      </div>
+      <canvas class="px texture" data-part="texture"></canvas>
+      <dl class="meta">
+        <dt>Von</dt><dd class="submitter"></dd>
+        <dt>Eingereicht</dt><dd class="submitted"></dd>
+        <dt>Trägt gerade</dt><dd class="users"></dd>
+        <dt class="reviewed-label">Geprüft</dt><dd class="reviewed"></dd>
+        <dt class="reason-label">Grund</dt><dd class="reason"></dd>
+      </dl>
+      <div class="actions">
+        <button type="button" class="primary approve">Freigeben</button>
+        <button type="button" class="danger reject">Ablehnen</button>
+      </div>
+      <form class="reject-form" hidden>
+        <input type="text" maxlength="200" placeholder="Grund (optional, sieht der Spieler)">
+        <div class="actions">
+          <button type="submit" class="danger">Ablehnen</button>
+          <button type="button" class="ghost cancel">Abbrechen</button>
+        </div>
+      </form>
+    </article>
+  </template>
+</body>
+</html>

@@ -1,16 +1,21 @@
 //! Salami Capes: eigene Capes (PNG im Minecraft-Cape-Layout) und die Auswahl, die beim
 //! Spielstart als `-Dsalami.cape=…` an salami-core geht.
 //!
-//! Alles bleibt lokal im Launcher-Ordner (`salami_capes/`). Es gibt keinen Cape-Server –
-//! andere Spieler sehen das Cape deshalb nicht.
+//! Die Bilder liegen lokal im Launcher-Ordner (`salami_capes/`). Mit anderen Salami-Spielern
+//! teilt salami-core das gewählte Cape über den Cape-Server (`branding::CAPE_SERVER_URL`,
+//! Code in `server/capes/`); eigene Bilder sehen andere erst nach Freigabe durch einen Admin.
+//! Der Launcher fragt dort nur den Prüfstatus ab ([`review_status`]).
 
-use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
+use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use base64::Engine;
 use image::{GenericImageView, ImageFormat};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 /// Mitgelieferte Capes (Dateinamen in salami-core und `launcher/public/capes`).
 pub const BUILTIN_CAPES: [&str; 3] = ["salami", "pepperoni", "board"];
@@ -51,6 +56,18 @@ pub struct CapeView {
     pub name: String,
     pub created: String,
     pub image: String,
+    /// ID des Bildes auf dem Cape-Server ([`share_id`]), für den Prüfstatus.
+    pub share_id: String,
+}
+
+/// Prüfstatus eines eigenen Capes auf dem Cape-Server.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct CapeReview {
+    /// `pending`, `approved` oder `rejected`.
+    pub status: String,
+    /// Begründung des Admins bei `rejected`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 #[derive(Serialize, Debug)]
@@ -121,12 +138,24 @@ fn clean_name(name: &str) -> String {
     if trimmed.is_empty() { "Mein Cape".to_string() } else { trimmed }
 }
 
+/// Cape-ID wie auf dem Cape-Server (`server/capes/png.mjs`): SHA-256 über Breite, Höhe
+/// (je 4 Byte Big Endian) und die RGBA-Pixel. Hängt nur am Bildinhalt, nicht an der Datei.
+pub fn share_id(png: &[u8]) -> Option<String> {
+    let image = image::load_from_memory(png).ok()?.to_rgba8();
+    let mut hasher = Sha256::new();
+    hasher.update(image.width().to_be_bytes());
+    hasher.update(image.height().to_be_bytes());
+    hasher.update(image.as_raw());
+    Some(hex::encode(hasher.finalize()))
+}
+
 fn view(dir: &Path, cape: &StoredCape) -> Option<CapeView> {
     let bytes = std::fs::read(png_path(dir, &cape.id)).ok()?;
     Some(CapeView {
         id: cape.id.clone(),
         name: cape.name.clone(),
         created: cape.created.clone(),
+        share_id: share_id(&bytes).unwrap_or_default(),
         image: format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes)),
     })
 }
@@ -212,6 +241,50 @@ pub fn select(dir: &Path, selection: Option<&str>) -> Result<()> {
     store.save(dir)
 }
 
+/// Adresse des Cape-Servers. In Debug-Builds überschreibbar per `SALAMI_CAPES_URL`
+/// (zum Testen gegen einen lokalen Server).
+pub fn server_url() -> Option<String> {
+    #[cfg(debug_assertions)]
+    if let Ok(url) = std::env::var("SALAMI_CAPES_URL") {
+        if !url.is_empty() {
+            return Some(url.trim_end_matches('/').to_string());
+        }
+    }
+    crate::branding::CAPE_SERVER_URL.map(|url| url.trim_end_matches('/').to_string())
+}
+
+#[derive(Deserialize)]
+struct StatusResponse {
+    status: HashMap<String, CapeReview>,
+}
+
+/// Prüfstatus dieser Cape-IDs ([`share_id`]). Fehlt eine ID, wurde das Bild noch nie
+/// eingereicht (das macht salami-core beim Spielen mit dem Cape).
+pub async fn review_status(ids: &[String]) -> Result<HashMap<String, CapeReview>> {
+    let Some(base) = server_url() else {
+        return Ok(HashMap::new());
+    };
+    let ids: Vec<&String> = ids.iter().filter(|id| id.len() == 64).take(100).collect();
+    if ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let response = HTTP_CLIENT
+        .post(format!("{base}/v1/capes/status"))
+        .timeout(Duration::from_secs(10))
+        .json(&serde_json::json!({ "ids": ids }))
+        .send()
+        .await
+        .map_err(|e| AppError::Other(format!("Cape-Server nicht erreichbar: {e}")))?;
+    if !response.status().is_success() {
+        return Err(AppError::Other(format!("Cape-Server antwortet mit {}", response.status())));
+    }
+    let body: StatusResponse = response
+        .json()
+        .await
+        .map_err(|e| AppError::Other(format!("Antwort des Cape-Servers unlesbar: {e}")))?;
+    Ok(body.status)
+}
+
 /// Wert für `-Dsalami.cape`: `none`, `builtin:<name>` oder der Pfad zur PNG-Datei.
 pub fn launch_arg(dir: &Path) -> String {
     let store = CapeStore::load(dir);
@@ -254,6 +327,21 @@ mod tests {
         assert!(normalize_cape_png(&png(64, 64)).is_err()); // Skin, kein Cape
         assert!(normalize_cape_png(&png(100, 50)).is_err()); // kein Vielfaches von 64
         assert!(normalize_cape_png(b"kein bild").is_err());
+    }
+
+    #[test]
+    fn share_id_depends_on_pixels_only() {
+        let a = share_id(&png(64, 32)).unwrap();
+        assert_eq!(a.len(), 64);
+        // gleiche Pixel, anders kodiert (RGB statt RGBA) → gleiche ID
+        let mut rgb = Cursor::new(Vec::new());
+        image::RgbImage::from_pixel(64, 32, image::Rgb([178, 58, 58]))
+            .write_to(&mut rgb, ImageFormat::Png)
+            .unwrap();
+        assert_eq!(share_id(&rgb.into_inner()).unwrap(), a);
+        assert_ne!(share_id(&png(128, 64)).unwrap(), a);
+        // gleiche Rechnung wie server/capes/png.mjs (capeId) für 64x32 einfarbig rgba(178,58,58,255)
+        assert_eq!(a, "866fdf3660b57ee457c5fa997f35d0cc495c72eaa03d02427b05f85a8779364d");
     }
 
     #[test]

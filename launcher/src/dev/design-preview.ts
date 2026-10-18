@@ -112,8 +112,16 @@ const capeStore = {
   builtin: ["salami", "pepperoni", "board"],
   // Beispiel: die Vorlage selbst als eigenes Cape (zeigt Cape- und Elytra-Flächen)
   capes: [
-    { id: "vorlage", name: "Vorlage", created: now, image: "/src-tauri/assets/salami_cape_template.png" },
-  ] as { id: string; name: string; created: string; image: string }[],
+    { id: "vorlage", name: "Vorlage", created: now, image: "/src-tauri/assets/salami_cape_template.png", share_id: "a".repeat(64) },
+    { id: "freigegeben", name: "Mein Brett", created: now, image: "/capes/board.png", share_id: "b".repeat(64) },
+    { id: "abgelehnt", name: "Werbung", created: now, image: "/capes/pepperoni.png", share_id: "c".repeat(64) },
+  ] as { id: string; name: string; created: string; image: string; share_id: string }[],
+};
+/** Prüfstatus auf dem Cape-Server; neu gezeichnete Capes fehlen hier („Nur für dich“). */
+const capeReviews: Record<string, { status: string; reason?: string }> = {
+  ["a".repeat(64)]: { status: "pending" },
+  ["b".repeat(64)]: { status: "approved" },
+  ["c".repeat(64)]: { status: "rejected", reason: "Bitte keine Werbung" },
 };
 
 mockWindows("main");
@@ -127,7 +135,7 @@ mockIPC((cmd, args) => {
       return null;
     case "salami_capes_save": {
       const id = (a.id as string | null) ?? crypto.randomUUID();
-      const cape = { id, name: String(a.name), created: now, image: String(a.pngBase64) };
+      const cape = { id, name: String(a.name), created: now, image: String(a.pngBase64), share_id: "d".repeat(64) };
       capeStore.capes = [...capeStore.capes.filter((c) => c.id !== id), cape];
       return cape;
     }
@@ -137,6 +145,8 @@ mockIPC((cmd, args) => {
     case "salami_capes_delete":
       capeStore.capes = capeStore.capes.filter((c) => c.id !== a.id);
       return null;
+    case "salami_capes_review_status":
+      return Object.fromEntries((a.ids as string[]).filter((id) => capeReviews[id]).map((id) => [id, capeReviews[id]]));
     case "salami_capes_download_template":
       return "C:\\Users\\Du\\Downloads\\salami_cape_vorlage.png";
     case "get_profile_log_files":

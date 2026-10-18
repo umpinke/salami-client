@@ -1,6 +1,7 @@
 package dev.salamiclient;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import dev.salamiclient.capes.SharedCapes;
 import dev.salamiclient.config.ConfigManager;
 import dev.salamiclient.gui.clickgui.ClickGuiScreen;
 import dev.salamiclient.gui.ModSettingsScreen;
@@ -349,6 +350,7 @@ public final class SalamiClient implements ClientModInitializer {
 			easyLeave();
 		}
 		modules.tick(client);
+		SharedCapes.tick(client);
 		config.tick();
 	}
 

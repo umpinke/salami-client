@@ -2,6 +2,8 @@ package dev.salamiclient.modules.visual;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import dev.salamiclient.SalamiClient;
+import dev.salamiclient.capes.CapeShare;
+import dev.salamiclient.capes.SharedCapes;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.setting.BoolSetting;
@@ -13,6 +15,7 @@ import net.minecraft.core.ClientAsset;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.PngInfo;
 import net.minecraft.world.entity.player.PlayerSkin;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.InputStream;
 import java.nio.file.FileSystemException;
@@ -20,6 +23,7 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -33,7 +37,9 @@ import java.util.function.Supplier;
  * Salami-Designs und {@code CUSTOM} = {@code config/salami/cape.png} (Cape-Layout 64x32
  * oder ein Vielfaches).
  *
- * <p>Nur für dich sichtbar – andere Spieler sehen ihr eigenes bzw. dein Mojang-Cape.
+ * <p>Andere Salami-Spieler sehen dein Cape über den Cape-Server ({@link SharedCapes}):
+ * mitgelieferte sofort, eigene Bilder erst nach Freigabe durch einen Admin. Spieler ohne
+ * Salami Client sehen weiter dein Mojang-Cape.
  */
 public final class CapesModule extends Module {
 	public enum Cape { LAUNCHER, SALAMI, PEPPERONI, BOARD, CUSTOM }
@@ -50,13 +56,18 @@ public final class CapesModule extends Module {
 
 	private final ModeSetting<Cape> cape = add(new ModeSetting<>("cape", Cape.LAUNCHER));
 	private final BoolSetting elytra = add(new BoolSetting("elytra", true));
+	private final BoolSetting others = add(new BoolSetting("others", true));
 
 	/** Geladenes eigenes Cape ({@code null} = keins oder Fehler). */
 	private ClientAsset.Texture custom;
 	private boolean customTried;
+	/** Bild des eigenen Capes fürs Teilen ({@code NONE}, wenn es nicht geladen werden konnte). */
+	private CapeShare customShare = CapeShare.NONE;
+	/** Was andere vom eigenen Cape sehen sollen – gesetzt von {@link #texture()}. */
+	private CapeShare share = CapeShare.NONE;
 	private final Map<Cape, ClientAsset.Texture> builtIn = new EnumMap<>(Cape.class);
-	private PlayerSkin lastBase;
-	private PlayerSkin lastResult;
+	/** getSkin() läuft jedes Frame für jeden Spieler – Ergebnis je Spieler wiederverwenden. */
+	private final Map<UUID, SkinCache> skins = new HashMap<>();
 	/** Zuletzt übernommene Launcher-Auswahl (siehe {@link #texture()}). */
 	private String appliedLauncherSelection;
 
@@ -75,24 +86,53 @@ public final class CapesModule extends Module {
 		customTried = false;
 	}
 
+	private record SkinCache(PlayerSkin base, PlayerSkin result) {}
+
 	/** Für {@code AbstractClientPlayerMixin}: Skin des Spielers, ggf. mit Salami-Cape. */
 	public static PlayerSkin apply(UUID player, PlayerSkin skin) {
 		CapesModule module = instance;
-		if (module == null || !module.isEnabled() || !player.equals(mc().getUser().getProfileId())) {
+		if (module == null || !module.isEnabled()) {
 			return skin;
 		}
-		ClientAsset.Texture texture = module.texture();
+		ClientAsset.Texture texture;
+		if (player.equals(mc().getUser().getProfileId())) {
+			texture = module.texture();
+		} else if (module.others.isOn()) {
+			// Andere Salami-Spieler: Cape vom Cape-Server (nur mitgelieferte und freigegebene)
+			texture = SharedCapes.capeOf(player, module::builtInNamed);
+		} else {
+			texture = null;
+		}
 		if (texture == null) {
 			return skin;
 		}
 		// getSkin() läuft jedes Frame – Ergebnis wiederverwenden, solange sich nichts ändert
 		ClientAsset.Texture elytraTexture = module.elytra.isOn() ? texture : skin.elytra();
-		PlayerSkin cached = module.lastResult;
-		if (cached == null || module.lastBase != skin || !cached.cape().equals(texture) || cached.elytra() != elytraTexture) {
-			module.lastBase = skin;
-			module.lastResult = new PlayerSkin(skin.body(), texture, elytraTexture, skin.model(), skin.secure());
+		SkinCache cached = module.skins.get(player);
+		if (cached == null || cached.base() != skin || !cached.result().cape().equals(texture) || cached.result().elytra() != elytraTexture) {
+			if (module.skins.size() > 512) {
+				module.skins.clear();
+			}
+			cached = new SkinCache(skin, new PlayerSkin(skin.body(), texture, elytraTexture, skin.model(), skin.secure()));
+			module.skins.put(player, cached);
 		}
-		return module.lastResult;
+		return cached.result();
+	}
+
+	/**
+	 * Für {@link SharedCapes}: was andere Salami-Spieler von dir sehen sollen.
+	 * {@code null} = noch unklar (keine Welt geladen).
+	 */
+	public static @Nullable CapeShare sharedState() {
+		CapesModule module = instance;
+		if (module == null || mc().player == null) {
+			return null;
+		}
+		if (!module.isEnabled()) {
+			return CapeShare.NONE;
+		}
+		module.texture();
+		return module.share;
 	}
 
 	private ClientAsset.Texture texture() {
@@ -111,7 +151,26 @@ public final class CapesModule extends Module {
 		if (selected == Cape.CUSTOM) {
 			return customFrom(CapesModule::customCapeFile);
 		}
+		return own(selected);
+	}
+
+	/** Mitgeliefertes Cape als eigenes Cape (wird so auch geteilt). */
+	private ClientAsset.Texture own(Cape selected) {
+		String name = selected.name().toLowerCase(Locale.ROOT);
+		if (!name.equals(share.builtin())) {
+			share = CapeShare.builtin(name);
+		}
 		return builtIn(selected);
+	}
+
+	/** Mitgeliefertes Cape eines anderen Spielers ({@code "salami"} …), unbekannte Namen → {@code null}. */
+	private ClientAsset.@Nullable Texture builtInNamed(String name) {
+		return switch (name) {
+			case "salami" -> builtIn(Cape.SALAMI);
+			case "pepperoni" -> builtIn(Cape.PEPPERONI);
+			case "board" -> builtIn(Cape.BOARD);
+			default -> null;
+		};
 	}
 
 	private ClientAsset.Texture builtIn(Cape selected) {
@@ -122,17 +181,18 @@ public final class CapesModule extends Module {
 	/** {@code null}/leer = Spiel ohne Launcher gestartet → Salami-Cape. */
 	private ClientAsset.Texture fromLauncher(String selection) {
 		if (selection == null || selection.isBlank()) {
-			return builtIn(Cape.SALAMI);
+			return own(Cape.SALAMI);
 		}
 		if (selection.equals("none")) {
+			share = CapeShare.NONE;
 			return null;
 		}
 		if (selection.startsWith("builtin:")) {
 			try {
 				Cape named = Cape.valueOf(selection.substring("builtin:".length()).toUpperCase(Locale.ROOT));
-				return named == Cape.LAUNCHER || named == Cape.CUSTOM ? builtIn(Cape.SALAMI) : builtIn(named);
+				return named == Cape.LAUNCHER || named == Cape.CUSTOM ? own(Cape.SALAMI) : own(named);
 			} catch (IllegalArgumentException unknown) {
-				return builtIn(Cape.SALAMI);
+				return own(Cape.SALAMI);
 			}
 		}
 		return customFrom(() -> launcherPath(selection));
@@ -161,13 +221,15 @@ public final class CapesModule extends Module {
 	private ClientAsset.Texture customFrom(Supplier<Path> file) {
 		if (!customTried) {
 			customTried = true;
+			customShare = CapeShare.NONE;
 			Path path = file.get();
 			custom = path == null ? null : loadCustom(path);
 		}
+		share = customShare;
 		return custom;
 	}
 
-	private static ClientAsset.Texture loadCustom(Path file) {
+	private ClientAsset.Texture loadCustom(Path file) {
 		// In Log und Chat nie den vollen Pfad – er enthält den Windows-Benutzernamen
 		String name = String.valueOf(file.getFileName());
 		NativeImage image = null;
@@ -200,6 +262,7 @@ public final class CapesModule extends Module {
 			}
 			mc().getTextureManager().register(CUSTOM_TEXTURE, new DynamicTexture(() -> "salami custom cape", image));
 			image = null; // gehört jetzt der Textur
+			customShare = CapeShare.png(data);
 			return new ClientAsset.ResourceTexture(CUSTOM_TEXTURE, CUSTOM_TEXTURE);
 		} catch (Exception e) {
 			// Exception statt nur IOException: ein kaputtes Bild darf das Spiel nie abstürzen lassen
@@ -214,7 +277,7 @@ public final class CapesModule extends Module {
 	}
 
 	/** Cape-Layout: Breite = 2 × Höhe, 64–2048 px breit, Vielfaches von 64. */
-	private static boolean validCapeSize(int width, int height) {
+	public static boolean validCapeSize(int width, int height) {
 		return width == height * 2 && width >= MIN_WIDTH && width <= MAX_WIDTH && width % MIN_WIDTH == 0;
 	}
 

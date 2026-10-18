@@ -6,6 +6,14 @@ export interface SalamiCape {
   name: string;
   created: string;
   image: string;
+  /** ID des Bildes auf dem Cape-Server (Hash über die Pixel), für den Prüfstatus. */
+  share_id: string;
+}
+
+/** Prüfstatus auf dem Cape-Server. Fehlt ein Cape, wurde es noch nicht eingereicht. */
+export interface SalamiCapeReview {
+  status: "pending" | "approved" | "rejected";
+  reason?: string;
 }
 
 export interface SalamiCapeOverview {
@@ -33,6 +41,10 @@ export const renameCape = (id: string, name: string) => invoke<void>("salami_cap
 export const deleteCape = (id: string) => invoke<void>("salami_capes_delete", { id });
 
 export const selectCape = (selection: string | null) => invoke<void>("salami_capes_select", { selection });
+
+/** Prüfstatus eigener Capes, Schlüssel ist `share_id`. */
+export const getCapeReviews = (ids: string[]) =>
+  invoke<Record<string, SalamiCapeReview>>("salami_capes_review_status", { ids });
 
 /** Speichert die Vorlage im Download-Ordner und liefert den Pfad. */
 export const downloadCapeTemplate = () => invoke<string>("salami_capes_download_template");

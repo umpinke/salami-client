@@ -28,12 +28,16 @@ import dev.salamiclient.util.ArrowBallistics;
 import dev.salamiclient.util.CrystalUtil;
 import dev.salamiclient.util.InteractUtil;
 import dev.salamiclient.util.TargetUtil;
+import com.mojang.authlib.GameProfile;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.RemotePlayer;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
@@ -48,6 +52,14 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.EntityHitResult;
 import org.apache.commons.lang3.function.FailableFunction;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.UncheckedIOException;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.UUID;
 
 /**
  * Funktionstests der Utility- und Visual-Module in einer echten Welt.
@@ -74,6 +86,7 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 			testLiveTracker(context, server, modules);
 			testParticles(context, server, modules);
 			testCapes(context, server, modules);
+			testSharedCapes(context, modules);
 			testPlayerEsp(context, modules);
 			testTriggerBot(context, server, modules);
 			testAimAssist(context, server, modules);
@@ -321,6 +334,75 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 		check(capeIs(context, "pepperoni"), "Capes: changing the cape in game after launch has no effect");
 		set(capes, "cape", CapesModule.Cape.LAUNCHER);
 		System.clearProperty("salami.cape");
+	}
+
+	/**
+	 * Andere Salami-Spieler: ein Mini-Cape-Server liefert für zwei fremde Spieler ein
+	 * mitgeliefertes und ein (freigegebenes) eigenes Cape – der Mod muss beide anzeigen.
+	 */
+	private static void testSharedCapes(ClientGameTestContext context, ModuleManager modules) {
+		UUID builtinPlayer = UUID.fromString("0f1e2d3c-4b5a-4978-8796-a5b4c3d2e1f0");
+		UUID customPlayer = UUID.fromString("11111111-2222-4333-8444-555555555555");
+		UUID unknownPlayer = UUID.fromString("22222222-3333-4444-8555-666666666666");
+		String customId = "ab".repeat(32);
+		HttpServer http;
+		try {
+			byte[] customPng = Files.readAllBytes(java.nio.file.Path.of(System.getProperty("user.dir"))
+				.resolve("../../../../launcher/src-tauri/assets/salami_cape_template.png").normalize());
+			String lookup = "{\"capes\":{\"" + builtinPlayer + "\":{\"builtin\":\"pepperoni\"},\""
+				+ customPlayer + "\":{\"id\":\"" + customId + "\"}}}";
+			http = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+			http.createContext("/v1/capes/lookup", exchange -> respond(exchange, 200, "application/json", lookup.getBytes(StandardCharsets.UTF_8)));
+			http.createContext("/v1/capes/img/" + customId + ".png", exchange -> respond(exchange, 200, "image/png", customPng));
+			// Teilen des eigenen Capes (Challenge) gibt es hier nicht – kein Mojang-Login im Test
+			http.createContext("/", exchange -> respond(exchange, 404, "application/json", "{\"error\":\"nicht gefunden\"}".getBytes(StandardCharsets.UTF_8)));
+			http.start();
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+		System.setProperty("salami.capes.url", "http://127.0.0.1:" + http.getAddress().getPort());
+		try {
+			Module capes = modules.get(CapesModule.class);
+			set(capes, "others", true);
+			RemotePlayer[] others = context.computeOnClient(c -> new RemotePlayer[] {
+				new RemotePlayer(c.level, new GameProfile(builtinPlayer, "Salamitester")),
+				new RemotePlayer(c.level, new GameProfile(customPlayer, "Pepper_99")),
+				new RemotePlayer(c.level, new GameProfile(unknownPlayer, "KeinSalami")),
+			});
+			Identifier pepperoni = Identifier.fromNamespaceAndPath("salami", "textures/cape/pepperoni.png");
+			Identifier custom = Identifier.fromNamespaceAndPath("salami", "cape/shared/" + customId);
+			check(waitFor(context, 100, c -> capePath(others[0]).equals(pepperoni) && capePath(others[1]).equals(custom)),
+				"Shared capes: other players' capes not shown (" + context.computeOnClient(c -> capePath(others[0]) + ", " + capePath(others[1])) + ")");
+			check(context.computeOnClient(c -> capePath(others[2]).getNamespace().equals("minecraft")),
+				"Shared capes: player without Salami cape got one");
+
+			set(capes, "others", false);
+			check(context.computeOnClient(c -> !capePath(others[0]).getNamespace().equals("salami")),
+				"Shared capes: still shown with 'others' off");
+			set(capes, "others", true);
+
+			// ohne Cape-Server (Launcher ohne Adresse): keine fremden Salami-Capes, Cache wird geleert
+			System.clearProperty("salami.capes.url");
+			check(context.computeOnClient(c -> !capePath(others[0]).getNamespace().equals("salami")),
+				"Shared capes: still shown without a cape server");
+		} finally {
+			System.clearProperty("salami.capes.url");
+			http.stop(0);
+		}
+	}
+
+	/** Cape-Textur eines Spielers; ohne Cape {@code minecraft:none}. */
+	private static Identifier capePath(RemotePlayer player) {
+		var cape = player.getSkin().cape();
+		return cape == null ? Identifier.withDefaultNamespace("none") : cape.texturePath();
+	}
+
+	private static void respond(HttpExchange exchange, int status, String type, byte[] body) throws IOException {
+		exchange.getResponseHeaders().set("Content-Type", type);
+		exchange.sendResponseHeaders(status, body.length);
+		try (OutputStream out = exchange.getResponseBody()) {
+			out.write(body);
+		}
 	}
 
 	private static boolean capeIs(ClientGameTestContext context, String name) {

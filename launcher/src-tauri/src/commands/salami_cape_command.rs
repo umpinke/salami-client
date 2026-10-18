@@ -1,9 +1,10 @@
 //! Befehle für die Cape-Seite des Launchers (siehe `integrations::salami_capes`).
 
 use crate::error::{AppError, CommandError};
-use crate::integrations::salami_capes::{self, CapeOverview, CapeView};
+use crate::integrations::salami_capes::{self, CapeOverview, CapeReview, CapeView};
 use base64::Engine;
 use log::{debug, info};
+use std::collections::HashMap;
 use tauri_plugin_opener::OpenerExt;
 
 type CommandResult<T> = Result<T, CommandError>;
@@ -45,6 +46,12 @@ pub async fn salami_capes_delete(id: String) -> CommandResult<()> {
 #[tauri::command]
 pub async fn salami_capes_select(selection: Option<String>) -> CommandResult<()> {
     Ok(salami_capes::select(&salami_capes::capes_dir(), selection.as_deref())?)
+}
+
+/// Prüfstatus eigener Capes auf dem Cape-Server (Schlüssel: `share_id`).
+#[tauri::command]
+pub async fn salami_capes_review_status(ids: Vec<String>) -> CommandResult<HashMap<String, CapeReview>> {
+    Ok(salami_capes::review_status(&ids).await?)
 }
 
 /// Legt die Vorlage in den Download-Ordner und zeigt sie im Explorer.

@@ -361,6 +361,10 @@ impl MinecraftLauncher {
             "-Dsalami.cape={}",
             crate::integrations::salami_capes::launch_arg(&crate::integrations::salami_capes::capes_dir())
         ));
+        // Salami Capes für alle: Cape-Server, über den salami-core Capes teilt und lädt
+        if let Some(url) = crate::integrations::salami_capes::server_url() {
+            command.arg(format!("-Dsalami.capes.url={}", url));
+        }
 
         // Fabric lädt die Mods des Profils aus dem launcher-verwalteten Ordner (zusätzlich zu
         // addMods=@<meta>). Forge/NeoForge bekommen sie stattdessen nach mods/ kopiert.

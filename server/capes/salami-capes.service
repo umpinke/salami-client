@@ -1,0 +1,31 @@
+[Unit]
+Description=Salami Client Cape-Server
+After=network.target
+
+[Service]
+Type=simple
+User=salami
+WorkingDirectory=/opt/salami-capes
+ExecStart=/usr/bin/node /opt/salami-capes/server.mjs
+Environment=PORT=8788
+# Hinter nginx/Caddy: nur lokal lauschen und die echte IP aus X-Forwarded-For lesen.
+Environment=HOST=127.0.0.1
+Environment=TRUST_PROXY=1
+Environment=DATA_DIR=/var/lib/salami-capes
+# Admin-Schlüssel stehen nicht hier, sondern in /etc/salami-capes.env (chmod 600):
+#   ADMIN_TOKENS=leo:langes-zufaelliges-geheimnis,max:anderes-geheimnis
+EnvironmentFile=/etc/salami-capes.env
+# legt /var/lib/salami-capes an (gehört dem Benutzer salami)
+StateDirectory=salami-capes
+Restart=always
+RestartSec=5
+
+# Abschotten: der Dienst braucht nur Netzwerk und seinen Datenordner.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+
+[Install]
+WantedBy=multi-user.target

@@ -11,11 +11,13 @@ import {
   deleteCape,
   downloadCapeTemplate,
   getCapeOverview,
+  getCapeReviews,
   importCape,
   renameCape,
   selectCape,
   type SalamiCape,
   type SalamiCapeOverview,
+  type SalamiCapeReview,
 } from "../../services/salami-cape-service";
 import { Cape3D } from "./Cape3D";
 import { CapeFace } from "./CapeFace";
@@ -23,6 +25,15 @@ import { CapeEditor, type CapeEditorTarget } from "./CapeEditor";
 import "./i18n";
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+type ReviewState = SalamiCapeReview["status"] | "new";
+
+const REVIEW_STYLE: Record<ReviewState, { icon: string; className: string }> = {
+  approved: { icon: "solar:check-circle-bold", className: "bg-emerald-500/20 text-emerald-200" },
+  pending: { icon: "solar:hourglass-bold", className: "bg-amber-500/20 text-amber-200" },
+  rejected: { icon: "solar:close-circle-bold", className: "bg-red-500/25 text-red-200" },
+  new: { icon: "solar:eye-closed-bold", className: "bg-white/10 text-white/70" },
+};
 
 /** Cape-Seite: Salami-Capes, eigene Capes, Vorlage, Import und Editor. */
 export function SalamiCapesTab() {
@@ -32,10 +43,20 @@ export function SalamiCapesTab() {
   const [hovered, setHovered] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [editor, setEditor] = useState<CapeEditorTarget | null>(null);
+  /** Prüfstatus vom Cape-Server; `null` = unbekannt (Server aus oder nicht erreichbar). */
+  const [reviews, setReviews] = useState<Record<string, SalamiCapeReview> | null>(null);
 
   const reload = useCallback(async () => {
     try {
-      setOverview(await getCapeOverview());
+      const next = await getCapeOverview();
+      setOverview(next);
+      const ids = next.capes.map((c) => c.share_id).filter(Boolean);
+      if (ids.length === 0) return;
+      try {
+        setReviews(await getCapeReviews(ids));
+      } catch {
+        setReviews(null);
+      }
     } catch (error) {
       toast.error(t("salami.capes.error", { error: errorText(error) }));
     }
@@ -115,6 +136,33 @@ export function SalamiCapesTab() {
   const selected = overview?.selected ?? null;
   const previewSelection = hovered ?? selected;
   const previewImage = imageOf(previewSelection);
+  const previewCape = overview?.capes.find((c) => c.id === previewSelection) ?? null;
+
+  const reviewOf = (cape: SalamiCape): { state: ReviewState; reason?: string } | null => {
+    if (!reviews) return null;
+    const review = reviews[cape.share_id];
+    return review ? { state: review.status, reason: review.reason } : { state: "new" };
+  };
+
+  const reviewHint = (review: { state: ReviewState; reason?: string }) =>
+    review.state === "rejected" && review.reason
+      ? t("salami.capes.review.rejected_reason", { reason: review.reason })
+      : t(`salami.capes.review.${review.state}_hint`);
+
+  const reviewBadge = (cape: SalamiCape) => {
+    const review = reviewOf(cape);
+    if (!review) return null;
+    const style = REVIEW_STYLE[review.state];
+    return (
+      <span
+        title={reviewHint(review)}
+        className={cn("flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold", style.className)}
+      >
+        <Icon icon={style.icon} className="h-3 w-3" />
+        {t(`salami.capes.review.${review.state}`)}
+      </span>
+    );
+  };
 
   const card = (key: string, selection: string | null, image: string | null, label: string, extra?: React.ReactNode) => {
     const isSelected = selected === selection;
@@ -226,7 +274,13 @@ export function SalamiCapesTab() {
         </div>
         <div className="px-1">
           <div className="text-lg font-semibold text-white">{nameOf(previewSelection)}</div>
-          <p className="mt-1 text-xs leading-relaxed text-white/55">{t("salami.capes.only_you")}</p>
+          {previewCape && reviewOf(previewCape) && (
+            <div className="mt-2 flex flex-col items-start gap-1">
+              {reviewBadge(previewCape)}
+              <p className="text-xs leading-relaxed text-white/70">{reviewHint(reviewOf(previewCape)!)}</p>
+            </div>
+          )}
+          <p className="mt-2 text-xs leading-relaxed text-white/55">{t("salami.capes.visibility")}</p>
         </div>
       </aside>
 
@@ -249,7 +303,18 @@ export function SalamiCapesTab() {
         <h3 className="mb-3 mt-7 text-base font-semibold text-white">{t("salami.capes.own")}</h3>
         {overview && overview.capes.length > 0 ? (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
-            {overview.capes.map((cape) => card(cape.id, cape.id, cape.image, cape.name, ownCapeActions(cape)))}
+            {overview.capes.map((cape) =>
+              card(
+                cape.id,
+                cape.id,
+                cape.image,
+                cape.name,
+                <>
+                  {reviewBadge(cape)}
+                  {ownCapeActions(cape)}
+                </>,
+              ),
+            )}
           </div>
         ) : (
           <div className="rounded-2xl border border-dashed border-white/15 bg-black/20 p-5 text-sm text-white/75">

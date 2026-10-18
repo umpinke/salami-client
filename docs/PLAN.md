@@ -337,6 +337,6 @@ Wünsche: Capes und weitere NoRisk-Features behalten oder nachbauen, Launcher so
 
 | Frage | Entscheidung |
 |---|---|
-| Capes | Eigenes System in `salami-core`. **Sichtbar nur für dich**: damit andere Spieler sie sehen, bräuchte es einen eigenen Cape-Server (Hosting) – später möglich. |
+| Capes | Eigenes System in `salami-core`, geteilt über den eigenen Cape-Server ([`server/capes/`](../server/capes/)): alle Salami-Spieler sehen die Capes der anderen. Mitgelieferte Capes sofort, eigene Bilder erst nach Freigabe durch einen Admin auf der Prüf-Webseite. Spieler ohne Salami Client sehen sie nicht. |
 | Trigger Bot, Aim Assist, Player ESP | Kategorie „Utility“ wie die anderen Kampfmodule: offen gekennzeichnet, durch Safe Mode und Easy Leave abschaltbar, keine Anti-Cheat-Tarnung. |
 | Screenshare-Block | **Wird nicht gebaut** (wie §2 ❌ „Screen-Share Detection / Protection“): Bildschirmaufnahme erkennen und dann alles ausschalten dient nur dazu, Moderatoren bei einer Screenshare-Prüfung zu täuschen. Easy Leave bleibt als manueller Schalter. |

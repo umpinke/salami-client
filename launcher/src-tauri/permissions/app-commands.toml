@@ -178,6 +178,7 @@ permissions = [
   "allow-salami-capes-delete",
   "allow-salami-capes-select",
   "allow-salami-capes-download-template",
+  "allow-salami-capes-review-status",
   "allow-get-all-profiles-and-last-played",
   "allow-get-local-content",
   "allow-install-local-content-to-profile",
