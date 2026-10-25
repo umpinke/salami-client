@@ -88,7 +88,9 @@ Der Signaturschlüssel liegt in `%USERPROFILE%\.salami-client\updater.key` (nich
 
 ### CurseForge-API-Key
 
-CurseForge vergibt API-Keys pro Anwendung. Der Salami Client liefert deshalb keinen fremden Key mit. Den eigenen Key (kostenlos über die [CurseForge Console](https://console.curseforge.com)) beim Bauen als Umgebungsvariable setzen:
+CurseForge vergibt API-Keys pro Anwendung. Der Salami Client liefert deshalb keinen fremden Key mit. Den eigenen Key (kostenlos über die [CurseForge Console](https://console.curseforge.com)) in `%USERPROFILE%\.salami-client\curseforge.key` ablegen (nicht im Repo, wie `updater.key`). `build.rs` baut ihn bei jedem Build ein – `tauri dev`, `tauri build` und `release.mjs`. Das Release-Skript bricht ohne Key ab.
+
+Alternativ für einen einzelnen Build als Umgebungsvariable (hat Vorrang vor der Datei):
 
 ```bash
 SALAMI_CURSEFORGE_API_KEY='$2a$10$...' npx yarn@1.22.22 tauri build

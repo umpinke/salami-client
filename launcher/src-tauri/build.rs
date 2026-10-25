@@ -53,10 +53,39 @@ fn write_permission_set(commands: &[String]) {
     }
 }
 
+/// CurseForge-API-Key für `option_env!("SALAMI_CURSEFORGE_API_KEY")` in integrations/curseforge.rs.
+/// Vorrang hat die Umgebungsvariable, sonst `%USERPROFILE%\.salami-client\curseforge.key`
+/// (wie updater.key nicht im Repo – das Repo ist öffentlich).
+fn curseforge_api_key() {
+    println!("cargo:rerun-if-env-changed=SALAMI_CURSEFORGE_API_KEY");
+    if std::env::var_os("SALAMI_CURSEFORGE_API_KEY").is_some() {
+        return;
+    }
+    let Some(home) = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME")) else {
+        return;
+    };
+    let dir = Path::new(&home).join(".salami-client");
+    // Ordner statt Datei beobachten: eine fehlende Datei ließe Cargo bei jedem Build neu kompilieren
+    if dir.is_dir() {
+        println!("cargo:rerun-if-changed={}", dir.display());
+    }
+    let key = fs::read_to_string(dir.join("curseforge.key")).unwrap_or_default();
+    let key = key.trim();
+    if key.is_empty() {
+        println!(
+            "cargo:warning=Kein CurseForge-API-Key ({} fehlt) – CurseForge ist in diesem Build aus.",
+            dir.join("curseforge.key").display()
+        );
+    } else {
+        println!("cargo:rustc-env=SALAMI_CURSEFORGE_API_KEY={key}");
+    }
+}
+
 fn main() {
     println!("cargo:rerun-if-env-changed=NRC_CAPTURE_RUNTIME_SHA256");
     println!("cargo:rerun-if-env-changed=NRC_CAPTURE_RUNTIME_URL");
     println!("cargo:rerun-if-changed=src/main.rs");
+    curseforge_api_key();
 
     // Ohne App-Manifest prüft Tauri Launcher-Befehle gar nicht: jede Seite in einem Fenster
     // (auch eine fremde nach einer Weiterleitung) könnte sie aufrufen. Mit Manifest gelten

@@ -30,8 +30,9 @@ use crate::utils::string_utils::safe_truncate;
 // Base URL for CurseForge API
 const CURSEFORGE_API_BASE_URL: &str = "https://api.curseforge.com/v1";
 
-// Salami: Der CurseForge-API-Key wird beim Build per Umgebungsvariable gesetzt
-// (SALAMI_CURSEFORGE_API_KEY). CurseForge vergibt Keys pro Anwendung
+// Salami: Der CurseForge-API-Key wird beim Build eingebaut – aus der Umgebungsvariable
+// SALAMI_CURSEFORGE_API_KEY oder aus %USERPROFILE%\.salami-client\curseforge.key
+// (build.rs). CurseForge vergibt Keys pro Anwendung
 // (https://console.curseforge.com) – fremde Keys werden nicht mitgeliefert.
 const CURSEFORGE_API_KEY: &str = match option_env!("SALAMI_CURSEFORGE_API_KEY") {
     Some(key) => key,

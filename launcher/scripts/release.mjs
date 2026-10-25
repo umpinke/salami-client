@@ -12,7 +12,8 @@
 // Release aktualisiert die Beta-Updatedatei mit, sobald es neuer ist als die letzte Beta.
 //
 // Voraussetzungen: Version in src-tauri/tauri.conf.json erhöht, `gh auth login` erledigt,
-// Signaturschlüssel in %USERPROFILE%\.salami-client\updater.key (oder TAURI_SIGNING_PRIVATE_KEY).
+// Signaturschlüssel in %USERPROFILE%\.salami-client\updater.key (oder TAURI_SIGNING_PRIVATE_KEY),
+// CurseForge-API-Key in %USERPROFILE%\.salami-client\curseforge.key (oder SALAMI_CURSEFORGE_API_KEY).
 // Der Launcher liest .../releases/latest/download/latest.json (branding.rs: UPDATE_BASE_URL).
 import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -106,6 +107,15 @@ if (!flag("--skip-build")) {
     env.TAURI_SIGNING_PRIVATE_KEY = readFileSync(keyFile, "utf8").trim();
   }
   env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ??= "";
+  // build.rs baut den CurseForge-Key ein – ohne ihn wäre CurseForge im Release aus
+  const curseforgeKeyFile = join(homedir(), ".salami-client", "curseforge.key");
+  if (
+    !env.SALAMI_CURSEFORGE_API_KEY &&
+    !(existsSync(curseforgeKeyFile) && readFileSync(curseforgeKeyFile, "utf8").trim())
+  ) {
+    console.error(`CurseForge-API-Key fehlt: ${curseforgeKeyFile} (oder SALAMI_CURSEFORGE_API_KEY)`);
+    process.exit(1);
+  }
   run("npx", [
     "yarn@1.22.22", "tauri", "build",
     "--config", "src-tauri/tauri.release-local.json",
