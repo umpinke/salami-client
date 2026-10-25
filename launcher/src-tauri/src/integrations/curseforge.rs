@@ -49,6 +49,44 @@ fn curseforge_api_key() -> Result<&'static str> {
     }
 }
 
+/// Salami: Seit 16.07.2026 verlangt CurseForge den Key auch für Datei-Downloads vom CDN
+/// (edge.forgecdn.net, sonst 401). Nur per HTTPS an CurseForge-Hosts, nie an fremde Server.
+pub fn with_cdn_key(request: reqwest::RequestBuilder, url: &str) -> reqwest::RequestBuilder {
+    if !CURSEFORGE_API_KEY.is_empty() && is_curseforge_cdn(url) {
+        request.header("x-api-key", CURSEFORGE_API_KEY)
+    } else {
+        request
+    }
+}
+
+fn is_curseforge_cdn(url: &str) -> bool {
+    let Ok(url) = reqwest::Url::parse(url) else {
+        return false;
+    };
+    url.scheme() == "https"
+        && url.host_str().is_some_and(|host| {
+            crate::utils::import_safety::CURSEFORGE_HOSTS
+                .iter()
+                .any(|cdn| host.eq_ignore_ascii_case(cdn))
+        })
+}
+
+#[cfg(test)]
+mod cdn_key_tests {
+    use super::is_curseforge_cdn;
+
+    #[test]
+    fn only_https_curseforge_hosts_get_the_key() {
+        assert!(is_curseforge_cdn("https://edge.forgecdn.net/files/5432/100/jei-1.21.1.jar"));
+        assert!(is_curseforge_cdn("https://MEDIAFILEZ.forgecdn.net/files/1/2/a.zip"));
+        assert!(!is_curseforge_cdn("http://edge.forgecdn.net/files/1/2/a.jar"));
+        assert!(!is_curseforge_cdn("https://cdn.modrinth.com/data/a/versions/b/c.jar"));
+        assert!(!is_curseforge_cdn("https://edge.forgecdn.net.evil.example/a.jar"));
+        assert!(!is_curseforge_cdn("https://evil.example/?edge.forgecdn.net"));
+        assert!(!is_curseforge_cdn("kein url"));
+    }
+}
+
 /// Determines appropriate memory settings based on recommended RAM and system capabilities
 fn determine_memory_settings(recommended_ram_mb: Option<u64>) -> crate::state::profile_state::MemorySettings {
     use crate::state::profile_state::MemorySettings;
@@ -2229,8 +2267,7 @@ pub async fn download_and_install_curseforge_modpack(
 
     // Download the file
     let client = HTTP_CLIENT.clone();
-    let response = client
-        .get(&download_url)
+    let response = with_cdn_key(client.get(&download_url), &download_url)
         .send_with_retry()
         .await
         .map_err(|e| {

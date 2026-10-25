@@ -315,7 +315,7 @@ impl DownloadUtils {
         }
 
         // Make HTTP request
-        let mut request = HTTP_CLIENT.get(url);
+        let mut request = crate::integrations::curseforge::with_cdn_key(HTTP_CLIENT.get(url), url);
         
         if let Some(user_agent) = &config.user_agent {
             request = request.header("User-Agent", user_agent);
