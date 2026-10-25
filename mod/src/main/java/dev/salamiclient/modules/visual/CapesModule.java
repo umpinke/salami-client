@@ -3,6 +3,7 @@ package dev.salamiclient.modules.visual;
 import com.mojang.blaze3d.platform.NativeImage;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.capes.CapeShare;
+import dev.salamiclient.capes.LauncherCapes;
 import dev.salamiclient.capes.SharedCapes;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
@@ -136,22 +137,31 @@ public final class CapesModule extends Module {
 	}
 
 	private ClientAsset.Texture texture() {
-		// Aus dem Launcher gestartet: dessen Auswahl gilt ab Spielstart – auch wenn in der
-		// Config noch ein anderes Cape steht (sonst sieht man immer z. B. das Salami-Cape).
-		// Im Spiel umstellen geht danach weiterhin, bis zum nächsten Start.
-		String launcher = System.getProperty(LAUNCHER_PROPERTY);
-		if (launcher != null && !launcher.isBlank() && !launcher.equals(appliedLauncherSelection)) {
-			appliedLauncherSelection = launcher;
+		// Aus dem Launcher gestartet: dessen Auswahl gilt – auch wenn in der Config noch ein
+		// anderes Cape steht (sonst sieht man immer z. B. das Salami-Cape). Wählt man im
+		// Launcher ein anderes Cape, während das Spiel läuft, gilt es sofort (LauncherCapes).
+		// Im Spiel umstellen geht weiterhin, bis man im Launcher wieder etwas wählt.
+		String launcher = launcherSelection();
+		String applied = launcher == null ? null : launcher + "#" + LauncherCapes.revision();
+		if (launcher != null && !launcher.isBlank() && !applied.equals(appliedLauncherSelection)) {
+			appliedLauncherSelection = applied;
 			cape.set(Cape.LAUNCHER);
+			customTried = false; // anderes oder geändertes Bild neu laden
 		}
 		Cape selected = cape.get();
 		if (selected == Cape.LAUNCHER) {
-			return fromLauncher(System.getProperty(LAUNCHER_PROPERTY));
+			return fromLauncher(launcher);
 		}
 		if (selected == Cape.CUSTOM) {
 			return customFrom(CapesModule::customCapeFile);
 		}
 		return own(selected);
+	}
+
+	/** Live-Auswahl aus dem Launcher-Ordner, sonst {@code -Dsalami.cape} vom Spielstart. */
+	private static String launcherSelection() {
+		String live = LauncherCapes.selection();
+		return live != null ? live : System.getProperty(LAUNCHER_PROPERTY);
 	}
 
 	/** Mitgeliefertes Cape als eigenes Cape (wird so auch geteilt). */

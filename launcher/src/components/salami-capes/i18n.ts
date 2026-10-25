@@ -4,7 +4,7 @@ import i18n from "../../i18n/i18n";
 const STRINGS: Record<string, Record<string, string>> = {
   de: {
     "salami.capes.title": "Capes",
-    "salami.capes.subtitle": "Wähle ein Cape oder mach dein eigenes. Es erscheint ab dem nächsten Spielstart.",
+    "salami.capes.subtitle": "Wähle ein Cape oder mach dein eigenes. Ein Wechsel gilt sofort – auch im laufenden Spiel und für alle anderen Salami-Spieler.",
     "salami.capes.visibility": "Salami-Capes sehen alle, die auch den Salami Client nutzen. Eigene Capes werden beim Spielen eingereicht und sind für andere sichtbar, sobald ein Admin sie freigegeben hat.",
     "salami.capes.review.approved": "Für alle sichtbar",
     "salami.capes.review.approved_hint": "Ein Admin hat das Cape freigegeben. Alle Salami-Spieler sehen es.",
@@ -65,7 +65,7 @@ const STRINGS: Record<string, Record<string, string>> = {
   },
   en: {
     "salami.capes.title": "Capes",
-    "salami.capes.subtitle": "Pick a cape or make your own. It shows up from the next game launch.",
+    "salami.capes.subtitle": "Pick a cape or make your own. Changes apply right away – even while the game is running, and for all other Salami players.",
     "salami.capes.visibility": "Salami capes are visible to everyone who also uses Salami Client. Your own capes are submitted when you play and others see them once an admin has approved them.",
     "salami.capes.review.approved": "Visible to all",
     "salami.capes.review.approved_hint": "An admin approved this cape. All Salami players see it.",

@@ -117,6 +117,45 @@ async function setCape(name, cape, { join = true } = {}) {
 const uuidOf = (name) =>
   PLAYERS[name].replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
 
+/** Live-Verbindung wie salami-core: sammelt die Ereignisse, `next` wartet auf ein passendes. */
+async function openEvents() {
+  const controller = new AbortController();
+  const response = await fetch(`${base}/v1/capes/events`, { signal: controller.signal });
+  const events = [];
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  (async () => {
+    try {
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) return;
+        buffer += decoder.decode(value, { stream: true });
+        let end;
+        while ((end = buffer.indexOf("\n\n")) >= 0) {
+          for (const line of buffer.slice(0, end).split("\n")) {
+            if (line.startsWith("data: ")) events.push(JSON.parse(line.slice(6)));
+          }
+          buffer = buffer.slice(end + 2);
+        }
+      }
+    } catch {}
+  })();
+  return {
+    response,
+    events,
+    close: () => controller.abort(),
+    async next(match, ms = 2_000) {
+      for (const deadline = Date.now() + ms; Date.now() < deadline; ) {
+        const index = events.findIndex(match);
+        if (index >= 0) return events.splice(index, 1)[0];
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      throw new Error("kein passendes Live-Ereignis");
+    },
+  };
+}
+
 function capePixels(width, seed) {
   const height = width / 2;
   const rgba = Buffer.alloc(width * height * 4);
@@ -271,6 +310,37 @@ test("ungeprüfte Capes, die keiner mehr trägt, verschwinden aus der Warteschla
   assert.equal((await admin("GET", "/v1/admin/capes?status=pending")).body.counts.pending, before);
   await setCape("Salamander", null);
   assert.deepEqual((await call("POST", "/v1/capes/lookup", { uuids: [uuidOf("Salamander")] })).body.capes, {});
+});
+
+test("Live: Cape-Wechsel und Freigaben kommen sofort an", async () => {
+  const live = await openEvents();
+  try {
+    assert.equal(live.response.status, 200);
+    assert.match(live.response.headers.get("content-type"), /text\/event-stream/);
+    assert.equal(live.response.headers.get("x-accel-buffering"), "no");
+    const uuid = uuidOf("Pepper_99");
+    const mine = (e) => e.uuid === uuid;
+
+    await setCape("Pepper_99", { builtin: "board" });
+    assert.deepEqual(await live.next(mine), { uuid, cape: { builtin: "board" } });
+
+    // eigenes Bild: bis zur Prüfung sehen andere kein Cape …
+    const pixels = capePixels(64, 40);
+    const id = capeId(64, 32, pixels.rgba);
+    await setCape("Pepper_99", { png: encodeRgba(64, 32, pixels.rgba).toString("base64") });
+    assert.deepEqual(await live.next(mine), { uuid, cape: null });
+    // … und nach der Freigabe sofort das Bild
+    await admin("POST", `/v1/admin/capes/${id}/approve`);
+    assert.deepEqual(await live.next(mine), { uuid, cape: { id } });
+
+    await setCape("Pepper_99", null);
+    assert.deepEqual(await live.next(mine), { uuid, cape: null });
+    // nichts geändert → keine Meldung
+    await setCape("Pepper_99", null);
+    await assert.rejects(live.next(mine, 300));
+  } finally {
+    live.close();
+  }
 });
 
 test("kaputte Bilder und Upload-Limit", async () => {

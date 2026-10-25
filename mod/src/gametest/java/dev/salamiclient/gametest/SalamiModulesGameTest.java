@@ -59,7 +59,15 @@ import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Funktionstests der Utility- und Visual-Module in einer echten Welt.
@@ -87,6 +95,7 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 			testParticles(context, server, modules);
 			testCapes(context, server, modules);
 			testSharedCapes(context, modules);
+			testLauncherLiveCapes(context);
 			testPlayerEsp(context, modules);
 			testTriggerBot(context, server, modules);
 			testAimAssist(context, server, modules);
@@ -338,22 +347,54 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 
 	/**
 	 * Andere Salami-Spieler: ein Mini-Cape-Server liefert für zwei fremde Spieler ein
-	 * mitgeliefertes und ein (freigegebenes) eigenes Cape – der Mod muss beide anzeigen.
+	 * mitgeliefertes und ein (freigegebenes) eigenes Cape – der Mod muss beide anzeigen und
+	 * Wechsel über die Live-Verbindung sofort übernehmen.
 	 */
 	private static void testSharedCapes(ClientGameTestContext context, ModuleManager modules) {
 		UUID builtinPlayer = UUID.fromString("0f1e2d3c-4b5a-4978-8796-a5b4c3d2e1f0");
 		UUID customPlayer = UUID.fromString("11111111-2222-4333-8444-555555555555");
 		UUID unknownPlayer = UUID.fromString("22222222-3333-4444-8555-666666666666");
 		String customId = "ab".repeat(32);
+		// Was der Server gerade für jeden Spieler meldet (wie capes.json auf dem echten Server)
+		Map<UUID, String> visible = new ConcurrentHashMap<>();
+		visible.put(builtinPlayer, "{\"builtin\":\"pepperoni\"}");
+		visible.put(customPlayer, "{\"id\":\"" + customId + "\"}");
+		BlockingQueue<String> events = new LinkedBlockingQueue<>();
+		AtomicBoolean live = new AtomicBoolean();
+		AtomicBoolean stopped = new AtomicBoolean();
+		ExecutorService handlers = Executors.newCachedThreadPool();
 		HttpServer http;
 		try {
 			byte[] customPng = Files.readAllBytes(java.nio.file.Path.of(System.getProperty("user.dir"))
 				.resolve("../../../../launcher/src-tauri/assets/salami_cape_template.png").normalize());
-			String lookup = "{\"capes\":{\"" + builtinPlayer + "\":{\"builtin\":\"pepperoni\"},\""
-				+ customPlayer + "\":{\"id\":\"" + customId + "\"}}}";
 			http = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-			http.createContext("/v1/capes/lookup", exchange -> respond(exchange, 200, "application/json", lookup.getBytes(StandardCharsets.UTF_8)));
+			http.setExecutor(handlers); // die Live-Verbindung bleibt offen und darf andere Anfragen nicht blockieren
+			http.createContext("/v1/capes/lookup", exchange -> {
+				StringBuilder json = new StringBuilder("{\"capes\":{");
+				visible.forEach((uuid, cape) -> json.append(json.length() > 10 ? "," : "").append('"').append(uuid).append("\":").append(cape));
+				respond(exchange, 200, "application/json", json.append("}}").toString().getBytes(StandardCharsets.UTF_8));
+			});
 			http.createContext("/v1/capes/img/" + customId + ".png", exchange -> respond(exchange, 200, "image/png", customPng));
+			http.createContext("/v1/capes/events", exchange -> {
+				exchange.getResponseHeaders().set("Content-Type", "text/event-stream");
+				exchange.sendResponseHeaders(200, 0);
+				try (OutputStream out = exchange.getResponseBody()) {
+					out.write(": verbunden\n\n".getBytes(StandardCharsets.UTF_8));
+					out.flush();
+					live.set(true);
+					while (!stopped.get()) {
+						String event = events.poll(100, TimeUnit.MILLISECONDS);
+						if (event != null) {
+							out.write(("data: " + event + "\n\n").getBytes(StandardCharsets.UTF_8));
+							out.flush();
+						}
+					}
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+				} catch (IOException ignored) {
+					// Mod hat die Verbindung geschlossen
+				}
+			});
 			// Teilen des eigenen Capes (Challenge) gibt es hier nicht – kein Mojang-Login im Test
 			http.createContext("/", exchange -> respond(exchange, 404, "application/json", "{\"error\":\"nicht gefunden\"}".getBytes(StandardCharsets.UTF_8)));
 			http.start();
@@ -370,11 +411,24 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 				new RemotePlayer(c.level, new GameProfile(unknownPlayer, "KeinSalami")),
 			});
 			Identifier pepperoni = Identifier.fromNamespaceAndPath("salami", "textures/cape/pepperoni.png");
+			Identifier board = Identifier.fromNamespaceAndPath("salami", "textures/cape/board.png");
 			Identifier custom = Identifier.fromNamespaceAndPath("salami", "cape/shared/" + customId);
 			check(waitFor(context, 100, c -> capePath(others[0]).equals(pepperoni) && capePath(others[1]).equals(custom)),
 				"Shared capes: other players' capes not shown (" + context.computeOnClient(c -> capePath(others[0]) + ", " + capePath(others[1])) + ")");
 			check(context.computeOnClient(c -> capePath(others[2]).getNamespace().equals("minecraft")),
 				"Shared capes: player without Salami cape got one");
+
+			// Live: Wechsel kommen ohne neue Abfrage innerhalb einer Sekunde an
+			check(waitFor(context, 100, c -> live.get()), "Shared capes: no live connection to the cape server");
+			context.waitTicks(5);
+			visible.put(builtinPlayer, "{\"builtin\":\"board\"}");
+			events.add("{\"uuid\":\"" + builtinPlayer + "\",\"cape\":{\"builtin\":\"board\"}}");
+			check(waitFor(context, 20, c -> capePath(others[0]).equals(board)),
+				"Shared capes: live change to board not applied (" + context.computeOnClient(c -> capePath(others[0])) + ")");
+			visible.remove(customPlayer);
+			events.add("{\"uuid\":\"" + customPlayer + "\",\"cape\":null}");
+			check(waitFor(context, 20, c -> !capePath(others[1]).getNamespace().equals("salami")),
+				"Shared capes: live removal not applied");
 
 			set(capes, "others", false);
 			check(context.computeOnClient(c -> !capePath(others[0]).getNamespace().equals("salami")),
@@ -387,8 +441,69 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 				"Shared capes: still shown without a cape server");
 		} finally {
 			System.clearProperty("salami.capes.url");
+			stopped.set(true);
 			http.stop(0);
+			handlers.shutdownNow();
 		}
+	}
+
+	/**
+	 * Launcher live: im Launcher ein anderes Cape wählen, während das Spiel läuft – salami-core
+	 * liest capes.json aus dem Launcher-Ordner ({@code -Dsalami.capes.dir}) und wechselt sofort.
+	 */
+	private static void testLauncherLiveCapes(ClientGameTestContext context) {
+		java.nio.file.Path dir;
+		try {
+			dir = Files.createTempDirectory("salami-capes-live");
+			java.nio.file.Path template = java.nio.file.Path.of(System.getProperty("user.dir"))
+				.resolve("../../../../launcher/src-tauri/assets/salami_cape_template.png").normalize();
+			Files.copy(template, dir.resolve("meins.png"));
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+		System.setProperty("salami.capes.dir", dir.toString());
+		try {
+			writeCapeStore(dir, "\"builtin:pepperoni\"", 1);
+			check(waitFor(context, 40, c -> ownCape(c).equals(Identifier.fromNamespaceAndPath("salami", "textures/cape/pepperoni.png"))),
+				"Launcher live: selection pepperoni not applied");
+			writeCapeStore(dir, "\"builtin:board\"", 2);
+			check(waitFor(context, 40, c -> ownCape(c).equals(Identifier.fromNamespaceAndPath("salami", "textures/cape/board.png"))),
+				"Launcher live: switching to board while playing has no effect");
+			writeCapeStore(dir, "\"meins\"", 3);
+			check(waitFor(context, 40, c -> ownCape(c).equals(Identifier.fromNamespaceAndPath("salami", "cape/custom"))),
+				"Launcher live: own cape from the launcher not applied (" + context.computeOnClient(SalamiModulesGameTest::ownCape) + ")");
+			writeCapeStore(dir, "null", 4);
+			check(waitFor(context, 40, c -> !ownCape(c).getNamespace().equals("salami")),
+				"Launcher live: 'no cape' still shows a salami cape");
+		} finally {
+			System.clearProperty("salami.capes.dir");
+			try (var files = Files.list(dir)) {
+				for (java.nio.file.Path file : files.toList()) {
+					Files.deleteIfExists(file);
+				}
+				Files.deleteIfExists(dir);
+			} catch (IOException ignored) {
+				// Temp-Ordner
+			}
+		}
+	}
+
+	/** capes.json wie der Launcher sie schreibt; Änderungszeit ausdrücklich weiterzählen. */
+	private static void writeCapeStore(java.nio.file.Path dir, String selected, int step) {
+		java.nio.file.Path store = dir.resolve("capes.json");
+		String json = "{\"selected\":" + selected + ",\"capes\":[{\"id\":\"meins\",\"name\":\"Meins\",\"created\":\"2026-10-25T00:00:00Z\"}]}";
+		try {
+			Files.writeString(store, json);
+			Files.setLastModifiedTime(store, java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() + step * 10_000L));
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+	}
+
+	/** Cape-Textur des eigenen Spielers; ohne Cape {@code minecraft:none}. */
+	private static Identifier ownCape(Minecraft c) {
+		var cape = c.player.getSkin().cape();
+		return cape == null ? Identifier.withDefaultNamespace("none") : cape.texturePath();
 	}
 
 	/** Cape-Textur eines Spielers; ohne Cape {@code minecraft:none}. */

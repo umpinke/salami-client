@@ -106,6 +106,7 @@
 	"salami.module.capes.setting.others.desc": "Shows the capes of other players who also use Salami Client.",
 	"salami.capes.custom_missing": "Salami Capes: No custom cape found. Put it here: %s",
 	"salami.capes.shared.pending": "Salami Capes: Your cape is waiting for an admin to review it. Other Salami players will see it once it's approved.",
+	"salami.capes.shared.approved": "Salami Capes: Your cape was approved – all Salami players see it now.",
 	"salami.capes.shared.rejected": "Salami Capes: Your cape was rejected (%s). Other Salami players don't see it.",
 	"salami.capes.shared.rejected_no_reason": "Salami Capes: An admin rejected your cape. Other Salami players don't see it.",
 	"salami.capes.shared.failed": "Salami Capes: Your cape couldn't be shared: %s",

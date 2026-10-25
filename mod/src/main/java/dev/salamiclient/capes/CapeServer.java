@@ -9,8 +9,10 @@ import com.mojang.authlib.minecraft.MinecraftSessionService;
 import net.minecraft.client.User;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.http.HttpClient;
@@ -26,6 +28,8 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 /**
  * Verbindung zum Salami Cape-Server ({@code server/capes/}). Die Adresse kommt vom
@@ -45,8 +49,29 @@ final class CapeServer {
 	/** Antwort auf {@code lookup}: mitgeliefertes Cape ({@code builtin}) oder freigegebenes eigenes ({@code id}). */
 	record Remote(@Nullable String builtin, @Nullable String id) {}
 
-	/** Ergebnis des Teilens: {@code approved}, {@code pending}, {@code rejected} oder {@code none}. */
-	record Published(String status, @Nullable String reason) {}
+	/** Ergebnis des Teilens: {@code approved}, {@code pending}, {@code rejected} oder {@code none}; {@code id} bei eigenen Bildern. */
+	record Published(String status, @Nullable String id, @Nullable String reason) {}
+
+	/** Live-Verbindung ({@code v1/capes/events}); {@link #close()} beendet sie, auch während sie liest. */
+	static final class EventStream implements AutoCloseable {
+		private volatile @Nullable InputStream body;
+		private volatile boolean closed;
+		/** Zuletzt etwas empfangen (auch das Lebenszeichen alle 20 s). */
+		volatile long lastSeen = System.currentTimeMillis();
+
+		@Override
+		public void close() {
+			closed = true;
+			InputStream in = body;
+			if (in != null) {
+				try {
+					in.close();
+				} catch (IOException ignored) {
+					// schon zu
+				}
+			}
+		}
+	}
 
 	/** Antwort des Cape-Servers mit Fehlerstatus; {@code message} kommt vom Server. */
 	static final class ServerException extends IOException {
@@ -163,7 +188,71 @@ final class CapeServer {
 			body.add("cape", share.toJson());
 			return body;
 		}, executor).thenCompose(body -> send(request("v1/capes/me").PUT(json(body)).build()))
-			.thenApply(json -> new Published(String.valueOf(string(json, "status")), string(json, "reason")));
+			.thenApply(json -> new Published(String.valueOf(string(json, "status")), string(json, "id"), string(json, "reason")));
+	}
+
+	/**
+	 * Öffnet die Live-Verbindung: jede Cape-Änderung eines Salami-Spielers kommt sofort als
+	 * (Spieler, sichtbares Cape oder {@code null}) an {@code onEvent}. {@code onOpen} meldet die
+	 * Verbindung, {@code onEnd} ihr Ende ({@code null} = mit {@link EventStream#close()} beendet).
+	 * Alle Rückrufe kommen aus einem Hintergrund-Thread.
+	 */
+	void events(EventStream stream, BiConsumer<UUID, @Nullable Remote> onEvent, Runnable onOpen, Consumer<@Nullable Throwable> onEnd) {
+		// Ohne Timeout: die Verbindung bleibt offen; tote Verbindungen erkennt SharedCapes am fehlenden Lebenszeichen
+		HttpRequest request = HttpRequest.newBuilder(base.resolve("v1/capes/events"))
+			.header("Accept", "text/event-stream")
+			.GET()
+			.build();
+		http.sendAsync(request, HttpResponse.BodyHandlers.ofInputStream()).whenComplete((response, error) -> {
+			if (error != null) {
+				onEnd.accept(stream.closed ? null : error);
+				return;
+			}
+			executor.execute(() -> read(stream, response, onEvent, onOpen, onEnd));
+		});
+	}
+
+	private static void read(EventStream stream, HttpResponse<InputStream> response,
+			BiConsumer<UUID, @Nullable Remote> onEvent, Runnable onOpen, Consumer<@Nullable Throwable> onEnd) {
+		Throwable failure = null;
+		try (InputStream in = response.body()) {
+			stream.body = in;
+			if (stream.closed) {
+				return;
+			}
+			if (response.statusCode() != 200) {
+				throw new ServerException(response.statusCode(), "Live-Verbindung abgelehnt");
+			}
+			onOpen.run();
+			BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+			for (String line; (line = reader.readLine()) != null; ) {
+				stream.lastSeen = System.currentTimeMillis();
+				if (line.startsWith("data:")) {
+					event(line.substring("data:".length()).trim(), onEvent);
+				}
+			}
+		} catch (Exception e) {
+			failure = e;
+		} finally {
+			onEnd.accept(stream.closed ? null : failure);
+		}
+	}
+
+	private static void event(String data, BiConsumer<UUID, @Nullable Remote> onEvent) {
+		try {
+			JsonObject json = JsonParser.parseString(data).getAsJsonObject();
+			String uuid = string(json, "uuid");
+			if (uuid == null) {
+				return;
+			}
+			JsonElement cape = json.get("cape");
+			Remote remote = cape != null && cape.isJsonObject()
+				? new Remote(string(cape.getAsJsonObject(), "builtin"), string(cape.getAsJsonObject(), "id"))
+				: null;
+			onEvent.accept(UUID.fromString(uuid), remote);
+		} catch (RuntimeException ignored) {
+			// kaputte Zeile überspringen
+		}
 	}
 
 	private HttpRequest post(String path, JsonObject body) {

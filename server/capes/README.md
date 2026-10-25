@@ -2,11 +2,12 @@
 
 Sorgt dafür, dass alle mit dem Salami Client die Capes der anderen Salami-Spieler sehen. Eigene Capes müssen vorher von einem Admin auf der Prüf-Webseite freigegeben werden.
 
-Geplante Adresse: **https://salami-client-capes.umpinke.de** (systemd-Dienst `salami-capes` auf `127.0.0.1:8788`, davor nginx mit Let's Encrypt). Die Prüf-Webseite liegt unter `/admin/`.
+Adresse: **https://salami-client-zaehler.umpinke.de/capes** – derselbe nginx und dasselbe Zertifikat wie der Online-Zähler, nur unter dem Pfad `/capes/` (systemd-Dienst `salami-capes` auf `127.0.0.1:8788`). Die Prüf-Webseite liegt unter **https://salami-client-zaehler.umpinke.de/capes/admin/**.
 
 ## So funktioniert es
 
 - **Mitgelieferte Capes** (Salami, Peperoni, Schneidebrett) sehen alle Salami-Spieler sofort.
+- **Live**: Jedes laufende Spiel hält eine Verbindung zu `/v1/capes/events` (Server-Sent Events). Wechselt jemand sein Cape oder gibt ein Admin eines frei, sehen es alle Mitspieler sofort. Gesendet werden nur UUID und sichtbares Cape, alle 20 s kommt ein Lebenszeichen.
 - **Eigene Capes** schickt salami-core beim Spielen an den Server. Sie landen in der Warteschlange. Bis ein Admin sie freigibt, sieht sie nur der Spieler selbst. Lehnt ein Admin ab, bekommt der Spieler den Grund im Spiel angezeigt.
 - **Anmeldung** wie beim Betreten eines Minecraft-Servers: Das Spiel meldet eine zufällige `serverId` bei Mojang an, der Cape-Server fragt bei Mojang nach (`hasJoined`). Das Zugangstoken des Spielers sieht der Cape-Server nie. So kann niemand ein Cape für einen fremden Account setzen.
 - **Bilder** werden vollständig dekodiert und als schlichtes PNG neu gespeichert (keine Metadaten, nichts Kaputtes). Die Cape-ID ist ein Hash über die Pixel: dasselbe Bild muss nur einmal geprüft werden, egal wer es hochlädt.
@@ -50,20 +51,24 @@ Benötigt **Node.js 18 oder neuer**. Es gibt keine Abhängigkeiten und kein `npm
    curl http://127.0.0.1:8788/health
    ```
 
-5. **nginx** (Subdomain per DNS auf den Server zeigen lassen, Zertifikat mit `certbot --nginx -d salami-client-capes.umpinke.de`):
+5. **nginx**: im bestehenden `server`-Block von `salami-client-zaehler.umpinke.de` (der mit `listen 443 ssl` und dem Zertifikat) **zusätzlich** diesen `location`-Block eintragen. Der Schrägstrich am Ende von `proxy_pass` ist wichtig: er schneidet `/capes` ab.
 
    ```nginx
-   server {
-       server_name salami-client-capes.umpinke.de;
+   location /capes/ {
+       proxy_pass http://127.0.0.1:8788/;
+       proxy_set_header Host $host;
+       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
        # nginx erlaubt sonst nur 1 MiB – Capes sind bis 4 MiB groß (Base64 ~5,4 MiB)
        client_max_body_size 8m;
-       location / {
-           proxy_pass http://127.0.0.1:8788;
-           proxy_set_header Host $host;
-           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-       }
+       # Live-Verbindung (/v1/capes/events): nicht puffern, lange offen lassen
+       proxy_buffering off;
+       proxy_read_timeout 1h;
+       proxy_http_version 1.1;
+       proxy_set_header Connection "";
    }
    ```
+
+   Dann `sudo nginx -t && sudo systemctl reload nginx` und prüfen: `curl https://salami-client-zaehler.umpinke.de/capes/health` muss `ok` liefern, `curl -N https://salami-client-zaehler.umpinke.de/capes/v1/capes/events` muss offen bleiben und `: verbunden` zeigen.
 
 6. **Adresse in den Launcher eintragen**: `CAPE_SERVER_URL` in `launcher/src-tauri/src/branding.rs`. Der Launcher gibt sie beim Spielstart als `-Dsalami.capes.url` an salami-core weiter. Danach ein Update veröffentlichen.
 
@@ -71,9 +76,9 @@ Logs: `journalctl -u salami-capes -f`. Nach einem Update der Dateien: `sudo syst
 
 ## Capes prüfen
 
-`https://salami-client-capes.umpinke.de/admin/` öffnen und mit dem Admin-Schlüssel anmelden. Pro Cape siehst du die Vorder- und Innenseite, die Elytra und die ganze Textur, wer es eingereicht hat und wer es gerade trägt.
+`https://salami-client-zaehler.umpinke.de/capes/admin/` öffnen und mit dem Admin-Schlüssel anmelden. Pro Cape siehst du die Vorder- und Innenseite, die Elytra und die ganze Textur, wer es eingereicht hat und wer es gerade trägt.
 
-- **Freigeben**: ab sofort für alle sichtbar (Mitspieler laden es spätestens nach 10 Minuten neu).
+- **Freigeben**: ab sofort für alle sichtbar – Mitspieler bekommen es live, der Spieler selbst eine Chat-Meldung.
 - **Ablehnen**: optional mit Grund. Der Spieler sieht den Grund im Spiel und im Launcher.
 - Unter „Freigegeben“ lassen sich Capes wieder **sperren**, unter „Abgelehnt“ **doch freigeben**.
 
@@ -90,6 +95,8 @@ Logs: `journalctl -u salami-capes -f`. Nach einem Update der Dateien: `sudo syst
 | `LOOKUP_RATE_PER_MINUTE` | `120` | Mitspieler-Abfragen und Bilder pro IP und Minute |
 | `UPLOADS_PER_DAY` | `10` | Neue eigene Capes pro Spieler und Tag |
 | `MAX_PENDING` | `500` | Höchstens so viele Capes in der Warteschlange |
+| `MAX_STREAMS` | `5000` | Höchstens so viele Live-Verbindungen insgesamt |
+| `MAX_STREAMS_PER_IP` | `10` | Live-Verbindungen pro IP |
 
 ## Testen
 
@@ -107,6 +114,7 @@ Startet den Server mit einem nachgebauten Mojang-Dienst und prüft Anmeldung, Wa
 | `PUT /v1/capes/me` mit `{"name","serverId","cape"}` | `{"status":"approved"\|"pending"\|"rejected","id"?,"reason"?}` – `cape`: `{"builtin":"salami"}`, `{"png":"<base64>"}` oder `null` |
 | `POST /v1/capes/lookup` mit `{"uuids":[…]}` (max. 200) | `{"capes":{"<uuid>":{"builtin":"salami"}\|{"id":"<capeId>"}}}` – nur sichtbare Capes |
 | `GET /v1/capes/img/<capeId>.png` | freigegebenes Cape-Bild |
+| `GET /v1/capes/events` | Server-Sent Events: `data: {"uuid":"…","cape":{…}\|null}` bei jeder sichtbaren Änderung, `: ping` alle 20 s |
 | `POST /v1/capes/status` mit `{"ids":[…]}` (max. 100) | `{"status":{"<capeId>":{"status":"pending",…}}}` – für den Launcher |
 | `GET /admin/` | Prüf-Webseite |
 | `GET /v1/admin/capes?status=pending` | Liste für Admins (`Authorization: Bearer <schlüssel>`) |

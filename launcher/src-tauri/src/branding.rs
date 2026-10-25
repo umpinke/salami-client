@@ -52,8 +52,9 @@ pub const ONLINE_COUNTER_URL: Option<&str> = Some("https://salami-client-zaehler
 /// Eigener Cape-Server (`server/capes/`), damit alle Salami-Spieler die Capes der anderen
 /// sehen. Geht beim Spielstart als `-Dsalami.capes.url` an salami-core. Eigene Capes sehen
 /// andere erst, wenn ein Admin sie auf der Prüf-Webseite (`/admin/`) freigegeben hat.
-/// `None` = Capes sind nur für den Spieler selbst sichtbar.
-pub const CAPE_SERVER_URL: Option<&str> = Some("https://salami-client-capes.umpinke.de");
+/// Läuft unter dem Pfad `/capes` auf derselben Domain wie der Online-Zähler (kein eigener
+/// DNS-Eintrag nötig). `None` = Capes sind nur für den Spieler selbst sichtbar.
+pub const CAPE_SERVER_URL: Option<&str> = Some("https://salami-client-zaehler.umpinke.de/capes");
 
 /// Pack für Profile, die auf unbekannte Packs verweisen (z. B. aus importierten Profilen
 /// anderer Launcher).

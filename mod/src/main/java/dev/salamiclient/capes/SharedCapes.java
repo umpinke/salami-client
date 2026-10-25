@@ -29,17 +29,26 @@ import java.util.regex.Pattern;
  * über den Cape-Server ({@link CapeServer}). Mitgelieferte Capes sehen andere sofort,
  * eigene Bilder erst, nachdem ein Admin sie auf der Prüf-Webseite freigegeben hat.
  *
+ * <p>Wechselt jemand sein Cape (oder gibt ein Admin eines frei), meldet der Server das
+ * sofort über eine Live-Verbindung; ohne sie wird regelmäßig neu gefragt.
+ *
  * <p>Alles hier läuft auf dem Client-Thread; Netzwerk passiert im Hintergrund und die
  * Ergebnisse kommen per {@code Minecraft#execute} zurück.
  */
 public final class SharedCapes {
-	/** So lange gilt das Cape eines Mitspielers, danach wird neu gefragt (Freigaben kommen so an). */
-	private static final long REFRESH_MS = 10 * 60_000L;
+	/** So lange gilt das Cape eines Mitspielers, danach wird neu gefragt – mit Live-Verbindung nur zur Sicherheit. */
+	private static final long REFRESH_LIVE_MS = 30 * 60_000L;
+	/** Ohne Live-Verbindung (Server alt oder Proxy blockt sie): so oft neu fragen. */
+	private static final long REFRESH_POLL_MS = 60_000L;
+	/** Kommt so lange nichts (der Server schickt alle 20 s ein Lebenszeichen), gilt die Verbindung als tot. */
+	private static final long STREAM_SILENCE_MS = 60_000L;
+	private static final long STREAM_RETRY_MIN_MS = 5_000L;
+	private static final long STREAM_RETRY_MAX_MS = 60_000L;
 	private static final long LOOKUP_INTERVAL_MS = 1_000L;
 	private static final long LOOKUP_RETRY_MS = 60_000L;
 	private static final long IMAGE_RETRY_MS = 5 * 60_000L;
 	/** Erst teilen, wenn die Auswahl kurz stabil ist (Durchklicken in der ClickGUI). */
-	private static final long PUBLISH_DELAY_MS = 3_000L;
+	private static final long PUBLISH_DELAY_MS = 1_000L;
 	private static final long PUBLISH_RETRY_MIN_MS = 60_000L;
 	private static final long PUBLISH_RETRY_MAX_MS = 30 * 60_000L;
 	private static final int LOOKUP_BATCH = 100;
@@ -69,6 +78,12 @@ public final class SharedCapes {
 	/** Wird beim Leeren erhöht, damit späte Antworten aus der alten Welt verworfen werden. */
 	private static int generation;
 
+	// --- Live-Verbindung
+	private static CapeServer.@Nullable EventStream stream;
+	private static boolean streamOpen;
+	private static long streamRetryAt;
+	private static long streamRetryMs = STREAM_RETRY_MIN_MS;
+
 	// --- eigenes Cape
 	private static @Nullable String publishedKey;
 	private static @Nullable String wantedKey;
@@ -76,6 +91,8 @@ public final class SharedCapes {
 	private static long publishRetryMs = PUBLISH_RETRY_MIN_MS;
 	private static boolean publishing;
 	private static @Nullable String loggedFailure;
+	/** Eigenes Bild, das gerade geprüft wird – kommt die Freigabe live, gibt es eine Chat-Meldung. */
+	private static @Nullable String pendingId;
 
 	private SharedCapes() {}
 
@@ -111,7 +128,7 @@ public final class SharedCapes {
 		}
 		long now = System.currentTimeMillis();
 		Entry entry = players.get(player);
-		if ((entry == null || now - entry.fetchedAt() > REFRESH_MS) && !inFlight.contains(player)) {
+		if ((entry == null || now - entry.fetchedAt() > refreshMs()) && !inFlight.contains(player)) {
 			queue.add(player);
 		}
 		if (entry == null || entry.remote() == null) {
@@ -137,8 +154,69 @@ public final class SharedCapes {
 			return;
 		}
 		long now = System.currentTimeMillis();
+		live(cs, mc, now);
 		lookup(cs, mc, now);
 		publish(cs, mc, now);
+	}
+
+	private static long refreshMs() {
+		return streamOpen ? REFRESH_LIVE_MS : REFRESH_POLL_MS;
+	}
+
+	// ------------------------------------------------------------------ Live-Verbindung
+
+	private static void live(CapeServer cs, Minecraft mc, long now) {
+		if (stream != null) {
+			if (now - stream.lastSeen > STREAM_SILENCE_MS) {
+				stream.close(); // meldet sich über onEnd zurück
+			}
+			return;
+		}
+		if (now < streamRetryAt) {
+			return;
+		}
+		CapeServer.EventStream opened = new CapeServer.EventStream();
+		stream = opened;
+		cs.events(opened,
+			(uuid, remote) -> mc.execute(() -> {
+				if (stream == opened) {
+					onEvent(mc, uuid, remote);
+				}
+			}),
+			() -> mc.execute(() -> {
+				if (stream == opened) {
+					streamOpen = true;
+					streamRetryMs = STREAM_RETRY_MIN_MS;
+					// Was während einer Unterbrechung passiert ist, kam nicht an: alles einmal neu fragen
+					players.replaceAll((uuid, entry) -> new Entry(entry.remote(), 0));
+				}
+			}),
+			error -> mc.execute(() -> {
+				if (stream == opened) {
+					stream = null;
+					streamOpen = false;
+					streamRetryAt = System.currentTimeMillis() + streamRetryMs;
+					streamRetryMs = Math.min(streamRetryMs * 2, STREAM_RETRY_MAX_MS);
+					if (error != null) {
+						SalamiClient.LOG.debug("Cape-Live-Verbindung getrennt: {}", CapeServer.unwrap(error).getMessage());
+					}
+				}
+			}));
+	}
+
+	private static void onEvent(Minecraft mc, UUID player, CapeServer.@Nullable Remote remote) {
+		if (player.equals(mc.getUser().getProfileId())) {
+			// Das eigene Cape zeigt der Client selbst – hier nur die Freigabe melden
+			if (remote != null && remote.id() != null && remote.id().equals(pendingId)) {
+				pendingId = null;
+				Chat.info("salami.capes.shared.approved");
+			}
+			return;
+		}
+		// Nur Spieler, die man schon kennt (sonst wüchse die Liste mit jedem Salami-Spieler)
+		if (players.containsKey(player)) {
+			players.put(player, new Entry(remote, System.currentTimeMillis()));
+		}
 	}
 
 	// ------------------------------------------------------------------ Mitspieler
@@ -163,7 +241,7 @@ public final class SharedCapes {
 			if (error != null) {
 				// Server nicht erreichbar: altes Ergebnis behalten, in einer Minute erneut fragen
 				for (UUID uuid : batch) {
-					players.compute(uuid, (key, old) -> new Entry(old == null ? null : old.remote(), done - REFRESH_MS + LOOKUP_RETRY_MS));
+					players.compute(uuid, (key, old) -> new Entry(old == null ? null : old.remote(), done - refreshMs() + LOOKUP_RETRY_MS));
 				}
 				nextLookupAt = done + LOOKUP_RETRY_MS;
 				SalamiClient.LOG.debug("Cape-Abfrage fehlgeschlagen: {}", CapeServer.unwrap(error).getMessage());
@@ -245,6 +323,13 @@ public final class SharedCapes {
 
 	private static void clear(Minecraft mc) {
 		generation++;
+		if (stream != null) {
+			stream.close();
+			stream = null;
+		}
+		streamOpen = false;
+		streamRetryAt = 0;
+		streamRetryMs = STREAM_RETRY_MIN_MS;
 		for (Image image : images.values()) {
 			if (image.id != null) {
 				mc.getTextureManager().release(image.id);
@@ -283,6 +368,7 @@ public final class SharedCapes {
 			if (error == null) {
 				publishedKey = wanted.key();
 				publishRetryMs = PUBLISH_RETRY_MIN_MS;
+				pendingId = "pending".equals(result.status()) ? result.id() : null;
 				announce(wanted, result);
 				return;
 			}

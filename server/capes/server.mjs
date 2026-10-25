@@ -17,6 +17,10 @@
  *   POST /v1/capes/lookup {"uuids":[…]}             → {"capes":{"<uuid>":{"builtin":"salami"}|{"id":"<capeId>"}}}
  *        nur sichtbare Capes: mitgelieferte und freigegebene
  *   GET  /v1/capes/img/<capeId>.png                 → freigegebenes Cape-Bild
+ *   GET  /v1/capes/events                           → Server-Sent Events, eine Zeile pro Änderung:
+ *        data: {"uuid":"…","cape":{"builtin":"salami"}|{"id":"…"}|null}
+ *        (Cape gewechselt oder von einem Admin freigegeben/gesperrt) – so sehen alle
+ *        Mitspieler einen Wechsel sofort.
  * Launcher:
  *   POST /v1/capes/status {"ids":[…]}               → {"status":{"<capeId>":{"status":"pending"|…,"reason"?}}}
  * Admins (Authorization: Bearer <token>, siehe ADMIN_TOKENS):
@@ -60,6 +64,11 @@ const LOOKUP_RATE_PER_MINUTE = env("LOOKUP_RATE_PER_MINUTE", 120);
 const UPLOADS_PER_DAY = env("UPLOADS_PER_DAY", 10);
 /** Höchstens so viele Capes warten gleichzeitig auf Prüfung. */
 const MAX_PENDING = env("MAX_PENDING", 500);
+/** Gleichzeitig offene Live-Verbindungen (eine pro laufendem Spiel). */
+const MAX_STREAMS = env("MAX_STREAMS", 5_000);
+const MAX_STREAMS_PER_IP = env("MAX_STREAMS_PER_IP", 10);
+/** Lebenszeichen auf offenen Live-Verbindungen, damit Proxy und Spiel tote Verbindungen erkennen. */
+const HEARTBEAT_MS = 20_000;
 
 const BUILTIN = new Set(["salami", "pepperoni", "board"]);
 const STATUSES = ["pending", "approved", "rejected"];
@@ -289,6 +298,7 @@ async function handleSetCape(req, res) {
   const body = await readJson(req, MAX_UPLOAD_BODY);
   const { uuid, name } = await verifyPlayer(body.name, body.serverId);
   const previous = db.players[uuid]?.cape?.id;
+  const visibleBefore = JSON.stringify(visibleCape(db.players[uuid]));
   const cape = body.cape ?? null;
   const now = new Date().toISOString();
   let result;
@@ -335,6 +345,8 @@ async function handleSetCape(req, res) {
 
   if (previous && previous !== result.id) dropIfOrphanedPending(previous);
   scheduleSave();
+  const visibleAfter = visibleCape(db.players[uuid]);
+  if (JSON.stringify(visibleAfter) !== visibleBefore) broadcast(uuid, visibleAfter);
   send(res, 200, result);
 }
 
@@ -425,6 +437,8 @@ async function handleReview(req, res, admin, id, action) {
   const cape = db.capes[id];
   if (!cape) return send(res, 404, { error: "Cape nicht gefunden" });
   const body = action === "reject" ? await readJson(req, MAX_SMALL_BODY).catch(() => ({})) : {};
+  const wearers = Object.entries(db.players).filter(([, player]) => player.cape?.id === id);
+  const visibleBefore = new Map(wearers.map(([uuid, player]) => [uuid, JSON.stringify(visibleCape(player))]));
   cape.status = action === "approve" ? "approved" : "rejected";
   cape.reviewedAt = new Date().toISOString();
   cape.reviewedBy = admin;
@@ -434,9 +448,48 @@ async function handleReview(req, res, admin, id, action) {
     delete cape.reason;
   }
   scheduleSave();
+  // Alle, die das Cape tragen: Mitspieler sehen die Freigabe (oder Sperre) sofort
+  for (const [uuid, player] of wearers) {
+    const visible = visibleCape(player);
+    if (JSON.stringify(visible) !== visibleBefore.get(uuid)) broadcast(uuid, visible);
+  }
   console.log(`[salami-capes] ${admin}: Cape ${id.slice(0, 12)} ${cape.status}`);
   send(res, 200, { id, status: cape.status });
 }
+
+// ------------------------------------------------------------------ Live-Änderungen (Server-Sent Events)
+
+/** Offene Live-Verbindungen: res → ip */
+const streams = new Map();
+
+function openEvents(req, res, ip) {
+  let fromIp = 0;
+  for (const other of streams.values()) if (other === ip) fromIp++;
+  if (streams.size >= MAX_STREAMS || fromIp >= MAX_STREAMS_PER_IP) throw new HttpError(503, "zu viele Verbindungen");
+  res.writeHead(200, {
+    ...SECURITY_HEADERS,
+    "Content-Type": "text/event-stream; charset=utf-8",
+    "Cache-Control": "no-store",
+    // nginx: nicht puffern, sonst kommen Änderungen erst verspätet an
+    "X-Accel-Buffering": "no",
+  });
+  res.write("retry: 5000\n: verbunden\n\n");
+  streams.set(res, ip);
+  const drop = () => streams.delete(res);
+  req.on("close", drop);
+  res.on("error", drop);
+}
+
+/** Meldet allen offenen Live-Verbindungen, was andere jetzt von diesem Spieler sehen. */
+function broadcast(uuid, cape) {
+  if (streams.size === 0) return;
+  const event = `data: ${JSON.stringify({ uuid, cape })}\n\n`;
+  for (const res of streams.keys()) res.write(event);
+}
+
+setInterval(() => {
+  for (const res of streams.keys()) res.write(": ping\n\n");
+}, HEARTBEAT_MS).unref();
 
 // ------------------------------------------------------------------ Admin-Webseite
 
@@ -495,6 +548,11 @@ async function route(req, res) {
     return handleImage(res, image[2], false);
   }
 
+  if (req.method === "GET" && path === "/v1/capes/events") {
+    if (rateLimited("events", ip, RATE_PER_MINUTE)) throw new HttpError(429, "zu viele Anfragen");
+    return openEvents(req, res, ip);
+  }
+
   if (req.method === "POST" && path === "/v1/capes/lookup") {
     if (rateLimited("lookup", ip, LOOKUP_RATE_PER_MINUTE)) throw new HttpError(429, "zu viele Anfragen");
     return handleLookup(req, res);
@@ -550,6 +608,7 @@ server.listen(PORT, HOST, () => {
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => {
     if (saveTimer) saveNow();
+    for (const res of streams.keys()) res.end();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 2_000).unref();
   });

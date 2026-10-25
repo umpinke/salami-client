@@ -361,6 +361,11 @@ impl MinecraftLauncher {
             "-Dsalami.cape={}",
             crate::integrations::salami_capes::launch_arg(&crate::integrations::salami_capes::capes_dir())
         ));
+        // Salami Capes live: salami-core liest die Auswahl im laufenden Spiel aus diesem Ordner
+        command.arg(format!(
+            "-Dsalami.capes.dir={}",
+            crate::integrations::salami_capes::capes_dir().display()
+        ));
         // Salami Capes für alle: Cape-Server, über den salami-core Capes teilt und lädt
         if let Some(url) = crate::integrations::salami_capes::server_url() {
             command.arg(format!("-Dsalami.capes.url={}", url));
