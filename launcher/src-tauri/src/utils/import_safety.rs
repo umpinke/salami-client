@@ -415,7 +415,11 @@ fn inspect_mod(mod_info: &Mod, report: &mut ImportSecurityReport) -> std::result
             file_hash_sha1,
             ..
         } => {
-            require_host(download_url, CURSEFORGE_HOSTS, "CurseForge")?;
+            // Leer: der Autor gibt die Datei nur über die CurseForge-Webseite heraus; der Spieler
+            // lädt sie selbst und der Launcher prüft sie per Prüfsumme (curseforge_manual)
+            if !download_url.is_empty() {
+                require_host(download_url, CURSEFORGE_HOSTS, "CurseForge")?;
+            }
             if file_hash_sha1.is_none() {
                 report.unverified_mod_count += 1;
             }

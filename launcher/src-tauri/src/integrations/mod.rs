@@ -1,5 +1,6 @@
 pub mod curseforge;
 pub mod curseforge_export;
+pub mod curseforge_manual;
 pub mod lenient;
 pub mod mod_dependencies;
 pub mod launcher_import;

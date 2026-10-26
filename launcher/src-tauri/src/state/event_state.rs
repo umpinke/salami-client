@@ -48,6 +48,8 @@ pub enum EventType {
     MinecraftSkinChanged,
     Error,
     OfflineMode,
+    /// Salami: CurseForge-Dateien, die der Spieler selbst laden muss (`message`: JSON-Liste).
+    CurseforgeManualDownloads,
     LaunchSuccessful,
     CrashReportContentAvailable,
     MigrationStarted,

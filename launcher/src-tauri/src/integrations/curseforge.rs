@@ -86,6 +86,30 @@ mod cdn_key_tests {
         assert!(!is_curseforge_cdn("https://evil.example/?edge.forgecdn.net"));
         assert!(!is_curseforge_cdn("kein url"));
     }
+
+    #[test]
+    fn file_without_download_url_still_parses() {
+        // So liefert CurseForge Dateien, deren Autor Downloads über andere Launcher sperrt
+        let json = r#"{"data":[{"id":7252390,"gameId":432,"modId":1390230,"isAvailable":true,
+            "displayName":"Cave Horror Sounds","fileName":"Cave-Horror-Sounds.jar","releaseType":1,
+            "fileStatus":4,"hashes":[{"value":"abc","algo":1}],"fileDate":"2026-01-01T00:00:00Z",
+            "fileLength":10,"downloadCount":1,"downloadUrl":null,"gameVersions":["1.20.1"],
+            "fileFingerprint":123}]}"#;
+        let parsed: super::GetModFilesResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(parsed.data[0].download_url, "");
+        assert_eq!(parsed.data[0].file_name, "Cave-Horror-Sounds.jar");
+    }
+
+    /// Echte API (Netz + Key nötig): `cargo test --lib -- --ignored blocked_files_from_the_real_api`
+    #[tokio::test]
+    #[ignore]
+    async fn blocked_files_from_the_real_api() {
+        // Cave Horror Sounds (Autor sperrt fremde Launcher) und JEI 1.12.2 (frei)
+        let files = super::get_files_by_ids(vec![7252390, 3040523]).await.unwrap();
+        let url = |id: u32| files.iter().find(|f| f.id == id).map(|f| f.download_url.clone());
+        assert_eq!(url(7252390).as_deref(), Some(""));
+        assert!(url(3040523).is_some_and(|u| u.starts_with("https://edge.forgecdn.net/")));
+    }
 }
 
 /// Determines appropriate memory settings based on recommended RAM and system capabilities
@@ -258,7 +282,10 @@ pub struct CurseForgeFile {
     pub file_length: u64,
     pub download_count: u64,
     pub file_size_on_disk: Option<u64>, // Made optional as per API docs
-    pub download_url: String, // Not optional per API docs
+    /// Salami: leer, wenn der Autor Downloads über andere Launcher gesperrt hat (API: `null`) –
+    /// dann muss der Spieler die Datei selbst laden, siehe `curseforge_manual`.
+    #[serde(default, deserialize_with = "null_as_empty")]
+    pub download_url: String,
     #[serde(default)]
     pub game_versions: Vec<String>,
     #[serde(default, deserialize_with = "lenient::vec")]
@@ -275,6 +302,10 @@ pub struct CurseForgeFile {
     pub file_fingerprint: u64,
     #[serde(default, deserialize_with = "lenient::vec")]
     pub modules: Vec<CurseForgeModule>,
+}
+
+fn null_as_empty<'de, D: serde::Deserializer<'de>>(deserializer: D) -> std::result::Result<String, D::Error> {
+    Ok(Option::<String>::deserialize(deserializer)?.unwrap_or_default())
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -1548,6 +1579,7 @@ pub async fn download_curseforge_content_files(
         file_details_map.insert(file_detail.id, file_detail);
     }
 
+    let mut manual = Vec::new();
     for (content_mod, folder) in content_mods {
         let Some(&file_id) = file_mapping.get(&content_mod.id) else {
             continue;
@@ -1560,20 +1592,31 @@ pub async fn download_curseforge_content_files(
             continue;
         };
 
-        if file_details.download_url.trim().is_empty() {
-            warn!(
-                "CurseForge content '{}' has no download URL (distribution disabled?). Skipping.",
-                content_mod.name
-            );
-            continue;
-        }
-
         let sanitized_name = sanitize_filename::sanitize(&file_details.file_name);
         if sanitized_name.is_empty() {
             warn!("Skipping CurseForge content with empty file name: {}", content_mod.name);
             continue;
         }
         let dest_path = target_dir.join(folder).join(&sanitized_name);
+
+        // Salami: vom Autor gesperrt – der Spieler muss die Datei selbst von CurseForge laden
+        if file_details.download_url.trim().is_empty() {
+            info!(
+                "CurseForge content '{}' may only be downloaded from the CurseForge website",
+                content_mod.name
+            );
+            manual.push(crate::integrations::curseforge_manual::ManualFile {
+                name: content_mod.name.clone(),
+                project_id: content_mod.id,
+                file_id,
+                file_name: file_details.file_name.clone(),
+                sha1: file_details.hashes.iter().find(|h| h.algo == 1).map(|h| h.value.clone()),
+                fingerprint: Some(file_details.file_fingerprint),
+                target: dest_path,
+                folder: Some(folder.to_string()),
+            });
+            continue;
+        }
 
         if let Some(parent) = dest_path.parent() {
             fs::create_dir_all(parent).await.map_err(AppError::Io)?;
@@ -1592,6 +1635,9 @@ pub async fn download_curseforge_content_files(
             }
         }
     }
+
+    let missing = crate::integrations::curseforge_manual::pick_up_from_downloads(manual).await;
+    crate::integrations::curseforge_manual::announce_missing(&missing).await;
 
     Ok(())
 }

@@ -1,5 +1,6 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
+use crate::integrations::curseforge_manual::{self, ManualFile};
 use crate::minecraft::downloads::mod_resolver::TargetMod;
 use crate::minecraft::launch::launch_summary::DownloadStats;
 use crate::state::profile_state::{self, ModSource, Profile};
@@ -72,6 +73,8 @@ impl ModDownloadService {
         }
 
         let mut download_futures = Vec::new();
+        // Salami: vom Autor gesperrte CurseForge-Dateien (kein Download-Link), siehe curseforge_manual
+        let manual: Arc<std::sync::Mutex<Vec<ManualFile>>> = Arc::default();
 
         for mod_info in mods.iter() {
             if !mod_info.enabled {
@@ -83,6 +86,7 @@ impl ModDownloadService {
             let cache_dir_clone = mod_cache_dir.clone();
             let source_clone = mod_info.source.clone();
             let stats = self.stats.clone();
+            let manual = manual.clone();
 
             let filename_result = profile_state::get_profile_mod_filename(&mod_info.source);
 
@@ -127,12 +131,30 @@ impl ModDownloadService {
                         download_url,
                         file_hash_sha1,
                         file_fingerprint,
-                        ..
+                        project_id,
+                        file_id,
+                        file_name,
                     } => {
                         trace!(
                             "Preparing CurseForge mod for cache: {} ({})",
                             display_name, filename
                         );
+                        if download_url.trim().is_empty() {
+                            let file = ManualFile {
+                                name: display_name.to_string(),
+                                project_id: project_id.parse().unwrap_or_default(),
+                                file_id: file_id.parse().unwrap_or_default(),
+                                file_name,
+                                sha1: file_hash_sha1,
+                                fingerprint: file_fingerprint,
+                                target: target_path.clone(),
+                                folder: None,
+                            };
+                            if !curseforge_manual::file_matches(&target_path, &file).await {
+                                manual.lock().unwrap_or_else(|e| e.into_inner()).push(file);
+                            }
+                            return Ok(());
+                        }
                         Self::download_and_verify_file(
                             &download_url,
                             &target_path,
@@ -201,6 +223,19 @@ impl ModDownloadService {
             if let Err(e) = result {
                 errors.push(e);
             }
+        }
+
+        let manual = std::mem::take(&mut *manual.lock().unwrap_or_else(|e| e.into_inner()));
+        let missing = curseforge_manual::pick_up_from_downloads(manual).await;
+        if !missing.is_empty() {
+            curseforge_manual::announce_missing(&missing).await;
+            errors.insert(
+                0,
+                AppError::Download(format!(
+                    "{} Mod(s) musst du selbst von CurseForge herunterladen – der Launcher zeigt dir die Liste.",
+                    missing.len()
+                )),
+            );
         }
 
         if errors.is_empty() {

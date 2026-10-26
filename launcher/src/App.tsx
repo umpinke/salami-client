@@ -20,6 +20,7 @@ import {
   type MinecraftProcessExitedPayload,
 } from "./types/events";
 import { GlobalCrashReportModal } from "./components/modals/GlobalCrashReportModal";
+import { CurseForgeManualDownloadsModal } from "./components/modals/CurseForgeManualDownloadsModal";
 import { ImportPackConfirmModal } from "./components/modals/ImportPackConfirmModal";
 import { DragDropOverlay } from "./components/ui/DragDropOverlay";
 import { TermsOfServiceModal, AnalyticsConsentBanner } from "./components/modals/TermsOfServiceModal";
@@ -558,6 +559,7 @@ export function App() {
         <GlobalToaster />
         <LauncherNoticeBanner />
         <GlobalCrashReportModal />
+        <CurseForgeManualDownloadsModal />
         <ImportPackConfirmModal />
         <DragDropOverlay />
         <TermsOfServiceModal isOpen={!termsAccepted} />

@@ -187,7 +187,8 @@ mockIPC((cmd, args) => {
   if (LIST_COMMANDS.test(cmd)) return [];
   // wie im echten Salami Client: nicht verfügbare Dienste schlagen fehl
   throw new Error(`design preview: no mock for ${cmd}`);
-});
+  // Ereignisse lassen sich per `emit` aus @tauri-apps/api/event nachstellen
+}, { shouldMockEvents: true });
 (window as unknown as { __TAURI_INTERNALS__: { convertFileSrc: (path: string) => string } })
   .__TAURI_INTERNALS__.convertFileSrc = (path) => path;
 

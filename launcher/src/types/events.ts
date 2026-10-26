@@ -38,6 +38,7 @@ export enum EventType {
   MinecraftSkinChanged = "minecraft_skin_changed",
   Error = "error",
   OfflineMode = "offline_mode",
+  CurseforgeManualDownloads = "curseforge_manual_downloads",
   LaunchSuccessful = "launch_successful",
   CrashReportContentAvailable = "crash_report_content_available",
   MigrationStarted = "migration_started",
