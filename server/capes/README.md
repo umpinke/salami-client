@@ -8,10 +8,10 @@ Adresse: **https://salami-client-zaehler.umpinke.de/capes** – derselbe nginx u
 
 - **Mitgelieferte Capes** (Salami, Peperoni, Schneidebrett) sehen alle Salami-Spieler sofort.
 - **Live**: Jedes laufende Spiel hält eine Verbindung zu `/v1/capes/events` (Server-Sent Events). Wechselt jemand sein Cape oder gibt ein Admin eines frei, sehen es alle Mitspieler sofort. Gesendet werden nur UUID und sichtbares Cape, alle 20 s kommt ein Lebenszeichen.
-- **Eigene Capes** schickt salami-core beim Spielen an den Server. Sie landen in der Warteschlange. Bis ein Admin sie freigibt, sieht sie nur der Spieler selbst. Lehnt ein Admin ab, bekommt der Spieler den Grund im Spiel angezeigt.
+- **Eigene Capes** reicht der Launcher (ab 1.3.4) gleich nach dem Hinzufügen ein (`/v1/capes/submit`), ohne das getragene Cape zu ändern. Ältere Versionen schicken sie erst beim Spielen mit dem Cape (salami-core). Sie landen in der Warteschlange. Bis ein Admin sie freigibt, sieht sie nur der Spieler selbst. Lehnt ein Admin ab, bekommt der Spieler den Grund im Spiel und im Launcher angezeigt.
 - **Anmeldung** wie beim Betreten eines Minecraft-Servers: Das Spiel meldet eine zufällige `serverId` bei Mojang an, der Cape-Server fragt bei Mojang nach (`hasJoined`). Das Zugangstoken des Spielers sieht der Cape-Server nie. So kann niemand ein Cape für einen fremden Account setzen.
 - **Bilder** werden vollständig dekodiert und als schlichtes PNG neu gespeichert (keine Metadaten, nichts Kaputtes). Die Cape-ID ist ein Hash über die Pixel: dasselbe Bild muss nur einmal geprüft werden, egal wer es hochlädt.
-- **Ungeprüfte Capes, die niemand mehr trägt**, verschwinden automatisch aus der Warteschlange.
+- **Ungeprüfte Capes, die niemand mehr trägt**, verschwinden automatisch aus der Warteschlange – außer sie wurden im Launcher eingereicht (Prüfseite: „niemand (im Launcher eingereicht)“).
 - Gespeichert wird pro Spieler: UUID, Name, gewähltes Cape. Mitspieler-Abfragen (welche UUIDs auf deinem Server sind) werden nicht protokolliert.
 - Grenzen: 10 neue Capes pro Spieler und Tag, höchstens 500 Capes in der Warteschlange, Anfragen pro IP begrenzt, nach 10 falschen Admin-Schlüsseln ist die IP 10 Minuten gesperrt.
 
@@ -116,6 +116,7 @@ Startet den Server mit einem nachgebauten Mojang-Dienst und prüft Anmeldung, Wa
 | `GET /v1/capes/img/<capeId>.png` | freigegebenes Cape-Bild |
 | `GET /v1/capes/events` | Server-Sent Events: `data: {"uuid":"…","cape":{…}\|null}` bei jeder sichtbaren Änderung, `: ping` alle 20 s |
 | `POST /v1/capes/status` mit `{"ids":[…]}` (max. 100) | `{"status":{"<capeId>":{"status":"pending",…}}}` – für den Launcher |
+| `POST /v1/capes/submit` mit `{"name","serverId","png"}` | `{"status":"approved"\|"pending"\|"rejected","id","reason"?}` – Launcher reicht ein eigenes Cape zur Prüfung ein, das getragene Cape bleibt |
 | `GET /admin/` | Prüf-Webseite |
 | `GET /v1/admin/capes?status=pending` | Liste für Admins (`Authorization: Bearer <schlüssel>`) |
 | `POST /v1/admin/capes/<capeId>/approve` \| `/reject` mit `{"reason"}` | Freigeben / Ablehnen |

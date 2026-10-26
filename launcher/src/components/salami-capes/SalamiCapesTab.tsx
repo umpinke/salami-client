@@ -104,8 +104,9 @@ export function SalamiCapesTab() {
     try {
       const cape = await importCape(picked, name);
       toast.success(t("salami.capes.imported", { name: cape.name }));
-      await reload();
+      // erst auswählen, dann neu laden – das Neuladen reicht das Cape zur Prüfung ein
       await choose(cape.id);
+      await reload();
     } catch (error) {
       toast.error(t("salami.capes.error", { error: errorText(error) }));
     }
@@ -335,8 +336,8 @@ export function SalamiCapesTab() {
           onSaved={async (cape) => {
             setEditor(null);
             toast.success(t("salami.capes.saved", { name: cape.name }));
-            await reload();
             await choose(cape.id);
+            await reload();
           }}
         />
       )}

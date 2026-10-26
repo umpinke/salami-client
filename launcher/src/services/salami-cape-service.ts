@@ -42,7 +42,7 @@ export const deleteCape = (id: string) => invoke<void>("salami_capes_delete", { 
 
 export const selectCape = (selection: string | null) => invoke<void>("salami_capes_select", { selection });
 
-/** Prüfstatus eigener Capes, Schlüssel ist `share_id`. */
+/** Prüfstatus eigener Capes, Schlüssel ist `share_id`. Noch nie eingereichte reicht der Launcher dabei ein. */
 export const getCapeReviews = (ids: string[]) =>
   invoke<Record<string, SalamiCapeReview>>("salami_capes_review_status", { ids });
 

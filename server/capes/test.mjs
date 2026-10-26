@@ -114,6 +114,13 @@ async function setCape(name, cape, { join = true } = {}) {
   return call("PUT", "/v1/capes/me", { name, serverId: body.serverId, cape });
 }
 
+/** Wie der Launcher: Challenge holen, bei „Mojang“ anmelden, Cape zur Prüfung einreichen. */
+async function submitCape(name, png, { join = true } = {}) {
+  const { body } = await call("POST", "/v1/auth/challenge");
+  if (join) joined.add(`${name}|${body.serverId}`);
+  return call("POST", "/v1/capes/submit", { name, serverId: body.serverId, png });
+}
+
 const uuidOf = (name) =>
   PLAYERS[name].replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
 
@@ -354,6 +361,41 @@ test("kaputte Bilder und Upload-Limit", async () => {
   }
   const p = capePixels(64, 30);
   assert.equal((await setCape("Salamander", { png: encodeRgba(64, 32, p.rgba).toString("base64") })).status, 429);
+});
+
+test("Launcher: Einreichen ändert das getragene Cape nicht und bleibt in der Warteschlange", async () => {
+  await setCape("Pepper_99", { builtin: "board" });
+  const pixels = capePixels(64, 50);
+  const png = encodeRgba(64, 32, pixels.rgba).toString("base64");
+  const id = capeId(64, 32, pixels.rgba);
+
+  assert.equal((await submitCape("Pepper_99", png, { join: false })).status, 401);
+  assert.equal((await submitCape("Pepper_99", undefined)).status, 400);
+  assert.equal((await submitCape("Pepper_99", Buffer.from("kein bild").toString("base64"))).status, 422);
+
+  assert.deepEqual((await submitCape("Pepper_99", png)).body, { status: "pending", id });
+  // getragen wird weiter das Brett
+  assert.deepEqual((await call("POST", "/v1/capes/lookup", { uuids: [uuidOf("Pepper_99")] })).body.capes, {
+    [uuidOf("Pepper_99")]: { builtin: "board" },
+  });
+  const listed = (await admin("GET", "/v1/admin/capes?status=pending")).body.capes.find((c) => c.id === id);
+  assert.equal(listed.submittedName, "Pepper_99");
+  assert.equal(listed.viaLauncher, true);
+  assert.deepEqual(listed.users, []);
+
+  // Anziehen und wieder ablegen: eingereichte Capes fliegen nicht aus der Warteschlange
+  await setCape("Pepper_99", { png });
+  await setCape("Pepper_99", { builtin: "salami" });
+  assert.deepEqual((await call("POST", "/v1/capes/status", { ids: [id] })).body.status, { [id]: { status: "pending" } });
+
+  // nochmal einreichen: dasselbe Cape, kein zweiter Eintrag
+  const before = (await admin("GET", "/v1/admin/capes?status=pending")).body.counts.pending;
+  assert.deepEqual((await submitCape("Pepper_99", png)).body, { status: "pending", id });
+  assert.equal((await admin("GET", "/v1/admin/capes?status=pending")).body.counts.pending, before);
+
+  // nach der Prüfung liefert Einreichen den Status samt Grund
+  await admin("POST", `/v1/admin/capes/${id}/reject`, { reason: "zu bunt" });
+  assert.deepEqual((await submitCape("Pepper_99", png)).body, { status: "rejected", id, reason: "zu bunt" });
 });
 
 test("Daten überstehen einen Neustart", async () => {

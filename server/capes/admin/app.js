@@ -186,7 +186,7 @@ function buildCard(cape, key) {
   card.querySelector(".submitted").textContent = formatDate(cape.submittedAt);
 
   const users = card.querySelector(".users");
-  if (cape.users.length === 0) users.textContent = "niemand";
+  if (cape.users.length === 0) users.textContent = cape.viaLauncher ? "niemand (im Launcher eingereicht)" : "niemand";
   cape.users.slice(0, 10).forEach((user, i) => {
     if (i > 0) users.append(", ");
     users.append(playerLink(user.name, user.uuid));

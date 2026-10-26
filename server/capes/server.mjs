@@ -23,6 +23,10 @@
  *        Mitspieler einen Wechsel sofort.
  * Launcher:
  *   POST /v1/capes/status {"ids":[…]}               → {"status":{"<capeId>":{"status":"pending"|…,"reason"?}}}
+ *   POST /v1/capes/submit {"name","serverId","png"} → {"status":"approved"|"pending"|"rejected","id","reason"?}
+ *        eigenes Cape gleich nach dem Hinzufügen zur Prüfung einreichen, ohne das getragene
+ *        Cape zu ändern. Anmeldung wie bei PUT /v1/capes/me. Solche Capes bleiben in der
+ *        Warteschlange, auch wenn sie (noch) keiner trägt.
  * Admins (Authorization: Bearer <token>, siehe ADMIN_TOKENS):
  *   GET  /admin/                                    → Prüf-Webseite
  *   GET  /v1/admin/me                               → {"name":"…"}
@@ -100,7 +104,8 @@ const ADMINS = (process.env.ADMIN_TOKENS || "")
 /**
  * players: uuid → { name, cape: {builtin} | {id}, updatedAt }
  * capes:   capeId → { status, width, height, submittedAt, submittedBy, submittedName,
- *                     reviewedAt?, reviewedBy?, reason? }
+ *                     viaLauncher?, reviewedAt?, reviewedBy?, reason? }
+ *          viaLauncher: im Launcher eingereicht – bleibt in der Warteschlange, auch ungetragen
  */
 let db = { players: {}, capes: {} };
 
@@ -125,10 +130,13 @@ function scheduleSave() {
 
 const imagePath = (id) => join(IMAGE_DIR, `${id}.png`);
 
-/** Warteschlange sauber halten: ungeprüfte Capes, die niemand mehr trägt, verschwinden. */
+/**
+ * Warteschlange sauber halten: ungeprüfte Capes, die niemand mehr trägt, verschwinden –
+ * außer sie wurden ausdrücklich im Launcher eingereicht.
+ */
 function dropIfOrphanedPending(id) {
   const cape = db.capes[id];
-  if (!cape || cape.status !== "pending") return;
+  if (!cape || cape.status !== "pending" || cape.viaLauncher) return;
   if (Object.values(db.players).some((p) => p.cape?.id === id)) return;
   delete db.capes[id];
   try {
@@ -294,6 +302,42 @@ async function verifyPlayer(name, serverId) {
 
 // ------------------------------------------------------------------ Spieler-API
 
+/** Prüft ein eingereichtes Bild (Base64-PNG) und legt es bei Bedarf neu in die Warteschlange. → capeId */
+function storeCape(pngBase64, uuid, name, now) {
+  const png = Buffer.from(pngBase64, "base64");
+  if (png.length === 0 || png.length > MAX_PNG_BYTES) throw new HttpError(413, "Bild größer als 4 MiB");
+  let decoded;
+  try {
+    decoded = decodeCape(png);
+  } catch (e) {
+    throw new HttpError(422, e instanceof PngError ? e.message : "Bild konnte nicht gelesen werden");
+  }
+  const id = capeId(decoded.width, decoded.height, decoded.rgba);
+  if (!db.capes[id]) {
+    if (!uploadAllowed(uuid)) throw new HttpError(429, "heute schon zu viele neue Capes eingereicht");
+    const pending = Object.values(db.capes).filter((c) => c.status === "pending").length;
+    if (pending >= MAX_PENDING) throw new HttpError(503, "Prüf-Warteschlange ist voll, bitte später nochmal");
+    writeFileSync(imagePath(id), encodeRgba(decoded.width, decoded.height, decoded.rgba));
+    db.capes[id] = {
+      status: "pending",
+      width: decoded.width,
+      height: decoded.height,
+      submittedAt: now,
+      submittedBy: uuid,
+      submittedName: name,
+    };
+    uploads.get(uuid).push(Date.now());
+    console.log(`[salami-capes] neues Cape ${id.slice(0, 12)} von ${name} wartet auf Prüfung`);
+  }
+  return id;
+}
+
+/** Antwort mit dem Prüfstatus eines Capes. */
+function capeResult(id) {
+  const entry = db.capes[id];
+  return { status: entry.status, id, ...(entry.status === "rejected" && entry.reason ? { reason: entry.reason } : {}) };
+}
+
 async function handleSetCape(req, res) {
   const body = await readJson(req, MAX_UPLOAD_BODY);
   const { uuid, name } = await verifyPlayer(body.name, body.serverId);
@@ -311,34 +355,9 @@ async function handleSetCape(req, res) {
     db.players[uuid] = { name, cape: { builtin: cape.builtin }, updatedAt: now };
     result = { status: "approved", builtin: cape.builtin };
   } else if (typeof cape.png === "string") {
-    const png = Buffer.from(cape.png, "base64");
-    if (png.length === 0 || png.length > MAX_PNG_BYTES) throw new HttpError(413, "Bild größer als 4 MiB");
-    let decoded;
-    try {
-      decoded = decodeCape(png);
-    } catch (e) {
-      throw new HttpError(422, e instanceof PngError ? e.message : "Bild konnte nicht gelesen werden");
-    }
-    const id = capeId(decoded.width, decoded.height, decoded.rgba);
-    if (!db.capes[id]) {
-      if (!uploadAllowed(uuid)) throw new HttpError(429, "heute schon zu viele neue Capes eingereicht");
-      const pending = Object.values(db.capes).filter((c) => c.status === "pending").length;
-      if (pending >= MAX_PENDING) throw new HttpError(503, "Prüf-Warteschlange ist voll, bitte später nochmal");
-      writeFileSync(imagePath(id), encodeRgba(decoded.width, decoded.height, decoded.rgba));
-      db.capes[id] = {
-        status: "pending",
-        width: decoded.width,
-        height: decoded.height,
-        submittedAt: now,
-        submittedBy: uuid,
-        submittedName: name,
-      };
-      uploads.get(uuid).push(Date.now());
-      console.log(`[salami-capes] neues Cape ${id.slice(0, 12)} von ${name} wartet auf Prüfung`);
-    }
+    const id = storeCape(cape.png, uuid, name, now);
     db.players[uuid] = { name, cape: { id }, updatedAt: now };
-    const entry = db.capes[id];
-    result = { status: entry.status, id, ...(entry.status === "rejected" && entry.reason ? { reason: entry.reason } : {}) };
+    result = capeResult(id);
   } else {
     throw new HttpError(400, "cape muss null, {builtin} oder {png} sein");
   }
@@ -348,6 +367,18 @@ async function handleSetCape(req, res) {
   const visibleAfter = visibleCape(db.players[uuid]);
   if (JSON.stringify(visibleAfter) !== visibleBefore) broadcast(uuid, visibleAfter);
   send(res, 200, result);
+}
+
+/** Launcher: eigenes Cape gleich nach dem Hinzufügen einreichen – das getragene Cape bleibt. */
+async function handleSubmit(req, res) {
+  const body = await readJson(req, MAX_UPLOAD_BODY);
+  if (typeof body.png !== "string") throw new HttpError(400, "png fehlt");
+  const { uuid, name } = await verifyPlayer(body.name, body.serverId);
+  const id = storeCape(body.png, uuid, name, new Date().toISOString());
+  const cape = db.capes[id];
+  if (cape.status === "pending") cape.viaLauncher = true;
+  scheduleSave();
+  send(res, 200, capeResult(id));
 }
 
 async function handleLookup(req, res) {
@@ -574,6 +605,7 @@ async function route(req, res) {
   if (rateLimited("api", ip, RATE_PER_MINUTE)) throw new HttpError(429, "zu viele Anfragen");
   if (req.method === "POST" && path === "/v1/auth/challenge") return send(res, 200, { serverId: newChallenge() });
   if (req.method === "PUT" && path === "/v1/capes/me") return handleSetCape(req, res);
+  if (req.method === "POST" && path === "/v1/capes/submit") return handleSubmit(req, res);
   if (req.method === "POST" && path === "/v1/capes/status") return handleStatus(req, res);
 
   send(res, 404, { error: "nicht gefunden" });

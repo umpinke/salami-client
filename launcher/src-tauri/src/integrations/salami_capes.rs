@@ -4,18 +4,23 @@
 //! Die Bilder liegen lokal im Launcher-Ordner (`salami_capes/`). Mit anderen Salami-Spielern
 //! teilt salami-core das gewählte Cape über den Cape-Server (`branding::CAPE_SERVER_URL`,
 //! Code in `server/capes/`); eigene Bilder sehen andere erst nach Freigabe durch einen Admin.
-//! Der Launcher fragt dort nur den Prüfstatus ab ([`review_status`]).
+//! Der Launcher fragt dort den Prüfstatus ab ([`review_status`]) und reicht neue eigene Capes
+//! gleich zur Prüfung ein ([`submit_for_review`]), nicht erst wenn man damit spielt.
 
 use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use base64::Engine;
 use image::{GenericImageView, ImageFormat};
+use once_cell::sync::Lazy;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+use uuid::Uuid;
 
 /// Mitgelieferte Capes (Dateinamen in salami-core und `launcher/public/capes`).
 pub const BUILTIN_CAPES: [&str; 3] = ["salami", "pepperoni", "board"];
@@ -26,6 +31,12 @@ const STORE_FILE: &str = "capes.json";
 pub const TEMPLATE_PNG: &[u8] = include_bytes!("../../assets/salami_cape_template.png");
 const MAX_WIDTH: u32 = 2048;
 const MAX_NAME_CHARS: usize = 40;
+const MOJANG_JOIN_URL: &str = "https://sessionserver.mojang.com/session/minecraft/join";
+/// Nach einem Einreichversuch (offline, Tageslimit …) so lange nicht erneut versuchen.
+const SUBMIT_RETRY: Duration = Duration::from_secs(10 * 60);
+
+/// share_id → letzter Einreichversuch in diesem Launcher-Lauf.
+static SUBMIT_ATTEMPTS: Lazy<Mutex<HashMap<String, Instant>>> = Lazy::new(Default::default);
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct StoredCape {
@@ -259,7 +270,7 @@ struct StatusResponse {
 }
 
 /// Prüfstatus dieser Cape-IDs ([`share_id`]). Fehlt eine ID, wurde das Bild noch nie
-/// eingereicht (das macht salami-core beim Spielen mit dem Cape).
+/// eingereicht (das macht [`submit_for_review`] oder salami-core beim Spielen mit dem Cape).
 pub async fn review_status(ids: &[String]) -> Result<HashMap<String, CapeReview>> {
     let Some(base) = server_url() else {
         return Ok(HashMap::new());
@@ -283,6 +294,113 @@ pub async fn review_status(ids: &[String]) -> Result<HashMap<String, CapeReview>
         .await
         .map_err(|e| AppError::Other(format!("Antwort des Cape-Servers unlesbar: {e}")))?;
     Ok(body.status)
+}
+
+/// Eigene Capes (share_id, PNG) aus `ids`, die laut `known` noch nie eingereicht wurden und
+/// keinen frischen Versuch hinter sich haben. Der Versuch wird sofort vermerkt, damit
+/// gleichzeitige Aufrufe nichts doppelt einreichen.
+pub fn take_unsubmitted(
+    dir: &Path,
+    ids: &[String],
+    known: &HashMap<String, CapeReview>,
+) -> Vec<(String, Vec<u8>)> {
+    let now = Instant::now();
+    let mut attempts = SUBMIT_ATTEMPTS.lock().unwrap_or_else(|e| e.into_inner());
+    let mut due: Vec<(String, Vec<u8>)> = Vec::new();
+    for cape in CapeStore::load(dir).capes {
+        let Ok(png) = std::fs::read(png_path(dir, &cape.id)) else {
+            continue;
+        };
+        let Some(id) = share_id(&png) else {
+            continue;
+        };
+        let recently_tried = attempts.get(&id).is_some_and(|at| now.duration_since(*at) < SUBMIT_RETRY);
+        if !ids.contains(&id) || known.contains_key(&id) || recently_tried || due.iter().any(|(d, _)| *d == id) {
+            continue;
+        }
+        attempts.insert(id.clone(), now);
+        due.push((id, png));
+    }
+    due
+}
+
+#[derive(Deserialize)]
+struct Challenge {
+    #[serde(rename = "serverId")]
+    server_id: String,
+}
+
+#[derive(Deserialize)]
+struct ServerError {
+    error: String,
+}
+
+async fn cape_server_json<T: DeserializeOwned>(response: reqwest::Response) -> Result<T> {
+    let status = response.status();
+    if !status.is_success() {
+        let message = match response.json::<ServerError>().await {
+            Ok(body) => body.error,
+            Err(_) => status.to_string(),
+        };
+        return Err(AppError::Other(format!("Cape-Server: {message}")));
+    }
+    response
+        .json()
+        .await
+        .map_err(|e| AppError::Other(format!("Antwort des Cape-Servers unlesbar: {e}")))
+}
+
+/// Reicht ein eigenes Cape zur Prüfung ein, ohne das getragene Cape zu ändern. Angemeldet
+/// wird wie beim Betreten eines Minecraft-Servers: der Launcher meldet eine serverId bei
+/// Mojang an, der Cape-Server fragt dort nach. Das Zugangstoken geht nur an Mojang.
+pub async fn submit_for_review(
+    player_id: Uuid,
+    player_name: &str,
+    access_token: &str,
+    png: &[u8],
+) -> Result<CapeReview> {
+    let base = server_url().ok_or_else(|| AppError::Other("Kein Cape-Server eingerichtet".into()))?;
+    let server_down = |e: reqwest::Error| AppError::Other(format!("Cape-Server nicht erreichbar: {e}"));
+
+    let challenge: Challenge = cape_server_json(
+        HTTP_CLIENT
+            .post(format!("{base}/v1/auth/challenge"))
+            .timeout(Duration::from_secs(10))
+            .send()
+            .await
+            .map_err(server_down)?,
+    )
+    .await?;
+
+    let joined = HTTP_CLIENT
+        .post(MOJANG_JOIN_URL)
+        .timeout(Duration::from_secs(10))
+        .json(&serde_json::json!({
+            "accessToken": access_token,
+            "selectedProfile": player_id.simple().to_string(),
+            "serverId": challenge.server_id,
+        }))
+        .send()
+        .await
+        .map_err(|e| AppError::Other(format!("Mojang nicht erreichbar: {e}")))?;
+    if !joined.status().is_success() {
+        return Err(AppError::Other(format!("Anmeldung bei Mojang fehlgeschlagen ({})", joined.status())));
+    }
+
+    cape_server_json(
+        HTTP_CLIENT
+            .post(format!("{base}/v1/capes/submit"))
+            .timeout(Duration::from_secs(30))
+            .json(&serde_json::json!({
+                "name": player_name,
+                "serverId": challenge.server_id,
+                "png": base64::engine::general_purpose::STANDARD.encode(png),
+            }))
+            .send()
+            .await
+            .map_err(server_down)?,
+    )
+    .await
 }
 
 /// Wert für `-Dsalami.cape`: `none`, `builtin:<name>` oder der Pfad zur PNG-Datei.
@@ -384,5 +502,23 @@ mod tests {
         assert!(select(&dir, Some("unbekannte-id")).is_err());
         select(&dir, None).unwrap();
         assert_eq!(launch_arg(&dir), "none");
+    }
+
+    #[test]
+    fn new_capes_are_submitted_once() {
+        let dir = temp_dir("submit");
+        let new = save_cape(&dir, None, "Neu", &png(256, 128)).unwrap();
+        let known = save_cape(&dir, None, "Bekannt", &png(512, 256)).unwrap();
+        let ids = vec![new.share_id.clone(), known.share_id.clone()];
+        let status = HashMap::from([(known.share_id.clone(), CapeReview { status: "pending".into(), reason: None })]);
+
+        let due = take_unsubmitted(&dir, &ids, &status);
+        assert_eq!(due.len(), 1);
+        assert_eq!(due[0].0, new.share_id);
+        assert_eq!(share_id(&due[0].1).as_deref(), Some(new.share_id.as_str()));
+
+        // gerade versucht → nicht gleich nochmal; nicht angefragte Capes nie
+        save_cape(&dir, None, "Nicht angefragt", &png(128, 64)).unwrap();
+        assert!(take_unsubmitted(&dir, &ids, &status).is_empty());
     }
 }
