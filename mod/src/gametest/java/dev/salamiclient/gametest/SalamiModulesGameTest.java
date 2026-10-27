@@ -1,5 +1,6 @@
 package dev.salamiclient.gametest;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.gui.clickgui.ClickGuiScreen;
 import dev.salamiclient.module.HudModule;
@@ -46,7 +47,6 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.entity.monster.zombie.Zombie;
 import net.minecraft.world.entity.projectile.arrow.Arrow;
-import org.lwjgl.glfw.GLFW;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
@@ -83,13 +83,15 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 		context.runOnClient(c -> modules.setEnabled(modules.get(SafeModeModule.class), false));
 
 		try (TestSingleplayerContext world = context.worldBuilder().create()) {
-			world.getClientWorld().waitForChunksRender();
+			GametestCompat.waitForChunksRender(world);
 			TestServerContext server = world.getServer();
 
 			testAutoTotem(context, server, modules);
 			testDoubleHandTotem(context, server, modules);
 			testCrystalMacro(context, server, modules);
 			testAnchorMacro(context, server, modules);
+			// Speere gibt es erst ab 1.21.11
+			//? if >=1.21.11
 			testGhostSpear(context, server, modules);
 			testLiveTracker(context, server, modules);
 			testParticles(context, server, modules);
@@ -233,7 +235,7 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 			return new double[] {(hudLeft - 4 - 7) * toWindow, 11 * toWindow};
 		});
 		context.getInput().setCursorPos(plus[0], plus[1]);
-		context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+		context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
 		context.waitTick();
 		checkClickGuiScale(context, 1.1f, "+ button");
 		context.runOnClient(c -> c.getToastManager().clear()); // Rezept-Meldung liegt sonst über den Knöpfen
@@ -246,10 +248,10 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 		context.getInput().scroll(1);
 		context.waitTick();
 		checkClickGuiScale(context, 1.2f, "Ctrl + scroll");
-		context.getInput().pressKey(GLFW.GLFW_KEY_0);
+		context.getInput().pressKey(InputConstants.KEY_0);
 		context.waitTick();
 		checkClickGuiScale(context, 1.0f, "Ctrl + 0");
-		context.getInput().pressKey(GLFW.GLFW_KEY_MINUS);
+		context.getInput().pressKey(InputConstants.KEY_MINUS);
 		context.waitTick();
 		checkClickGuiScale(context, 0.9f, "Ctrl + -");
 		context.getInput().releaseControl();
@@ -275,13 +277,13 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 		context.runOnClient(c -> c.particleEngine.clearParticles());
 		server.runCommand(spawn);
 		context.waitTicks(3);
-		int hidden = context.computeOnClient(c -> Integer.parseInt(c.particleEngine.countParticles()));
+		int hidden = context.computeOnClient(GametestCompat::particleCount);
 
 		context.runOnClient(c -> modules.setEnabled(particles, false));
 		context.runOnClient(c -> c.particleEngine.clearParticles());
 		server.runCommand(spawn);
 		context.waitTicks(3);
-		int shown = context.computeOnClient(c -> Integer.parseInt(c.particleEngine.countParticles()));
+		int shown = context.computeOnClient(GametestCompat::particleCount);
 
 		check(shown >= 10, "Particles: test setup spawned only " + shown + " explosion particles");
 		check(hidden == 0, "Particles: " + hidden + " explosion particles were not hidden");
@@ -309,8 +311,7 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 			"Capes: elytra does not use the cape texture");
 		context.takeScreenshot("salami-10b-elytra-salami");
 		// eigenes HD-Cape (512x256) – hier die Vorlage aus dem Launcher
-		java.nio.file.Path template = java.nio.file.Path.of(System.getProperty("user.dir"))
-			.resolve("../../../../launcher/src-tauri/assets/salami_cape_template.png").normalize();
+		java.nio.file.Path template = capeTemplate();
 		set(capes, "cape", CapesModule.Cape.LAUNCHER);
 		System.setProperty("salami.cape", template.toString());
 		context.waitTicks(5);
@@ -365,8 +366,7 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 		ExecutorService handlers = Executors.newCachedThreadPool();
 		HttpServer http;
 		try {
-			byte[] customPng = Files.readAllBytes(java.nio.file.Path.of(System.getProperty("user.dir"))
-				.resolve("../../../../launcher/src-tauri/assets/salami_cape_template.png").normalize());
+			byte[] customPng = Files.readAllBytes(capeTemplate());
 			http = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
 			http.setExecutor(handlers); // die Live-Verbindung bleibt offen und darf andere Anfragen nicht blockieren
 			http.createContext("/v1/capes/lookup", exchange -> {
@@ -455,8 +455,7 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 		java.nio.file.Path dir;
 		try {
 			dir = Files.createTempDirectory("salami-capes-live");
-			java.nio.file.Path template = java.nio.file.Path.of(System.getProperty("user.dir"))
-				.resolve("../../../../launcher/src-tauri/assets/salami_cape_template.png").normalize();
+			java.nio.file.Path template = capeTemplate();
 			Files.copy(template, dir.resolve("meins.png"));
 		} catch (IOException e) {
 			throw new UncheckedIOException(e);
@@ -489,6 +488,11 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 	}
 
 	/** capes.json wie der Launcher sie schreibt; Änderungszeit ausdrücklich weiterzählen. */
+	// Cape-Vorlage aus dem Launcher; build.gradle.kts übergibt den Repo-Ordner als salami.repoDir.
+	private static java.nio.file.Path capeTemplate() {
+		return java.nio.file.Path.of(System.getProperty("salami.repoDir"), "launcher/src-tauri/assets/salami_cape_template.png");
+	}
+
 	private static void writeCapeStore(java.nio.file.Path dir, String selected, int step) {
 		java.nio.file.Path store = dir.resolve("capes.json");
 		String json = "{\"selected\":" + selected + ",\"capes\":[{\"id\":\"meins\",\"name\":\"Meins\",\"created\":\"2026-10-25T00:00:00Z\"}]}";

@@ -10,6 +10,7 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
+//? if >=1.21.11
 import net.minecraft.world.item.component.PiercingWeapon;
 import net.minecraft.world.item.enchantment.Enchantments;
 
@@ -54,15 +55,25 @@ public final class SpeedLungeModule extends Module {
 			InventoryUtil.selectHotbar(slot);
 			return; // ab dem nächsten Tick mit dem Speer
 		}
+		// Speere gibt es erst ab 1.21.11 (davor ist das Modul nicht registriert)
+		//? if >=1.21.11 {
 		if (player.cannotAttackWithItem(stack, 0)) {
 			return;
 		}
 		PiercingWeapon piercing = stack.get(DataComponents.PIERCING_WEAPON);
+		//? if >=26.3 {
+		/*mc().gameMode.piercingAttack(stack.getAttackAnimation(), piercing); // schwingt selbst
+		*///?} else {
 		mc().gameMode.piercingAttack(piercing);
 		player.swing(InteractionHand.MAIN_HAND);
+		//?}
+		//?}
 	}
 
 	private boolean isLungeSpear(ItemStack stack) {
+		//? if >=1.21.11 {
 		return WeaponUtil.isSpear(stack) && WeaponUtil.enchantLevel(stack, Enchantments.LUNGE) > 0;
+		//?} else
+		/*return false;*/
 	}
 }

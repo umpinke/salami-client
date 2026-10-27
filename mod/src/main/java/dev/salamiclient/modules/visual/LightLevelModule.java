@@ -1,14 +1,12 @@
 package dev.salamiclient.modules.visual;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.WorldRenderListener;
+import dev.salamiclient.render.WorldContext;
 import dev.salamiclient.render.WorldLines;
 import dev.salamiclient.setting.ColorSetting;
 import dev.salamiclient.setting.NumberSetting;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.EntityType;
@@ -86,6 +84,9 @@ public final class LightLevelModule extends Module implements WorldRenderListene
 					continue;
 				}
 				below.set(pos.getX(), pos.getY() - 1, pos.getZ());
+				//? if >=26.2 {
+				/*if (!level.getBlockState(below).isValidSpawn(level, below, net.minecraft.world.entity.EntityTypes.ZOMBIE)) {
+				*///?} else
 				if (!level.getBlockState(below).isValidSpawn(level, below, EntityType.ZOMBIE)) {
 					continue;
 				}
@@ -106,28 +107,29 @@ public final class LightLevelModule extends Module implements WorldRenderListene
 	 * und ohne Objekte pro Kante (bei Tausenden Markierungen spürbar schneller).
 	 */
 	@Override
-	public void renderWorld(WorldRenderContext context) {
+	public void renderWorld(WorldContext context) {
 		if (marks.isEmpty()) {
 			return;
 		}
 		RenderType type = WorldLines.VISIBLE;
-		VertexConsumer lines = context.consumers().getBuffer(type);
-		PoseStack.Pose pose = context.matrices().last();
 		Vec3 cam = mc().gameRenderer.getMainCamera().position();
 		int dark = darkColor.argb();
 		int night = nightColor.argb();
-		for (Mark mark : marks) {
-			int color = mark.alwaysDark() ? dark : night;
-			float x0 = (float) (mark.pos().getX() + 0.2 - cam.x);
-			float x1 = (float) (mark.pos().getX() + 0.8 - cam.x);
-			float y = (float) (mark.pos().getY() + 0.02 - cam.y);
-			float z0 = (float) (mark.pos().getZ() + 0.2 - cam.z);
-			float z1 = (float) (mark.pos().getZ() + 0.8 - cam.z);
-			WorldLines.line(lines, pose, x0, y, z0, x1, y, z0, 1, 0, 0, color, 2f);
-			WorldLines.line(lines, pose, x0, y, z1, x1, y, z1, 1, 0, 0, color, 2f);
-			WorldLines.line(lines, pose, x0, y, z0, x0, y, z1, 0, 0, 1, color, 2f);
-			WorldLines.line(lines, pose, x1, y, z0, x1, y, z1, 0, 0, 1, color, 2f);
-		}
-		WorldLines.flush(context.consumers(), type);
+		List<Mark> snapshot = marks; // ab 26.2 erst später im Frame gezeichnet; die Liste wird nur ersetzt, nie geändert
+		WorldLines.lines(context, type, 2f, (lines, pose) -> {
+			for (Mark mark : snapshot) {
+				int color = mark.alwaysDark() ? dark : night;
+				float x0 = (float) (mark.pos().getX() + 0.2 - cam.x);
+				float x1 = (float) (mark.pos().getX() + 0.8 - cam.x);
+				float y = (float) (mark.pos().getY() + 0.02 - cam.y);
+				float z0 = (float) (mark.pos().getZ() + 0.2 - cam.z);
+				float z1 = (float) (mark.pos().getZ() + 0.8 - cam.z);
+				WorldLines.line(lines, pose, x0, y, z0, x1, y, z0, 1, 0, 0, color, 2f);
+				WorldLines.line(lines, pose, x0, y, z1, x1, y, z1, 1, 0, 0, color, 2f);
+				WorldLines.line(lines, pose, x0, y, z0, x0, y, z1, 0, 0, 1, color, 2f);
+				WorldLines.line(lines, pose, x1, y, z0, x1, y, z1, 0, 0, 1, color, 2f);
+			}
+		});
+		WorldLines.flush(context, type);
 	}
 }

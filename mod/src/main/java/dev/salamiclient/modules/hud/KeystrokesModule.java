@@ -3,6 +3,7 @@ package dev.salamiclient.modules.hud;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.HudModule;
+import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.setting.BoolSetting;
 import dev.salamiclient.setting.ColorSetting;
 import dev.salamiclient.theme.Theme;
@@ -80,13 +81,13 @@ public final class KeystrokesModule extends HudModule {
 		int color = down ? pressedText.argb() : textColor();
 		var font = mc().font;
 		if (sub == null) {
-			g.drawString(font, label, x + (w - font.width(label)) / 2, y + (h - 8) / 2, color, shadow() && !down);
+			GuiDraw.text(g, font, label, x + (w - font.width(label)) / 2, y + (h - 8) / 2, color, shadow() && !down);
 		} else {
-			g.drawString(font, label, x + (w - font.width(label)) / 2, y + 3, color, shadow() && !down);
+			GuiDraw.text(g, font, label, x + (w - font.width(label)) / 2, y + 3, color, shadow() && !down);
 			g.pose().pushMatrix();
 			g.pose().translate(x + w / 2f, y + 13);
 			g.pose().scale(0.5f, 0.5f);
-			g.drawString(font, sub, -font.width(sub) / 2, 0, color, false);
+			GuiDraw.text(g, font, sub, -font.width(sub) / 2, 0, color, false);
 			g.pose().popMatrix();
 		}
 	}

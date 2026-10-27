@@ -6,8 +6,8 @@ import dev.salamiclient.module.Module;
 import dev.salamiclient.setting.BoolSetting;
 import dev.salamiclient.setting.KeybindSetting;
 import dev.salamiclient.setting.NumberSetting;
+import dev.salamiclient.util.Keys;
 import net.minecraft.client.Minecraft;
-import org.lwjgl.glfw.GLFW;
 
 /**
  * Zoom: Taste gedrückt halten (Standard C) zoomt heran, das Mausrad ändert dabei die Stärke.
@@ -16,7 +16,7 @@ import org.lwjgl.glfw.GLFW;
 public final class ZoomModule extends Module {
 	private static ZoomModule instance;
 
-	private final KeybindSetting zoomKey = add(new KeybindSetting("zoom_key", GLFW.GLFW_KEY_C));
+	private final KeybindSetting zoomKey = add(new KeybindSetting("zoom_key", InputConstants.KEY_C));
 	private final NumberSetting strength = add(new NumberSetting("strength", 4, 1.5, 10, 0.5));
 	private final BoolSetting scroll = add(new BoolSetting("scroll", true));
 	private final BoolSetting smoothCamera = add(new BoolSetting("smooth_camera", true));
@@ -70,7 +70,7 @@ public final class ZoomModule extends Module {
 	private double frameZoom() {
 		Minecraft mc = Minecraft.getInstance();
 		boolean keyDown = mc.screen == null && zoomKey.isBound()
-			&& InputConstants.isKeyDown(mc.getWindow(), zoomKey.key());
+			&& Keys.isDown(zoomKey.key());
 		if (keyDown && !zooming) {
 			startZoom(mc);
 		} else if (!keyDown && zooming) {

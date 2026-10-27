@@ -103,7 +103,13 @@ public final class GlintColorizerModule extends Module {
 	private static final class TintedTexture extends DynamicTexture {
 		TintedTexture(Identifier id, NativeImage image, AbstractTexture original) {
 			super(() -> "salami tinted " + id, image);
+			//? if >=1.21.11 {
 			this.sampler = original.getSampler();
+			//?} else {
+			/*// bis 1.21.10 gibt es keinen Sampler zum Übernehmen: wie die Glanz-Texturen (.mcmeta: blur)
+			setClamp(false);
+			setFilter(true, false);
+			*///?}
 		}
 	}
 }

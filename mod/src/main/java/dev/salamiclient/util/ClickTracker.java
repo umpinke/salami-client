@@ -1,5 +1,7 @@
 package dev.salamiclient.util;
 
+import com.mojang.blaze3d.platform.InputConstants;
+
 import java.util.ArrayDeque;
 
 /**
@@ -13,7 +15,7 @@ public final class ClickTracker {
 
 	private ClickTracker() {}
 
-	/** GLFW-Maustaste 0 = links, 1 = rechts. */
+	/** Maustaste wie in {@link InputConstants} (bis 26.2 GLFW 0/1, ab 26.3 SDL 1/3). */
 	public static void press(int button) {
 		ArrayDeque<Long> clicks = clicks(button);
 		if (clicks == null) {
@@ -39,8 +41,8 @@ public final class ClickTracker {
 
 	private static ArrayDeque<Long> clicks(int button) {
 		return switch (button) {
-			case 0 -> LEFT;
-			case 1 -> RIGHT;
+			case InputConstants.MOUSE_BUTTON_LEFT -> LEFT;
+			case InputConstants.MOUSE_BUTTON_RIGHT -> RIGHT;
 			default -> null;
 		};
 	}

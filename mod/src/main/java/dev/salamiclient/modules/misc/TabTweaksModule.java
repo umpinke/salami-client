@@ -2,6 +2,7 @@ package dev.salamiclient.modules.misc;
 
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
+import dev.salamiclient.render.GuiDraw;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.multiplayer.PlayerInfo;
@@ -28,7 +29,7 @@ public final class TabTweaksModule extends Module {
 		graphics.pose().pushMatrix();
 		graphics.pose().translate(x + width - 1 - font.width(text) * scale, y + 1);
 		graphics.pose().scale(scale, scale);
-		graphics.drawString(font, text, 0, 0, color, true);
+		GuiDraw.text(graphics, font, text, 0, 0, color, true);
 		graphics.pose().popMatrix();
 		return true;
 	}

@@ -11,6 +11,7 @@ import dev.salamiclient.setting.NumberSetting;
 import dev.salamiclient.setting.StringListSetting;
 import dev.salamiclient.util.Chat;
 import dev.salamiclient.util.InventoryUtil;
+import dev.salamiclient.util.Keys;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -20,7 +21,6 @@ import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -47,7 +47,7 @@ public final class KitsModule extends Module {
 	private static final int MAX_MOVES = 64;
 
 	private final ModeSetting<Kit> kit = add(new ModeSetting<>("kit", Kit.CRYSTAL));
-	private final KeybindSetting applyKey = add(new KeybindSetting("apply_key", GLFW.GLFW_KEY_K));
+	private final KeybindSetting applyKey = add(new KeybindSetting("apply_key", InputConstants.KEY_K));
 	private final BoolSetting onlyInventory = add(new BoolSetting("only_inventory", true));
 	private final NumberSetting delay = add(new NumberSetting("delay", 1, 0, 5, 1));
 	private final BoolSetting saveCurrent = add(new BoolSetting("save_current", false));
@@ -100,7 +100,7 @@ public final class KitsModule extends Module {
 	@Override
 	public void onTick() {
 		boolean down = applyKey.isBound()
-			&& InputConstants.isKeyDown(mc().getWindow(), applyKey.key());
+			&& Keys.isDown(applyKey.key());
 		// In Textfeldern (Chat, Schilder, Suche …) gehört die Taste dem Feld
 		if (down && !keyWasDown && (mc().screen == null || !SalamiClient.isTyping(mc().screen))) {
 			apply();
@@ -222,7 +222,11 @@ public final class KitsModule extends Module {
 
 	private static final Predicate<ItemStack> SWORD = stack -> stack.is(ItemTags.SWORDS);
 	private static final Predicate<ItemStack> AXE = stack -> stack.is(ItemTags.AXES);
+	// Speere gibt es erst ab 1.21.11
+	//? if >=1.21.11 {
 	private static final Predicate<ItemStack> SPEAR = stack -> stack.is(ItemTags.SPEARS);
+	//?} else
+	/*private static final Predicate<ItemStack> SPEAR = stack -> false;*/
 	private static final Predicate<ItemStack> TOTEM = is(Items.TOTEM_OF_UNDYING);
 
 	@SafeVarargs

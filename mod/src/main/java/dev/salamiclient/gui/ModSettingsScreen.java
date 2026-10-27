@@ -1,9 +1,11 @@
 package dev.salamiclient.gui;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.ModuleManager;
 import dev.salamiclient.modules.client.GuiScaleModule;
+import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.setting.ActionSetting;
 import dev.salamiclient.setting.BoolSetting;
 import dev.salamiclient.setting.ColorSetting;
@@ -20,9 +22,9 @@ import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.resources.language.I18n;
+import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -129,7 +131,7 @@ public final class ModSettingsScreen extends Screen {
 	}
 
 	private List<FormattedCharSequence> description() {
-		if (!I18n.exists(module.descriptionKey())) {
+		if (!Language.getInstance().has(module.descriptionKey())) {
 			return List.of();
 		}
 		int[] f = frame();
@@ -184,13 +186,21 @@ public final class ModSettingsScreen extends Screen {
 	// ------------------------------------------------------------------ Zeichnen
 
 	@Override
+	//? if >=26.1 {
+	/*public void extractBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+	*///?} else
 	public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
 		graphics.fill(0, 0, width, height, 0xAA000000);
 	}
 
 	@Override
+	//? if >=26.1 {
+	/*public void extractRenderState(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+		super.extractRenderState(g, mouseX, mouseY, partialTick);
+	*///?} else {
 	public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
 		super.render(g, mouseX, mouseY, partialTick);
+	//?}
 		Theme theme = SalamiClient.get().theme();
 		int mx = (int) (mouseX / uiScale);
 		int my = (int) (mouseY / uiScale);
@@ -202,20 +212,20 @@ public final class ModSettingsScreen extends Screen {
 		int[] f = frame();
 		g.fill(f[0], f[1], f[2], f[3], theme.panel());
 		g.fill(f[0], f[1], f[2], f[1] + HEADER - 2, theme.header());
-		g.renderOutline(f[0], f[1], f[2] - f[0], f[3] - f[1], theme.outline());
+		GuiDraw.outline(g, f[0], f[1], f[2] - f[0], f[3] - f[1], theme.outline());
 
 		int[] back = backButton();
 		boolean backHover = inside(back, mx, my);
 		g.fill(back[0], back[1], back[2], back[3], backHover ? theme.accent() : theme.panel());
-		g.drawString(font, I18n.get("salami.mods.back"), back[0] + 6, back[1] + 3, theme.headerText(), false);
+		GuiDraw.text(g, font, I18n.get("salami.mods.back"), back[0] + 6, back[1] + 3, theme.headerText(), false);
 
 		String name = I18n.get(module.translationKey());
-		g.drawCenteredString(font, name, (f[0] + f[2]) / 2, f[1] + 8, module.isEnabled() ? theme.accent() : theme.headerText());
+		GuiDraw.centeredText(g, font, name, (f[0] + f[2]) / 2, f[1] + 8, module.isEnabled() ? theme.accent() : theme.headerText());
 		drawSwitch(g, theme, toggle(), module.isEnabled());
 
 		int dy = f[1] + HEADER + 6;
 		for (FormattedCharSequence line : description()) {
-			g.drawString(font, line, f[0] + PAD, dy, theme.textDim(), false);
+			GuiDraw.text(g, font, line, f[0] + PAD, dy, theme.textDim(), false);
 			dy += 10;
 		}
 
@@ -236,7 +246,7 @@ public final class ModSettingsScreen extends Screen {
 					tooltip = Component.translatable("salami.clickgui.edit_in_config");
 				}
 			}
-			g.drawString(font, font.plainSubstrByWidth(SettingText.label(row.setting()), c[2] - c[0] - CONTROL_W - 8), c[0], row.y() + 5, theme.text(), false);
+			GuiDraw.text(g, font, font.plainSubstrByWidth(SettingText.label(row.setting()), c[2] - c[0] - CONTROL_W - 8), c[0], row.y() + 5, theme.text(), false);
 			renderControl(g, theme, row, mx, my);
 		}
 		g.disableScissor();
@@ -264,43 +274,43 @@ public final class ModSettingsScreen extends Screen {
 			int knobX = r[0] + (int) Math.round((trackRight - r[0]) * number.fraction());
 			g.fill(r[0], trackY, knobX, trackY + 1, theme.accent());
 			g.fill(knobX - 2, trackY - 3, knobX + 2, trackY + 4, theme.accent());
-			g.drawString(font, value, r[2] - font.width(value), textY, theme.text(), false);
+			GuiDraw.text(g, font, value, r[2] - font.width(value), textY, theme.text(), false);
 		} else if (setting instanceof ModeSetting<?> mode) {
 			String value = "< " + SettingText.modeLabel(mode) + " >";
-			g.drawString(font, value, r[2] - font.width(value), textY, theme.accent(), false);
+			GuiDraw.text(g, font, value, r[2] - font.width(value), textY, theme.accent(), false);
 		} else if (setting instanceof KeybindSetting keybind) {
 			String value = listeningKeybind == keybind ? "..." : keybind.keyName();
 			int w = Math.max(40, font.width(value) + 10);
 			g.fill(r[2] - w, r[1], r[2], r[3], listeningKeybind == keybind ? theme.accent() : 0xFF0B0B0E);
-			g.renderOutline(r[2] - w, r[1], w, r[3] - r[1], theme.outline());
-			g.drawString(font, value, r[2] - w + (w - font.width(value)) / 2, textY, listeningKeybind == keybind ? 0xFF000000 : theme.text(), false);
+			GuiDraw.outline(g, r[2] - w, r[1], w, r[3] - r[1], theme.outline());
+			GuiDraw.text(g, font, value, r[2] - w + (w - font.width(value)) / 2, textY, listeningKeybind == keybind ? 0xFF000000 : theme.text(), false);
 		} else if (setting instanceof ColorSetting color) {
 			String hex = color.isChroma() ? I18n.get("salami.colorpicker.chroma") : ColorSetting.toHex(color.get());
-			g.drawString(font, hex, r[2] - 24 - font.width(hex), textY, theme.textDim(), false);
+			GuiDraw.text(g, font, hex, r[2] - 24 - font.width(hex), textY, theme.textDim(), false);
 			g.fill(r[2] - 20, r[1], r[2], r[3], color.argb());
-			g.renderOutline(r[2] - 20, r[1], 20, r[3] - r[1], picker != null && picker.setting() == color ? theme.accent() : theme.outline());
+			GuiDraw.outline(g, r[2] - 20, r[1], 20, r[3] - r[1], picker != null && picker.setting() == color ? theme.accent() : theme.outline());
 		} else if (setting instanceof StringListSetting list) {
 			String value = I18n.get("salami.clickgui.entries", list.get().size());
-			g.drawString(font, value, r[2] - font.width(value), textY, theme.textDim(), false);
+			GuiDraw.text(g, font, value, r[2] - font.width(value), textY, theme.textDim(), false);
 		} else if (setting instanceof ActionSetting) {
 			boolean hovered = inside(r, mx, my);
 			g.fill(r[0], r[1], r[2], r[3], hovered ? theme.accent() : theme.header());
 			String label = I18n.get("salami.mods.open");
-			g.drawString(font, label, r[0] + (r[2] - r[0] - font.width(label)) / 2, textY, hovered ? 0xFF000000 : theme.headerText(), false);
+			GuiDraw.text(g, font, label, r[0] + (r[2] - r[0] - font.width(label)) / 2, textY, hovered ? 0xFF000000 : theme.headerText(), false);
 		} else if (setting instanceof TextSetting text) {
 			boolean editing = editingText == text;
 			g.fill(r[0], r[1], r[2], r[3], 0xFF0B0B0E);
-			g.renderOutline(r[0], r[1], r[2] - r[0], r[3] - r[1], editing ? theme.accent() : theme.outline());
+			GuiDraw.outline(g, r[0], r[1], r[2] - r[0], r[3] - r[1], editing ? theme.accent() : theme.outline());
 			String value = editing ? editBuffer : text.get();
 			String shown = font.plainSubstrByWidth(value, r[2] - r[0] - 8, editing);
-			g.drawString(font, shown, r[0] + 3, textY, value.isEmpty() && !editing ? theme.textDim() : theme.text(), false);
+			GuiDraw.text(g, font, shown, r[0] + 3, textY, value.isEmpty() && !editing ? theme.textDim() : theme.text(), false);
 			if (editing && (System.currentTimeMillis() / 500) % 2 == 0) {
 				int cx = r[0] + 3 + font.width(shown);
 				g.fill(cx, r[1] + 2, cx + 1, r[3] - 2, theme.text());
 			}
 		} else {
 			String value = String.valueOf(setting.get());
-			g.drawString(font, value, r[2] - font.width(value), textY, theme.text(), false);
+			GuiDraw.text(g, font, value, r[2] - font.width(value), textY, theme.text(), false);
 		}
 	}
 
@@ -318,7 +328,7 @@ public final class ModSettingsScreen extends Screen {
 		double x = event.x() / uiScale;
 		double y = event.y() / uiScale;
 		int button = event.button();
-		boolean back = button == GLFW.GLFW_MOUSE_BUTTON_RIGHT;
+		boolean back = button == InputConstants.MOUSE_BUTTON_RIGHT;
 		listeningKeybind = null;
 		commitText();
 		if (picker != null) {
@@ -459,7 +469,7 @@ public final class ModSettingsScreen extends Screen {
 			if (picker.keyPressed(event.key())) {
 				return true;
 			}
-			if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
+			if (event.key() == InputConstants.KEY_ESCAPE) {
 				picker = null;
 				return true;
 			}
@@ -467,9 +477,9 @@ public final class ModSettingsScreen extends Screen {
 		if (editingText != null) {
 			capturedLastKey = true;
 			switch (event.key()) {
-				case GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER -> commitText();
-				case GLFW.GLFW_KEY_ESCAPE -> editingText = null;
-				case GLFW.GLFW_KEY_BACKSPACE -> {
+				case InputConstants.KEY_RETURN, InputConstants.KEY_NUMPADENTER -> commitText();
+				case InputConstants.KEY_ESCAPE -> editingText = null;
+				case InputConstants.KEY_BACKSPACE -> {
 					if (!editBuffer.isEmpty()) {
 						editBuffer = editBuffer.substring(0, editBuffer.length() - 1);
 					}
@@ -482,9 +492,9 @@ public final class ModSettingsScreen extends Screen {
 		capturedLastKey = listeningKeybind != null;
 		if (listeningKeybind != null) {
 			int key = event.key();
-			if (key == GLFW.GLFW_KEY_DELETE || key == GLFW.GLFW_KEY_BACKSPACE) {
+			if (key == InputConstants.KEY_DELETE || key == InputConstants.KEY_BACKSPACE) {
 				listeningKeybind.set(KeybindSetting.NONE);
-			} else if (key != GLFW.GLFW_KEY_ESCAPE) {
+			} else if (key != InputConstants.KEY_ESCAPE) {
 				listeningKeybind.set(key);
 			}
 			listeningKeybind = null;

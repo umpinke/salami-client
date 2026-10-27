@@ -30,6 +30,9 @@ public final class Chat {
 			.withStyle(ChatFormatting.DARK_GRAY)
 			.append(Component.literal("Salami").withStyle(ChatFormatting.RED))
 			.append(Component.literal("] ").withStyle(ChatFormatting.DARK_GRAY));
+		//? if >=26.1 {
+		/*mc.gui.getChat().addClientSystemMessage(prefix.append(message));
+		*///?} else
 		mc.gui.getChat().addMessage(prefix.append(message));
 	}
 }

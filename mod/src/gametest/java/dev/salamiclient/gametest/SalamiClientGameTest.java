@@ -1,5 +1,6 @@
 package dev.salamiclient.gametest;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.gui.ConfigsScreen;
 import dev.salamiclient.gui.clickgui.ClickGuiScreen;
@@ -15,7 +16,6 @@ import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.loader.api.FabricLoader;
-import org.lwjgl.glfw.GLFW;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -55,7 +55,7 @@ public final class SalamiClientGameTest implements FabricClientGameTest {
 		context.takeScreenshot("salami-00-title");
 
 		try (TestSingleplayerContext world = context.worldBuilder().create()) {
-			world.getClientWorld().waitForChunksRender();
+			GametestCompat.waitForChunksRender(world);
 			context.takeScreenshot("salami-01-hud");
 
 			// --- ClickGUI über die echte Taste öffnen ---
@@ -66,18 +66,18 @@ public final class SalamiClientGameTest implements FabricClientGameTest {
 
 			// --- Salami-Modus per Linksklick ausschalten (1. Modul im Client-Panel) ---
 			boolean themeBefore = context.computeOnClient(c -> modules.get(SalamiThemeModule.class).isEnabled());
-			click(context, PANEL_X + 20, PANEL_Y + HEADER_HEIGHT + 5, GLFW.GLFW_MOUSE_BUTTON_LEFT);
+			click(context, PANEL_X + 20, PANEL_Y + HEADER_HEIGHT + 5, InputConstants.MOUSE_BUTTON_LEFT);
 			boolean themeAfter = context.computeOnClient(c -> modules.get(SalamiThemeModule.class).isEnabled());
 			check(themeBefore != themeAfter, "Left click on module row did not toggle it");
 			context.takeScreenshot("salami-03-clickgui-default");
 
 			// --- Safe-Mode-Einstellungen per Rechtsklick aufklappen (2. Modul) ---
-			click(context, PANEL_X + 20, PANEL_Y + HEADER_HEIGHT + MODULE_HEIGHT + 5, GLFW.GLFW_MOUSE_BUTTON_RIGHT);
+			click(context, PANEL_X + 20, PANEL_Y + HEADER_HEIGHT + MODULE_HEIGHT + 5, InputConstants.MOUSE_BUTTON_RIGHT);
 			context.takeScreenshot("salami-04-safemode-settings");
 
 			// Theme wiederherstellen und GUI schließen
-			click(context, PANEL_X + 20, PANEL_Y + HEADER_HEIGHT + 5, GLFW.GLFW_MOUSE_BUTTON_LEFT);
-			context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+			click(context, PANEL_X + 20, PANEL_Y + HEADER_HEIGHT + 5, InputConstants.MOUSE_BUTTON_LEFT);
+			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 			context.waitTick();
 
 			// --- Easy Leave ---
@@ -96,10 +96,10 @@ public final class SalamiClientGameTest implements FabricClientGameTest {
 			}
 
 			// --- Pausemenü mit Salami-Buttons ---
-			context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 			context.waitTicks(2);
 			context.takeScreenshot("salami-06-pause-menu");
-			context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 			context.waitTick();
 
 			// Aufräumen: Safe Mode wieder aus, damit die Test-Config neutral bleibt
@@ -116,7 +116,7 @@ public final class SalamiClientGameTest implements FabricClientGameTest {
 		context.runOnClient(c -> c.setScreen(new ConfigsScreen(null)));
 		context.waitTicks(2);
 		context.takeScreenshot("salami-05b-configs");
-		context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+		context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 		context.waitTick();
 		check(context.computeOnClient(c -> c.screen == null), "Configs screen did not close with Esc");
 

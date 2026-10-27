@@ -22,7 +22,13 @@ public abstract class EntityRendererMixin {
 		return PlayerEspModule.glowColor(entity, teamColor);
 	}
 
-	@ModifyExpressionValue(method = "extractRenderState",
+	/** Wo der Name fürs Namensschild geholt wird (ab 26.2 eine eigene Methode). */
+	//? if >=26.2 {
+	/*private static final String NAME_TAG = "extractNameTags(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/client/renderer/entity/state/EntityRenderState;FDD)V";
+	*///?} else
+	private static final String NAME_TAG = "extractRenderState";
+
+	@ModifyExpressionValue(method = NAME_TAG,
 		at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/entity/EntityRenderer;getNameTag(Lnet/minecraft/world/entity/Entity;)Lnet/minecraft/network/chat/Component;"))
 	private Component salami$healthIndicator(Component name, @Local(argsOnly = true) Entity entity) {
 		// Streamer Mode betrifft nur den eigenen Namen – andere Namen nicht jedes Frame durchsuchen

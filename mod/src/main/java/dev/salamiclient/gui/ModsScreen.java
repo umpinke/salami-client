@@ -1,10 +1,12 @@
 package dev.salamiclient.gui;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.ModuleManager;
 import dev.salamiclient.modules.client.GuiScaleModule;
+import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.setting.Setting;
 import dev.salamiclient.theme.Theme;
 import net.minecraft.client.gui.GuiGraphics;
@@ -13,9 +15,9 @@ import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.resources.language.I18n;
+import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -166,7 +168,7 @@ public final class ModsScreen extends Screen {
 		if (I18n.get(module.translationKey()).toLowerCase(Locale.ROOT).contains(q) || module.id().contains(q)) {
 			return true;
 		}
-		return I18n.exists(module.descriptionKey()) && I18n.get(module.descriptionKey()).toLowerCase(Locale.ROOT).contains(q);
+		return Language.getInstance().has(module.descriptionKey()) && I18n.get(module.descriptionKey()).toLowerCase(Locale.ROOT).contains(q);
 	}
 
 	private int columns() {
@@ -224,13 +226,21 @@ public final class ModsScreen extends Screen {
 	// ------------------------------------------------------------------ Zeichnen
 
 	@Override
+	//? if >=26.1 {
+	/*public void extractBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+	*///?} else
 	public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
 		graphics.fill(0, 0, width, height, 0xAA000000);
 	}
 
 	@Override
+	//? if >=26.1 {
+	/*public void extractRenderState(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+		super.extractRenderState(g, mouseX, mouseY, partialTick);
+	*///?} else {
 	public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
 		super.render(g, mouseX, mouseY, partialTick);
+	//?}
 		Theme theme = SalamiClient.get().theme();
 		int mx = (int) (mouseX / uiScale);
 		int my = (int) (mouseY / uiScale);
@@ -242,14 +252,14 @@ public final class ModsScreen extends Screen {
 		int[] f = frame();
 		g.fill(f[0], f[1], f[2], f[3], theme.panel());
 		g.fill(f[0], f[1], f[2], f[1] + HEADER - 2, theme.header());
-		g.renderOutline(f[0], f[1], f[2] - f[0], f[3] - f[1], theme.outline());
-		g.drawString(font, I18n.get("salami.mods.title"), f[0] + PAD, f[1] + 8, theme.headerText(), false);
+		GuiDraw.outline(g, f[0], f[1], f[2] - f[0], f[3] - f[1], theme.outline());
+		GuiDraw.text(g, font, I18n.get("salami.mods.title"), f[0] + PAD, f[1] + 8, theme.headerText(), false);
 
 		renderSearch(g, theme, mx, my);
 		int[] close = closeButton();
 		boolean closeHover = inside(close, mx, my);
 		g.fill(close[0], close[1], close[2], close[3], closeHover ? theme.accent() : theme.panel());
-		g.drawString(font, "x", close[0] + 5, close[1] + 3, theme.headerText(), false);
+		GuiDraw.text(g, font, "x", close[0] + 5, close[1] + 3, theme.headerText(), false);
 
 		for (Object[] t : tabs()) {
 			Object key = t[0];
@@ -258,9 +268,9 @@ public final class ModsScreen extends Screen {
 			boolean hovered = inside(r, mx, my);
 			g.fill(r[0], r[1], r[2], r[3], selected ? theme.accent() : hovered ? theme.hover() : theme.header());
 			int color = selected ? 0xFF000000 : theme.text();
-			g.drawString(font, tabLabel(key), r[0] + 6, r[1] + 4, color, false);
+			GuiDraw.text(g, font, tabLabel(key), r[0] + 6, r[1] + 4, color, false);
 			if (key instanceof Category category && category.isRestricted()) {
-				g.drawString(font, "!", r[2] - 5, r[1] + 4, theme.warning(), false);
+				GuiDraw.text(g, font, "!", r[2] - 5, r[1] + 4, theme.warning(), false);
 				if (hovered) {
 					tooltip = Component.translatable("salami.category.utility.warning");
 				}
@@ -283,7 +293,7 @@ public final class ModsScreen extends Screen {
 		}
 		g.disableScissor();
 		if (cards.isEmpty()) {
-			g.drawCenteredString(font, I18n.get("salami.mods.empty"), (c[0] + c[2]) / 2, c[1] + 20, theme.textDim());
+			GuiDraw.centeredText(g, font, I18n.get("salami.mods.empty"), (c[0] + c[2]) / 2, c[1] + 20, theme.textDim());
 		}
 		renderScrollbar(g, theme, c);
 
@@ -296,12 +306,12 @@ public final class ModsScreen extends Screen {
 	private void renderSearch(GuiGraphics g, Theme theme, int mx, int my) {
 		int[] r = searchBox();
 		g.fill(r[0], r[1], r[2], r[3], 0xFF0B0B0E);
-		g.renderOutline(r[0], r[1], r[2] - r[0], r[3] - r[1], query.isEmpty() ? theme.outline() : theme.accent());
+		GuiDraw.outline(g, r[0], r[1], r[2] - r[0], r[3] - r[1], query.isEmpty() ? theme.outline() : theme.accent());
 		if (query.isEmpty()) {
-			g.drawString(font, I18n.get("salami.mods.search"), r[0] + 4, r[1] + 3, theme.textDim(), false);
+			GuiDraw.text(g, font, I18n.get("salami.mods.search"), r[0] + 4, r[1] + 3, theme.textDim(), false);
 		} else {
 			String shown = font.plainSubstrByWidth(query, r[2] - r[0] - 12, true);
-			g.drawString(font, shown, r[0] + 4, r[1] + 3, theme.text(), false);
+			GuiDraw.text(g, font, shown, r[0] + 4, r[1] + 3, theme.text(), false);
 			if ((System.currentTimeMillis() / 500) % 2 == 0) {
 				int cx = r[0] + 4 + font.width(shown);
 				g.fill(cx, r[1] + 3, cx + 1, r[1] + 12, theme.text());
@@ -325,21 +335,21 @@ public final class ModsScreen extends Screen {
 		if (hovered) {
 			g.fill(x, y, x + CARD_W, y + CARD_H, theme.hover());
 		}
-		g.renderOutline(x, y, CARD_W, CARD_H, hovered || on ? theme.accent() : theme.outline());
+		GuiDraw.outline(g, x, y, CARD_W, CARD_H, hovered || on ? theme.accent() : theme.outline());
 
 		String name = font.plainSubstrByWidth(I18n.get(module.translationKey()), CARD_W - 16);
-		g.drawString(font, name, x + 6, y + 6, on ? theme.accent() : theme.text(), false);
+		GuiDraw.text(g, font, name, x + 6, y + 6, on ? theme.accent() : theme.text(), false);
 		if (module.category().isRestricted()) {
-			g.drawString(font, "!", x + CARD_W - 9, y + 6, theme.warning(), false);
+			GuiDraw.text(g, font, "!", x + CARD_W - 9, y + 6, theme.warning(), false);
 		}
 
-		if (I18n.exists(module.descriptionKey())) {
+		if (Language.getInstance().has(module.descriptionKey())) {
 			List<FormattedCharSequence> lines = font.split(Component.translatable(module.descriptionKey()), (int) ((CARD_W - 12) / 0.75f));
 			g.pose().pushMatrix();
 			g.pose().translate(x + 6, y + 18);
 			g.pose().scale(0.75f, 0.75f);
 			for (int i = 0; i < Math.min(3, lines.size()); i++) {
-				g.drawString(font, lines.get(i), 0, i * 10, theme.textDim(), false);
+				GuiDraw.text(g, font, lines.get(i), 0, i * 10, theme.textDim(), false);
 			}
 			g.pose().popMatrix();
 		}
@@ -350,7 +360,7 @@ public final class ModsScreen extends Screen {
 		g.fill(px, py, px + 22, py + 10, on ? theme.accent() : 0xFF3A3A44);
 		int knob = on ? px + 13 : px + 1;
 		g.fill(knob, py + 1, knob + 8, py + 9, on ? 0xFF1A1A1F : 0xFFF3F3F3);
-		g.drawString(font, I18n.get(on ? "salami.on" : "salami.off"), px + 26, py + 1, on ? theme.accent() : theme.textDim(), false);
+		GuiDraw.text(g, font, I18n.get(on ? "salami.on" : "salami.off"), px + 26, py + 1, on ? theme.accent() : theme.textDim(), false);
 
 		if (hasSettings(module)) {
 			int[] gr = gear(card);
@@ -358,7 +368,7 @@ public final class ModsScreen extends Screen {
 			if (gearHover) {
 				g.fill(gr[0], gr[1], gr[2], gr[3], theme.hover());
 			}
-			g.drawString(font, "⚙", gr[0] + 3, gr[1] + 2, gearHover ? theme.accent() : theme.textDim(), false);
+			GuiDraw.text(g, font, "⚙", gr[0] + 3, gr[1] + 2, gearHover ? theme.accent() : theme.textDim(), false);
 		}
 	}
 
@@ -371,20 +381,20 @@ public final class ModsScreen extends Screen {
 		if (hovered) {
 			g.fill(x, y, x + CARD_W, y + CARD_H, theme.hover());
 		}
-		g.renderOutline(x, y, CARD_W, CARD_H, hovered ? theme.accent() : theme.outline());
-		g.drawString(font, font.plainSubstrByWidth(I18n.get(entry.nameKey()), CARD_W - 12), x + 6, y + 6, theme.text(), false);
-		if (I18n.exists(entry.descriptionKey())) {
+		GuiDraw.outline(g, x, y, CARD_W, CARD_H, hovered ? theme.accent() : theme.outline());
+		GuiDraw.text(g, font, font.plainSubstrByWidth(I18n.get(entry.nameKey()), CARD_W - 12), x + 6, y + 6, theme.text(), false);
+		if (Language.getInstance().has(entry.descriptionKey())) {
 			List<FormattedCharSequence> lines = font.split(Component.translatable(entry.descriptionKey()), (int) ((CARD_W - 12) / 0.75f));
 			g.pose().pushMatrix();
 			g.pose().translate(x + 6, y + 18);
 			g.pose().scale(0.75f, 0.75f);
 			for (int i = 0; i < Math.min(3, lines.size()); i++) {
-				g.drawString(font, lines.get(i), 0, i * 10, theme.textDim(), false);
+				GuiDraw.text(g, font, lines.get(i), 0, i * 10, theme.textDim(), false);
 			}
 			g.pose().popMatrix();
 		}
 		String open = I18n.get("salami.mods.open_settings");
-		g.drawString(font, open, x + 6, y + CARD_H - 14, hovered ? theme.accent() : theme.textDim(), false);
+		GuiDraw.text(g, font, open, x + 6, y + CARD_H - 14, hovered ? theme.accent() : theme.textDim(), false);
 	}
 
 	private Component cardTooltip(Card card, int mx, int my) {
@@ -395,7 +405,7 @@ public final class ModsScreen extends Screen {
 			return Component.translatable("salami.mods.settings");
 		}
 		String key = card.module().descriptionKey();
-		if (I18n.exists(key) && font.split(Component.translatable(key), (int) ((CARD_W - 12) / 0.75f)).size() > 3) {
+		if (Language.getInstance().has(key) && font.split(Component.translatable(key), (int) ((CARD_W - 12) / 0.75f)).size() > 3) {
 			return Component.translatable(key);
 		}
 		return null;
@@ -432,7 +442,7 @@ public final class ModsScreen extends Screen {
 				return true;
 			}
 		}
-		if (inside(searchBox(), x, y) && button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
+		if (inside(searchBox(), x, y) && button == InputConstants.MOUSE_BUTTON_RIGHT) {
 			query = "";
 			return true;
 		}
@@ -449,10 +459,10 @@ public final class ModsScreen extends Screen {
 					return true;
 				}
 				Module module = card.module();
-				boolean wantsSettings = button == GLFW.GLFW_MOUSE_BUTTON_RIGHT || inside(gear(card), x, y);
+				boolean wantsSettings = button == InputConstants.MOUSE_BUTTON_RIGHT || inside(gear(card), x, y);
 				if (wantsSettings && hasSettings(module)) {
 					minecraft.setScreen(new ModSettingsScreen(modules, module, this));
-				} else if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+				} else if (button == InputConstants.MOUSE_BUTTON_LEFT) {
 					modules.toggle(module);
 				}
 				return true;
@@ -471,12 +481,12 @@ public final class ModsScreen extends Screen {
 	@Override
 	public boolean keyPressed(KeyEvent event) {
 		int key = event.key();
-		if (key == GLFW.GLFW_KEY_BACKSPACE && !query.isEmpty()) {
+		if (key == InputConstants.KEY_BACKSPACE && !query.isEmpty()) {
 			query = query.substring(0, query.length() - 1);
 			scroll = 0;
 			return true;
 		}
-		if (key == GLFW.GLFW_KEY_ESCAPE && !query.isEmpty()) {
+		if (key == InputConstants.KEY_ESCAPE && !query.isEmpty()) {
 			query = "";
 			return true;
 		}

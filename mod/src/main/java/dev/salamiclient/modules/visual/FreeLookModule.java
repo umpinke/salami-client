@@ -5,10 +5,10 @@ import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.setting.BoolSetting;
 import dev.salamiclient.setting.KeybindSetting;
+import dev.salamiclient.util.Keys;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
-import org.lwjgl.glfw.GLFW;
 
 /**
  * Free Look: Taste halten (Standard: linke Alt-Taste) und dich in der Third-Person-Ansicht
@@ -17,7 +17,7 @@ import org.lwjgl.glfw.GLFW;
 public final class FreeLookModule extends Module {
 	private static FreeLookModule instance;
 
-	private final KeybindSetting lookKey = add(new KeybindSetting("look_key", GLFW.GLFW_KEY_LEFT_ALT));
+	private final KeybindSetting lookKey = add(new KeybindSetting("look_key", InputConstants.KEY_LALT));
 	private final BoolSetting toggle = add(new BoolSetting("toggle", false));
 	private final BoolSetting invertPitch = add(new BoolSetting("invert_pitch", false));
 
@@ -35,7 +35,7 @@ public final class FreeLookModule extends Module {
 	@Override
 	public void onTick() {
 		Minecraft mc = mc();
-		boolean down = mc.screen == null && lookKey.isBound() && InputConstants.isKeyDown(mc.getWindow(), lookKey.key());
+		boolean down = mc.screen == null && lookKey.isBound() && Keys.isDown(lookKey.key());
 		boolean wanted = toggle.isOn() ? (down && !keyWasDown ? !active : active) : down;
 		keyWasDown = down;
 		if (wanted && !active) {

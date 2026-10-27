@@ -46,7 +46,7 @@ public final class SalamiBenchmarkGameTest implements FabricClientGameTest {
 		context.runOnClient(c -> modules.setEnabled(modules.get(SafeModeModule.class), false));
 
 		try (TestSingleplayerContext world = context.worldBuilder().create()) {
-			world.getClientWorld().waitForChunksRender();
+			GametestCompat.waitForChunksRender(world);
 			TestServerContext server = world.getServer();
 			server.runCommand("tp @p 400.5 " + FEET_Y + " 0.5 0 10");
 			context.waitTicks(10);

@@ -3,11 +3,11 @@ package dev.salamiclient.modules.utility;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.WorldRenderListener;
+import dev.salamiclient.render.WorldContext;
 import dev.salamiclient.setting.BoolSetting;
 import dev.salamiclient.setting.NumberSetting;
 import dev.salamiclient.util.TargetUtil;
 import dev.salamiclient.util.WeaponUtil;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.AABB;
@@ -42,7 +42,7 @@ public final class AimAssistModule extends Module implements WorldRenderListener
 	}
 
 	@Override
-	public void renderWorld(WorldRenderContext context) {
+	public void renderWorld(WorldContext context) {
 		long now = System.nanoTime();
 		float ticks = lastFrame == 0 ? 0 : Math.min((now - lastFrame) / 50_000_000f, 3f);
 		lastFrame = now;

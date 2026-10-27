@@ -2,6 +2,7 @@ package dev.salamiclient.modules.hud;
 
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.HudModule;
+import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.setting.BoolSetting;
 import dev.salamiclient.util.ClickTracker;
 import net.minecraft.client.DeltaTracker;
@@ -47,6 +48,6 @@ public final class CpsModule extends HudModule {
 
 	@Override
 	protected void render(GuiGraphics graphics, DeltaTracker delta) {
-		graphics.drawString(mc().font, text, 4, 3, textColor(), shadow());
+		GuiDraw.text(graphics, mc().font, text, 4, 3, textColor(), shadow());
 	}
 }

@@ -1,0 +1,133 @@
+plugins {
+	// Wendet die passende Loom-Variante an: fabric-loom-remap bis 1.21.11, fabric-loom ab 26.1
+	id("dev.kikugie.loom-back-compat")
+}
+
+// Läuft einmal pro Minecraft-Version (versions/<version>/), Werte aus stonecutter.properties.toml.
+val minecraft = sc.current.version
+version = "${sc.properties.get<String>("mod.version")}+$minecraft"
+group = sc.properties.get<String>("mod.group")
+
+base {
+	archivesName = sc.properties.get<String>("mod.archives_name")
+}
+
+// Ab 26.1 verlangt Minecraft Java 25
+val requiredJava = if (sc.current.parsed >= "26.1") JavaVersion.VERSION_25 else JavaVersion.VERSION_21
+
+dependencies {
+	minecraft("com.mojang:minecraft:$minecraft")
+	// Mojang-Mappings bis 1.21.11 – ab 26.x ist Minecraft unverschleiert und hat genau diese Namen.
+	loomx.applyMojangMappings()
+	// mod… geht auch ab 26.1; loom-back-compat macht daraus implementation
+	modImplementation("net.fabricmc:fabric-loader:${sc.properties.get<String>("deps.fabric_loader")}")
+	modImplementation("net.fabricmc.fabric-api:fabric-api:${sc.properties.get<String>("deps.fabric_api")}")
+}
+
+fabricApi {
+	// Client-Gametests: startet Minecraft, prüft UI/Logik automatisch, macht Screenshots.
+	// Ausführen: ./gradlew :1.21.11:runClientGameTest  (Screenshots: versions/<version>/build/run/clientGameTest/screenshots)
+	configureTests {
+		createSourceSet = true
+		modId = "salami-gametest"
+		enableGameTests = false
+		enableClientGameTests = true
+		eula = true
+	}
+}
+
+loom {
+	runs {
+		configureEach {
+			// Utility-Module (Explosionen, Inventar-Klicks) bringen den deterministischen
+			// Netzwerk-Synchronizer der Gametests durcheinander; die Tests warten stattdessen
+			// mit Zeitfenstern auf das erwartete Ergebnis.
+			if (name == "clientGameTest") {
+				jvmArguments.add("-Dfabric.client.gametest.disableNetworkSynchronizer=true")
+				// Repo-Ordner, damit Tests Dateien des Launchers finden (z. B. die Cape-Vorlage)
+				jvmArguments.add("-Dsalami.repoDir=${rootProject.projectDir.parentFile.absolutePath}")
+			}
+		}
+	}
+}
+
+tasks.processResources {
+	// Mixins, die es nur in manchen Versionen gibt (die Klasse ist sonst leer)
+	val versionMixins = buildList {
+		if (sc.current.parsed >= "26.3") add("FirstPersonHandsMixin")
+	}
+	val props = mapOf(
+		"version" to project.version.toString(),
+		"minecraft" to sc.properties.get<String>("mod.mc_compat"),
+		"java" to requiredJava.majorVersion,
+		"versionMixins" to versionMixins.joinToString("") { ",\n\t\t\"$it\"" },
+	)
+	inputs.properties(props)
+
+	filesMatching(listOf("fabric.mod.json", "salami.mixins.json")) {
+		expand(props)
+	}
+
+	// Ab 26.3 werden Shader zu SPIR-V übersetzt (Vulkan): Ein- und Ausgaben brauchen feste Plätze
+	val spirvShaders = sc.current.parsed >= "26.3"
+	inputs.property("spirvShaders", spirvShaders)
+	if (spirvShaders) {
+		filesMatching("assets/*/shaders/**/*.fsh") {
+			filter { line ->
+				when {
+					line.startsWith("#version ") -> "$line\n#extension GL_ARB_separate_shader_objects : require"
+					line.startsWith("in vec2 texCoord;") -> "layout(location = 0) $line"
+					line.startsWith("out vec4 fragColor;") -> "layout(location = 0) $line"
+					else -> line
+				}
+			}
+		}
+	}
+}
+
+tasks.withType<JavaCompile>().configureEach {
+	options.release = requiredJava.majorVersion.toInt()
+	options.encoding = "UTF-8"
+}
+
+java {
+	sourceCompatibility = requiredJava
+	targetCompatibility = requiredJava
+}
+
+tasks.jar {
+	from(rootProject.file("../LICENSE")) {
+		rename { "LICENSE_salami-core" }
+	}
+}
+
+// Name, unter dem der Launcher die Jar dieser Version erwartet (packs/salami-packs.json).
+val launcherJarName = "salami-core-$minecraft.jar"
+
+// Kopiert die gebaute Jar in den Datenordner des Salami-Launchers, wo das Pack "salami" sie als
+// file:dev/salami-core-<version>.jar erwartet. Ohne Versionspfad für alle Versionen:
+// ./gradlew installDev   Anderer Ort: ./gradlew installDev -PlauncherDir=<pfad>
+val launcherDir = providers.gradleProperty("launcherDir").orElse(
+	providers.environmentVariable("APPDATA").map { "$it/salamiclient/SalamiClient" }
+		.orElse(providers.systemProperty("user.home").map { "$it/.local/share/salamiclient" })
+)
+
+tasks.register<Copy>("installDev") {
+	group = "salami"
+	description = "Builds salami-core and copies it into the Salami launcher (dev pack)."
+	val jarName = launcherJarName // lokale Kopie: der Konfigurationscache kann keine Skript-Variablen speichern
+	from(loomx.modJar.flatMap { it.archiveFile })
+	into(launcherDir.map { "$it/dev" })
+	rename { jarName }
+}
+
+// Fester Ordner für den Launcher-Installer (bundle.resources in tauri.release-local.json):
+// der Installer legt die Jars als mods/salami-core-<version>.jar neben die Launcher-Exe.
+tasks.register<Copy>("launcherBundle") {
+	group = "salami"
+	description = "Builds salami-core and stages it for the launcher installer."
+	val jarName = launcherJarName
+	from(loomx.modJar.flatMap { it.archiveFile })
+	into(rootProject.layout.buildDirectory.dir("launcher"))
+	rename { jarName }
+}

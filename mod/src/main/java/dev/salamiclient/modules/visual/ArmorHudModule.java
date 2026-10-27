@@ -3,6 +3,7 @@ package dev.salamiclient.modules.visual;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.HudModule;
+import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.setting.BoolSetting;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.GuiGraphics;
@@ -48,14 +49,14 @@ public final class ArmorHudModule extends HudModule {
 		if (stack.isEmpty()) {
 			return;
 		}
-		graphics.renderItem(stack, 0, y);
-		graphics.renderItemDecorations(mc().font, stack, 0, y);
+		GuiDraw.item(graphics, stack, 0, y);
+		GuiDraw.itemDecorations(graphics, mc().font, stack, 0, y);
 		if (percent.isOn() && stack.isDamageableItem()) {
 			int left = 100 - Math.round(100f * stack.getDamageValue() / stack.getMaxDamage());
 			int color = left > 50 ? 0xFF55FF55 : left > 20 ? 0xFFFFAA00 : 0xFFFF5555;
-			graphics.drawString(mc().font, left + "%", 20, y + 4, color, shadow());
+			GuiDraw.text(graphics, mc().font, left + "%", 20, y + 4, color, shadow());
 		} else if (percent.isOn() && stack.getCount() > 1) {
-			graphics.drawString(mc().font, "x" + stack.getCount(), 20, y + 4, textColor(), shadow());
+			GuiDraw.text(graphics, mc().font, "x" + stack.getCount(), 20, y + 4, textColor(), shadow());
 		}
 	}
 }

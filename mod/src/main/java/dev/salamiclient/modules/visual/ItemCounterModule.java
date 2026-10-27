@@ -2,6 +2,7 @@ package dev.salamiclient.modules.visual;
 
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.HudModule;
+import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.setting.BoolSetting;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.GuiGraphics;
@@ -84,9 +85,9 @@ public final class ItemCounterModule extends HudModule {
 	protected void render(GuiGraphics graphics, DeltaTracker delta) {
 		int y = 0;
 		for (Row row : rows) {
-			graphics.renderItem(row.icon(), 0, y);
+			GuiDraw.item(graphics, row.icon(), 0, y);
 			int color = row.count() == 0 ? 0xFFFF5555 : textColor();
-			graphics.drawString(mc().font, String.valueOf(row.count()), 20, y + 4, color, shadow());
+			GuiDraw.text(graphics, mc().font, String.valueOf(row.count()), 20, y + 4, color, shadow());
 			y += ROW;
 		}
 	}

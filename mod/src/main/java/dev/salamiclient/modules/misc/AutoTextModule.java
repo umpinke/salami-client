@@ -5,6 +5,7 @@ import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.setting.KeybindSetting;
 import dev.salamiclient.setting.TextSetting;
+import dev.salamiclient.util.Keys;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 
 /**
@@ -35,7 +36,7 @@ public final class AutoTextModule extends Module {
 		ClientPacketListener connection = mc.getConnection();
 		for (int i = 0; i < SLOTS; i++) {
 			// Zustand immer merken – sonst zählt eine beim Schließen eines Menüs gehaltene Taste als neuer Druck
-			boolean down = keys[i].isBound() && InputConstants.isKeyDown(mc.getWindow(), keys[i].key());
+			boolean down = keys[i].isBound() && Keys.isDown(keys[i].key());
 			if (down && !wasDown[i] && mc.screen == null && connection != null) {
 				send(connection, i);
 			}

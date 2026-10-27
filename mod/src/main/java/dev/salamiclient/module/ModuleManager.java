@@ -1,13 +1,14 @@
 package dev.salamiclient.module;
 
 import dev.salamiclient.SalamiClient;
+import dev.salamiclient.render.WorldContext;
 import dev.salamiclient.util.Chat;
 import com.mojang.blaze3d.platform.InputConstants;
+import dev.salamiclient.util.Keys;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.world.entity.Entity;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -189,14 +190,14 @@ public final class ModuleManager {
 	}
 
 	/** Weltrendering (siehe {@link WorldRenderListener}). */
-	public void renderWorld(WorldRenderContext context) {
+	public void renderWorld(WorldContext context) {
 		long start = System.nanoTime();
 		renderWorldListeners(context);
 		worldNanos += System.nanoTime() - start;
 		worldFrames++;
 	}
 
-	private void renderWorldListeners(WorldRenderContext context) {
+	private void renderWorldListeners(WorldContext context) {
 		for (Module module : active) {
 			if (module instanceof WorldRenderListener listener) {
 				try {
@@ -237,7 +238,7 @@ public final class ModuleManager {
 			if (!module.keybind.isBound()) {
 				continue;
 			}
-			if (InputConstants.isKeyDown(client.getWindow(), key)) {
+			if (Keys.isDown(key)) {
 				downNow.add(key);
 				if (!keysDownLastTick.contains(key)) {
 					toggle(module);

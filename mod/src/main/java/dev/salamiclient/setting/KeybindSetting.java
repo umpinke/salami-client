@@ -3,11 +3,11 @@ package dev.salamiclient.setting;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonPrimitive;
 import com.mojang.blaze3d.platform.InputConstants;
-import org.lwjgl.glfw.GLFW;
+import dev.salamiclient.util.Keys;
 
-/** GLFW-Tastencode; {@link #NONE} = keine Taste. */
+/** Tastencode wie in {@link InputConstants} (bis 26.2 GLFW, ab 26.3 SDL-Scancode); {@link #NONE} = keine Taste. */
 public final class KeybindSetting extends Setting<Integer> {
-	public static final int NONE = GLFW.GLFW_KEY_UNKNOWN;
+	public static final int NONE = Keys.NONE;
 
 	public KeybindSetting(String id, int defaultKey) {
 		super(id, defaultKey);
@@ -29,13 +29,13 @@ public final class KeybindSetting extends Setting<Integer> {
 		return InputConstants.Type.KEYSYM.getOrCreate(get()).getDisplayName().getString();
 	}
 
-	/** Nur gültige GLFW-Tastencodes (Leertaste bis {@code GLFW_KEY_LAST}); alles andere = keine Taste. */
+	/** Nur gültige Tastencodes (siehe {@link Keys#isValid}); alles andere = keine Taste. */
 	@Override
 	protected Integer sanitize(Integer raw) {
 		if (raw == null) {
 			return defaultValue();
 		}
-		return raw < GLFW.GLFW_KEY_SPACE || raw > GLFW.GLFW_KEY_LAST ? NONE : raw;
+		return Keys.isValid(raw) ? raw : NONE;
 	}
 
 	@Override

@@ -51,8 +51,12 @@ public final class WeaponUtil {
 		return best;
 	}
 
+	/** Speer (gibt es erst ab Minecraft 1.21.11). */
 	public static boolean isSpear(ItemStack stack) {
+		//? if >=1.21.11 {
 		return stack.has(DataComponents.PIERCING_WEAPON);
+		//?} else
+		/*return false;*/
 	}
 
 	/** Nahkampfwaffe: Schwert, Axt, Streitkolben, Speer oder Dreizack. */

@@ -48,7 +48,12 @@ public final class GhostSpearModule extends Module {
 		stepIndex = 0;
 		wait = 0;
 		LocalPlayer player = mc().player;
-		if (player == null || !player.getMainHandItem().is(ItemTags.SPEARS)) {
+		// Speere gibt es erst ab 1.21.11 (davor ist das Modul nicht registriert)
+		//? if >=1.21.11 {
+		boolean spear = player != null && player.getMainHandItem().is(ItemTags.SPEARS);
+		//?} else
+		/*boolean spear = false;*/
+		if (!spear) {
 			Chat.warn("salami.ghost_spear.no_spear");
 			return; // leere Schrittliste -> nächster Tick schaltet ab
 		}
@@ -79,9 +84,15 @@ public final class GhostSpearModule extends Module {
 		switch (step) {
 			// wie Taste Q (Drop-Taste)
 			case DROP -> {
+				//? if >=26.3 {
+				/*if (!player.isSpectator()) {
+					mc().gameMode.dropItem(player, false); // schwingt selbst
+				}
+				*///?} else {
 				if (!player.isSpectator() && player.drop(false)) {
 					player.swing(InteractionHand.MAIN_HAND);
 				}
+				//?}
 			}
 			// wie Taste F (Offhand tauschen)
 			case SWAP -> {

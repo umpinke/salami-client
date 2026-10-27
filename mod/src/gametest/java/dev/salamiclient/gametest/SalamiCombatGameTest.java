@@ -1,5 +1,6 @@
 package dev.salamiclient.gametest;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.gui.HudEditorScreen;
 import dev.salamiclient.module.Module;
@@ -39,7 +40,6 @@ import net.minecraft.world.entity.monster.zombie.Zombie;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import org.apache.commons.lang3.function.FailableFunction;
-import org.lwjgl.glfw.GLFW;
 
 /** Funktionstests für Streitkolben/Speer-Module, Kits und Visuals in echten Testszenen. */
 public final class SalamiCombatGameTest implements FabricClientGameTest {
@@ -51,7 +51,7 @@ public final class SalamiCombatGameTest implements FabricClientGameTest {
 		context.runOnClient(c -> modules.setEnabled(modules.get(SafeModeModule.class), false));
 
 		try (TestSingleplayerContext world = context.worldBuilder().create()) {
-			world.getClientWorld().waitForChunksRender();
+			GametestCompat.waitForChunksRender(world);
 			TestServerContext server = world.getServer();
 			server.runCommand("difficulty easy");
 			server.runCommand("gamerule doMobSpawning false");
@@ -59,11 +59,14 @@ public final class SalamiCombatGameTest implements FabricClientGameTest {
 			testBreachSwap(context, server, modules);
 			testAutoMace(context, server, modules);
 			testAutoElytra(context, server, modules);
+			// Speere gibt es erst ab 1.21.11
+			//? if >=1.21.11
 			testSpeedLunge(context, server, modules);
 			testKeyPearl(context, server, modules);
 			testCobwebPlacer(context, server, modules);
 			testFastXp(context, server, modules);
 			testSpeedBridge(context, server, modules);
+			//? if >=1.21.11
 			testLungeMacro(context, server, modules);
 			testAutoPot(context, server, modules);
 			testKits(context, server, modules);
@@ -95,7 +98,7 @@ public final class SalamiCombatGameTest implements FabricClientGameTest {
 		context.waitTicks(2);
 		check(context.computeOnClient(c -> c.hitResult instanceof net.minecraft.world.phys.EntityHitResult), "Breach Swap: zombie not targeted");
 
-		context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+		context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
 		boolean swappedToMace = false;
 		for (int i = 0; i < 3; i++) {
 			swappedToMace |= context.computeOnClient(c -> c.player.getInventory().getSelectedSlot() == 1);
@@ -211,7 +214,7 @@ public final class SalamiCombatGameTest implements FabricClientGameTest {
 
 		Module pearl = modules.get(KeyPearlModule.class); // Standard-Taste: R
 		context.runOnClient(c -> modules.setEnabled(pearl, true));
-		context.getInput().holdKeyFor(GLFW.GLFW_KEY_R, 2);
+		context.getInput().holdKeyFor(InputConstants.KEY_R, 2);
 		boolean thrown = waitFor(context, 10, c -> c.player.getInventory().countItem(Items.ENDER_PEARL) == 3);
 		context.runOnClient(c -> modules.setEnabled(pearl, false));
 		check(thrown, "Key Pearl: no pearl was thrown");
@@ -229,9 +232,9 @@ public final class SalamiCombatGameTest implements FabricClientGameTest {
 		context.runOnClient(c -> c.player.getInventory().setSelectedSlot(0));
 
 		Module web = modules.get(CobwebPlacerModule.class);
-		set(web, "trigger_key", GLFW.GLFW_KEY_J);
+		set(web, "trigger_key", InputConstants.KEY_J);
 		context.runOnClient(c -> modules.setEnabled(web, true));
-		context.getInput().holdKeyFor(GLFW.GLFW_KEY_J, 2);
+		context.getInput().holdKeyFor(InputConstants.KEY_J, 2);
 		BlockPos feet = new BlockPos(160, FEET_Y, 0);
 		boolean placed = waitFor(context, 10, c -> c.level.getBlockState(feet).is(Blocks.COBWEB));
 		context.runOnClient(c -> modules.setEnabled(web, false));
@@ -286,10 +289,10 @@ public final class SalamiCombatGameTest implements FabricClientGameTest {
 		check(context.computeOnClient(c -> c.hitResult instanceof net.minecraft.world.phys.EntityHitResult), "Lunge Macro: zombie not targeted");
 
 		Module lunge = modules.get(LungeMacroModule.class);
-		set(lunge, "trigger_key", GLFW.GLFW_KEY_J);
+		set(lunge, "trigger_key", InputConstants.KEY_J);
 		set(lunge, "swap_delay", 5.0);
 		context.runOnClient(c -> modules.setEnabled(lunge, true));
-		context.getInput().holdKeyFor(GLFW.GLFW_KEY_J, 2);
+		context.getInput().holdKeyFor(InputConstants.KEY_J, 2);
 		boolean swapped = context.computeOnClient(c -> c.player.getInventory().getSelectedSlot() == 2);
 		boolean hurt = waitFor(context, 10, c -> zombieHurt(c));
 		boolean back = waitFor(context, 10, c -> c.player.getInventory().getSelectedSlot() == 0);

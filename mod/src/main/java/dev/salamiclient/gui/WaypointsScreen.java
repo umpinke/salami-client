@@ -1,8 +1,10 @@
 package dev.salamiclient.gui;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.modules.client.GuiScaleModule;
 import dev.salamiclient.modules.misc.WaypointsModule;
+import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.setting.ColorSetting;
 import dev.salamiclient.theme.Theme;
 import dev.salamiclient.modules.misc.StreamerModeModule;
@@ -15,7 +17,6 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.phys.Vec3;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 import java.util.Locale;
@@ -131,13 +132,21 @@ public final class WaypointsScreen extends Screen {
 	// ------------------------------------------------------------------ Zeichnen
 
 	@Override
+	//? if >=26.1 {
+	/*public void extractBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+	*///?} else
 	public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
 		graphics.fill(0, 0, width, height, 0xAA000000);
 	}
 
 	@Override
+	//? if >=26.1 {
+	/*public void extractRenderState(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+		super.extractRenderState(g, mouseX, mouseY, partialTick);
+	*///?} else {
 	public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
 		super.render(g, mouseX, mouseY, partialTick);
+	//?}
 		Theme theme = SalamiClient.get().theme();
 		int mx = (int) (mouseX / uiScale);
 		int my = (int) (mouseY / uiScale);
@@ -147,15 +156,15 @@ public final class WaypointsScreen extends Screen {
 		int[] f = frame();
 		g.fill(f[0], f[1], f[2], f[3], theme.panel());
 		g.fill(f[0], f[1], f[2], f[1] + HEADER - 2, theme.header());
-		g.renderOutline(f[0], f[1], f[2] - f[0], f[3] - f[1], theme.outline());
-		g.drawCenteredString(font, I18n.get("salami.module.waypoints"), (f[0] + f[2]) / 2, f[1] + 8, theme.headerText());
+		GuiDraw.outline(g, f[0], f[1], f[2] - f[0], f[3] - f[1], theme.outline());
+		GuiDraw.centeredText(g, font, I18n.get("salami.module.waypoints"), (f[0] + f[2]) / 2, f[1] + 8, theme.headerText());
 		button(g, theme, backButton(), I18n.get("salami.mods.back"), mx, my);
 		button(g, theme, addButton(), I18n.get("salami.module.waypoints.add_here"), mx, my);
 
 		int[] c = content();
 		List<Waypoint> list = waypoints();
 		if (list.isEmpty()) {
-			g.drawCenteredString(font, I18n.get("salami.module.waypoints.empty"), (c[0] + c[2]) / 2, c[1] + 10, theme.textDim());
+			GuiDraw.centeredText(g, font, I18n.get("salami.module.waypoints.empty"), (c[0] + c[2]) / 2, c[1] + 10, theme.textDim());
 		}
 		g.enableScissor(c[0], c[1], c[2], c[3]);
 		Vec3 eyes = minecraft.player != null ? minecraft.player.getEyePosition() : Vec3.ZERO;
@@ -172,7 +181,7 @@ public final class WaypointsScreen extends Screen {
 			g.fill(cells[0][0], y + 4, cells[0][1], y + 16, waypoint.color | 0xFF000000);
 			boolean isEditing = editing == waypoint;
 			String name = isEditing ? editBuffer : waypoint.name;
-			g.drawString(font, font.plainSubstrByWidth(name, cells[1][1] - cells[1][0], isEditing), cells[1][0], y + 6,
+			GuiDraw.text(g, font, font.plainSubstrByWidth(name, cells[1][1] - cells[1][0], isEditing), cells[1][0], y + 6,
 				isEditing ? theme.accent() : waypoint.visible ? theme.text() : theme.textDim(), false);
 			if (isEditing && (System.currentTimeMillis() / 500) % 2 == 0) {
 				int cx = cells[1][0] + Math.min(font.width(name), cells[1][1] - cells[1][0]);
@@ -182,9 +191,9 @@ public final class WaypointsScreen extends Screen {
 			String coords = StreamerModeModule.hidesCoords()
 				? distance + "m"
 				: String.format(Locale.ROOT, "%d %d %d  %dm", waypoint.x, waypoint.y, waypoint.z, distance);
-			g.drawString(font, coords, cells[1][1] + 6, y + 6, theme.textDim(), false);
-			g.drawString(font, waypoint.visible ? "◉" : "○", cells[2][0] + 4, y + 6, waypoint.visible ? theme.accent() : theme.textDim(), false);
-			g.drawString(font, "x", cells[3][0] + 5, y + 6, theme.warning(), false);
+			GuiDraw.text(g, font, coords, cells[1][1] + 6, y + 6, theme.textDim(), false);
+			GuiDraw.text(g, font, waypoint.visible ? "◉" : "○", cells[2][0] + 4, y + 6, waypoint.visible ? theme.accent() : theme.textDim(), false);
+			GuiDraw.text(g, font, "x", cells[3][0] + 5, y + 6, theme.warning(), false);
 		}
 		g.disableScissor();
 		g.pose().popMatrix();
@@ -193,7 +202,7 @@ public final class WaypointsScreen extends Screen {
 	private void button(GuiGraphics g, Theme theme, int[] r, String label, int mx, int my) {
 		boolean hovered = inside(r, mx, my);
 		g.fill(r[0], r[1], r[2], r[3], hovered ? theme.accent() : theme.panel());
-		g.drawString(font, label, r[0] + 6, r[1] + 3, hovered ? 0xFF000000 : theme.headerText(), false);
+		GuiDraw.text(g, font, label, r[0] + 6, r[1] + 3, hovered ? 0xFF000000 : theme.headerText(), false);
 	}
 
 	// ------------------------------------------------------------------ Eingabe
@@ -224,7 +233,7 @@ public final class WaypointsScreen extends Screen {
 			}
 			Waypoint waypoint = list.get(i);
 			if (x >= cells[0][0] && x < cells[0][1]) {
-				waypoint.color = nextColor(waypoint.color, event.button() == GLFW.GLFW_MOUSE_BUTTON_RIGHT ? -1 : 1);
+				waypoint.color = nextColor(waypoint.color, event.button() == InputConstants.MOUSE_BUTTON_RIGHT ? -1 : 1);
 				module.store().save();
 			} else if (x >= cells[1][0] && x < cells[1][1]) {
 				editing = waypoint;
@@ -268,9 +277,9 @@ public final class WaypointsScreen extends Screen {
 	public boolean keyPressed(KeyEvent event) {
 		if (editing != null) {
 			switch (event.key()) {
-				case GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER -> commit();
-				case GLFW.GLFW_KEY_ESCAPE -> editing = null;
-				case GLFW.GLFW_KEY_BACKSPACE -> {
+				case InputConstants.KEY_RETURN, InputConstants.KEY_NUMPADENTER -> commit();
+				case InputConstants.KEY_ESCAPE -> editing = null;
+				case InputConstants.KEY_BACKSPACE -> {
 					if (!editBuffer.isEmpty()) {
 						editBuffer = editBuffer.substring(0, editBuffer.length() - 1);
 					}

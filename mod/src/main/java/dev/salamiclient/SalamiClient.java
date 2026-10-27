@@ -105,6 +105,7 @@ import dev.salamiclient.modules.visual.LiveTrackerModule;
 import dev.salamiclient.modules.visual.LogoOverlayModule;
 import dev.salamiclient.modules.visual.ParticlesModule;
 import dev.salamiclient.modules.visual.CapesModule;
+import dev.salamiclient.render.WorldContext;
 import dev.salamiclient.render.WorldLines;
 import dev.salamiclient.modules.visual.WatermarkModule;
 import dev.salamiclient.theme.Theme;
@@ -116,7 +117,13 @@ import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
+//? if >=26.1 {
+/*import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
+*///?} else {
+import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
+//?}
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenKeyboardEvents;
 import net.fabricmc.loader.api.FabricLoader;
@@ -131,7 +138,6 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractSignEditScreen;
 import net.minecraft.client.gui.screens.recipebook.RecipeBookComponent;
 import net.minecraft.resources.Identifier;
-import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -272,11 +278,14 @@ public final class SalamiClient implements ClientModInitializer {
 		modules.register(new CrystalMacroModule());
 		modules.register(new CrystalTweaksModule());
 		modules.register(new AnchorMacroModule());
+		// Speer-Module (Ghost Spear, Speed Lunge, Lunge Macro): Speere gibt es erst ab 1.21.11
+		//? if >=1.21.11
 		modules.register(new GhostSpearModule());
 		modules.register(new BreachSwapModule());
 		modules.register(new AttributeSwapModule());
 		modules.register(new AutoMaceModule());
 		modules.register(new AutoElytraModule());
+		//? if >=1.21.11
 		modules.register(new SpeedLungeModule());
 		modules.register(new BlockEspModule());
 		modules.register(new PlayerEspModule());
@@ -291,6 +300,7 @@ public final class SalamiClient implements ClientModInitializer {
 		modules.register(new KeyPearlModule());
 		modules.register(new PearlCatchModule());
 		modules.register(new StunSlamModule());
+		//? if >=1.21.11
 		modules.register(new LungeMacroModule());
 		modules.register(new SpeedBridgeModule());
 		modules.register(new FastXpModule());
@@ -301,9 +311,9 @@ public final class SalamiClient implements ClientModInitializer {
 	private void registerKeybinds() {
 		KeyMapping.Category category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(MOD_ID, "main"));
 		clickGuiKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
-			"key.salami.clickgui", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_SHIFT, category));
+			"key.salami.clickgui", InputConstants.Type.KEYSYM, InputConstants.KEY_RSHIFT, category));
 		easyLeaveKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
-			"key.salami.easy_leave", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_END, category));
+			"key.salami.easy_leave", InputConstants.Type.KEYSYM, InputConstants.KEY_END, category));
 	}
 
 	private void registerEvents() {
@@ -315,11 +325,19 @@ public final class SalamiClient implements ClientModInitializer {
 			if (crosshair.isEnabled() && Minecraft.getInstance().options.getCameraType().isFirstPerson()) {
 				crosshair.render(graphics);
 			} else {
+				//? if >=26.1 {
+				/*vanilla.extractRenderState(graphics, delta);
+				*///?} else
 				vanilla.render(graphics, delta);
 			}
 		});
-		WorldRenderEvents.BEFORE_BLOCK_OUTLINE.register((context, state) -> modules.get(BlockOutlineModule.class).render(context, state));
-		WorldRenderEvents.END_MAIN.register(modules::renderWorld);
+		//? if >=26.1 {
+		/*LevelRenderEvents.BEFORE_BLOCK_OUTLINE.register((context, state) -> modules.get(BlockOutlineModule.class).render(worldContext(context), state));
+		LevelRenderEvents.END_MAIN.register(context -> modules.renderWorld(worldContext(context)));
+		*///?} else {
+		WorldRenderEvents.BEFORE_BLOCK_OUTLINE.register((context, state) -> modules.get(BlockOutlineModule.class).render(worldContext(context), state));
+		WorldRenderEvents.END_MAIN.register(context -> modules.renderWorld(worldContext(context)));
+		//?}
 		WorldLines.init();
 		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
 			modules.get(SafeModeModule.class).onJoin(client.getCurrentServer());
@@ -339,6 +357,21 @@ public final class SalamiClient implements ClientModInitializer {
 				}
 			}));
 	}
+
+	/** Fabrics Welt-Render-Kontext der jeweiligen Version als {@link WorldContext} für die Module. */
+	//? if >=26.2 {
+	/*private static WorldContext worldContext(LevelRenderContext context) {
+		return new WorldContext(context.poseStack(), context.submitNodeCollector());
+	}
+	*///?} else if >=26.1 {
+	/*private static WorldContext worldContext(LevelRenderContext context) {
+		return new WorldContext(context.poseStack(), context.bufferSource());
+	}
+	*///?} else {
+	private static WorldContext worldContext(WorldRenderContext context) {
+		return new WorldContext(context.matrices(), context.consumers());
+	}
+	//?}
 
 	private void onTick(Minecraft client) {
 		while (clickGuiKey.consumeClick()) {

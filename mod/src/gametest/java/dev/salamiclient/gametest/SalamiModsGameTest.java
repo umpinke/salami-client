@@ -1,5 +1,6 @@
 package dev.salamiclient.gametest;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.gui.ModSettingsScreen;
 import dev.salamiclient.gui.ModsScreen;
@@ -33,7 +34,6 @@ import net.minecraft.client.gui.components.debug.DebugScreenEntries;
 import net.minecraft.world.entity.monster.zombie.Zombie;
 import net.minecraft.world.phys.EntityHitResult;
 import org.apache.commons.lang3.function.FailableFunction;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 
@@ -47,7 +47,7 @@ public final class SalamiModsGameTest implements FabricClientGameTest {
 		context.runOnClient(c -> modules.setEnabled(modules.get(SafeModeModule.class), false));
 
 		try (TestSingleplayerContext world = context.worldBuilder().create()) {
-			world.getClientWorld().waitForChunksRender();
+			GametestCompat.waitForChunksRender(world);
 			TestServerContext server = world.getServer();
 			server.runCommand("time set day");
 			server.runCommand("gamerule doDaylightCycle false");
@@ -130,9 +130,9 @@ public final class SalamiModsGameTest implements FabricClientGameTest {
 
 		// Vergleich: Hitboxen über das echte F3 + B statt über das Modul
 		context.runOnClient(c -> modules.setEnabled(modules.get(HitboxModule.class), false));
-		context.getInput().holdKey(GLFW.GLFW_KEY_F3);
-		context.getInput().pressKey(GLFW.GLFW_KEY_B);
-		context.getInput().releaseKey(GLFW.GLFW_KEY_F3);
+		context.getInput().holdKey(InputConstants.KEY_F3);
+		context.getInput().pressKey(InputConstants.KEY_B);
+		context.getInput().releaseKey(InputConstants.KEY_F3);
 		context.waitTicks(5);
 		boolean vanillaOn = context.computeOnClient(c -> c.debugEntries.isCurrentlyEnabled(DebugScreenEntries.ENTITY_HITBOXES));
 		context.takeScreenshot("salami-24b-hitbox-vanilla-f3b");
@@ -163,14 +163,14 @@ public final class SalamiModsGameTest implements FabricClientGameTest {
 		Module zoom = modules.get(ZoomModule.class);
 		set(zoom, "animation", false);
 		context.runOnClient(c -> modules.setEnabled(zoom, true));
-		context.getInput().holdKey(GLFW.GLFW_KEY_C);
+		context.getInput().holdKey(InputConstants.KEY_C);
 		context.waitTicks(3);
 		float zoomed = context.computeOnClient(c -> ZoomModule.applyFov(70.0F, 0.0F));
 		context.takeScreenshot("salami-25-zoom");
 		context.getInput().scroll(2);
 		context.waitTick();
 		float scrolled = context.computeOnClient(c -> ZoomModule.applyFov(70.0F, 0.0F));
-		context.getInput().releaseKey(GLFW.GLFW_KEY_C);
+		context.getInput().releaseKey(InputConstants.KEY_C);
 		context.waitTicks(2);
 		float released = context.computeOnClient(c -> ZoomModule.applyFov(70.0F, 0.0F));
 		context.runOnClient(c -> modules.setEnabled(zoom, false));
@@ -195,7 +195,7 @@ public final class SalamiModsGameTest implements FabricClientGameTest {
 		context.runOnClient(c -> modules.setEnabled(reach, true));
 		int before = context.computeOnClient(c -> ClickTracker.left());
 		for (int i = 0; i < 3; i++) {
-			context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+			context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
 			context.waitTick();
 		}
 		int after = context.computeOnClient(c -> ClickTracker.left());

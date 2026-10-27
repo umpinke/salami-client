@@ -3,6 +3,7 @@ package dev.salamiclient.gui;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.module.HudModule;
 import dev.salamiclient.module.Module;
+import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.theme.Theme;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
@@ -56,13 +57,21 @@ public final class HudEditorScreen extends Screen {
 	}
 
 	@Override
+	//? if >=26.1 {
+	/*public void extractBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+	*///?} else
 	public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
 		graphics.fill(0, 0, width, height, 0x30000000);
 	}
 
 	@Override
+	//? if >=26.1 {
+	/*public void extractRenderState(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+		super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+	*///?} else {
 	public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
 		super.render(graphics, mouseX, mouseY, partialTick);
+	//?}
 		Theme theme = SalamiClient.get().theme();
 		for (HudModule hud : elements()) {
 			Box b = box(hud);
@@ -70,16 +79,16 @@ public final class HudEditorScreen extends Screen {
 			if (!hud.hasContent()) {
 				graphics.fill(b.x(), b.y(), b.x() + b.w(), b.y() + b.h(), 0x40000000);
 			}
-			graphics.renderOutline(b.x() - 1, b.y() - 1, b.w() + 2, b.h() + 2, active ? theme.accent() : theme.textDim());
+			GuiDraw.outline(graphics, b.x() - 1, b.y() - 1, b.w() + 2, b.h() + 2, active ? theme.accent() : theme.textDim());
 			if (active) {
 				// Name nur am Element unter der Maus – sonst überlappen die Beschriftungen
 				String name = I18n.get(hud.translationKey());
 				int labelY = b.y() >= 10 ? b.y() - 10 : b.y() + b.h() + 2;
 				int labelX = Math.min(b.x(), width - font.width(name) - 2);
-				graphics.drawString(font, name, labelX, labelY, theme.accent(), true);
+				GuiDraw.text(graphics, font, name, labelX, labelY, theme.accent(), true);
 			}
 		}
-		graphics.drawCenteredString(font, I18n.get("salami.hud_editor.hint"), width / 2, height / 2 + 24, theme.textDim());
+		GuiDraw.centeredText(graphics, font, I18n.get("salami.hud_editor.hint"), width / 2, height / 2 + 24, theme.textDim());
 	}
 
 	@Override

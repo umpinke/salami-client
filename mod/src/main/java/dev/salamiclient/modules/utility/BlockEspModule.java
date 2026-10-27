@@ -3,12 +3,12 @@ package dev.salamiclient.modules.utility;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.WorldRenderListener;
+import dev.salamiclient.render.WorldContext;
 import dev.salamiclient.render.WorldLines;
 import dev.salamiclient.setting.BoolSetting;
 import dev.salamiclient.setting.ColorSetting;
 import dev.salamiclient.setting.ModeSetting;
 import dev.salamiclient.setting.NumberSetting;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.core.BlockPos;
@@ -112,16 +112,16 @@ public final class BlockEspModule extends Module implements WorldRenderListener 
 	}
 
 	@Override
-	public void renderWorld(WorldRenderContext context) {
+	public void renderWorld(WorldContext context) {
 		if (found.isEmpty()) {
 			return;
 		}
 		RenderType type = throughWalls.isOn() ? WorldLines.THROUGH_WALLS : WorldLines.VISIBLE;
 		int argb = color.argb();
 		for (BlockPos pos : found) {
-			WorldLines.box(context.matrices(), context.consumers(), type, new AABB(pos), argb, 2f);
+			WorldLines.box(context, type, new AABB(pos), argb, 2f);
 		}
-		WorldLines.flush(context.consumers(), type);
+		WorldLines.flush(context, type);
 	}
 
 	private static Predicate<BlockState> matcher(Preset preset) {

@@ -8,6 +8,7 @@ import dev.salamiclient.setting.BoolSetting;
 import dev.salamiclient.setting.NumberSetting;
 import dev.salamiclient.util.InteractUtil;
 import dev.salamiclient.util.InventoryUtil;
+import dev.salamiclient.util.Keys;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.player.LocalPlayer;
@@ -21,7 +22,6 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.alchemy.PotionContents;
-import org.lwjgl.glfw.GLFW;
 
 /**
  * Auto Pot: benutzt Tränke automatisch –
@@ -239,9 +239,9 @@ public final class AutoPotModule extends Module {
 		InputConstants.Key key = KeyBindingHelper.getBoundKeyOf(use);
 		boolean physical;
 		if (key.getType() == InputConstants.Type.MOUSE) {
-			physical = GLFW.glfwGetMouseButton(mc().getWindow().handle(), key.getValue()) == GLFW.GLFW_PRESS;
+			physical = Keys.isMouseDown(key.getValue());
 		} else {
-			physical = key.getValue() != GLFW.GLFW_KEY_UNKNOWN && InputConstants.isKeyDown(mc().getWindow(), key.getValue());
+			physical = key.getValue() != Keys.NONE && Keys.isDown(key.getValue());
 		}
 		use.setDown(physical);
 	}

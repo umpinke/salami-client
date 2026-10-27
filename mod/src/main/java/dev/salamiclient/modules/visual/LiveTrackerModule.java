@@ -2,6 +2,7 @@ package dev.salamiclient.modules.visual;
 
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
+import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.setting.BoolSetting;
 import dev.salamiclient.setting.NumberSetting;
 import dev.salamiclient.util.Projection;
@@ -125,8 +126,8 @@ public final class LiveTrackerModule extends Module {
 			int y = -ICON - 12; // über der Namenszeile
 			graphics.fill(x - 2, y - 2, x + width + 2, y + ICON + 2, 0x66000000);
 			for (ItemStack stack : items) {
-				graphics.renderItem(stack, x, y);
-				graphics.renderItemDecorations(mc().font, stack, x, y);
+				GuiDraw.item(graphics, stack, x, y);
+				GuiDraw.itemDecorations(graphics, mc().font, stack, x, y);
 				x += ICON + GAP;
 			}
 			graphics.pose().popMatrix();

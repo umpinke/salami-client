@@ -114,7 +114,10 @@ public final class AutoReconnectModule extends Module {
 	}
 
 	/** Knopf mit Countdown im Text; verbindet beim Klick oder wenn der Countdown abläuft. */
+	//? if >=1.21.11 {
 	private static final class ReconnectButton extends Button.Plain {
+	//?} else
+	/*private static final class ReconnectButton extends Button {*/
 		private final ServerData server;
 		private final long deadline;
 		private boolean done;
@@ -143,13 +146,23 @@ public final class AutoReconnectModule extends Module {
 		}
 
 		@Override
+		//? if >=26.1 {
+		/*protected void extractContents(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+		*///?} else if >=1.21.11 {
 		protected void renderContents(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+		//?} else
+		/*protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {*/
 			updateLabel();
 			if (deadline >= 0 && !done && System.currentTimeMillis() >= deadline) {
 				// nicht mitten im Zeichnen den Bildschirm wechseln – im nächsten Durchlauf verbinden
 				Minecraft.getInstance().execute(this::fire);
 			}
+			//? if >=26.1 {
+			/*super.extractContents(graphics, mouseX, mouseY, partialTick);
+			*///?} else if >=1.21.11 {
 			super.renderContents(graphics, mouseX, mouseY, partialTick);
+			//?} else
+			/*super.renderWidget(graphics, mouseX, mouseY, partialTick);*/
 		}
 	}
 }

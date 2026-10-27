@@ -13,6 +13,10 @@ mod/run/
 mod/out/
 mod/bin/
 mod/remappedSrc/
+# Stonecutter: ein Unterprojekt pro Minecraft-Version
+mod/versions/*/build/
+mod/versions/*/run/
+mod/versions/*/.gradle/
 
 # Secrets
 .env

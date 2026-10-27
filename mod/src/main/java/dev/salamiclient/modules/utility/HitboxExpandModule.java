@@ -3,13 +3,13 @@ package dev.salamiclient.modules.utility;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.WorldRenderListener;
+import dev.salamiclient.render.WorldContext;
 import dev.salamiclient.render.WorldLines;
 import dev.salamiclient.setting.BoolSetting;
 import dev.salamiclient.setting.ColorSetting;
 import dev.salamiclient.setting.NumberSetting;
 import dev.salamiclient.util.Chat;
 import dev.salamiclient.util.TargetUtil;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.AABB;
@@ -86,7 +86,7 @@ public final class HitboxExpandModule extends Module implements WorldRenderListe
 	}
 
 	@Override
-	public void renderWorld(WorldRenderContext context) {
+	public void renderWorld(WorldContext context) {
 		if (!display.isOn() || mc().level == null || mc().player == null) {
 			return;
 		}
@@ -100,11 +100,11 @@ public final class HitboxExpandModule extends Module implements WorldRenderListe
 			}
 			Vec3 lerped = entity.getPosition(partial);
 			AABB box = entity.getBoundingBox().move(lerped.subtract(entity.position())).inflate(inflate);
-			WorldLines.box(context.matrices(), context.consumers(), WorldLines.VISIBLE, box, color.argb(), 1.5f);
+			WorldLines.box(context, WorldLines.VISIBLE, box, color.argb(), 1.5f);
 			any = true;
 		}
 		if (any) {
-			WorldLines.flush(context.consumers(), WorldLines.VISIBLE);
+			WorldLines.flush(context, WorldLines.VISIBLE);
 		}
 	}
 }

@@ -20,7 +20,7 @@ public final class InteractUtil {
 		}
 		InteractionResult result = mc.gameMode.useItemOn(player, InteractionHand.MAIN_HAND, hit);
 		if (result instanceof InteractionResult.Success) {
-			player.swing(InteractionHand.MAIN_HAND);
+			swing(player);
 			return true;
 		}
 		return false;
@@ -35,7 +35,7 @@ public final class InteractUtil {
 		}
 		if (mc.gameMode.useItem(player, InteractionHand.MAIN_HAND) instanceof InteractionResult.Success success) {
 			if (success.swingSource() == InteractionResult.SwingSource.CLIENT) {
-				player.swing(InteractionHand.MAIN_HAND);
+				swing(player);
 			}
 			return true;
 		}
@@ -49,6 +49,14 @@ public final class InteractUtil {
 			return;
 		}
 		mc.gameMode.attack(mc.player, target);
-		mc.player.swing(InteractionHand.MAIN_HAND);
+		swing(mc.player);
+	}
+
+	/** Schwung-Animation der Haupthand (ab 26.3 mit Animationsart). */
+	public static void swing(LocalPlayer player) {
+		//? if >=26.3 {
+		/*player.swing(InteractionHand.MAIN_HAND, net.minecraft.world.item.component.SwingAnimation.DEFAULT, false);
+		*///?} else
+		player.swing(InteractionHand.MAIN_HAND);
 	}
 }

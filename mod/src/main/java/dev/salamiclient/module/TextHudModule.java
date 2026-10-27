@@ -1,5 +1,6 @@
 package dev.salamiclient.module;
 
+import dev.salamiclient.render.GuiDraw;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.GuiGraphics;
 
@@ -59,7 +60,7 @@ public abstract class TextHudModule extends HudModule {
 
 	@Override
 	protected void render(GuiGraphics graphics, DeltaTracker delta) {
-		graphics.drawString(mc().font, prefix, 4, 3, accentColor(), shadow());
-		graphics.drawString(mc().font, value == null ? "-" : value, 4 + prefixWidth, 3, textColor(), shadow());
+		GuiDraw.text(graphics, mc().font, prefix, 4, 3, accentColor(), shadow());
+		GuiDraw.text(graphics, mc().font, value == null ? "-" : value, 4 + prefixWidth, 3, textColor(), shadow());
 	}
 }

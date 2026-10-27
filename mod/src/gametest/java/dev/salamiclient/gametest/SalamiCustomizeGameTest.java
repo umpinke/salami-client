@@ -2,6 +2,7 @@ package dev.salamiclient.gametest;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonPrimitive;
+import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.config.ConfigManager;
 import dev.salamiclient.gui.ColorPicker;
@@ -44,7 +45,7 @@ public final class SalamiCustomizeGameTest implements FabricClientGameTest {
 		testColorSetting();
 
 		try (TestSingleplayerContext world = context.worldBuilder().create()) {
-			world.getClientWorld().waitForChunksRender();
+			GametestCompat.waitForChunksRender(world);
 			world.getServer().runCommand("tp @p 500.5 -60 0.5 0 10");
 			context.waitTicks(10);
 
@@ -139,7 +140,7 @@ public final class SalamiCustomizeGameTest implements FabricClientGameTest {
 		int before = text.get();
 		int after = context.computeOnClient(c -> {
 			int[] b = picker.bounds();
-			picker.mouseClicked(c.font, b[0] + 30, b[1] + 20, 0); // ins Farbfeld
+			picker.mouseClicked(c.font, b[0] + 30, b[1] + 20, InputConstants.MOUSE_BUTTON_LEFT); // ins Farbfeld
 			picker.mouseReleased();
 			return text.get();
 		});
@@ -147,15 +148,15 @@ public final class SalamiCustomizeGameTest implements FabricClientGameTest {
 		// Hex-Eingabe
 		context.runOnClient(c -> {
 			int[] b = picker.bounds();
-			picker.mouseClicked(c.font, b[2] - 20, b[1] + 6 + 72 + 6 + 4, 0); // Hex-Feld
+			picker.mouseClicked(c.font, b[2] - 20, b[1] + 6 + 72 + 6 + 4, InputConstants.MOUSE_BUTTON_LEFT); // Hex-Feld
 		});
 		check(picker.isEditingText(), "hex field not editable");
 		context.runOnClient(c -> {
 			for (int i = 0; i < 9; i++) {
-				picker.keyPressed(org.lwjgl.glfw.GLFW.GLFW_KEY_BACKSPACE);
+				picker.keyPressed(InputConstants.KEY_BACKSPACE);
 			}
 			picker.charTyped("#3366CC");
-			picker.keyPressed(org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER);
+			picker.keyPressed(InputConstants.KEY_RETURN);
 		});
 		check(text.get() == 0xFF3366CC, "hex input not applied: " + Integer.toHexString(text.get()));
 		check(context.computeOnClient(c -> ((ModSettingsScreen) c.screen).wasCapturingKey()) == false, "still capturing keys after Enter");
@@ -200,10 +201,13 @@ public final class SalamiCustomizeGameTest implements FabricClientGameTest {
 	}
 
 	private static void testHitboxColors(ClientGameTestContext context, ModuleManager modules) {
-		// lädt die Klasse – das Mixin muss alle drei Farben finden
+		// lädt die Klasse – das Mixin muss alle drei Farben finden (bis 1.21.10: HitboxFeatureRenderer)
 		context.runOnClient(c -> {
 			try {
+				//? if >=1.21.11 {
 				Class.forName("net.minecraft.client.renderer.debug.EntityHitboxDebugRenderer");
+				//?} else
+				/*Class.forName("net.minecraft.client.renderer.feature.HitboxFeatureRenderer");*/
 			} catch (ClassNotFoundException e) {
 				throw new AssertionError(e);
 			}

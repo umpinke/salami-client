@@ -6,16 +6,18 @@ import dev.salamiclient.gui.WaypointsScreen;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.WorldRenderListener;
+import dev.salamiclient.render.GuiDraw;
+import dev.salamiclient.render.WorldContext;
 import dev.salamiclient.render.WorldLines;
 import dev.salamiclient.setting.ActionSetting;
 import dev.salamiclient.setting.BoolSetting;
 import dev.salamiclient.setting.ColorSetting;
 import dev.salamiclient.setting.KeybindSetting;
 import dev.salamiclient.util.Chat;
+import dev.salamiclient.util.Keys;
 import dev.salamiclient.util.Projection;
 import dev.salamiclient.waypoints.Waypoint;
 import dev.salamiclient.waypoints.WaypointStore;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.GuiGraphics;
@@ -24,7 +26,6 @@ import net.minecraft.client.resources.language.I18n;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import org.lwjgl.glfw.GLFW;
 
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -39,7 +40,7 @@ import java.util.Locale;
 public final class WaypointsModule extends Module implements WorldRenderListener {
 	private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
 
-	private final KeybindSetting addKey = add(new KeybindSetting("add_key", GLFW.GLFW_KEY_B));
+	private final KeybindSetting addKey = add(new KeybindSetting("add_key", InputConstants.KEY_B));
 	private final KeybindSetting menuKey = add(new KeybindSetting("menu_key", KeybindSetting.NONE));
 	private final ColorSetting color = add(new ColorSetting("color", 0xFFB23A3A));
 	private final BoolSetting deathPoints = add(new BoolSetting("death_points", true));
@@ -96,14 +97,14 @@ public final class WaypointsModule extends Module implements WorldRenderListener
 	public void onTick() {
 		var mc = mc();
 		// Tastenzustand immer merken, ausgelöst wird nur ohne offenes Menü
-		boolean addDown = addKey.isBound() && InputConstants.isKeyDown(mc.getWindow(), addKey.key());
+		boolean addDown = addKey.isBound() && Keys.isDown(addKey.key());
 		if (addDown && !addWasDown && mc.screen == null) {
 			addHere(String.format(Locale.ROOT, "%s %d", I18n.get("salami.module.waypoints.default_name"),
 				store().current().size() + 1), color.argb());
 		}
 		addWasDown = addDown;
 
-		boolean menuDown = menuKey.isBound() && InputConstants.isKeyDown(mc.getWindow(), menuKey.key());
+		boolean menuDown = menuKey.isBound() && Keys.isDown(menuKey.key());
 		if (menuDown && !menuWasDown && mc.screen == null) {
 			openScreen();
 		}
@@ -141,7 +142,7 @@ public final class WaypointsModule extends Module implements WorldRenderListener
 	}
 
 	@Override
-	public void renderWorld(WorldRenderContext context) {
+	public void renderWorld(WorldContext context) {
 		if (!beams.isOn() || mc().level == null || shown.isEmpty()) {
 			return;
 		}
@@ -151,11 +152,11 @@ public final class WaypointsModule extends Module implements WorldRenderListener
 		for (Shown entry : shown) {
 			Waypoint waypoint = entry.waypoint();
 			AABB beam = new AABB(waypoint.x + 0.45, minY, waypoint.z + 0.45, waypoint.x + 0.55, maxY, waypoint.z + 0.55);
-			WorldLines.box(context.matrices(), context.consumers(), type, beam, waypoint.color, 2f);
-			WorldLines.box(context.matrices(), context.consumers(), type,
+			WorldLines.box(context, type, beam, waypoint.color, 2f);
+			WorldLines.box(context, type,
 				new AABB(waypoint.x, waypoint.y, waypoint.z, waypoint.x + 1, waypoint.y + 1, waypoint.z + 1), waypoint.color, 2f);
 		}
-		WorldLines.flush(context.consumers(), type);
+		WorldLines.flush(context, type);
 	}
 
 	@Override
@@ -173,7 +174,7 @@ public final class WaypointsModule extends Module implements WorldRenderListener
 			int y = Math.round(screenPos[1]) - 5;
 			graphics.fill(x - 2, y - 2, x + w + 2, y + 10, 0x90000000);
 			graphics.fill(x - 2, y - 2, x - 1, y + 10, entry.waypoint().color | 0xFF000000);
-			graphics.drawString(font, entry.text(), x, y, 0xFFFFFFFF, false);
+			GuiDraw.text(graphics, font, entry.text(), x, y, 0xFFFFFFFF, false);
 		}
 	}
 }

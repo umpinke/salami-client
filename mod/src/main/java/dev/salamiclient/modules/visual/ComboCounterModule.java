@@ -4,6 +4,7 @@ import dev.salamiclient.SalamiClient;
 import dev.salamiclient.module.AttackListener;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.HudModule;
+import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.setting.NumberSetting;
 import dev.salamiclient.theme.Theme;
 import net.minecraft.client.DeltaTracker;
@@ -89,6 +90,6 @@ public final class ComboCounterModule extends HudModule implements AttackListene
 	protected void render(GuiGraphics graphics, DeltaTracker delta) {
 		Theme theme = SalamiClient.get().theme();
 		int color = combo >= 5 ? theme.warning() : accentColor();
-		graphics.drawString(mc().font, text(), 0, 0, color, shadow());
+		GuiDraw.text(graphics, mc().font, text(), 0, 0, color, shadow());
 	}
 }

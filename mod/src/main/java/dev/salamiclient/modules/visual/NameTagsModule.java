@@ -65,8 +65,13 @@ public final class NameTagsModule extends Module {
 			return false;
 		}
 		Minecraft mc = Minecraft.getInstance();
+		// Namen sind unsichtbar, solange das HUD ausgeblendet ist (F1)
+		//? if >=26.2 {
+		/*boolean namesShown = !mc.gui.hud.isHidden();
+		*///?} else
+		boolean namesShown = Minecraft.renderNames();
 		return entity == mc.player
-			&& Minecraft.renderNames()
+			&& namesShown
 			&& !mc.options.getCameraType().isFirstPerson()
 			&& !entity.isInvisible();
 	}

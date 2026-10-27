@@ -3,6 +3,7 @@ package dev.salamiclient.modules.visual;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.HudModule;
+import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.setting.BoolSetting;
 import dev.salamiclient.setting.NumberSetting;
 import net.minecraft.client.DeltaTracker;
@@ -40,7 +41,7 @@ public final class LogoOverlayModule extends HudModule {
 			WatermarkModule.LOGO_TEXTURE_SIZE, WatermarkModule.LOGO_TEXTURE_SIZE, ARGB.white(alpha / 255f));
 		if (showName.isOn()) {
 			int color = ARGB.color(Math.max(alpha, 26), accentColor());
-			graphics.drawCenteredString(mc().font, SalamiClient.NAME, width() / 2, SIZE + 2, color);
+			GuiDraw.centeredText(graphics, mc().font, SalamiClient.NAME, width() / 2, SIZE + 2, color);
 		}
 	}
 }

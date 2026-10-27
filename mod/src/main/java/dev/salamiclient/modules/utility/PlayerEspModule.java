@@ -3,12 +3,12 @@ package dev.salamiclient.modules.utility;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.WorldRenderListener;
+import dev.salamiclient.render.WorldContext;
 import dev.salamiclient.render.WorldLines;
 import dev.salamiclient.setting.BoolSetting;
 import dev.salamiclient.setting.ColorSetting;
 import dev.salamiclient.setting.ModeSetting;
 import dev.salamiclient.setting.NumberSetting;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
@@ -121,7 +121,7 @@ public final class PlayerEspModule extends Module implements WorldRenderListener
 	// --- Rahmen ---
 
 	@Override
-	public void renderWorld(WorldRenderContext context) {
+	public void renderWorld(WorldContext context) {
 		if (mode.get() == Mode.GLOW || mc().level == null) {
 			return;
 		}
@@ -137,11 +137,11 @@ public final class PlayerEspModule extends Module implements WorldRenderListener
 			}
 			Vec3 lerped = entity.getPosition(partial);
 			AABB box = entity.getBoundingBox().move(lerped.subtract(entity.position()));
-			WorldLines.box(context.matrices(), context.consumers(), type, box, colorFor(entity), width);
+			WorldLines.box(context, type, box, colorFor(entity), width);
 			any = true;
 		}
 		if (any) {
-			WorldLines.flush(context.consumers(), type);
+			WorldLines.flush(context, type);
 		}
 	}
 }

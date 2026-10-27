@@ -1,7 +1,7 @@
 {
 	"required": true,
 	"package": "dev.salamiclient.mixin",
-	"compatibilityLevel": "JAVA_21",
+	"compatibilityLevel": "JAVA_${java}",
 	"client": [
 		"AbstractButtonMixin",
 		"AbstractClientPlayerMixin",
@@ -44,7 +44,7 @@
 		"ScreenEffectRendererMixin",
 		"ScreenMixin",
 		"ToastManagerMixin",
-		"WindowMixin"
+		"WindowMixin"${versionMixins}
 	],
 	"injectors": {
 		"defaultRequire": 1

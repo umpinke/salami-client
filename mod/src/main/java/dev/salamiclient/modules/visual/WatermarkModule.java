@@ -3,6 +3,7 @@ package dev.salamiclient.modules.visual;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.HudModule;
+import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.setting.BoolSetting;
 import dev.salamiclient.theme.Theme;
 import net.minecraft.client.DeltaTracker;
@@ -63,13 +64,13 @@ public final class WatermarkModule extends HudModule {
 		graphics.blit(RenderPipelines.GUI_TEXTURED, LOGO, 0, 0, 0f, 0f, 12, 12,
 			LOGO_TEXTURE_SIZE, LOGO_TEXTURE_SIZE, LOGO_TEXTURE_SIZE, LOGO_TEXTURE_SIZE);
 		int x = 15;
-		graphics.drawString(font, SalamiClient.NAME, x, 2, accentColor(), shadow());
+		GuiDraw.text(graphics, font, SalamiClient.NAME, x, 2, accentColor(), shadow());
 		x += font.width(SalamiClient.NAME) + 4;
 		if (rest == null) {
 			updateText();
 		}
 		if (!rest.isEmpty()) {
-			graphics.drawString(font, rest, x, 2, dimColor(), shadow());
+			GuiDraw.text(graphics, font, rest, x, 2, dimColor(), shadow());
 		}
 	}
 }

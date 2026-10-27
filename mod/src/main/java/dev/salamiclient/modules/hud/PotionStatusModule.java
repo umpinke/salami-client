@@ -3,6 +3,7 @@ package dev.salamiclient.modules.hud;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.HudModule;
+import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.setting.BoolSetting;
 import dev.salamiclient.theme.Theme;
 import net.minecraft.client.DeltaTracker;
@@ -106,8 +107,8 @@ public final class PotionStatusModule extends HudModule {
 				g.blitSprite(RenderPipelines.GUI_TEXTURED, row.sprite(), 0, y + 1, 18, 18);
 				x = 22;
 			}
-			g.drawString(mc().font, row.name(), x, y + 1, textColor(), shadow());
-			g.drawString(mc().font, row.duration(), x, y + 10, row.ending() ? theme.warning() : dimColor(), shadow());
+			GuiDraw.text(g, mc().font, row.name(), x, y + 1, textColor(), shadow());
+			GuiDraw.text(g, mc().font, row.duration(), x, y + 10, row.ending() ? theme.warning() : dimColor(), shadow());
 			y += ROW;
 		}
 	}

@@ -1,5 +1,6 @@
 package dev.salamiclient.gametest;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.gui.WaypointsScreen;
 import dev.salamiclient.module.Module;
@@ -34,7 +35,6 @@ import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 
@@ -49,7 +49,7 @@ public final class SalamiModsBatchCGameTest implements FabricClientGameTest {
 
 		// Cheats an: AutoText wird über einen Befehl geprüft, den der Spieler selbst ausführen darf
 		try (TestSingleplayerContext world = context.worldBuilder().adjustSettings(settings -> settings.setAllowCommands(true)).create()) {
-			world.getClientWorld().waitForChunksRender();
+			GametestCompat.waitForChunksRender(world);
 			TestServerContext server = world.getServer();
 			server.runCommand("time set day");
 			server.runCommand("tp @p 300.5 " + FEET_Y + " 0.5 0 10");
@@ -87,14 +87,14 @@ public final class SalamiModsBatchCGameTest implements FabricClientGameTest {
 
 	private static void testChat(ClientGameTestContext context, TestServerContext server, ModuleManager modules) {
 		Module autoText = modules.get(AutoTextModule.class);
-		set(autoText, "key_1", GLFW.GLFW_KEY_K);
+		set(autoText, "key_1", InputConstants.KEY_K);
 		// Befehl statt Chat: lässt sich auf dem Server sicher nachprüfen
 		set(autoText, "text_1", "/tag @s add salami_autotext");
 		List<Class<? extends Module>> chat = List.of(AutoTextModule.class, StreamerModeModule.class, ChatTweaksModule.class, NoAdvancementModule.class);
 		for (Class<? extends Module> type : chat) {
 			context.runOnClient(c -> modules.setEnabled(modules.get(type), true));
 		}
-		context.getInput().holdKeyFor(GLFW.GLFW_KEY_K, 3);
+		context.getInput().holdKeyFor(InputConstants.KEY_K, 3);
 		context.waitTicks(5);
 		check(server.computeOnServer(s -> s.getPlayerList().getPlayers().get(0).getTags().contains("salami_autotext")),
 			"AutoText: command was not sent");
@@ -142,7 +142,7 @@ public final class SalamiModsBatchCGameTest implements FabricClientGameTest {
 		WaypointsModule waypoints = modules.get(WaypointsModule.class);
 		context.runOnClient(c -> modules.setEnabled(waypoints, true));
 		int before = context.computeOnClient(c -> waypoints.store().current().size());
-		context.getInput().holdKeyFor(GLFW.GLFW_KEY_B, 3);
+		context.getInput().holdKeyFor(InputConstants.KEY_B, 3);
 		context.waitTicks(3);
 		check(context.computeOnClient(c -> waypoints.store().current().size()) == before + 1, "Waypoints: key B did not add a waypoint");
 		context.runOnClient(c -> c.player.setPos(c.player.getX(), c.player.getY(), c.player.getZ() - 12));

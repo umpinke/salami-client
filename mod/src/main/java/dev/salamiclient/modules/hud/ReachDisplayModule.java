@@ -3,6 +3,7 @@ package dev.salamiclient.modules.hud;
 import dev.salamiclient.module.AttackListener;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.HudModule;
+import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.setting.NumberSetting;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.GuiGraphics;
@@ -61,7 +62,7 @@ public final class ReachDisplayModule extends HudModule implements AttackListene
 
 	@Override
 	protected void render(GuiGraphics graphics, DeltaTracker delta) {
-		graphics.drawString(mc().font, text, 4, 3, textColor(), shadow());
+		GuiDraw.text(graphics, mc().font, text, 4, 3, textColor(), shadow());
 	}
 
 	@Override

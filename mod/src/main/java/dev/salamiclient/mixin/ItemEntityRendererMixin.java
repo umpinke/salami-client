@@ -32,10 +32,18 @@ public abstract class ItemEntityRendererMixin {
 		return ItemPhysicsModule.active() ? ItemPhysicsModule.restingHeight(box) : y;
 	}
 
+	// Die Vanilla-Drehung um die Hochachse (ab 26.3 als rotate(Axis, Winkel) statt mit Quaternion)
+	//? if >=26.3 {
+	/*@WrapWithCondition(method = "submit",
+		at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;rotate(Lcom/mojang/math/Axis;F)V"))
+	private boolean salami$layFlat(PoseStack poseStack, Axis axis, float spin,
+		@Local(argsOnly = true) ItemEntityRenderState state, @Local AABB box) {
+	*///?} else {
 	@WrapWithCondition(method = "submit",
 		at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;mulPose(Lorg/joml/Quaternionfc;)V"))
 	private boolean salami$layFlat(PoseStack poseStack, Quaternionfc spin,
 		@Local(argsOnly = true) ItemEntityRenderState state, @Local AABB box) {
+	//?}
 		if (!ItemPhysicsModule.active()) {
 			return true; // Vanilla-Drehung
 		}

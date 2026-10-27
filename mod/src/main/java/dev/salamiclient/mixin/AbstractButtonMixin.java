@@ -11,7 +11,10 @@ import org.spongepowered.asm.mixin.injection.ModifyArg;
 @Mixin(AbstractButton.class)
 public abstract class AbstractButtonMixin {
 	@ModifyArg(
+		//? if >=1.21.11 {
 		method = "renderDefaultSprite",
+		//?} else
+		/*method = "renderWidget",*/
 		at = @At(
 			value = "INVOKE",
 			target = "Lnet/minecraft/client/gui/GuiGraphics;blitSprite(Lcom/mojang/blaze3d/pipeline/RenderPipeline;Lnet/minecraft/resources/Identifier;IIIII)V"

@@ -4,6 +4,7 @@ import dev.salamiclient.SalamiClient;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.HudModule;
 import dev.salamiclient.modules.misc.StreamerModeModule;
+import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.setting.BoolSetting;
 import dev.salamiclient.theme.Theme;
 import net.minecraft.client.DeltaTracker;
@@ -79,8 +80,8 @@ public final class InfoHudModule extends HudModule {
 	protected void render(GuiGraphics graphics, DeltaTracker delta) {
 		int y = 0;
 		for (Line line : lines) {
-			graphics.drawString(mc().font, line.label(), 0, y, accentColor(), shadow());
-			graphics.drawString(mc().font, line.value(), line.valueX(), y, textColor(), shadow());
+			GuiDraw.text(graphics, mc().font, line.label(), 0, y, accentColor(), shadow());
+			GuiDraw.text(graphics, mc().font, line.value(), line.valueX(), y, textColor(), shadow());
 			y += 10;
 		}
 	}

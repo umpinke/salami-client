@@ -20,7 +20,7 @@ public final class KeyTrigger {
 	/** Einmal pro Tick aufrufen (auch wenn das Ergebnis gerade egal ist – sonst stimmt die Flanke nicht). */
 	public boolean pressed() {
 		Minecraft mc = Minecraft.getInstance();
-		boolean down = key.isBound() && InputConstants.isKeyDown(mc.getWindow(), key.key());
+		boolean down = key.isBound() && Keys.isDown(key.key());
 		boolean pressed = down && !wasDown && mc.screen == null;
 		wasDown = down;
 		return pressed;

@@ -2,6 +2,7 @@ package dev.salamiclient.gui.clickgui;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.config.ConfigManager;
 import dev.salamiclient.gui.ColorPicker;
@@ -13,6 +14,7 @@ import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.modules.client.GuiScaleModule;
 import dev.salamiclient.module.ModuleManager;
+import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.setting.ActionSetting;
 import dev.salamiclient.setting.BoolSetting;
 import dev.salamiclient.setting.ColorSetting;
@@ -22,14 +24,15 @@ import dev.salamiclient.setting.NumberSetting;
 import dev.salamiclient.setting.Setting;
 import dev.salamiclient.setting.StringListSetting;
 import dev.salamiclient.theme.Theme;
+import dev.salamiclient.util.Keys;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.resources.language.I18n;
+import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -117,13 +120,21 @@ public final class ClickGuiScreen extends Screen {
 	// ------------------------------------------------------------------ Zeichnen
 
 	@Override
+	//? if >=26.1 {
+	/*public void extractBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+	*///?} else
 	public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
 		graphics.fill(0, 0, width, height, 0x88000000);
 	}
 
 	@Override
+	//? if >=26.1 {
+	/*public void extractRenderState(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+		super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+	*///?} else {
 	public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
 		super.render(graphics, mouseX, mouseY, partialTick);
+	//?}
 		Theme theme = SalamiClient.get().theme();
 		int mx = (int) (mouseX / uiScale);
 		int my = (int) (mouseY / uiScale);
@@ -134,7 +145,7 @@ public final class ClickGuiScreen extends Screen {
 		for (Panel panel : panels) {
 			renderPanel(graphics, panel, theme, hover);
 		}
-		graphics.drawCenteredString(font, I18n.get("salami.clickgui.hint"), uiWidth() / 2, uiHeight() - 12, theme.textDim());
+		GuiDraw.centeredText(graphics, font, I18n.get("salami.clickgui.hint"), uiWidth() / 2, uiHeight() - 12, theme.textDim());
 		renderHudButton(graphics, theme, mx, my);
 		renderModsButton(graphics, theme, mx, my);
 		renderConfigsButton(graphics, theme, mx, my);
@@ -164,16 +175,16 @@ public final class ClickGuiScreen extends Screen {
 		g.fill(panel.x, panel.y, right, bottom, theme.panel());
 		g.fill(panel.x, panel.y, right, panel.y + HEADER_HEIGHT, theme.header());
 
-		g.drawString(font, I18n.get(panel.category.translationKey()), panel.x + PADDING, panel.y + 4, theme.headerText(), false);
+		GuiDraw.text(g, font, I18n.get(panel.category.translationKey()), panel.x + PADDING, panel.y + 4, theme.headerText(), false);
 		String marker = panel.open ? "-" : "+";
 		int markerX = right - PADDING - font.width(marker);
-		g.drawString(font, marker, markerX, panel.y + 4, theme.headerText(), false);
+		GuiDraw.text(g, font, marker, markerX, panel.y + 4, theme.headerText(), false);
 		if (panel.category.isRestricted()) {
-			g.drawString(font, "!", markerX - 8, panel.y + 4, theme.warning(), false);
+			GuiDraw.text(g, font, "!", markerX - 8, panel.y + 4, theme.warning(), false);
 		}
 
 		if (panel.open && rows.isEmpty()) {
-			g.drawString(font, I18n.get("salami.clickgui.empty"), panel.x + PADDING, panel.y + HEADER_HEIGHT + 3, theme.textDim(), false);
+			GuiDraw.text(g, font, I18n.get("salami.clickgui.empty"), panel.x + PADDING, panel.y + HEADER_HEIGHT + 3, theme.textDim(), false);
 		}
 
 		for (Row row : rows) {
@@ -185,7 +196,7 @@ public final class ClickGuiScreen extends Screen {
 			}
 		}
 
-		g.renderOutline(panel.x, panel.y, PANEL_WIDTH, bottom - panel.y, theme.outline());
+		GuiDraw.outline(g, panel.x, panel.y, PANEL_WIDTH, bottom - panel.y, theme.outline());
 	}
 
 	// ------------------------------------------------------------------ HUD-Editor-Knopf
@@ -199,8 +210,8 @@ public final class ClickGuiScreen extends Screen {
 		int[] b = hudButton();
 		boolean hovered = mouseX >= b[0] && mouseX < b[2] && mouseY >= b[1] && mouseY < b[3];
 		g.fill(b[0], b[1], b[2], b[3], hovered ? theme.header() : theme.panel());
-		g.renderOutline(b[0], b[1], b[2] - b[0], b[3] - b[1], theme.outline());
-		g.drawString(font, I18n.get("salami.clickgui.hud_editor"), b[0] + 6, b[1] + 3, theme.headerText(), false);
+		GuiDraw.outline(g, b[0], b[1], b[2] - b[0], b[3] - b[1], theme.outline());
+		GuiDraw.text(g, font, I18n.get("salami.clickgui.hud_editor"), b[0] + 6, b[1] + 3, theme.headerText(), false);
 	}
 
 	// ------------------------------------------------------------------ Mods-Knopf (oben links)
@@ -214,8 +225,8 @@ public final class ClickGuiScreen extends Screen {
 		int[] b = modsButton();
 		boolean hovered = mouseX >= b[0] && mouseX < b[2] && mouseY >= b[1] && mouseY < b[3];
 		g.fill(b[0], b[1], b[2], b[3], hovered ? theme.accent() : theme.header());
-		g.renderOutline(b[0], b[1], b[2] - b[0], b[3] - b[1], theme.accent());
-		g.drawString(font, I18n.get("salami.clickgui.mods"), b[0] + 8, b[1] + 3, hovered ? theme.panel() | 0xFF000000 : theme.headerText(), false);
+		GuiDraw.outline(g, b[0], b[1], b[2] - b[0], b[3] - b[1], theme.accent());
+		GuiDraw.text(g, font, I18n.get("salami.clickgui.mods"), b[0] + 8, b[1] + 3, hovered ? theme.panel() | 0xFF000000 : theme.headerText(), false);
 	}
 
 	// ------------------------------------------------------------------ Configs-Knopf (neben Mods)
@@ -230,8 +241,8 @@ public final class ClickGuiScreen extends Screen {
 		int[] b = configsButton();
 		boolean hovered = mouseX >= b[0] && mouseX < b[2] && mouseY >= b[1] && mouseY < b[3];
 		g.fill(b[0], b[1], b[2], b[3], hovered ? theme.header() : theme.panel());
-		g.renderOutline(b[0], b[1], b[2] - b[0], b[3] - b[1], theme.outline());
-		g.drawString(font, I18n.get("salami.clickgui.configs"), b[0] + 6, b[1] + 3, theme.headerText(), false);
+		GuiDraw.outline(g, b[0], b[1], b[2] - b[0], b[3] - b[1], theme.outline());
+		GuiDraw.text(g, font, I18n.get("salami.clickgui.configs"), b[0] + 6, b[1] + 3, theme.headerText(), false);
 	}
 
 	// ------------------------------------------------------------------ Größe (− 100 % +)
@@ -270,10 +281,10 @@ public final class ClickGuiScreen extends Screen {
 			int x0 = controls[i][0];
 			int x1 = controls[i][1];
 			g.fill(x0, CONTROL_TOP, x1, CONTROL_BOTTOM, hovered == i ? theme.header() : theme.panel());
-			g.renderOutline(x0, CONTROL_TOP, x1 - x0, CONTROL_BOTTOM - CONTROL_TOP, theme.outline());
+			GuiDraw.outline(g, x0, CONTROL_TOP, x1 - x0, CONTROL_BOTTOM - CONTROL_TOP, theme.outline());
 			if (i == 1) {
 				String percent = Math.round(uiScale * 100) + "%";
-				g.drawString(font, percent, (x0 + x1 - font.width(percent)) / 2, CONTROL_TOP + 3, theme.headerText(), false);
+				GuiDraw.text(g, font, percent, (x0 + x1 - font.width(percent)) / 2, CONTROL_TOP + 3, theme.headerText(), false);
 			} else {
 				drawMagnifier(g, (x0 + x1) / 2 - 5, CONTROL_TOP + 2, i == 2, theme.headerText());
 			}
@@ -322,8 +333,8 @@ public final class ClickGuiScreen extends Screen {
 		String expander = EXPANDED.contains(module.id()) ? "v" : ">";
 		int expanderX = right - PADDING - font.width(expander);
 		String name = font.plainSubstrByWidth(I18n.get(module.translationKey()), expanderX - panel.x - PADDING - 2);
-		g.drawString(font, name, panel.x + PADDING, row.y() + 3, module.isEnabled() ? theme.accent() : theme.text(), false);
-		g.drawString(font, expander, expanderX, row.y() + 3, theme.textDim(), false);
+		GuiDraw.text(g, font, name, panel.x + PADDING, row.y() + 3, module.isEnabled() ? theme.accent() : theme.text(), false);
+		GuiDraw.text(g, font, expander, expanderX, row.y() + 3, theme.textDim(), false);
 	}
 
 	private void renderSettingRow(GuiGraphics g, Panel panel, Row row, Theme theme, boolean hovered) {
@@ -359,7 +370,7 @@ public final class ClickGuiScreen extends Screen {
 		} else if (setting instanceof ColorSetting color) {
 			value = "";
 			g.fill(right - 9, row.y() + 2, right, row.y() + 10, color.argb());
-			g.renderOutline(right - 9, row.y() + 2, 9, 8, picker != null && picker.setting() == color ? theme.accent() : theme.outline());
+			GuiDraw.outline(g, right - 9, row.y() + 2, 9, 8, picker != null && picker.setting() == color ? theme.accent() : theme.outline());
 			valueRight = right - 12;
 		} else if (setting instanceof StringListSetting list) {
 			value = I18n.get("salami.clickgui.entries", list.get().size());
@@ -372,9 +383,9 @@ public final class ClickGuiScreen extends Screen {
 
 		int valueWidth = font.width(value);
 		String label = font.plainSubstrByWidth(label(setting), valueRight - valueWidth - left - 4);
-		g.drawString(font, label, left, textY, theme.textDim(), false);
+		GuiDraw.text(g, font, label, left, textY, theme.textDim(), false);
 		if (!value.isEmpty()) {
-			g.drawString(font, value, valueRight - valueWidth, textY, valueColor, false);
+			GuiDraw.text(g, font, value, valueRight - valueWidth, textY, valueColor, false);
 		}
 	}
 
@@ -391,7 +402,7 @@ public final class ClickGuiScreen extends Screen {
 		Row row = hit.row();
 		if (row.isModule()) {
 			String key = row.module().descriptionKey();
-			return I18n.exists(key) ? Component.translatable(key) : null;
+			return Language.getInstance().has(key) ? Component.translatable(key) : null;
 		}
 		String desc = SettingText.description(row.setting());
 		if (desc != null) {
@@ -479,7 +490,7 @@ public final class ClickGuiScreen extends Screen {
 			picker = null; // Klick daneben schließt den Farbwähler
 		}
 		int control = scaleControlAt(event.x(), event.y());
-		if (control >= 0 && event.button() == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+		if (control >= 0 && event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
 			stepScale(control - 1); // − = -1, Prozent = zurücksetzen, + = +1
 			return true;
 		}
@@ -507,11 +518,11 @@ public final class ClickGuiScreen extends Screen {
 		int button = event.button();
 
 		if (hit.header()) {
-			if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+			if (button == InputConstants.MOUSE_BUTTON_LEFT) {
 				draggedPanel = panel;
 				dragOffsetX = event.x() - panel.x;
 				dragOffsetY = event.y() - panel.y;
-			} else if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
+			} else if (button == InputConstants.MOUSE_BUTTON_RIGHT) {
 				panel.open = !panel.open;
 				savePanels();
 			}
@@ -523,9 +534,9 @@ public final class ClickGuiScreen extends Screen {
 			return true;
 		}
 		if (row.isModule()) {
-			if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+			if (button == InputConstants.MOUSE_BUTTON_LEFT) {
 				modules.toggle(row.module());
-			} else if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
+			} else if (button == InputConstants.MOUSE_BUTTON_RIGHT) {
 				String id = row.module().id();
 				if (!EXPANDED.remove(id)) {
 					EXPANDED.add(id);
@@ -539,7 +550,7 @@ public final class ClickGuiScreen extends Screen {
 
 	private void clickSetting(Row row, Panel panel, double mouseX, int button) {
 		Setting<?> setting = row.setting();
-		boolean back = button == GLFW.GLFW_MOUSE_BUTTON_RIGHT;
+		boolean back = button == InputConstants.MOUSE_BUTTON_RIGHT;
 		if (setting instanceof BoolSetting bool) {
 			bool.toggle();
 		} else if (setting instanceof NumberSetting number) {
@@ -643,7 +654,7 @@ public final class ClickGuiScreen extends Screen {
 			if (picker.keyPressed(event.key())) {
 				return true;
 			}
-			if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
+			if (event.key() == InputConstants.KEY_ESCAPE) {
 				picker = null;
 				return true;
 			}
@@ -651,9 +662,9 @@ public final class ClickGuiScreen extends Screen {
 		capturedLastKey = listeningKeybind != null;
 		if (listeningKeybind != null) {
 			int key = event.key();
-			if (key == GLFW.GLFW_KEY_DELETE || key == GLFW.GLFW_KEY_BACKSPACE) {
+			if (key == InputConstants.KEY_DELETE || key == InputConstants.KEY_BACKSPACE) {
 				listeningKeybind.set(KeybindSetting.NONE);
-			} else if (key != GLFW.GLFW_KEY_ESCAPE) {
+			} else if (key != InputConstants.KEY_ESCAPE) {
 				listeningKeybind.set(key);
 			}
 			listeningKeybind = null;
@@ -666,9 +677,9 @@ public final class ClickGuiScreen extends Screen {
 		if (event.hasControlDown() || minecraft.hasControlDown()) {
 			int steps = switch (event.key()) {
 				// „+“/„-“ liegen auf deutschen Tastaturen auf ] und /
-				case GLFW.GLFW_KEY_EQUAL, GLFW.GLFW_KEY_KP_ADD, GLFW.GLFW_KEY_RIGHT_BRACKET -> 1;
-				case GLFW.GLFW_KEY_MINUS, GLFW.GLFW_KEY_KP_SUBTRACT, GLFW.GLFW_KEY_SLASH -> -1;
-				case GLFW.GLFW_KEY_0, GLFW.GLFW_KEY_KP_0 -> 0;
+				case InputConstants.KEY_EQUALS, InputConstants.KEY_ADD, InputConstants.KEY_RBRACKET -> 1;
+				case InputConstants.KEY_MINUS, Keys.KEYPAD_SUBTRACT, InputConstants.KEY_SLASH -> -1;
+				case InputConstants.KEY_0, InputConstants.KEY_NUMPAD0 -> 0;
 				default -> Integer.MIN_VALUE;
 			};
 			if (steps != Integer.MIN_VALUE) {

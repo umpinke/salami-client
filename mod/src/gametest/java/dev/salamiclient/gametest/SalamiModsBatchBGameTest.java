@@ -1,5 +1,6 @@
 package dev.salamiclient.gametest;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.ModuleManager;
@@ -38,7 +39,6 @@ import net.minecraft.world.entity.item.PrimedTnt;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.AABB;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 
@@ -52,7 +52,7 @@ public final class SalamiModsBatchBGameTest implements FabricClientGameTest {
 		context.runOnClient(c -> modules.setEnabled(modules.get(SafeModeModule.class), false));
 
 		try (TestSingleplayerContext world = context.worldBuilder().create()) {
-			world.getClientWorld().waitForChunksRender();
+			GametestCompat.waitForChunksRender(world);
 			TestServerContext server = world.getServer();
 			server.runCommand("time set day");
 			server.runCommand("weather clear");
@@ -72,7 +72,7 @@ public final class SalamiModsBatchBGameTest implements FabricClientGameTest {
 		Module look = modules.get(FreeLookModule.class);
 		context.runOnClient(c -> modules.setEnabled(look, true));
 		float yawBefore = context.computeOnClient(c -> c.player.getYRot());
-		context.getInput().holdKey(GLFW.GLFW_KEY_LEFT_ALT);
+		context.getInput().holdKey(InputConstants.KEY_LALT);
 		context.waitTicks(3);
 		check(context.computeOnClient(c -> c.options.getCameraType() == CameraType.THIRD_PERSON_BACK), "Free Look: no third person");
 		// Im Testfenster ist die Maus nicht eingefangen – Mausbewegung direkt in Free Look geben
@@ -80,9 +80,12 @@ public final class SalamiModsBatchBGameTest implements FabricClientGameTest {
 		context.runOnClient(c -> FreeLookModule.turn(400, 0));
 		context.waitTicks(3);
 		float yawWhile = context.computeOnClient(c -> c.player.getYRot());
+		//? if >=1.21.11 {
 		boolean lookedAround = context.computeOnClient(c -> Math.abs(c.gameRenderer.getMainCamera().yRot() - yawBefore) > 10);
+		//?} else
+		/*boolean lookedAround = context.computeOnClient(c -> Math.abs(c.gameRenderer.getMainCamera().getYRot() - yawBefore) > 10);*/
 		context.takeScreenshot("salami-30-free-look");
-		context.getInput().releaseKey(GLFW.GLFW_KEY_LEFT_ALT);
+		context.getInput().releaseKey(InputConstants.KEY_LALT);
 		context.waitTicks(3);
 		boolean restored = context.computeOnClient(c -> c.options.getCameraType() == CameraType.FIRST_PERSON);
 		context.runOnClient(c -> modules.setEnabled(look, false));

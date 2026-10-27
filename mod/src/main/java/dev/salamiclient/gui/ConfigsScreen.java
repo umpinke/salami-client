@@ -1,6 +1,7 @@
 package dev.salamiclient.gui;
 
 import dev.salamiclient.SalamiClient;
+import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.theme.Theme;
 import dev.salamiclient.util.Chat;
 import net.fabricmc.loader.api.FabricLoader;
@@ -12,9 +13,17 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+//? if >=26.3 {
+/*import org.lwjgl.sdl.SDLDialog;
+import org.lwjgl.sdl.SDL_DialogFileCallback;
+import org.lwjgl.sdl.SDL_DialogFileFilter;
+import org.lwjgl.system.MemoryUtil;
+import java.nio.ByteBuffer;
+*///?} else {
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.util.tinyfd.TinyFileDialogs;
+//?}
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -55,13 +64,18 @@ public final class ConfigsScreen extends Screen {
 	}
 
 	@Override
+	//? if >=26.1 {
+	/*public void extractRenderState(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+		super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+	*///?} else {
 	public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
 		super.render(graphics, mouseX, mouseY, partialTick);
+	//?}
 		Theme theme = SalamiClient.get().theme();
 		int top = height / 2 - 36;
-		graphics.drawCenteredString(font, title, width / 2, top - 34, theme.headerText());
-		graphics.drawCenteredString(font, I18n.get("salami.configs.hint"), width / 2, top - 20, theme.textDim());
-		graphics.drawCenteredString(font, status, width / 2, top + 72, statusError ? theme.warning() : theme.accent());
+		GuiDraw.centeredText(graphics, font, title, width / 2, top - 34, theme.headerText());
+		GuiDraw.centeredText(graphics, font, I18n.get("salami.configs.hint"), width / 2, top - 20, theme.textDim());
+		GuiDraw.centeredText(graphics, font, status, width / 2, top + 72, statusError ? theme.warning() : theme.accent());
 	}
 
 	@Override
@@ -126,10 +140,52 @@ public final class ConfigsScreen extends Screen {
 		}
 	}
 
-	/**
-	 * Öffnet den Dateidialog des Systems in einem eigenen Thread (er blockiert, bis er
-	 * geschlossen wird); die gewählte Datei wird im Spiel-Thread verarbeitet.
-	 */
+	// Öffnet den Dateidialog des Systems; die gewählte Datei wird im Spiel-Thread verarbeitet.
+	//? if >=26.3 {
+	/*// Ab 26.3 über SDL: der Dialog läuft asynchron und meldet sich über einen Rückruf.
+	private void chooseFile(boolean save, Consumer<Path> onChosen) {
+		if (!DIALOG_OPEN.compareAndSet(false, true)) {
+			return;
+		}
+		ByteBuffer name = MemoryUtil.memUTF8("JSON");
+		ByteBuffer pattern = MemoryUtil.memUTF8("json");
+		SDL_DialogFileFilter.Buffer filters = SDL_DialogFileFilter.calloc(1);
+		filters.name(name).pattern(pattern);
+		SDL_DialogFileCallback[] callback = new SDL_DialogFileCallback[1];
+		callback[0] = SDL_DialogFileCallback.create((userdata, files, filter) -> {
+			Path path = null;
+			try {
+				long first = files == 0L ? 0L : MemoryUtil.memGetAddress(files);
+				if (first != 0L) {
+					String chosen = MemoryUtil.memUTF8(first);
+					path = Path.of(save && !chosen.toLowerCase(Locale.ROOT).endsWith(".json") ? chosen + ".json" : chosen);
+				}
+			} catch (Throwable t) {
+				SalamiClient.LOG.error("File dialog failed", t);
+			}
+			Path chosenPath = path;
+			// Speicher erst im Spiel-Thread freigeben – der Rückruf läuft gerade noch
+			Minecraft.getInstance().execute(() -> {
+				callback[0].free();
+				filters.free();
+				MemoryUtil.memFree(name);
+				MemoryUtil.memFree(pattern);
+				DIALOG_OPEN.set(false);
+				if (chosenPath != null) {
+					onChosen.accept(chosenPath);
+				}
+			});
+		});
+		long window = Minecraft.getInstance().getWindow().handle();
+		String suggested = defaultFile().toString();
+		if (save) {
+			SDLDialog.SDL_ShowSaveFileDialog(callback[0], 0L, window, filters, suggested);
+		} else {
+			SDLDialog.SDL_ShowOpenFileDialog(callback[0], 0L, window, filters, suggested, false);
+		}
+	}
+	*///?} else {
+	// Der Dialog blockiert, bis er geschlossen wird – deshalb in einem eigenen Thread.
 	private void chooseFile(boolean save, Consumer<Path> onChosen) {
 		if (!DIALOG_OPEN.compareAndSet(false, true)) {
 			return;
@@ -160,4 +216,5 @@ public final class ConfigsScreen extends Screen {
 		thread.setDaemon(true);
 		thread.start();
 	}
+	//?}
 }

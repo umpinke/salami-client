@@ -1,27 +1,44 @@
 package dev.salamiclient.mixin;
 
-import com.mojang.blaze3d.platform.Monitor;
-import com.mojang.blaze3d.platform.ScreenManager;
-import com.mojang.blaze3d.platform.VideoMode;
 import com.mojang.blaze3d.platform.Window;
 import dev.salamiclient.modules.client.BorderlessFullscreenModule;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+//? if >=26.3 {
+/*import com.llamalad7.mixinextras.injector.ModifyReturnValue;
+*///?} else {
+import com.mojang.blaze3d.platform.Monitor;
+//? if >=26.2 {
+/*import com.mojang.blaze3d.platform.MonitorManager;
+*///?} else
+import com.mojang.blaze3d.platform.ScreenManager;
+import com.mojang.blaze3d.platform.VideoMode;
 import org.lwjgl.glfw.GLFW;
 import org.spongepowered.asm.mixin.Final;
-import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
-import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+//?}
 
 /** Borderless Fullscreen: statt echtem Vollbild ein randloses Fenster über den ganzen Bildschirm. */
 @Mixin(Window.class)
 public abstract class WindowMixin {
+	//? if >=26.3 {
+	/*// Ab 26.3 kann Minecraft selbst randlos (statt exklusivem Vollbild) – das Modul schaltet nur darauf um.
+	@ModifyReturnValue(method = "useBorderlessFullscreenWindow", at = @At("RETURN"))
+	private boolean salami$borderless(boolean vanilla) {
+		return vanilla || BorderlessFullscreenModule.active();
+	}
+	*///?} else {
 	@Shadow
 	@Final
 	private long handle;
 	@Shadow
 	@Final
+	//? if >=26.2 {
+	/*private MonitorManager monitorManager;
+	*///?} else
 	private ScreenManager screenManager;
 	@Shadow
 	private boolean fullscreen;
@@ -48,6 +65,9 @@ public abstract class WindowMixin {
 	@Inject(method = "setMode", at = @At("HEAD"), cancellable = true)
 	private void salami$borderlessMode(CallbackInfo ci) {
 		if (fullscreen && BorderlessFullscreenModule.active()) {
+			//? if >=26.2 {
+			/*Monitor monitor = monitorManager.findBestMonitor((Window) (Object) this);
+			*///?} else
 			Monitor monitor = screenManager.findBestMonitor((Window) (Object) this);
 			if (monitor == null) {
 				return; // Vanilla übernimmt (und meldet den Fehler)
@@ -59,9 +79,15 @@ public abstract class WindowMixin {
 				windowedWidth = width;
 				windowedHeight = height;
 			}
+			//? if >=26.2 {
+			/*VideoMode mode = monitor.currentMode();
+			x = monitor.x();
+			y = monitor.y();
+			*///?} else {
 			VideoMode mode = monitor.getCurrentMode();
 			x = monitor.getX();
 			y = monitor.getY();
+			//?}
 			width = mode.getWidth();
 			height = mode.getHeight();
 			GLFW.glfwSetWindowAttrib(handle, GLFW.GLFW_DECORATED, GLFW.GLFW_FALSE);
@@ -76,4 +102,5 @@ public abstract class WindowMixin {
 			salami$borderless = false;
 		}
 	}
+	//?}
 }

@@ -5,6 +5,9 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.authlib.exceptions.AuthenticationException;
+//? if >=26.3 {
+/*import com.mojang.authlib.minecraft.SessionService;
+*///?} else
 import com.mojang.authlib.minecraft.MinecraftSessionService;
 import net.minecraft.client.User;
 import org.jetbrains.annotations.Nullable;
@@ -171,6 +174,9 @@ final class CapeServer {
 	}
 
 	/** Teilt das eigene Cape: anmelden (Mojang) und setzen. Läuft im Hintergrund. */
+	//? if >=26.3 {
+	/*CompletableFuture<Published> publish(User user, SessionService session, CapeShare share) {
+	*///?} else
 	CompletableFuture<Published> publish(User user, MinecraftSessionService session, CapeShare share) {
 		return send(post("v1/auth/challenge", new JsonObject())).thenApplyAsync(challenge -> {
 			String serverId = string(challenge, "serverId");

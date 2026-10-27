@@ -34,9 +34,19 @@ public final class BorderlessFullscreenModule extends Module {
 	/** Läuft das Spiel schon im Vollbild, sofort in den neuen Modus wechseln. */
 	private static void reapply() {
 		Minecraft mc = Minecraft.getInstance();
+		//? if >=26.3 {
+		/*// Ab 26.3 wird der Modus beim nächsten Abgleich angewendet – einmal aus- und wieder einschalten
+		if (mc.getWindow() != null && mc.options.fullscreen().get()) {
+			mc.getWindow().setFullscreen(false);
+			mc.getWindow().updateFullscreenIfChanged();
+			mc.getWindow().setFullscreen(true);
+			mc.getWindow().updateFullscreenIfChanged();
+		}
+		*///?} else {
 		if (mc.getWindow() != null && mc.getWindow().isFullscreen()) {
 			mc.getWindow().toggleFullScreen();
 			mc.getWindow().toggleFullScreen();
 		}
+		//?}
 	}
 }
