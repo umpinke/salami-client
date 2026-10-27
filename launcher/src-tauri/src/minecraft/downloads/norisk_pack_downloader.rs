@@ -64,11 +64,7 @@ impl NoriskPackDownloadService {
         let mut download_futures = Vec::new();
 
         for mod_entry in &pack_definition.mods {
-            let compatibility_target = match mod_entry
-                .compatibility
-                .get(minecraft_version)
-                .and_then(|loader_map| loader_map.get(loader))
-            {
+            let compatibility_target = match mod_entry.target_for(minecraft_version, loader) {
                 Some(target) => target.clone(),
                 None => {
                     warn!(
@@ -302,7 +298,7 @@ impl NoriskPackDownloadService {
 const BUNDLED_MODS_DIR: &str = "mods";
 
 /// Salami: Quelle einer "file:"-Packmod.
-/// 1. der angegebene Pfad – relativ zum Launcher-Datenordner (`dev/salami-core.jar` von
+/// 1. der angegebene Pfad – relativ zum Launcher-Datenordner (`dev/salami-core-<version>.jar` von
 ///    `gradlew installDev`) oder absolut (`file:///C:/x.jar` bzw. `file:///home/x.jar`)
 /// 2. die mit dem Installer ausgelieferte Kopie `<exe-Ordner>/mods/<dateiname>`
 /// Gibt es beide, gewinnt die neuere – so verdeckt weder ein alter Dev-Build ein

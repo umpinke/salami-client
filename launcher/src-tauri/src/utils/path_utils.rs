@@ -669,9 +669,7 @@ pub fn get_norisk_mod_cache_path(
 ) -> Result<PathBuf> {
     // Überprüfe die Kompatibilität des Mods für die angegebene MC-Version und den Loader
     let compatibility_target = mod_entry
-        .compatibility
-        .get(minecraft_version)
-        .and_then(|loader_map| loader_map.get(loader))
+        .target_for(minecraft_version, loader)
         .ok_or_else(|| {
             let display_name = mod_entry.display_name.as_deref().unwrap_or(&mod_entry.id);
             AppError::Other(format!(

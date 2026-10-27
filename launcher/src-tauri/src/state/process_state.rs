@@ -197,11 +197,7 @@ pub async fn build_crash_mod_manifest(
         match config.get_resolved_pack_definition(&pack_id) {
             Ok(def) => {
                 for entry in &def.mods {
-                    if !entry
-                        .compatibility
-                        .get(&profile.game_version)
-                        .is_some_and(|l| l.contains_key(loader_key))
-                    {
+                    if entry.target_for(&profile.game_version, loader_key).is_none() {
                         continue;
                     }
                     let identifier = NoriskModIdentifier {

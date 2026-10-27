@@ -28,6 +28,10 @@ export function extractNrcCompatibility(
             for (const loader of Object.keys(loaderMap)) {
               compatibleLoadersByVersion.get(version)!.add(loader);
             }
+            // Quilt lädt Fabric-Mods – der Launcher nimmt dann den Fabric-Eintrag
+            if ("fabric" in loaderMap) {
+              compatibleLoadersByVersion.get(version)!.add("quilt");
+            }
           }
         }
       }

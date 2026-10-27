@@ -107,6 +107,17 @@ pub struct NoriskModEntryDefinition {
     pub compatibility: CompatibilityMap,
 }
 
+impl NoriskModEntryDefinition {
+    /// Salami: Eintrag für Minecraft-Version und Loader. Quilt lädt Fabric-Mods – ohne
+    /// eigenen Quilt-Eintrag gilt deshalb der Fabric-Eintrag.
+    pub fn target_for(&self, minecraft_version: &str, loader: &str) -> Option<&CompatibilityTarget> {
+        let loaders = self.compatibility.get(minecraft_version)?;
+        loaders
+            .get(loader)
+            .or_else(|| if loader == "quilt" { loaders.get("fabric") } else { None })
+    }
+}
+
 /// Defines the general source of a Norisk mod.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(tag = "type", rename_all = "lowercase")]
@@ -1113,4 +1124,46 @@ pub async fn load_dummy_modpacks() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::NoriskModEntryDefinition;
+
+    fn entry() -> NoriskModEntryDefinition {
+        serde_json::from_str(
+            r#"{
+                "id": "salami-core",
+                "displayName": null,
+                "source": { "type": "url" },
+                "compatibility": {
+                    "26.3": { "fabric": { "identifier": "file:dev/salami-core-26.3.jar", "filename": "salami-core-26.3.jar" } },
+                    "1.21.11": {
+                        "fabric": { "identifier": "fabric", "filename": null },
+                        "quilt": { "identifier": "quilt", "filename": null }
+                    }
+                }
+            }"#,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn quilt_falls_back_to_fabric() {
+        let target = entry().target_for("26.3", "quilt").map(|t| t.identifier.clone());
+        assert_eq!(target.as_deref(), Some("file:dev/salami-core-26.3.jar"));
+    }
+
+    #[test]
+    fn own_quilt_entry_wins() {
+        let target = entry().target_for("1.21.11", "quilt").map(|t| t.identifier.clone());
+        assert_eq!(target.as_deref(), Some("quilt"));
+    }
+
+    #[test]
+    fn other_loaders_and_versions_get_nothing() {
+        let e = entry();
+        assert!(e.target_for("26.3", "forge").is_none());
+        assert!(e.target_for("1.20.1", "fabric").is_none());
+    }
 }

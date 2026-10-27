@@ -356,9 +356,8 @@ pub async fn check_content_installed(params: CheckContentParams) -> Result<Conte
                     // TODO: Add project matching for other source types if needed
 
                     if is_potential_project_match {
-                        if let Some(loader_map) = norisk_mod.compatibility.get(target_game_version)
                         {
-                            if let Some(target) = loader_map.get(target_loader_str) {
+                            if let Some(target) = norisk_mod.target_for(target_game_version, target_loader_str) {
                                 status.is_included_in_norisk_pack = true;
 
                                 // Check if the SPECIFIC version NUMBER requested matches the pack identifier
@@ -1520,9 +1519,8 @@ async fn process_mod_requests(
                     }
 
                     if is_potential_project_match {
-                        if let Some(loader_map) = norisk_mod.compatibility.get(target_game_version)
                         {
-                            if let Some(target) = loader_map.get(target_loader_str) {
+                            if let Some(target) = norisk_mod.target_for(target_game_version, target_loader_str) {
                                 status.is_included_in_norisk_pack = true;
 
                                 // Check specific version match
@@ -2063,11 +2061,7 @@ impl LocalContentLoader {
                         for norisk_mod in &pack_def.mods {
                             // Extract fallback version from compatibility target at the beginning
                             let fallback_version = norisk_mod
-                                .compatibility
-                                .get(&profile.game_version)
-                                .and_then(|game_version_map| {
-                                    game_version_map.get(profile.loader.as_str())
-                                })
+                                .target_for(&profile.game_version, profile.loader.as_str())
                                 .map(|loader_target| loader_target.identifier.clone());
 
                             // Skip this mod if no fallback version is available
@@ -2100,9 +2094,8 @@ impl LocalContentLoader {
                             // Extract Modrinth info if available
                             let modrinth_info = if let crate::integrations::norisk_packs::NoriskModSourceDefinition::Modrinth { project_id, .. } = &norisk_mod.source {
                                 // For version info we need to look at compatibility
-                                let version_id = norisk_mod.compatibility
-                                    .get(&profile.game_version)
-                                    .and_then(|game_version_map| game_version_map.get(profile.loader.as_str()))
+                                let version_id = norisk_mod
+                                    .target_for(&profile.game_version, profile.loader.as_str())
                                     .map(|loader_target| loader_target.identifier.clone())
                                     .unwrap_or_else(|| "unknown".to_string());
 

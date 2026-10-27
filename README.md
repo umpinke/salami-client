@@ -1,11 +1,11 @@
 # Salami Client
 
-Minecraft-Client für **1.21.11 (Fabric)** mit eigenem Launcher, Modul-System und dem Salami-Look.
+Minecraft-Client für **1.21.9 bis 26.3 (Fabric, Quilt)** mit eigenem Launcher, Modul-System und dem Salami-Look.
 
 | Teil | Ordner | Technik |
 |---|---|---|
 | Launcher | [`launcher/`](launcher/) | Fork des [NoRisk-Launchers](https://github.com/NoRiskClient/noriskclient-launcher) (Tauri 2, React, Rust) |
-| In-Game-Mod `salami-core` | [`mod/`](mod/) | Fabric, Java 21, Mojang-Mappings |
+| In-Game-Mod `salami-core` | [`mod/`](mod/) | Fabric, Java 21/25, Mojang-Mappings, [Stonecutter](https://stonecutter.kikugie.dev) (eine Jar pro Minecraft-Version) |
 | Pack-Definitionen | [`packs/`](packs/) | JSON, im Launcher eingebettet |
 | Online-Zähler | [`server/online-counter/`](server/online-counter/) | Node.js, ohne Abhängigkeiten, auf eigenem Server |
 | Cape-Server + Prüf-Webseite | [`server/capes/`](server/capes/) | Node.js, ohne Abhängigkeiten, auf eigenem Server |
@@ -18,10 +18,27 @@ Minecraft-Client für **1.21.11 (Fabric)** mit eigenem Launcher, Modul-System un
 
 ```bash
 cd mod
-./gradlew build        # Jar nach mod/build/libs/
-./gradlew runClient    # Minecraft 1.21.11 mit salami-core starten
-./gradlew installDev   # Jar in den Salami-Launcher kopieren (Pack "salami")
+./gradlew build                # alle Versionen, Jars nach mod/versions/<version>/build/libs/
+./gradlew :1.21.11:runClient   # Minecraft 1.21.11 mit salami-core starten
+./gradlew installDev           # alle Jars in den Salami-Launcher kopieren (Pack "salami")
 ```
+
+Ein Quellcode für alle Versionen: Unterschiede stehen als Stonecutter-Kommentare im Code
+(`//? if >=26.1 { … }`) oder als Ersetzungen in `mod/stonecutter.gradle.kts`. Welche Jar welche
+Minecraft-Versionen abdeckt, steht in `mod/stonecutter.properties.toml`:
+
+| Jar | Minecraft |
+|---|---|
+| `salami-core-1.21.10.jar` | 1.21.9, 1.21.10 (ohne Speer-Module – Speere gibt es erst ab 1.21.11) |
+| `salami-core-1.21.11.jar` | 1.21.11 |
+| `salami-core-26.1.2.jar` | 26.1, 26.1.1, 26.1.2 |
+| `salami-core-26.2.jar` | 26.2 |
+| `salami-core-26.3.jar` | 26.3 |
+
+Der Code in `src/` steht immer für 1.21.11. Wer in der IDE auf eine andere Version umschaltet
+(`./gradlew "Set active project to 26.3"`), stellt vor dem Commit zurück: `./gradlew "Reset active project"`.
+Neue Minecraft-Version: Eintrag in `settings.gradle.kts` und `stonecutter.properties.toml`, dann
+`node launcher/scripts/update-salami-pack.mjs` (trägt salami-core und die Pack-Mods ins Pack ein).
 
 Im Spiel:
 
@@ -50,7 +67,7 @@ Die Clip-Aufnahme (`norisk-capture`, FFmpeg) braucht zusätzlich **LLVM/libclang
 npx yarn@1.22.22 tauri dev --config src-tauri/tauri.dev-noclips.json
 ```
 
-Beim ersten Start legt der Launcher den Datenordner `%APPDATA%\salamiclient\SalamiClient` an. Das Standardprofil „Salami Client 1.21.11“ lädt `salami-core` – beim Entwickeln aus `dev/salami-core.jar` (vorher in `mod/` `./gradlew installDev` ausführen), im installierten Launcher die mitgelieferte Kopie – sowie die Performance-Mods von Modrinth. Importierte `.noriskpack`-Profile laufen automatisch mit dem Salami-Pack.
+Beim ersten Start legt der Launcher den Datenordner `%APPDATA%\salamiclient\SalamiClient` an. Das Standardprofil „Salami Client 1.21.11“ lädt `salami-core` – beim Entwickeln aus `dev/salami-core-<version>.jar` (vorher in `mod/` `./gradlew installDev` ausführen), im installierten Launcher die mitgelieferte Kopie – sowie die Performance-Mods von Modrinth. Eigene Profile mit 1.21.9 bis 26.3 (Fabric oder Quilt) bekommen automatisch die passende Jar. Importierte `.noriskpack`-Profile laufen automatisch mit dem Salami-Pack.
 
 ### Launcher installieren (Windows)
 
@@ -61,7 +78,7 @@ npx yarn@1.22.22 tauri build --config src-tauri/tauri.release-local.json
 
 Das erzeugt `src-tauri/target/release/bundle/nsis/Salami Client_<version>_x64-setup.exe`. Der Installer installiert ohne Admin-Rechte nach `%LOCALAPPDATA%\Salami Client` und legt Startmenü- und Desktop-Verknüpfung an.
 
-Der Build baut vorher `salami-core` (`scripts/bundle-salami-core.mjs` → `./gradlew launcherBundle`). Der Installer legt die Mod als `mods\salami-core.jar` neben die Launcher-Exe, damit braucht der installierte Launcher keinen Dev-Ordner. Liegt zusätzlich ein `dev\salami-core.jar` im Datenordner (von `installDev`), nimmt der Launcher die neuere der beiden Dateien.
+Der Build baut vorher `salami-core` für alle Versionen (`scripts/bundle-salami-core.mjs` → `./gradlew launcherBundle`). Der Installer legt die Jars als `mods\salami-core-<version>.jar` neben die Launcher-Exe, damit braucht der installierte Launcher keinen Dev-Ordner. Liegt zusätzlich eine Jar im Datenordner `dev\` (von `installDev`), nimmt der Launcher die neuere der beiden Dateien.
 
 Der lokale Build lässt die Updater-Signatur und die Clip-Komponente weg. Die Clip-Komponente braucht LLVM.
 
@@ -166,7 +183,8 @@ Alle Grafiken erzeugen die Skripte unter `branding/` (`generate_logo.py`, `gener
 
 ```bash
 cd mod
-./gradlew runClientGameTest
+./gradlew :1.21.11:runClientGameTest   # eine Version
+./gradlew runClientGameTest             # alle Versionen nacheinander
 ```
 
 Der Test startet Minecraft mit einer Testwelt und prüft:

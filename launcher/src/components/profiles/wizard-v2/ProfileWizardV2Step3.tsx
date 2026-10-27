@@ -173,7 +173,9 @@ export function ProfileWizardV2Step3({
                     if (mod.id === "salami-core") {
                         // Check if it has compatibility for the selected version and loader
                         const versionCompat = mod.compatibility?.[selectedMinecraftVersion];
-                        const loaderCompat = versionCompat?.[selectedLoader];
+                        // Quilt lädt Fabric-Mods – ohne eigenen Quilt-Eintrag gilt der Fabric-Eintrag
+                        const loaderCompat = versionCompat?.[selectedLoader]
+                            ?? (selectedLoader === "quilt" ? versionCompat?.fabric : undefined);
                         console.log(`Checking mod ${mod.id} compatibility:`, {
                             version: selectedMinecraftVersion,
                             loader: selectedLoader,

@@ -331,11 +331,7 @@ async fn resolve_pack_entry(
         }
     }
 
-    let target = match mod_entry
-        .compatibility
-        .get(minecraft_version)
-        .and_then(|l| l.get(loader_str))
-    {
+    let target = match mod_entry.target_for(minecraft_version, loader_str) {
         Some(target) => target,
         None => {
             warn!(

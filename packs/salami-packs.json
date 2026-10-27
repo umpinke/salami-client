@@ -11,113 +11,246 @@
           "displayName": "Salami Client Core",
           "source": { "type": "url" },
           "compatibility": {
-            "1.21.11": {
-              "fabric": {
-                "identifier": "file:dev/salami-core.jar",
-                "filename": "salami-core.jar",
-                "source": null
-              }
-            }
+            "1.21.9": { "fabric": { "identifier": "file:dev/salami-core-1.21.10.jar", "filename": "salami-core-1.21.10.jar", "source": null } },
+            "1.21.10": { "fabric": { "identifier": "file:dev/salami-core-1.21.10.jar", "filename": "salami-core-1.21.10.jar", "source": null } },
+            "1.21.11": { "fabric": { "identifier": "file:dev/salami-core-1.21.11.jar", "filename": "salami-core-1.21.11.jar", "source": null } },
+            "26.1": { "fabric": { "identifier": "file:dev/salami-core-26.1.2.jar", "filename": "salami-core-26.1.2.jar", "source": null } },
+            "26.1.1": { "fabric": { "identifier": "file:dev/salami-core-26.1.2.jar", "filename": "salami-core-26.1.2.jar", "source": null } },
+            "26.1.2": { "fabric": { "identifier": "file:dev/salami-core-26.1.2.jar", "filename": "salami-core-26.1.2.jar", "source": null } },
+            "26.2": { "fabric": { "identifier": "file:dev/salami-core-26.2.jar", "filename": "salami-core-26.2.jar", "source": null } },
+            "26.3": { "fabric": { "identifier": "file:dev/salami-core-26.3.jar", "filename": "salami-core-26.3.jar", "source": null } }
           }
         },
         {
           "id": "fabric-api",
           "displayName": "Fabric API",
           "source": { "type": "modrinth", "projectId": "P7dR8mSH", "projectSlug": "fabric-api" },
-          "compatibility": { "1.21.11": { "fabric": { "identifier": "6qAuTtLR", "filename": null, "source": null } } }
+          "compatibility": {
+            "1.21.9": { "fabric": { "identifier": "vczmWJBj", "filename": null, "source": null } },
+            "1.21.10": { "fabric": { "identifier": "tV4Gc0Zo", "filename": null, "source": null } },
+            "1.21.11": { "fabric": { "identifier": "6qAuTtLR", "filename": null, "source": null } },
+            "26.1": { "fabric": { "identifier": "3dM0X6ou", "filename": null, "source": null } },
+            "26.1.1": { "fabric": { "identifier": "3dM0X6ou", "filename": null, "source": null } },
+            "26.1.2": { "fabric": { "identifier": "3dM0X6ou", "filename": null, "source": null } },
+            "26.2": { "fabric": { "identifier": "ewUK83HI", "filename": null, "source": null } },
+            "26.3": { "fabric": { "identifier": "EQKgpeKu", "filename": null, "source": null } }
+          }
         },
         {
           "id": "sodium",
           "displayName": "Sodium",
           "source": { "type": "modrinth", "projectId": "AANobbMI", "projectSlug": "sodium" },
-          "compatibility": { "1.21.11": { "fabric": { "identifier": "rkdTcxoT", "filename": null, "source": null } } }
+          "compatibility": {
+            "1.21.9": { "fabric": { "identifier": "sFfidWgd", "filename": null, "source": null } },
+            "1.21.10": { "fabric": { "identifier": "sFfidWgd", "filename": null, "source": null } },
+            "1.21.11": { "fabric": { "identifier": "rkdTcxoT", "filename": null, "source": null } },
+            "26.1": { "fabric": { "identifier": "uGvVQBnw", "filename": null, "source": null } },
+            "26.1.1": { "fabric": { "identifier": "uGvVQBnw", "filename": null, "source": null } },
+            "26.1.2": { "fabric": { "identifier": "tZQ3jqnf", "filename": null, "source": null } },
+            "26.2": { "fabric": { "identifier": "xJZxADzI", "filename": null, "source": null } },
+            "26.3": { "fabric": { "identifier": "bAZQdGpg", "filename": null, "source": null } }
+          }
         },
         {
           "id": "lithium",
           "displayName": "Lithium",
           "source": { "type": "modrinth", "projectId": "gvQqBUqZ", "projectSlug": "lithium" },
-          "compatibility": { "1.21.11": { "fabric": { "identifier": "Ow7wA0kG", "filename": null, "source": null } } }
+          "compatibility": {
+            "1.21.9": { "fabric": { "identifier": "L1sSIxFm", "filename": null, "source": null } },
+            "1.21.10": { "fabric": { "identifier": "NsswKiwi", "filename": null, "source": null } },
+            "1.21.11": { "fabric": { "identifier": "Ow7wA0kG", "filename": null, "source": null } },
+            "26.1": { "fabric": { "identifier": "Oqq8TOAV", "filename": null, "source": null } },
+            "26.1.1": { "fabric": { "identifier": "Oqq8TOAV", "filename": null, "source": null } },
+            "26.1.2": { "fabric": { "identifier": "Oqq8TOAV", "filename": null, "source": null } },
+            "26.2": { "fabric": { "identifier": "f7vZ0VWU", "filename": null, "source": null } },
+            "26.3": { "fabric": { "identifier": "xS0Q8LSi", "filename": null, "source": null } }
+          }
         },
         {
           "id": "immediatelyfast",
           "displayName": "ImmediatelyFast",
           "source": { "type": "modrinth", "projectId": "5ZwdcRci", "projectSlug": "immediatelyfast" },
-          "compatibility": { "1.21.11": { "fabric": { "identifier": "4EwhsTu7", "filename": null, "source": null } } }
+          "compatibility": {
+            "1.21.9": { "fabric": { "identifier": "9hztj0xA", "filename": null, "source": null } },
+            "1.21.10": { "fabric": { "identifier": "9hztj0xA", "filename": null, "source": null } },
+            "1.21.11": { "fabric": { "identifier": "4EwhsTu7", "filename": null, "source": null } },
+            "26.1": { "fabric": { "identifier": "xOA9hbpf", "filename": null, "source": null } },
+            "26.1.1": { "fabric": { "identifier": "xOA9hbpf", "filename": null, "source": null } },
+            "26.1.2": { "fabric": { "identifier": "xOA9hbpf", "filename": null, "source": null } },
+            "26.2": { "fabric": { "identifier": "pMWERcSu", "filename": null, "source": null } },
+            "26.3": { "fabric": { "identifier": "3MP9UR23", "filename": null, "source": null } }
+          }
         },
         {
           "id": "entityculling",
           "displayName": "EntityCulling",
           "source": { "type": "modrinth", "projectId": "NNAgCjsB", "projectSlug": "entityculling" },
-          "compatibility": { "1.21.11": { "fabric": { "identifier": "CTabrwB1", "filename": null, "source": null } } }
+          "compatibility": {
+            "1.21.9": { "fabric": { "identifier": "YkqoVa13", "filename": null, "source": null } },
+            "1.21.10": { "fabric": { "identifier": "1EFDjmh5", "filename": null, "source": null } },
+            "1.21.11": { "fabric": { "identifier": "CTabrwB1", "filename": null, "source": null } },
+            "26.1": { "fabric": { "identifier": "VhQ51u7a", "filename": null, "source": null } },
+            "26.1.1": { "fabric": { "identifier": "VhQ51u7a", "filename": null, "source": null } },
+            "26.1.2": { "fabric": { "identifier": "VhQ51u7a", "filename": null, "source": null } },
+            "26.2": { "fabric": { "identifier": "uXe0pIaz", "filename": null, "source": null } },
+            "26.3": { "fabric": { "identifier": "X1g3VhTx", "filename": null, "source": null } }
+          }
         },
         {
           "id": "ferrite-core",
           "displayName": "FerriteCore",
           "source": { "type": "modrinth", "projectId": "uXXizFIs", "projectSlug": "ferrite-core" },
-          "compatibility": { "1.21.11": { "fabric": { "identifier": "Ii0gP3D8", "filename": null, "source": null } } }
+          "compatibility": {
+            "1.21.9": { "fabric": { "identifier": "bPLllEgi", "filename": null, "source": null } },
+            "1.21.10": { "fabric": { "identifier": "bPLllEgi", "filename": null, "source": null } },
+            "1.21.11": { "fabric": { "identifier": "Ii0gP3D8", "filename": null, "source": null } },
+            "26.1": { "fabric": { "identifier": "d5ddUdiB", "filename": null, "source": null } },
+            "26.1.1": { "fabric": { "identifier": "d5ddUdiB", "filename": null, "source": null } },
+            "26.1.2": { "fabric": { "identifier": "d5ddUdiB", "filename": null, "source": null } },
+            "26.2": { "fabric": { "identifier": "d5ddUdiB", "filename": null, "source": null } },
+            "26.3": { "fabric": { "identifier": "d5ddUdiB", "filename": null, "source": null } }
+          }
         },
         {
           "id": "cloth-config",
           "displayName": "Cloth Config API",
           "source": { "type": "modrinth", "projectId": "9s6osm5g", "projectSlug": "cloth-config" },
-          "compatibility": { "1.21.11": { "fabric": { "identifier": "xuX40TN5", "filename": null, "source": null } } }
+          "compatibility": {
+            "1.21.9": { "fabric": { "identifier": "qMxkrrmq", "filename": null, "source": null } },
+            "1.21.10": { "fabric": { "identifier": "qMxkrrmq", "filename": null, "source": null } },
+            "1.21.11": { "fabric": { "identifier": "xuX40TN5", "filename": null, "source": null } },
+            "26.1": { "fabric": { "identifier": "GFM8zh9J", "filename": null, "source": null } },
+            "26.1.1": { "fabric": { "identifier": "GFM8zh9J", "filename": null, "source": null } },
+            "26.1.2": { "fabric": { "identifier": "GFM8zh9J", "filename": null, "source": null } },
+            "26.2": { "fabric": { "identifier": "Nv3xnWXd", "filename": null, "source": null } },
+            "26.3": { "fabric": { "identifier": "fg2uyxOW", "filename": null, "source": null } }
+          }
         },
         {
           "id": "placeholder-api",
           "displayName": "Text Placeholder API",
           "source": { "type": "modrinth", "projectId": "eXts2L7r", "projectSlug": "placeholder-api" },
-          "compatibility": { "1.21.11": { "fabric": { "identifier": "qxjzQ9xY", "filename": null, "source": null } } }
+          "compatibility": {
+            "1.21.9": { "fabric": { "identifier": "T5pDJV1K", "filename": null, "source": null } },
+            "1.21.10": { "fabric": { "identifier": "qxjzQ9xY", "filename": null, "source": null } },
+            "1.21.11": { "fabric": { "identifier": "qxjzQ9xY", "filename": null, "source": null } },
+            "26.1": { "fabric": { "identifier": "b3IPAHgB", "filename": null, "source": null } },
+            "26.1.1": { "fabric": { "identifier": "b3IPAHgB", "filename": null, "source": null } },
+            "26.1.2": { "fabric": { "identifier": "b3IPAHgB", "filename": null, "source": null } },
+            "26.2": { "fabric": { "identifier": "NDqH16LT", "filename": null, "source": null } },
+            "26.3": { "fabric": { "identifier": "lXytLqWj", "filename": null, "source": null } }
+          }
         },
         {
           "id": "modmenu",
           "displayName": "Mod Menu",
           "source": { "type": "modrinth", "projectId": "mOgUt4GM", "projectSlug": "modmenu" },
-          "compatibility": { "1.21.11": { "fabric": { "identifier": "cLkYaVuL", "filename": null, "source": null } } }
+          "compatibility": {
+            "1.21.9": { "fabric": { "identifier": "pYbFlVtR", "filename": null, "source": null } },
+            "1.21.10": { "fabric": { "identifier": "pYbFlVtR", "filename": null, "source": null } },
+            "1.21.11": { "fabric": { "identifier": "cLkYaVuL", "filename": null, "source": null } },
+            "26.1": { "fabric": { "identifier": "ZJ6YTrMY", "filename": null, "source": null } },
+            "26.1.1": { "fabric": { "identifier": "ZJ6YTrMY", "filename": null, "source": null } },
+            "26.1.2": { "fabric": { "identifier": "ZJ6YTrMY", "filename": null, "source": null } },
+            "26.2": { "fabric": { "identifier": "iRo7AZXf", "filename": null, "source": null } },
+            "26.3": { "fabric": { "identifier": "kyy7dbrZ", "filename": null, "source": null } }
+          }
         },
         {
           "id": "wavey-capes",
           "displayName": "Wavey Capes",
           "source": { "type": "modrinth", "projectId": "kYuIpRLv", "projectSlug": "wavey-capes" },
-          "compatibility": { "1.21.11": { "fabric": { "identifier": "HiXJOcqr", "filename": null, "source": null } } }
+          "compatibility": {
+            "1.21.9": { "fabric": { "identifier": "fUE9xs1s", "filename": null, "source": null } },
+            "1.21.10": { "fabric": { "identifier": "1yhIWF62", "filename": null, "source": null } },
+            "1.21.11": { "fabric": { "identifier": "HiXJOcqr", "filename": null, "source": null } },
+            "26.1": { "fabric": { "identifier": "TQ8147bZ", "filename": null, "source": null } },
+            "26.1.1": { "fabric": { "identifier": "TQ8147bZ", "filename": null, "source": null } },
+            "26.1.2": { "fabric": { "identifier": "TQ8147bZ", "filename": null, "source": null } },
+            "26.2": { "fabric": { "identifier": "qADFZPJi", "filename": null, "source": null } },
+            "26.3": { "fabric": { "identifier": "HzJI5xeL", "filename": null, "source": null } }
+          }
         },
         {
           "id": "3dskinlayers",
           "displayName": "3D Skin Layers",
           "source": { "type": "modrinth", "projectId": "zV5r3pPn", "projectSlug": "3dskinlayers" },
-          "compatibility": { "1.21.11": { "fabric": { "identifier": "TpZj1P0j", "filename": null, "source": null } } }
+          "compatibility": {
+            "1.21.9": { "fabric": { "identifier": "Uv7uC5kA", "filename": null, "source": null } },
+            "1.21.10": { "fabric": { "identifier": "5xP3oAho", "filename": null, "source": null } },
+            "1.21.11": { "fabric": { "identifier": "TpZj1P0j", "filename": null, "source": null } },
+            "26.1": { "fabric": { "identifier": "hIowUmVK", "filename": null, "source": null } },
+            "26.1.1": { "fabric": { "identifier": "hIowUmVK", "filename": null, "source": null } },
+            "26.1.2": { "fabric": { "identifier": "hIowUmVK", "filename": null, "source": null } },
+            "26.2": { "fabric": { "identifier": "w5Ondgft", "filename": null, "source": null } },
+            "26.3": { "fabric": { "identifier": "gjM2TO0L", "filename": null, "source": null } }
+          }
         },
         {
           "id": "appleskin",
           "displayName": "AppleSkin",
           "source": { "type": "modrinth", "projectId": "EsAfCjCV", "projectSlug": "appleskin" },
-          "compatibility": { "1.21.11": { "fabric": { "identifier": "59ti1rvg", "filename": null, "source": null } } }
+          "compatibility": {
+            "1.21.9": { "fabric": { "identifier": "8sbiz1lS", "filename": null, "source": null } },
+            "1.21.10": { "fabric": { "identifier": "8sbiz1lS", "filename": null, "source": null } },
+            "1.21.11": { "fabric": { "identifier": "59ti1rvg", "filename": null, "source": null } },
+            "26.1": { "fabric": { "identifier": "zLlqqiTA", "filename": null, "source": null } },
+            "26.1.1": { "fabric": { "identifier": "zLlqqiTA", "filename": null, "source": null } },
+            "26.1.2": { "fabric": { "identifier": "zLlqqiTA", "filename": null, "source": null } },
+            "26.2": { "fabric": { "identifier": "uo5bAN1Y", "filename": null, "source": null } },
+            "26.3": { "fabric": { "identifier": "PHjDtQay", "filename": null, "source": null } }
+          }
         },
         {
           "id": "shulkerboxtooltip",
           "displayName": "Shulker Box Tooltip",
           "source": { "type": "modrinth", "projectId": "2M01OLQq", "projectSlug": "shulkerboxtooltip" },
-          "compatibility": { "1.21.11": { "fabric": { "identifier": "rZovgkWT", "filename": null, "source": null } } }
+          "compatibility": {
+            "1.21.9": { "fabric": { "identifier": "Pq4bDUO1", "filename": null, "source": null } },
+            "1.21.10": { "fabric": { "identifier": "Tu7L0xsA", "filename": null, "source": null } },
+            "1.21.11": { "fabric": { "identifier": "rZovgkWT", "filename": null, "source": null } },
+            "26.1": { "fabric": { "identifier": "ZkGgdpPY", "filename": null, "source": null } },
+            "26.1.1": { "fabric": { "identifier": "cCQDtoFu", "filename": null, "source": null } },
+            "26.1.2": { "fabric": { "identifier": "cCQDtoFu", "filename": null, "source": null } },
+            "26.2": { "fabric": { "identifier": "woHKruB1", "filename": null, "source": null } },
+            "26.3": { "fabric": { "identifier": "60krd8u8", "filename": null, "source": null } }
+          }
         },
         {
           "id": "moreculling",
           "displayName": "More Culling",
           "source": { "type": "modrinth", "projectId": "51shyZVL", "projectSlug": "moreculling" },
-          "compatibility": { "1.21.11": { "fabric": { "identifier": "wOzykoLV", "filename": null, "source": null } } }
+          "compatibility": {
+            "1.21.9": { "fabric": { "identifier": "nASRyMbu", "filename": null, "source": null } },
+            "1.21.10": { "fabric": { "identifier": "nASRyMbu", "filename": null, "source": null } },
+            "1.21.11": { "fabric": { "identifier": "wOzykoLV", "filename": null, "source": null } },
+            "26.1": { "fabric": { "identifier": "PX8FzP3c", "filename": null, "source": null } },
+            "26.1.1": { "fabric": { "identifier": "PX8FzP3c", "filename": null, "source": null } },
+            "26.1.2": { "fabric": { "identifier": "PX8FzP3c", "filename": null, "source": null } },
+            "26.2": { "fabric": { "identifier": "D5oVCouK", "filename": null, "source": null } },
+            "26.3": { "fabric": { "identifier": "t7vAlfgO", "filename": null, "source": null } }
+          }
         },
         {
           "id": "tiers",
           "displayName": "Tiers",
           "source": { "type": "modrinth", "projectId": "bubOj4AD", "projectSlug": "tiers" },
-          "compatibility": { "1.21.11": { "fabric": { "identifier": "dDJ7wOUg", "filename": null, "source": null } } }
+          "compatibility": {
+            "1.21.9": { "fabric": { "identifier": "Iv5XUYgU", "filename": null, "source": null } },
+            "1.21.10": { "fabric": { "identifier": "wBlVDwhm", "filename": null, "source": null } },
+            "1.21.11": { "fabric": { "identifier": "dDJ7wOUg", "filename": null, "source": null } },
+            "26.1": { "fabric": { "identifier": "SqA7lA98", "filename": null, "source": null } },
+            "26.1.1": { "fabric": { "identifier": "JHCxjdxy", "filename": null, "source": null } },
+            "26.1.2": { "fabric": { "identifier": "2FhPa2uT", "filename": null, "source": null } },
+            "26.2": { "fabric": { "identifier": "fMxF0Tus", "filename": null, "source": null } },
+            "26.3": { "fabric": { "identifier": "6TDcDJ2S", "filename": null, "source": null } }
+          }
         }
       ],
       "assets": [],
       "isExperimental": false,
       "listing": { "category": "salami", "weight": 100, "hidden": false },
-      "loaderPolicy": {
-        "default": { "fabric": { "version": "0.19.5", "min": null, "strategy": null } },
-        "byMinecraft": {}
-      },
+      "loaderPolicy": { "default": { "fabric": { "version": "0.19.5", "min": null, "strategy": null } }, "byMinecraft": {} },
       "startupHelper": null
     }
   },

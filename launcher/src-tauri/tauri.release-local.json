@@ -6,7 +6,7 @@
     "targets": ["nsis"],
     "createUpdaterArtifacts": false,
     "resources": {
-      "../../mod/build/launcher/salami-core.jar": "mods/salami-core.jar"
+      "../../mod/build/launcher/*.jar": "mods/"
     }
   }
 }
