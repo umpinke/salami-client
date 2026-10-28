@@ -89,6 +89,14 @@ public abstract class Module {
 		}
 	}
 
+	/**
+	 * Gehört zu den Kampf-Modulen, die der Launcher abschalten kann
+	 * ({@code -Dsalami.combat=off}): dann fehlt das Modul im Spiel komplett.
+	 */
+	public boolean needsCombat() {
+		return category.isRestricted();
+	}
+
 	final void bindChangeHook(Runnable hook) {
 		this.changeHook = hook;
 	}

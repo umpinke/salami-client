@@ -39,6 +39,12 @@ public final class SafeModeModule extends Module {
 		super("safe_mode", Category.CLIENT);
 	}
 
+	/** Ohne Kampf-Module gibt es nichts abzusichern – dann fehlt auch Safe Mode. */
+	@Override
+	public boolean needsCombat() {
+		return true;
+	}
+
 	@Override
 	protected void onEnable() {
 		SalamiClient.get().modules().disableCategory(Category.UTILITY);
@@ -46,6 +52,9 @@ public final class SafeModeModule extends Module {
 
 	/** Aktiviert Safe Mode und meldet, wie viele Kampfmodule ausgeschaltet wurden. */
 	public void engage(Reason reason) {
+		if (!SalamiClient.get().modules().isAvailable(this)) {
+			return;
+		}
 		int running = 0;
 		for (Module module : SalamiClient.get().modules().byCategory(Category.UTILITY)) {
 			if (module.isEnabled()) {

@@ -69,6 +69,12 @@ npx yarn@1.22.22 tauri dev --config src-tauri/tauri.dev-noclips.json
 
 Beim ersten Start legt der Launcher den Datenordner `%APPDATA%\salamiclient\SalamiClient` an. Das Standardprofil „Salami Client 1.21.11“ lädt `salami-core` – beim Entwickeln aus `dev/salami-core-<version>.jar` (vorher in `mod/` `./gradlew installDev` ausführen), im installierten Launcher die mitgelieferte Kopie – sowie die Performance-Mods von Modrinth. Eigene Profile mit 1.21.9 bis 26.3 (Fabric oder Quilt) bekommen automatisch die passende Jar. Importierte `.noriskpack`-Profile laufen automatisch mit dem Salami-Pack.
 
+### Performance
+
+- **Pack-Mods**: Sodium, Lithium, ImmediatelyFast, EntityCulling, FerriteCore, More Culling, BadOptimizations, ScalableLux und Dynamic FPS (weniger FPS, solange das Fenster im Hintergrund ist). Sie ändern nichts am Aussehen. `update-salami-pack.mjs` trägt nur Release- oder Beta-Versionen ein; für 26.3 gibt es ScalableLux bisher nur als Alpha, dort fehlt es deshalb. Mods mit eigenen Abhängigkeiten (z. B. Particle Core mit Kotlin und Fzzy Config) gehören nur mit diesen Abhängigkeiten ins Pack – `-PpackMods` (siehe [Tests](#tests)) findet so etwas.
+- **Java**: Ohne eigene GC-Einstellung startet der Launcher Minecraft mit G1 und zusätzlich `-XX:+DisableExplicitGC`, `-XX:+PerfDisableSharedMem`, `-XX:ReservedCodeCacheSize=400M` und `-XX:-DontCompileHugeMethods`, ab Java 25 (Minecraft 26.x) außerdem mit `-XX:+UseCompactObjectHeaders`.
+- **salami-core**: Der Benchmark-Test (`-PsalamiTests=Benchmark`, siehe [Tests](#tests)) misst jedes Modul einzeln. So sieht man, welches Modul pro Frame am meisten kostet.
+
 ### Launcher installieren (Windows)
 
 ```bash
@@ -80,7 +86,7 @@ Das erzeugt `src-tauri/target/release/bundle/nsis/Salami Client_<version>_x64-se
 
 Der Build baut vorher `salami-core` für alle Versionen (`scripts/bundle-salami-core.mjs` → `./gradlew launcherBundle`). Der Installer legt die Jars als `mods\salami-core-<version>.jar` neben die Launcher-Exe, damit braucht der installierte Launcher keinen Dev-Ordner. Liegt zusätzlich eine Jar im Datenordner `dev\` (von `installDev`), nimmt der Launcher die neuere der beiden Dateien.
 
-Der lokale Build lässt die Updater-Signatur und die Clip-Komponente weg. Die Clip-Komponente braucht LLVM.
+Der Build braucht **LLVM** (`winget install LLVM.LLVM`), denn er baut auch das Clip-Aufnahmeprogramm (`yarn stage-native` → `norisk-capture`). Der Installer legt `norisk-capture.exe`, die FFmpeg-DLLs und den Grafik-Hook neben die Launcher-Exe. Clips sind standardmäßig aus; wer sie unter *Einstellungen → Clips* einschaltet, speichert mit **F8** die letzten 30 Sekunden. Der lokale Build lässt nur die Updater-Signatur weg.
 
 ### Updates veröffentlichen (Auto-Update)
 
@@ -162,6 +168,7 @@ node --test "src/features/mod-downloader/*.test.ts"
   - per Taste,
   - manuell,
   - oder automatisch auf Servern einer editierbaren Liste.
+- **Kampf-Module erlauben** (*Launcher → Einstellungen → Allgemein → Im Spiel*, Standard: an): Ist der Schalter aus, gibt der Launcher `-Dsalami.combat=off` mit. Dann fehlen alle Utility-Module und Safe Mode im Spiel komplett: Sie erscheinen weder in der ClickGUI noch in der Mod-Liste und lassen sich weder per Taste noch über die Config einschalten.
 - **Salami-Modus**:
   - Theme-Schalter im Mod (`SalamiThemeModule`).
   - Der Launcher kann ihn per `-Dsalami.theme=salami|default` vorgeben.
@@ -185,7 +192,13 @@ Alle Grafiken erzeugen die Skripte unter `branding/` (`generate_logo.py`, `gener
 cd mod
 ./gradlew :1.21.11:runClientGameTest   # eine Version
 ./gradlew runClientGameTest             # alle Versionen nacheinander
+./gradlew :26.3:runClientGameTest -PsalamiTests=Benchmark   # nur einzelne Tests (Teile des Klassennamens, kommagetrennt)
+./gradlew :26.3:runClientGameTest -PpackMods                # mit allen Pack-Mods (Sodium, Lithium …) – Kompatibilitätstest
 ```
+
+Der Benchmark schreibt die Zeit aller Module und die zehn teuersten einzeln ins Log (`[Benchmark]`).
+
+`-PpackMods` lädt die Pack-Mods von Modrinth und legt sie unverändert in den `mods`-Ordner des Testlaufs, wie im Launcher und samt eingebetteter Bibliotheken. Bis 1.21.11 übersetzt Fabric Loader ihre Namen beim Start. Weggelassen werden nur Dynamic FPS (bremst das unfokussierte Testfenster) und Sodium auf 26.1.x: Der Test-Screenshot der Fabric-Gametest-API überspringt dort den Schritt, in dem Sodium das Gelände vorbereitet; im Spiel läuft es normal. Weitere Mods zum Eingrenzen: `-PpackModsSkip=badoptimizations,scalablelux`.
 
 Der Test startet Minecraft mit einer Testwelt und prüft:
 

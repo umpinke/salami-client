@@ -428,6 +428,9 @@ public final class ClickGuiScreen extends Screen {
 		}
 		int y = panel.y + HEADER_HEIGHT;
 		for (Module module : modules.byCategory(panel.category)) {
+			if (!modules.isAvailable(module)) {
+				continue;
+			}
 			rows.add(new Row(module, null, y, MODULE_HEIGHT));
 			y += MODULE_HEIGHT;
 			if (EXPANDED.contains(module.id())) {
@@ -744,6 +747,10 @@ public final class ClickGuiScreen extends Screen {
 		int y = 24;
 		int rowHeight = 0;
 		for (Category category : Category.values()) {
+			// Kampf-Module im Launcher aus: kein leeres Utility-Panel
+			if (modules.byCategory(category).stream().noneMatch(modules::isAvailable)) {
+				continue;
+			}
 			if (x > 10 && x + PANEL_WIDTH > uiWidth() - 10) {
 				x = 10;
 				y += rowHeight + gap;
@@ -774,7 +781,9 @@ public final class ClickGuiScreen extends Screen {
 	}
 
 	private void savePanels() {
-		JsonObject state = new JsonObject();
+		// Ausgeblendete Panels (Kampf-Module aus) behalten ihre gespeicherte Position
+		JsonElement saved = config.gui().get("panels");
+		JsonObject state = saved != null && saved.isJsonObject() ? saved.getAsJsonObject().deepCopy() : new JsonObject();
 		for (Panel panel : panels) {
 			JsonObject obj = new JsonObject();
 			obj.addProperty("x", panel.x);

@@ -24,8 +24,9 @@ public final class WatermarkModule extends HudModule {
 		super("watermark", Category.HUD, true, 0.005, 0.008);
 	}
 
-	/** Text hinter dem Namen und Gesamtbreite – einmal pro Tick statt in jedem Frame gebaut. */
+	/** Text hinter dem Namen und Breiten – einmal pro Tick statt in jedem Frame gebaut. */
 	private String rest;
+	private int nameWidth;
 	private int width;
 
 	@Override
@@ -42,7 +43,8 @@ public final class WatermarkModule extends HudModule {
 			text.append("  ").append(I18n.get("salami.theme.tagline"));
 		}
 		rest = text.toString().trim();
-		width = 15 + mc().font.width(SalamiClient.NAME) + (rest.isEmpty() ? 0 : 4 + mc().font.width(rest));
+		nameWidth = mc().font.width(SalamiClient.NAME);
+		width = 15 + nameWidth + (rest.isEmpty() ? 0 : 4 + mc().font.width(rest));
 	}
 
 	@Override
@@ -63,12 +65,12 @@ public final class WatermarkModule extends HudModule {
 		Font font = mc().font;
 		graphics.blit(RenderPipelines.GUI_TEXTURED, LOGO, 0, 0, 0f, 0f, 12, 12,
 			LOGO_TEXTURE_SIZE, LOGO_TEXTURE_SIZE, LOGO_TEXTURE_SIZE, LOGO_TEXTURE_SIZE);
-		int x = 15;
-		GuiDraw.text(graphics, font, SalamiClient.NAME, x, 2, accentColor(), shadow());
-		x += font.width(SalamiClient.NAME) + 4;
 		if (rest == null) {
 			updateText();
 		}
+		int x = 15;
+		GuiDraw.text(graphics, font, SalamiClient.NAME, x, 2, accentColor(), shadow());
+		x += nameWidth + 4;
 		if (!rest.isEmpty()) {
 			GuiDraw.text(graphics, font, rest, x, 2, dimColor(), shadow());
 		}

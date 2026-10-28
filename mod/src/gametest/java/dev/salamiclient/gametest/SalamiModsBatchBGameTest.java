@@ -48,6 +48,9 @@ public final class SalamiModsBatchBGameTest implements FabricClientGameTest {
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
+		if (!GametestCompat.selected(this)) {
+			return;
+		}
 		ModuleManager modules = SalamiClient.get().modules();
 		context.runOnClient(c -> modules.setEnabled(modules.get(SafeModeModule.class), false));
 

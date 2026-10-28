@@ -17,9 +17,12 @@ public final class FullBrightModule extends Module {
 
 	/** Gamma für {@code LightTextureMixin}: nie dunkler als der eigene Optionswert. */
 	public static float gamma(float vanilla) {
-		if (instance == null || !instance.isEnabled()) {
-			return vanilla;
-		}
-		return Math.max(vanilla, instance.brightness.get().floatValue());
+		float own = override();
+		return own < 0 ? vanilla : Math.max(vanilla, own);
+	}
+
+	/** Eigener Gamma-Wert oder -1, wenn aus – {@code LightTextureMixin} erkennt daran Änderungen. */
+	public static float override() {
+		return instance == null || !instance.isEnabled() ? -1 : instance.brightness.get().floatValue();
 	}
 }

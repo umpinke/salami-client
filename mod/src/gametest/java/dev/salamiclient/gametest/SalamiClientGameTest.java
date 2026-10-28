@@ -45,6 +45,9 @@ public final class SalamiClientGameTest implements FabricClientGameTest {
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
+		if (!GametestCompat.selected(this)) {
+			return;
+		}
 		ModuleManager modules = SalamiClient.get().modules();
 		Module dummy = context.computeOnClient(client -> modules.register(new DummyUtility()));
 
@@ -104,7 +107,38 @@ public final class SalamiClientGameTest implements FabricClientGameTest {
 
 			// Aufräumen: Safe Mode wieder aus, damit die Test-Config neutral bleibt
 			context.runOnClient(c -> modules.setEnabled(modules.get(SafeModeModule.class), false));
+
+			testCombatOff(context, modules, dummy);
 		}
+	}
+
+	/** Launcher-Schalter „Kampf-Module erlauben“ aus ({@code -Dsalami.combat=off}). */
+	private static void testCombatOff(ClientGameTestContext context, ModuleManager modules, Module dummy) {
+		SafeModeModule safeMode = modules.get(SafeModeModule.class);
+		check(context.computeOnClient(c -> modules.setEnabled(dummy, true)), "Utility module could not be enabled");
+		context.runOnClient(c -> modules.setCombatAllowed(false));
+		check(context.computeOnClient(c -> !dummy.isEnabled()), "Combat off did not disable a running utility module");
+		check(context.computeOnClient(c -> !modules.setEnabled(dummy, true)), "Combat off did not block enabling a utility module");
+		check(context.computeOnClient(c -> {
+			modules.restoreState(dummy, true);
+			return !dummy.isEnabled();
+		}), "Combat off did not block a utility module from the config");
+		check(context.computeOnClient(c -> !modules.isAvailable(safeMode) && modules.isAvailable(modules.get(SalamiThemeModule.class))),
+			"Combat off should hide Safe Mode but keep the client modules");
+		context.runOnClient(c -> safeMode.engage(SafeModeModule.Reason.EASY_LEAVE));
+		check(context.computeOnClient(c -> !safeMode.isEnabled()), "Easy Leave enabled Safe Mode although combat is off");
+
+		// ClickGUI ohne Utility-Panel
+		context.getInput().pressKey(SalamiClient.get().clickGuiKey());
+		context.waitTick();
+		check(context.computeOnClient(client -> client.screen instanceof ClickGuiScreen), "ClickGUI did not open with combat off");
+		context.takeScreenshot("salami-07-clickgui-no-combat");
+		context.getInput().pressKey(InputConstants.KEY_ESCAPE);
+		context.waitTick();
+
+		context.runOnClient(c -> modules.setCombatAllowed(true));
+		check(context.computeOnClient(c -> modules.setEnabled(dummy, true)), "Utility module stayed blocked after combat was allowed again");
+		context.runOnClient(c -> modules.setEnabled(dummy, false));
 	}
 
 	/**

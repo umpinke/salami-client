@@ -157,6 +157,8 @@ public final class SalamiClient implements ClientModInitializer {
 
 	/** JVM-Property, über die der Launcher den Salami-Modus mitgibt. */
 	public static final String THEME_PROPERTY = "salami.theme";
+	/** JVM-Property für den Launcher-Schalter „Kampf-Module erlauben“ ({@code on|off}, fehlt = an). */
+	public static final String COMBAT_PROPERTY = "salami.combat";
 
 	private static SalamiClient instance;
 
@@ -169,10 +171,16 @@ public final class SalamiClient implements ClientModInitializer {
 		return instance;
 	}
 
+	private static String version;
+
+	/** Version von salami-core (einmal gelesen – die Watermark fragt jeden Tick). */
 	public static String version() {
-		return FabricLoader.getInstance().getModContainer(MOD_ID)
-			.map(c -> c.getMetadata().getVersion().getFriendlyString())
-			.orElse("dev");
+		if (version == null) {
+			version = FabricLoader.getInstance().getModContainer(MOD_ID)
+				.map(c -> c.getMetadata().getVersion().getFriendlyString())
+				.orElse("dev");
+		}
+		return version;
 	}
 
 	@Override
@@ -182,6 +190,7 @@ public final class SalamiClient implements ClientModInitializer {
 		modules = new ModuleManager();
 		registerModules();
 		modules.setSafeModeCheck(() -> modules.get(SafeModeModule.class).isEnabled());
+		applyLauncherCombat();
 
 		config = new ConfigManager(FabricLoader.getInstance().getConfigDir().resolve(MOD_ID), modules);
 		config.load();
@@ -472,6 +481,14 @@ public final class SalamiClient implements ClientModInitializer {
 		boolean salami = fromLauncher.equalsIgnoreCase("salami");
 		modules.restoreState(modules.get(SalamiThemeModule.class), salami);
 		LOG.info("Theme vom Launcher: {}", salami ? "Salami" : "Standard");
+	}
+
+	/** Brücke zum Launcher: {@code -Dsalami.combat=off} blendet alle Kampf-Module aus. */
+	private void applyLauncherCombat() {
+		if ("off".equalsIgnoreCase(System.getProperty(COMBAT_PROPERTY))) {
+			modules.setCombatAllowed(false);
+			LOG.info("Kampf-Module im Launcher ausgeschaltet");
+		}
 	}
 
 	public ModuleManager modules() {

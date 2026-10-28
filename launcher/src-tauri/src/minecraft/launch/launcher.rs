@@ -349,12 +349,28 @@ impl MinecraftLauncher {
             command.arg("-XX:G1ReservePercent=20");
             command.arg("-XX:MaxGCPauseMillis=50");
             command.arg("-XX:G1HeapRegionSize=32M");
+            // Salami: keine Komplett-Pausen durch System.gc() aus Mods, keine Hänger beim
+            // Schreiben der JVM-Statistikdatei, Platz im JIT-Cache für viele Mods (sonst schaltet
+            // die JVM den Compiler ab) und große Methoden werden ebenfalls kompiliert.
+            command.arg("-XX:+DisableExplicitGC");
+            command.arg("-XX:+PerfDisableSharedMem");
+            command.arg("-XX:ReservedCodeCacheSize=400M");
+            command.arg("-XX:-DontCompileHugeMethods");
+            // Ab Java 25: kleinere Objekt-Header – weniger Speicher, weniger GC (Java 21 kennt das Flag nicht)
+            if piston_meta.java_version.major_version >= 25 {
+                command.arg("-XX:+UseCompactObjectHeaders");
+            }
         }
 
         // Salami: Theme-Brücke – salami-core übernimmt den Salami-Modus des Launchers.
         command.arg(format!(
             "-Dsalami.theme={}",
             if launcher_config.salami_theme { "salami" } else { "default" }
+        ));
+        // Kampf-Module: bei "off" blendet salami-core Crystal Macro, Auto Totem & Co. aus
+        command.arg(format!(
+            "-Dsalami.combat={}",
+            if launcher_config.combat_modules { "on" } else { "off" }
         ));
         // Salami Capes: im Launcher gewähltes Cape (builtin:<name>, Pfad oder none)
         command.arg(format!(

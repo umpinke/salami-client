@@ -154,6 +154,8 @@ export interface LauncherConfig {
   log_level: LogLevel;
   /** Salami-Modus, wird als -Dsalami.theme an salami-core übergeben. */
   salami_theme?: boolean;
+  /** Kampf-Module in salami-core erlauben, wird als -Dsalami.combat übergeben (Standard: an). */
+  combat_modules?: boolean;
 }
 
 export type LogLevel = "error" | "warn" | "info" | "debug" | "trace";

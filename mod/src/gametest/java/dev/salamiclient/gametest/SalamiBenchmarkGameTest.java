@@ -4,6 +4,7 @@ import dev.salamiclient.SalamiClient;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.ModuleManager;
+import dev.salamiclient.module.TextHudModule;
 import dev.salamiclient.modules.client.SafeModeModule;
 import dev.salamiclient.modules.client.BorderlessFullscreenModule;
 import dev.salamiclient.modules.misc.AutoTextModule;
@@ -42,6 +43,9 @@ public final class SalamiBenchmarkGameTest implements FabricClientGameTest {
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
+		if (!GametestCompat.selected(this)) {
+			return;
+		}
 		ModuleManager modules = SalamiClient.get().modules();
 		context.runOnClient(c -> modules.setEnabled(modules.get(SafeModeModule.class), false));
 
@@ -69,7 +73,11 @@ public final class SalamiBenchmarkGameTest implements FabricClientGameTest {
 				}
 			});
 			context.waitTicks(20);
+			context.runOnClient(c -> modules.setProfiling(true));
 			double[] loaded = measure(context, modules);
+			logSlowest(context, modules);
+			context.runOnClient(c -> modules.setProfiling(false));
+			logSteadyTextTicks(context, modules);
 			context.takeScreenshot("salami-50-benchmark-all-modules");
 			context.runOnClient(c -> enabled.forEach(m -> modules.setEnabled(m, false)));
 
@@ -84,6 +92,49 @@ public final class SalamiBenchmarkGameTest implements FabricClientGameTest {
 			}
 			server.runCommand("kill @e[type=minecraft:zombie]");
 		}
+	}
+
+	/** Die zehn teuersten Module (Summe aus HUD, Welt und Tick) mit µs pro Frame bzw. Tick. */
+	private static void logSlowest(ClientGameTestContext context, ModuleManager modules) {
+		context.runOnClient(c -> {
+			long[] counts = modules.profileCounts();
+			modules.profile().entrySet().stream()
+				.sorted((a, b) -> Long.compare(sum(b.getValue()), sum(a.getValue())))
+				.limit(10)
+				.forEach(e -> SalamiClient.LOG.info(String.format(Locale.ROOT, "[Benchmark]   %-22s HUD %7.1f µs  Welt %7.1f µs  Tick %7.1f µs",
+					e.getKey().id(), perCall(e.getValue()[0], counts[0]), perCall(e.getValue()[1], counts[1]), perCall(e.getValue()[2], counts[2]))));
+		});
+	}
+
+	/**
+	 * Reine Rechenzeit von {@code onTick} der Text-Anzeigen (2000 Aufrufe am Stück, ohne GC-Pausen
+	 * und JIT-Aufwärmen im Mittel) – trennt echte Kosten von Ausreißern im Tick-Profil.
+	 */
+	private static void logSteadyTextTicks(ClientGameTestContext context, ModuleManager modules) {
+		context.runOnClient(c -> {
+			for (Module module : modules.all()) {
+				if (!(module instanceof TextHudModule) || !module.isEnabled()) {
+					continue;
+				}
+				for (int i = 0; i < 500; i++) {
+					module.onTick();
+				}
+				long start = System.nanoTime();
+				for (int i = 0; i < 2000; i++) {
+					module.onTick();
+				}
+				SalamiClient.LOG.info(String.format(Locale.ROOT, "[Benchmark]   steady %-15s Tick %6.2f µs",
+					module.id(), (System.nanoTime() - start) / 1000.0 / 2000));
+			}
+		});
+	}
+
+	private static double perCall(long nanos, long calls) {
+		return calls == 0 ? 0 : nanos / 1000.0 / calls;
+	}
+
+	private static long sum(long[] values) {
+		return values[0] + values[1] + values[2];
 	}
 
 	/** {HUD ms/Frame, Welt ms/Frame, ms/Tick} über {@link #FRAMES} Ticks. */

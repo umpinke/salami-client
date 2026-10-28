@@ -13,6 +13,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Vector3fc;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -104,7 +105,8 @@ public final class LightLevelModule extends Module implements WorldRenderListene
 
 	/**
 	 * Nur die vier oberen Kanten je Markierung, direkt in einen Linienpuffer – ohne Form-Berechnung
-	 * und ohne Objekte pro Kante (bei Tausenden Markierungen spürbar schneller).
+	 * und ohne Objekte pro Kante (bei Tausenden Markierungen spürbar schneller). Markierungen hinter
+	 * der Kamera werden gar nicht erst gezeichnet (etwa die Hälfte).
 	 */
 	@Override
 	public void renderWorld(WorldContext context) {
@@ -113,17 +115,25 @@ public final class LightLevelModule extends Module implements WorldRenderListene
 		}
 		RenderType type = WorldLines.VISIBLE;
 		Vec3 cam = mc().gameRenderer.getMainCamera().position();
+		Vector3fc look = WorldLines.cameraForward();
+		float lx = look.x();
+		float ly = look.y();
+		float lz = look.z();
 		int dark = darkColor.argb();
 		int night = nightColor.argb();
 		List<Mark> snapshot = marks; // ab 26.2 erst später im Frame gezeichnet; die Liste wird nur ersetzt, nie geändert
 		WorldLines.lines(context, type, 2f, (lines, pose) -> {
 			for (Mark mark : snapshot) {
-				int color = mark.alwaysDark() ? dark : night;
 				float x0 = (float) (mark.pos().getX() + 0.2 - cam.x);
 				float x1 = (float) (mark.pos().getX() + 0.8 - cam.x);
 				float y = (float) (mark.pos().getY() + 0.02 - cam.y);
 				float z0 = (float) (mark.pos().getZ() + 0.2 - cam.z);
 				float z1 = (float) (mark.pos().getZ() + 0.8 - cam.z);
+				// mehr als einen Block hinter der Kamera: bei jedem Sichtfeld unsichtbar
+				if ((x0 + 0.3f) * lx + y * ly + (z0 + 0.3f) * lz < -1f) {
+					continue;
+				}
+				int color = mark.alwaysDark() ? dark : night;
 				WorldLines.line(lines, pose, x0, y, z0, x1, y, z0, 1, 0, 0, color, 2f);
 				WorldLines.line(lines, pose, x0, y, z1, x1, y, z1, 1, 0, 0, color, 2f);
 				WorldLines.line(lines, pose, x0, y, z0, x0, y, z1, 0, 0, 1, color, 2f);

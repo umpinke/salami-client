@@ -119,7 +119,12 @@ public final class ModsScreen extends Screen {
 		int y = f[1] + HEADER;
 		List<Object> entries = new ArrayList<>();
 		entries.add(null);
-		entries.addAll(List.of(Category.values()));
+		for (Category category : Category.values()) {
+			// Kampf-Module im Launcher aus: kein leerer Utility-Reiter
+			if (modules.byCategory(category).stream().anyMatch(modules::isAvailable)) {
+				entries.add(category);
+			}
+		}
 		if (!ExternalMods.installed().isEmpty()) {
 			entries.add(EXTRAS);
 		}
@@ -145,7 +150,7 @@ public final class ModsScreen extends Screen {
 		List<Object> list = new ArrayList<>();
 		if (tab != EXTRAS) {
 			for (Module module : modules.all()) {
-				if (tab != null && module.category() != tab) {
+				if (!modules.isAvailable(module) || tab != null && module.category() != tab) {
 					continue;
 				}
 				if (!q.isEmpty() && !matches(module, q)) {

@@ -33,6 +33,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import org.joml.Vector3fc;
 
 /**
  * Linien in der Welt (Block-Umrisse, ESP-Boxen).
@@ -182,6 +183,14 @@ public final class WorldLines {
 
 	private static Vec3 camera() {
 		return Minecraft.getInstance().gameRenderer.getMainCamera().position();
+	}
+
+	/** Blickrichtung der Kamera (nicht des Spielers – FreeLook dreht nur die Kamera). */
+	public static Vector3fc cameraForward() {
+		//? if >=1.21.11 {
+		return Minecraft.getInstance().gameRenderer.getMainCamera().forwardVector();
+		//?} else
+		/*return Minecraft.getInstance().gameRenderer.getMainCamera().getLookVector();*/
 	}
 
 	//? if <26.2 {

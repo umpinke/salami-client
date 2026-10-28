@@ -24,6 +24,57 @@ dependencies {
 	modImplementation("net.fabricmc.fabric-api:fabric-api:${sc.properties.get<String>("deps.fabric_api")}")
 }
 
+// Kompatibilitätstest: alle Modrinth-Mods des Salami-Packs (Sodium, Lithium …) mitladen.
+// ./gradlew :26.3:runClientGameTest -PpackMods
+// Die Jars kommen unverändert in den mods-Ordner des Testlaufs – wie im Launcher, samt eingebetteter
+// Bibliotheken; bis 1.21.11 übersetzt Fabric Loader ihre Namen beim Start. Ohne -PpackMods wird der
+// Ordner wieder geleert.
+val packMods = configurations.create("salamiPackMods") { isTransitive = false }
+if (providers.gradleProperty("packMods").isPresent) {
+	// Der Test-Screenshot der Gametest-API für 26.1 überspringt GameRenderer.update, wo Sodium sein
+	// Gelände vorbereitet ("Global terrain uniforms have not been updated"). Im Spiel läuft es normal.
+	val testSkips = if (sc.current.parsed >= "26.1" && sc.current.parsed < "26.2") setOf("sodium") else emptySet()
+	for (coordinate in packModCoordinates(minecraft, testSkips)) {
+		dependencies.add(packMods.name, coordinate)
+	}
+}
+val syncPackMods = tasks.register<Sync>("syncPackMods") {
+	from(packMods)
+	into(layout.buildDirectory.dir("run/clientGameTest/mods"))
+	// Fabric API leert den Testordner vor jedem Lauf – erst danach die Mods hineinlegen
+	mustRunAfter(tasks.matching { it.name == "deleteGameTestRunDir" })
+}
+tasks.matching { it.name == "runClientGameTest" }.configureEach { dependsOn(syncPackMods) }
+
+/**
+ * Modrinth-Maven-Koordinaten der Pack-Mods für eine Minecraft-Version (packs/salami-packs.json).
+ * Ohne Fabric API (kommt schon aus dem Build), Dynamic FPS (bremst unfokussierte Testfenster) und
+ * ohne [testSkips] (Mods, die nur in der Testumgebung dieser Version nicht laufen).
+ */
+fun packModCoordinates(minecraft: String, testSkips: Set<String>): List<String> {
+	// Eingrenzen bei Problemen: -PpackModsSkip=badoptimizations,scalablelux
+	val skipped = providers.gradleProperty("packModsSkip").orNull?.split(",")?.map { it.trim() }.orEmpty()
+	val skip = setOf("fabric-api", "dynamic-fps") + skipped + testSkips
+	// über providers gelesen, damit der Konfigurationscache Änderungen an der Datei bemerkt
+	val json = providers.fileContents(rootProject.layout.projectDirectory.file("../packs/salami-packs.json")).asText.get()
+	@Suppress("UNCHECKED_CAST")
+	val pack = groovy.json.JsonSlurper().parseText(json) as Map<String, Any?>
+	val mods = ((pack["packs"] as Map<String, Any?>)["salami"] as Map<String, Any?>)["mods"] as List<Map<String, Any?>>
+	return mods.mapNotNull { mod ->
+		val source = mod["source"] as Map<String, Any?>
+		val target = ((mod["compatibility"] as Map<String, Any?>)[minecraft] as Map<String, Any?>?)?.get("fabric") as Map<String, Any?>?
+		if (source["type"] != "modrinth" || mod["id"] in skip || target == null) null
+		else "maven.modrinth:${source["projectId"]}:${target["identifier"]}"
+	}
+}
+
+repositories {
+	maven("https://api.modrinth.com/maven") {
+		name = "Modrinth"
+		content { includeGroup("maven.modrinth") }
+	}
+}
+
 fabricApi {
 	// Client-Gametests: startet Minecraft, prüft UI/Logik automatisch, macht Screenshots.
 	// Ausführen: ./gradlew :1.21.11:runClientGameTest  (Screenshots: versions/<version>/build/run/clientGameTest/screenshots)
@@ -46,6 +97,8 @@ loom {
 				jvmArguments.add("-Dfabric.client.gametest.disableNetworkSynchronizer=true")
 				// Repo-Ordner, damit Tests Dateien des Launchers finden (z. B. die Cape-Vorlage)
 				jvmArguments.add("-Dsalami.repoDir=${rootProject.projectDir.parentFile.absolutePath}")
+				// Nur einzelne Tests: -PsalamiTests=Benchmark,Client (Teile des Klassennamens)
+				providers.gradleProperty("salamiTests").orNull?.let { jvmArguments.add("-Dsalami.tests=$it") }
 			}
 		}
 	}

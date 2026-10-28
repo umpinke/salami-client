@@ -1,7 +1,7 @@
 // Trägt das Salami-Pack (packs/salami-packs.json) für alle Minecraft-Versionen ein, für die
 // salami-core gebaut wird (mod/stonecutter.properties.toml, mod.mc_releases):
 //   - salami-core: file:dev/salami-core-<build>.jar (installDev bzw. Installer-Kopie)
-//   - übrige Pack-Mods: neueste Modrinth-Version (Fabric) je Minecraft-Version
+//   - übrige Pack-Mods: neueste Modrinth-Version (Fabric, Release oder Beta) je Minecraft-Version
 // Vorhandene Einträge der anderen Mods bleiben, wie sie sind (feste Versionen).
 //
 //   node scripts/update-salami-pack.mjs            (schreiben)
@@ -42,9 +42,10 @@ async function modrinthVersions(projectId) {
   return res.json(); // neueste zuerst
 }
 
+/** Neueste Release-Version, sonst Beta – nie Alpha (dann fehlt die Mod für diese Version). */
 function pick(versions, minecraft) {
   const fitting = versions.filter((v) => v.game_versions.includes(minecraft));
-  return fitting.find((v) => v.version_type === "release") ?? fitting[0];
+  return fitting.find((v) => v.version_type === "release") ?? fitting.find((v) => v.version_type === "beta");
 }
 
 /** JSON wie bisher: kurze Objekte in einer Zeile, Rest eingerückt. */
@@ -93,7 +94,7 @@ for (const mod of salami.mods) {
   for (const minecraft of todo) {
     const version = pick(versions, minecraft);
     if (!version) {
-      console.warn(`${mod.id}: keine Fabric-Version für ${minecraft} auf Modrinth`);
+      console.warn(`${mod.id}: keine Fabric-Version (Release/Beta) für ${minecraft} auf Modrinth`);
       continue;
     }
     missing.push(`${mod.id} ${minecraft}`);

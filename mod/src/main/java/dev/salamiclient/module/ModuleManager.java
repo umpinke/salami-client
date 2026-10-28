@@ -12,6 +12,7 @@ import net.minecraft.world.entity.Entity;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -33,6 +34,8 @@ public final class ModuleManager {
 	private final Set<Integer> keysDownLastTick = new HashSet<>();
 	private Runnable changeListener = () -> {};
 	private BooleanSupplier safeModeActive = () -> false;
+	/** Launcher-Schalter „Kampf-Module erlauben“; aus = alle {@link Module#needsCombat()} fehlen. */
+	private boolean combatAllowed = true;
 	private boolean utilityWarningShown;
 	/** Gemessene Zeit der Module (für den Benchmark-Test und zur Fehlersuche). */
 	private long hudNanos;
@@ -41,6 +44,8 @@ public final class ModuleManager {
 	private long tickCount;
 	private long worldNanos;
 	private long worldFrames;
+	/** Zeit pro Modul in ns {HUD, Welt, Tick}; nur im Benchmark an, sonst {@code null}. */
+	private Map<Module, long[]> profile;
 
 	public <M extends Module> M register(M module) {
 		if (byId.putIfAbsent(module.id(), module) != null) {
@@ -57,6 +62,33 @@ public final class ModuleManager {
 
 	public void setSafeModeCheck(BooleanSupplier check) {
 		this.safeModeActive = check;
+	}
+
+	/** Kampf-Module erlauben oder komplett ausblenden; ausgeblendete werden sofort abgeschaltet. */
+	public void setCombatAllowed(boolean allowed) {
+		combatAllowed = allowed;
+		if (!allowed) {
+			int count = 0;
+			for (Module module : byId.values()) {
+				if (module.needsCombat() && module.isEnabled()) {
+					applySafely(module, false);
+					count++;
+				}
+			}
+			if (count > 0) {
+				rebuildActive();
+				changeListener.run();
+			}
+		}
+	}
+
+	public boolean combatAllowed() {
+		return combatAllowed;
+	}
+
+	/** Ob das Modul im Spiel vorkommt (in GUIs gelistet, per Taste schaltbar). */
+	public boolean isAvailable(Module module) {
+		return combatAllowed || !module.needsCombat();
 	}
 
 	// --- Abfragen ---
@@ -99,6 +131,9 @@ public final class ModuleManager {
 		if (module.isEnabled() == enabled) {
 			return true;
 		}
+		if (enabled && !isAvailable(module)) {
+			return false;
+		}
 		if (enabled && module.category().isRestricted()) {
 			if (safeModeActive.getAsBoolean()) {
 				Chat.warn("salami.safe_mode.blocked");
@@ -135,9 +170,9 @@ public final class ModuleManager {
 		return count;
 	}
 
-	/** Setzt den Zustand ohne Prüfungen – nur für das Laden der Config. */
+	/** Setzt den Zustand ohne Safe-Mode-Prüfung – nur für das Laden der Config. */
 	public void restoreState(Module module, boolean enabled) {
-		applySafely(module, enabled);
+		applySafely(module, enabled && isAvailable(module));
 		rebuildActive();
 	}
 
@@ -153,11 +188,13 @@ public final class ModuleManager {
 		}
 		long start = System.nanoTime();
 		for (Module module : active) {
+			long moduleStart = profile != null ? System.nanoTime() : 0L;
 			try {
 				module.onTick();
 			} catch (Throwable t) {
 				crash(module, "tick", t);
 			}
+			record(module, 2, moduleStart);
 		}
 		tickNanos += System.nanoTime() - start;
 		tickCount++;
@@ -166,11 +203,13 @@ public final class ModuleManager {
 	public void renderHud(GuiGraphics graphics, DeltaTracker delta) {
 		long start = System.nanoTime();
 		for (Module module : active) {
+			long moduleStart = profile != null ? System.nanoTime() : 0L;
 			try {
 				module.onHud(graphics, delta);
 			} catch (Throwable t) {
 				crash(module, "hud", t);
 			}
+			record(module, 0, moduleStart);
 		}
 		hudNanos += System.nanoTime() - start;
 		hudFrames++;
@@ -200,11 +239,13 @@ public final class ModuleManager {
 	private void renderWorldListeners(WorldContext context) {
 		for (Module module : active) {
 			if (module instanceof WorldRenderListener listener) {
+				long moduleStart = profile != null ? System.nanoTime() : 0L;
 				try {
 					listener.renderWorld(context);
 				} catch (Throwable t) {
 					crash(module, "render", t);
 				}
+				record(module, 1, moduleStart);
 			}
 		}
 	}
@@ -214,6 +255,30 @@ public final class ModuleManager {
 	/** Setzt die Zeitmessung zurück. */
 	public void resetTimings() {
 		hudNanos = hudFrames = tickNanos = tickCount = worldNanos = worldFrames = 0;
+		if (profile != null) {
+			profile.clear();
+		}
+	}
+
+	/** Zeit pro Modul mitschreiben (Benchmark); kostet sonst nichts. */
+	public void setProfiling(boolean on) {
+		profile = on ? new HashMap<>() : null;
+	}
+
+	/** Gemessene Zeit pro Modul seit {@link #resetTimings()} in ns: {HUD, Welt, Tick}. */
+	public Map<Module, long[]> profile() {
+		return profile == null ? Map.of() : Collections.unmodifiableMap(profile);
+	}
+
+	/** Anzahl der Aufrufe seit {@link #resetTimings()}: {HUD-Frames, Welt-Frames, Ticks}. */
+	public long[] profileCounts() {
+		return new long[] {hudFrames, worldFrames, tickCount};
+	}
+
+	private void record(Module module, int slot, long start) {
+		if (profile != null) {
+			profile.computeIfAbsent(module, m -> new long[3])[slot] += System.nanoTime() - start;
+		}
 	}
 
 	/** Durchschnittliche Zeit pro Frame im HUD aller Module (ms). */
@@ -235,7 +300,7 @@ public final class ModuleManager {
 		Set<Integer> downNow = new HashSet<>();
 		for (Module module : byId.values()) {
 			int key = module.keybind.key();
-			if (!module.keybind.isBound()) {
+			if (!module.keybind.isBound() || !isAvailable(module)) {
 				continue;
 			}
 			if (Keys.isDown(key)) {

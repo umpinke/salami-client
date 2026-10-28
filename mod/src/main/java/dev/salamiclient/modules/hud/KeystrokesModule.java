@@ -52,18 +52,44 @@ public final class KeystrokesModule extends HudModule {
 		return h;
 	}
 
+	/** Beschriftungen und ihre Breiten: einmal pro Tick statt in jedem Frame (W, A, S, D, LMB, RMB). */
+	private final String[] labels = new String[6];
+	private final int[] labelWidths = new int[6];
+	private String leftCps;
+	private String rightCps;
+	private int leftCpsWidth;
+	private int rightCpsWidth;
+
+	@Override
+	public void onTick() {
+		var options = mc().options;
+		var font = mc().font;
+		KeyMapping[] keys = {options.keyUp, options.keyLeft, options.keyDown, options.keyRight, options.keyAttack, options.keyUse};
+		for (int i = 0; i < keys.length; i++) {
+			labels[i] = shortName(keys[i]);
+			labelWidths[i] = font.width(labels[i]);
+		}
+		leftCps = cps.isOn() ? ClickTracker.left() + " CPS" : null;
+		rightCps = cps.isOn() ? ClickTracker.right() + " CPS" : null;
+		leftCpsWidth = leftCps == null ? 0 : font.width(leftCps);
+		rightCpsWidth = rightCps == null ? 0 : font.width(rightCps);
+	}
+
 	@Override
 	protected void render(GuiGraphics g, DeltaTracker delta) {
+		if (labels[0] == null) {
+			onTick(); // HUD-Editor-Vorschau ohne Welt: noch kein Tick gelaufen
+		}
 		var options = mc().options;
-		key(g, options.keyUp, KEY + GAP, 0, KEY, KEY, null);
+		key(g, options.keyUp, 0, KEY + GAP, 0, KEY, KEY, null, 0);
 		int row2 = KEY + GAP;
-		key(g, options.keyLeft, 0, row2, KEY, KEY, null);
-		key(g, options.keyDown, KEY + GAP, row2, KEY, KEY, null);
-		key(g, options.keyRight, (KEY + GAP) * 2, row2, KEY, KEY, null);
+		key(g, options.keyLeft, 1, 0, row2, KEY, KEY, null, 0);
+		key(g, options.keyDown, 2, KEY + GAP, row2, KEY, KEY, null, 0);
+		key(g, options.keyRight, 3, (KEY + GAP) * 2, row2, KEY, KEY, null, 0);
 		int y = row2 + KEY + GAP;
 		if (mouse.isOn()) {
-			key(g, options.keyAttack, 0, y, MOUSE_WIDTH, KEY, cps.isOn() ? ClickTracker.left() + " CPS" : null);
-			key(g, options.keyUse, WIDTH - MOUSE_WIDTH, y, MOUSE_WIDTH, KEY, cps.isOn() ? ClickTracker.right() + " CPS" : null);
+			key(g, options.keyAttack, 4, 0, y, MOUSE_WIDTH, KEY, leftCps, leftCpsWidth);
+			key(g, options.keyUse, 5, WIDTH - MOUSE_WIDTH, y, MOUSE_WIDTH, KEY, rightCps, rightCpsWidth);
 			y += KEY + GAP;
 		}
 		if (space.isOn()) {
@@ -74,20 +100,21 @@ public final class KeystrokesModule extends HudModule {
 		}
 	}
 
-	private void key(GuiGraphics g, KeyMapping mapping, int x, int y, int w, int h, String sub) {
+	private void key(GuiGraphics g, KeyMapping mapping, int index, int x, int y, int w, int h, String sub, int subWidth) {
 		boolean down = mapping.isDown();
 		g.fill(x, y, x + w, y + h, down ? pressed() : backgroundColor());
-		String label = shortName(mapping);
+		String label = labels[index];
+		int labelX = x + (w - labelWidths[index]) / 2;
 		int color = down ? pressedText.argb() : textColor();
 		var font = mc().font;
 		if (sub == null) {
-			GuiDraw.text(g, font, label, x + (w - font.width(label)) / 2, y + (h - 8) / 2, color, shadow() && !down);
+			GuiDraw.text(g, font, label, labelX, y + (h - 8) / 2, color, shadow() && !down);
 		} else {
-			GuiDraw.text(g, font, label, x + (w - font.width(label)) / 2, y + 3, color, shadow() && !down);
+			GuiDraw.text(g, font, label, labelX, y + 3, color, shadow() && !down);
 			g.pose().pushMatrix();
 			g.pose().translate(x + w / 2f, y + 13);
 			g.pose().scale(0.5f, 0.5f);
-			GuiDraw.text(g, font, sub, -font.width(sub) / 2, 0, color, false);
+			GuiDraw.text(g, font, sub, -subWidth / 2, 0, color, false);
 			g.pose().popMatrix();
 		}
 	}

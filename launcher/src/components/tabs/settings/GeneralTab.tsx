@@ -237,6 +237,37 @@ export function GeneralTab() {
         </SettingRow>
       </SettingsSection>
 
+      <SettingsSection
+        id="settings-section-ingame"
+        title={t("settings.sections.ingame")}
+        icon="solar:gamepad-bold"
+        keywords={kw("settings.sections.ingame", "spiel", "game", "salami", "client")}
+      >
+        <SettingRow
+          label={t("settings.combat_modules")}
+          description={t("settings.combat_modules.tooltip")}
+          searchKeywords={kw(
+            "settings.combat_modules",
+            "crystal",
+            "kristall",
+            "anchor",
+            "totem",
+            "utility",
+            "kampf",
+            "combat",
+            "pvp",
+          )}
+          disabled={saving}
+        >
+          <ToggleSwitch
+            checked={tempConfig?.combat_modules ?? true}
+            onChange={(checked) => tempConfig && setTempConfig({ ...tempConfig, combat_modules: checked })}
+            disabled={saving}
+            size="md"
+          />
+        </SettingRow>
+      </SettingsSection>
+
       <SettingsSection id="settings-section-interface" title={t("settings.sections.interface")} icon="solar:slider-horizontal-bold" keywords={kw("settings.sections.interface", "downloads", "interface", "oberfläche", "performance")}>
         <SettingRow
           label={t("settings.concurrent_downloads")}
