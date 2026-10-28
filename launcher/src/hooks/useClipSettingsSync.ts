@@ -5,6 +5,7 @@ import { toast } from "react-hot-toast";
 import { applyClipSettings } from "../services/clip-service";
 import { useClipsStore } from "../store/clips-store";
 import type { LauncherConfig } from "../types/launcherConfig";
+import { parseErrorMessage } from "../utils/error-utils";
 import { supportsClips } from "../utils/platform";
 
 function hotkeySignature(config: LauncherConfig): string {
@@ -48,7 +49,7 @@ export function useClipSettingsSync(config: LauncherConfig | null, saving: boole
         }
       })
       .catch((error) => {
-        toast.error(t("settings.clips.apply_failed", { error: String(error) }));
+        toast.error(t("settings.clips.apply_failed", { error: parseErrorMessage(error) }));
       })
       .finally(() => setApplying(false));
   }, [config, saving, setApplying, t]);

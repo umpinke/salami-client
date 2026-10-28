@@ -110,11 +110,16 @@ pub async fn ensure_engine() -> Result<PathBuf> {
     }
 
     let Some((sha, url)) = *PINNED else {
-        return Err(AppError::Other(
+        // Salami: der Installer legt die Engine neben die Exe – fehlt sie, ist die Installation alt oder kaputt
+        return Err(AppError::Other(if cfg!(debug_assertions) {
             "The capture engine was not found next to the launcher. \
-             Build it with: cargo build -p norisk-capture"
-                .into(),
-        ));
+             Stage it with: node scripts/stage-native-deps.mjs --debug"
+                .into()
+        } else {
+            "The clip recorder is not part of this installation. \
+             Update or reinstall Salami Client to use clips."
+                .into()
+        }));
     };
 
     let _guard = INSTALL_LOCK.lock().await;
