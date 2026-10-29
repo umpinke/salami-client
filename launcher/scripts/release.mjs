@@ -279,6 +279,7 @@ if (!flag("--skip-build")) {
   run("npx", [
     "yarn@1.22.22", "tauri", "build",
     "--config", "src-tauri/tauri.release-local.json",
+    "--config", "src-tauri/tauri.release-windows.json",
     "--config", "src-tauri/tauri.release-signed.json",
   ], { env: signingEnv });
 }

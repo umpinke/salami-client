@@ -79,10 +79,10 @@ Beim ersten Start legt der Launcher den Datenordner `%APPDATA%\salamiclient\Sala
 
 ```bash
 cd launcher
-npx yarn@1.22.22 tauri build --config src-tauri/tauri.release-local.json
+npx yarn@1.22.22 tauri build --config src-tauri/tauri.release-local.json --config src-tauri/tauri.release-windows.json
 ```
 
-Das erzeugt `src-tauri/target/release/bundle/nsis/Salami Client_<version>_x64-setup.exe`. Der Installer installiert ohne Admin-Rechte nach `%LOCALAPPDATA%\Salami Client` und legt Startmenü- und Desktop-Verknüpfung an.
+`tauri.release-local.json` gilt für alle Systeme (salami-core, kein Updater). `tauri.release-windows.json` ergänzt die Windows-Clip-Dateien. Das erzeugt `src-tauri/target/release/bundle/nsis/Salami Client_<version>_x64-setup.exe`. Der Installer installiert ohne Admin-Rechte nach `%LOCALAPPDATA%\Salami Client` und legt Startmenü- und Desktop-Verknüpfung an.
 
 Der Build baut vorher `salami-core` für alle Versionen (`scripts/bundle-salami-core.mjs` → `./gradlew launcherBundle`). Der Installer legt die Jars als `mods\salami-core-<version>.jar` neben die Launcher-Exe, damit braucht der installierte Launcher keinen Dev-Ordner. Liegt zusätzlich eine Jar im Datenordner `dev\` (von `installDev`), nimmt der Launcher die neuere der beiden Dateien.
 
@@ -98,7 +98,7 @@ Den Launcher gibt es auch für macOS (Apple Silicon und Intel, ab macOS 11) und 
 | macOS (Intel) | `Salami-Client_<version>_macOS-Intel.dmg` | wie oben |
 | Linux | `Salami-Client_<version>_Linux.AppImage` oder `_Linux.deb` | `~/.local/share/salamiclient` |
 
-Die mitgelieferte `salami-core`-Mod liegt in den App-Ressourcen: auf dem Mac in `Salami Client.app/Contents/Resources/mods/`, unter Linux in `/usr/lib/Salami Client/mods/`.
+Die mitgelieferten `salami-core`-Jars liegen in den App-Ressourcen: auf dem Mac in `Salami Client.app/Contents/Resources/mods/`, unter Linux in `/usr/lib/Salami Client/mods/`. Die Mac-App bringt die Clip-Aufnahme mit (`norisk-capture`); unter Linux gibt es keine Clips.
 
 Die Mac-App ist nur ad hoc signiert, nicht von Apple notarisiert (dafür bräuchte es ein Apple-Developer-Konto). Beim ersten Öffnen blockiert macOS sie deshalb. Spieler öffnen sie einmal über *Systemeinstellungen → Datenschutz & Sicherheit → Trotzdem öffnen*. Danach startet sie normal, und Auto-Updates laufen ohne Nachfrage.
 

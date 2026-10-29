@@ -24,7 +24,13 @@ const mb = (bytes) => (bytes / 1048576).toFixed(1);
 
 if (process.platform === "darwin") {
   const targetIndex = process.argv.indexOf("--target");
-  const target = targetIndex >= 0 ? process.argv[targetIndex + 1] : null;
+  // Salami: als beforeBuildCommand von `tauri build --target …` kommt das Ziel über die Umgebung
+  const target =
+    targetIndex >= 0
+      ? process.argv[targetIndex + 1]
+      : profile === "release"
+        ? process.env.TAURI_ENV_TARGET_TRIPLE || null
+        : null;
   const triple = target || readHostTriple();
   execFileSync(
     "cargo",

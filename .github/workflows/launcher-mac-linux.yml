@@ -68,10 +68,11 @@ jobs:
         with:
           node-version: 22
 
+      # salami-core für Minecraft ab 26.1 kompiliert mit --release 25 (mod/build.gradle.kts)
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: 25
           cache: gradle
           cache-dependency-path: |
             mod/*.gradle*
@@ -94,11 +95,14 @@ jobs:
       - name: Version
         run: echo "VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")" >> "$GITHUB_ENV"
 
-      # tauri.macos.conf.json liefert die Clip-Aufnahme (norisk-capture) als externalBin mit
+      # Clip-Aufnahme norisk-capture (externalBin in tauri.macos.conf.json) für das Ziel dieses Jobs.
+      # beforeBuildCommand (tauri.release-local.json) baut sie auch, für Intel aber nur, wenn
+      # TAURI_ENV_TARGET_TRIPLE ankommt – dann ist das hier ein Cache-Treffer.
       - name: Clip-Aufnahme für macOS
         if: runner.os == 'macOS'
         run: node scripts/stage-native-deps.mjs --target ${{ matrix.target }}
 
+      # beforeBuildCommand baut außerdem salami-core für alle Minecraft-Versionen
       - name: Launcher bauen
         env:
           CURSEFORGE_KEY: ${{ secrets.SALAMI_CURSEFORGE_API_KEY }}

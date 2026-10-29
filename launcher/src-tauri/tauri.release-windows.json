@@ -1,0 +1,16 @@
+{
+  "bundle": {
+    "resources": {
+      "binaries/norisk-capture-x86_64-pc-windows-msvc.exe": "norisk-capture.exe",
+      "binaries/avcodec-62.dll": "avcodec-62.dll",
+      "binaries/avformat-62.dll": "avformat-62.dll",
+      "binaries/avutil-60.dll": "avutil-60.dll",
+      "binaries/swresample-6.dll": "swresample-6.dll",
+      "binaries/graphics-hook64.dll": "graphics-hook64.dll",
+      "binaries/graphics-hook32.dll": "graphics-hook32.dll",
+      "binaries/ffmpeg-LICENSE.txt": "licenses/ffmpeg-LICENSE.txt",
+      "binaries/ffmpeg-NOTICE.txt": "licenses/ffmpeg-NOTICE.txt",
+      "binaries/graphics-hook-NOTICE.txt": "licenses/graphics-hook-NOTICE.txt"
+    }
+  }
+}
