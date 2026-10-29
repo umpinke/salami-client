@@ -88,6 +88,20 @@ Der Build baut vorher `salami-core` für alle Versionen (`scripts/bundle-salami-
 
 Der Build braucht **LLVM** (`winget install LLVM.LLVM`), denn er baut auch das Clip-Aufnahmeprogramm (`yarn stage-native` → `norisk-capture`). Der Installer legt `norisk-capture.exe`, die FFmpeg-DLLs und den Grafik-Hook neben die Launcher-Exe. Clips sind standardmäßig aus; wer sie unter *Einstellungen → Clips* einschaltet, speichert mit **F8** die letzten 30 Sekunden. Der lokale Build lässt nur die Updater-Signatur weg.
 
+### macOS und Linux
+
+Den Launcher gibt es auch für macOS (Apple Silicon und Intel, ab macOS 11) und Linux (AppImage und `.deb`). Gebaut werden diese Versionen auf GitHub Actions ([`.github/workflows/launcher-mac-linux.yml`](.github/workflows/launcher-mac-linux.yml)), weil ein Windows-Rechner keine Mac- und Linux-Pakete bauen kann. Ohne Release lässt sich der Workflow unter *Actions → Launcher macOS + Linux → Run workflow* starten. Die Pakete liegen dann als Artefakte am Lauf.
+
+| System | Datei im Release | Datenordner |
+|---|---|---|
+| macOS (Apple Silicon) | `Salami-Client_<version>_macOS-Apple-Silicon.dmg` | `~/Library/Application Support/dev.salamiclient.SalamiClient` |
+| macOS (Intel) | `Salami-Client_<version>_macOS-Intel.dmg` | wie oben |
+| Linux | `Salami-Client_<version>_Linux.AppImage` oder `_Linux.deb` | `~/.local/share/salamiclient` |
+
+Die mitgelieferte `salami-core`-Mod liegt in den App-Ressourcen: auf dem Mac in `Salami Client.app/Contents/Resources/mods/`, unter Linux in `/usr/lib/Salami Client/mods/`.
+
+Die Mac-App ist nur ad hoc signiert, nicht von Apple notarisiert (dafür bräuchte es ein Apple-Developer-Konto). Beim ersten Öffnen blockiert macOS sie deshalb. Spieler öffnen sie einmal über *Systemeinstellungen → Datenschutz & Sicherheit → Trotzdem öffnen*. Danach startet sie normal, und Auto-Updates laufen ohne Nachfrage.
+
 ### Updates veröffentlichen (Auto-Update)
 
 Der Launcher prüft beim Start `latest.json` im neuesten Release von
@@ -102,10 +116,17 @@ und installiert neuere Versionen selbst – samt mitgelieferter `salami-core`-Mo
    node scripts/release.mjs --notes "Was ist neu"
    ```
 
-   Das Skript baut den Installer signiert (`tauri.release-signed.json`), schreibt `latest.json`
-   und legt mit `gh` das GitHub-Release `v<version>` an.
+   Das Skript startet zuerst den macOS/Linux-Build auf GitHub. Danach baut es den
+   Windows-Installer signiert (`tauri.release-signed.json`) und wartet auf GitHub. Dann signiert
+   es die Mac- und Linux-Updatedateien lokal und prüft alle Signaturen gegen
+   `plugins.updater.pubkey`. Zum Schluss schreibt es `latest.json` für alle Systeme und legt mit
+   `gh` das GitHub-Release `v<version>` mit allen Installern an. Der Release-Commit muss dafür
+   committet und gepusht sein. Mit `--windows-only` geht es wie früher nur um Windows.
 
-Der Signaturschlüssel liegt in `%USERPROFILE%\.salami-client\updater.key` (nicht im Repo).
+   Einmalig vorher: den CurseForge-Key als GitHub-Secret hinterlegen (`node scripts/release.mjs --setup-ci`).
+
+Der Signaturschlüssel liegt in `%USERPROFILE%\.salami-client\updater.key` (nicht im Repo, auch
+nicht bei GitHub – die Mac- und Linux-Pakete signiert `release.mjs` lokal).
 **Sichern!** Ohne ihn können installierte Launcher keine Updates mehr annehmen. Der passende
 öffentliche Schlüssel steht in `tauri.conf.json` unter `plugins.updater.pubkey`.
 

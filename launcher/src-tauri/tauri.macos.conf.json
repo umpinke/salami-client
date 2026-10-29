@@ -1,8 +1,5 @@
 {
   "bundle": {
-    "resources": [
-      "Assets.car"
-    ],
     "externalBin": [
       "binaries/norisk-capture"
     ],

@@ -3,7 +3,6 @@
     "beforeBuildCommand": "node scripts/bundle-salami-core.mjs && yarn build && yarn stage-native"
   },
   "bundle": {
-    "targets": ["nsis"],
     "createUpdaterArtifacts": false,
     "resources": {
       "../../mod/build/launcher/*.jar": "mods/",

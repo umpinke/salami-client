@@ -93,6 +93,17 @@ fn pick_update_bases(
     beta.into_iter().chain(stable).collect()
 }
 
+/// Salami: Eintrag in `latest.json` für Linux-Installationen aus dem .deb-Paket. Tauri liest
+/// sonst `linux-x86_64` – dort steht das AppImage, das ein .deb-Launcher nicht einspielen kann.
+/// `release.mjs` schreibt das .deb deshalb zusätzlich unter `linux-x86_64-deb`.
+fn deb_manifest_target() -> Option<String> {
+    if cfg!(target_os = "linux") && std::env::var_os("APPIMAGE").is_none() {
+        tauri_plugin_updater::target().map(|target| format!("{target}-deb"))
+    } else {
+        None
+    }
+}
+
 /// Checks if an update is available and returns detailed information including the updater instance.
 /// This version provides all necessary information to proceed with download/installation without redundancy.
 ///
@@ -150,10 +161,13 @@ pub async fn check_update_available_detailed(
         })?);
     }
 
-    let updater_builder = app_handle.updater_builder()
+    let mut updater_builder = app_handle.updater_builder()
         .configure_client(|c| c.connect_timeout(HTTP_CONNECT_TIMEOUT))
         .endpoints(update_urls)
         .map_err(|e| AppError::Other(format!("Failed to set updater endpoints: {}", e)))?;
+    if let Some(target) = deb_manifest_target() {
+        updater_builder = updater_builder.target(target);
+    }
 
     let updater = updater_builder
         .build()
@@ -564,7 +578,11 @@ pub async fn check_for_updates(
     let updater_result = app_handle
         .updater_builder()
         .configure_client(|c| c.connect_timeout(HTTP_CONNECT_TIMEOUT))
-        .endpoints(update_urls);
+        .endpoints(update_urls)
+        .map(|builder| match deb_manifest_target() {
+            Some(target) => builder.target(target),
+            None => builder,
+        });
 
     let updater = match updater_result {
         Ok(builder) => match builder.build() {

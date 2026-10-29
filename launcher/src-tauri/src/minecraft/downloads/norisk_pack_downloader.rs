@@ -293,14 +293,30 @@ impl NoriskPackDownloadService {
 
 }
 
-/// Ordner neben der Launcher-Exe, in den der Installer mitgelieferte Mods legt
+/// Unterordner der App-Ressourcen, in den der Installer mitgelieferte Mods legt
 /// (`bundle.resources` in tauri.release-local.json).
 const BUNDLED_MODS_DIR: &str = "mods";
+
+/// Salami: Ressourcen-Ordner der installierten App, wie Tauri ihn auflöst – unter Windows
+/// neben der Exe, auf dem Mac `Salami Client.app/Contents/Resources`, unter Linux
+/// `/usr/lib/Salami Client` (.deb) bzw. `$APPDIR/usr/lib/Salami Client` (AppImage).
+fn bundled_mods_dir() -> Option<PathBuf> {
+    let package = tauri::PackageInfo {
+        name: crate::branding::PRODUCT_NAME.to_string(),
+        version: env!("CARGO_PKG_VERSION").parse().ok()?,
+        authors: env!("CARGO_PKG_AUTHORS"),
+        description: env!("CARGO_PKG_DESCRIPTION"),
+        crate_name: env!("CARGO_PKG_NAME"),
+    };
+    tauri::utils::platform::resource_dir(&package, &tauri::Env::default())
+        .ok()
+        .map(|dir| dir.join(BUNDLED_MODS_DIR))
+}
 
 /// Salami: Quelle einer "file:"-Packmod.
 /// 1. der angegebene Pfad – relativ zum Launcher-Datenordner (`dev/salami-core-<version>.jar` von
 ///    `gradlew installDev`) oder absolut (`file:///C:/x.jar` bzw. `file:///home/x.jar`)
-/// 2. die mit dem Installer ausgelieferte Kopie `<exe-Ordner>/mods/<dateiname>`
+/// 2. die mit dem Installer ausgelieferte Kopie `<Ressourcen-Ordner>/mods/<dateiname>`
 /// Gibt es beide, gewinnt die neuere – so verdeckt weder ein alter Dev-Build ein
 /// Launcher-Update noch ein altes Update einen frischen Dev-Build.
 fn local_pack_mod_source(local: &str) -> PathBuf {
@@ -308,9 +324,7 @@ fn local_pack_mod_source(local: &str) -> PathBuf {
     let raw = if cfg!(windows) { raw.trim_start_matches('/') } else { raw };
     let p = PathBuf::from(raw);
     let explicit = if p.is_absolute() { p } else { LAUNCHER_DIRECTORY.root_dir().join(p) };
-    let bundled = std::env::current_exe()
-        .ok()
-        .and_then(|exe| exe.parent().map(|dir| dir.join(BUNDLED_MODS_DIR)))
+    let bundled = bundled_mods_dir()
         .zip(explicit.file_name())
         .map(|(dir, name)| dir.join(name));
     newest_source(explicit, bundled)

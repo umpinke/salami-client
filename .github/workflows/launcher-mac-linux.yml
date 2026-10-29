@@ -1,0 +1,156 @@
+# Baut den Launcher für macOS (Apple Silicon + Intel) und Linux (AppImage + .deb).
+#
+# Windows baut weiter `launcher/scripts/release.mjs` lokal. Das Skript startet diesen Workflow
+# für den Release-Commit, wartet auf ihn, lädt die Pakete herunter, signiert die Update-Dateien
+# lokal (der Updater-Schlüssel bleibt auf dem Rechner) und veröffentlicht alles in einem Release.
+#
+# Hier wird nichts veröffentlicht und nichts signiert – die Pakete liegen nur als Artefakte am Lauf.
+# Secret (optional): SALAMI_CURSEFORGE_API_KEY – ohne ihn ist CurseForge in diesen Builds aus.
+name: Launcher macOS + Linux
+
+run-name: ${{ inputs.label || format('Launcher macOS + Linux ({0})', github.ref_name) }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: "Commit, der gebaut wird (leer: Spitze des gewählten Branches)"
+        required: false
+        default: ""
+      label:
+        description: "Name des Laufs (release.mjs findet ihn darüber wieder)"
+        required: false
+        default: ""
+  pull_request:
+    paths:
+      - ".github/workflows/launcher-mac-linux.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.suffix }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+            suffix: macOS-Apple-Silicon
+          - runner: macos-latest
+            target: x86_64-apple-darwin
+            suffix: macOS-Intel
+          # 22.04: ältere glibc, damit AppImage und .deb auch auf älteren Distributionen laufen
+          - runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            suffix: Linux
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+        working-directory: launcher
+    env:
+      OUT_DIR: ${{ github.workspace }}/release-out
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit || github.sha }}
+
+      - name: Linux-Pakete
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+          cache-dependency-path: |
+            mod/*.gradle*
+            mod/gradle/wrapper/gradle-wrapper.properties
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "launcher/src-tauri -> target"
+          key: ${{ matrix.target }}
+
+      - name: Frontend-Abhängigkeiten
+        run: |
+          npm install -g yarn@1.22.22
+          yarn install --frozen-lockfile
+
+      - name: Version
+        run: echo "VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")" >> "$GITHUB_ENV"
+
+      # tauri.macos.conf.json liefert die Clip-Aufnahme (norisk-capture) als externalBin mit
+      - name: Clip-Aufnahme für macOS
+        if: runner.os == 'macOS'
+        run: node scripts/stage-native-deps.mjs --target ${{ matrix.target }}
+
+      - name: Launcher bauen
+        env:
+          CURSEFORGE_KEY: ${{ secrets.SALAMI_CURSEFORGE_API_KEY }}
+          # Linux: libayatana-appindicator fest verlinken, sonst fehlt sie im AppImage (Tray-Icon)
+          RUSTFLAGS: ${{ runner.os == 'Linux' && '-C link-arg=-Wl,--no-as-needed -C link-arg=-layatana-appindicator3 -C link-arg=-Wl,--as-needed' || '' }}
+        run: |
+          # build.rs übernimmt die Variable ungekürzt – ein Zeilenumbruch im Secret machte den Key ungültig
+          key="$(printf '%s' "$CURSEFORGE_KEY" | tr -d '[:space:]')"
+          if [ -n "$key" ]; then
+            export SALAMI_CURSEFORGE_API_KEY="$key"
+          else
+            echo "::warning::Secret SALAMI_CURSEFORGE_API_KEY fehlt – CurseForge ist in diesem Build aus."
+          fi
+          yarn tauri build --target ${{ matrix.target }} --config src-tauri/tauri.release-local.json
+
+      - name: macOS-Pakete einsammeln
+        if: runner.os == 'macOS'
+        run: |
+          bundle="src-tauri/target/${{ matrix.target }}/release/bundle"
+          name="Salami-Client_${VERSION}_${{ matrix.suffix }}"
+          mkdir -p "$OUT_DIR"
+          cp "$bundle"/dmg/*.dmg "$OUT_DIR/$name.dmg"
+          # Update-Datei wie Tauri sie baut: die .app als tar.gz (ohne macOS-Zusatzdateien ._*)
+          COPYFILE_DISABLE=1 tar -czf "$OUT_DIR/$name.app.tar.gz" -C "$bundle/macos" "Salami Client.app"
+          ls -la "$OUT_DIR"
+
+      - name: Linux-Pakete einsammeln
+        if: runner.os == 'Linux'
+        run: |
+          bundle="src-tauri/target/${{ matrix.target }}/release/bundle"
+          name="Salami-Client_${VERSION}_${{ matrix.suffix }}"
+          mkdir -p "$OUT_DIR"
+          cp "$bundle"/deb/*.deb "$OUT_DIR/$name.deb"
+
+          # Mitgelieferte Wayland-Bibliotheken passen nicht zu neueren Mesa-Treibern (leeres
+          # Fenster/Absturz) – raus damit, dann nimmt das AppImage die des Systems.
+          work="$RUNNER_TEMP/appimage"
+          mkdir -p "$work"
+          cp "$bundle"/appimage/*.AppImage "$work/app.AppImage"
+          chmod +x "$work/app.AppImage"
+          (cd "$work" && ./app.AppImage --appimage-extract > /dev/null)
+          find "$work/squashfs-root" -name "*wayland*" -print -delete
+          curl -fsSL -o "$work/appimagetool" \
+            https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
+          chmod +x "$work/appimagetool"
+          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "$work/appimagetool" --no-appstream \
+            "$work/squashfs-root" "$OUT_DIR/$name.AppImage"
+          ls -la "$OUT_DIR"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launcher-${{ matrix.suffix }}
+          path: ${{ env.OUT_DIR }}/*
+          if-no-files-found: error
+          retention-days: 7
