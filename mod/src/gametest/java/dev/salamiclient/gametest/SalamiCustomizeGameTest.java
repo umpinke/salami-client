@@ -2,6 +2,7 @@ package dev.salamiclient.gametest;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonPrimitive;
+import com.mojang.authlib.GameProfile;
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.config.ConfigManager;
@@ -17,20 +18,30 @@ import dev.salamiclient.modules.hud.CpsModule;
 import dev.salamiclient.modules.hud.KeystrokesModule;
 import dev.salamiclient.modules.visual.HitboxModule;
 import dev.salamiclient.modules.utility.PlayerEspModule;
+import dev.salamiclient.modules.utility.TracersModule;
 import dev.salamiclient.modules.visual.InfoHudModule;
 import dev.salamiclient.modules.visual.NameTagsModule;
 import dev.salamiclient.setting.ColorSetting;
 import dev.salamiclient.setting.Setting;
+import dev.salamiclient.util.Projection;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.RemotePlayer;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.animal.cow.Cow;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.zombie.Zombie;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.AABB;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Anpassen: Farbwähler (Hex, HSV, Regenbogen, Speichern), Darstellung aller HUD-Elemente
@@ -57,6 +68,7 @@ public final class SalamiCustomizeGameTest implements FabricClientGameTest {
 			testInterfaceColors(context, modules);
 			testHitboxColors(context, modules);
 			testEspAndNameTags(context, modules, world);
+			testItemTagsAndTracers(context, modules);
 		}
 	}
 
@@ -297,6 +309,79 @@ public final class SalamiCustomizeGameTest implements FabricClientGameTest {
 		check(NameTagsModule.scale(400) == 1F, "name tags still scaled while off");
 		server.runCommand("kill @e[type=!player]");
 		server.runCommand("item replace entity @p armor.chest with minecraft:air");
+	}
+
+	/**
+	 * NameTags-Item-Zeile und Tracers mit Spielern, die nur im Client existieren: einer vorne in
+	 * (teils beschädigter) Rüstung ohne Schuhe, einer hinter der Kamera, einer unsichtbar.
+	 */
+	private static void testItemTagsAndTracers(ClientGameTestContext context, ModuleManager modules) {
+		NameTagsModule tags = modules.get(NameTagsModule.class);
+		TracersModule tracers = modules.get(TracersModule.class);
+		context.waitTicks(25); // Mobs aus dem vorigen Test zu Ende sterben lassen (ihre Namen lägen sonst darüber)
+		RemotePlayer[] fakes = context.computeOnClient(c -> {
+			// etwas rechts vom Fadenkreuz, damit die Tracer-Linie im Bild zu sehen ist
+			RemotePlayer front = fakePlayer(c, 900_001, "Ruestung", 498.5, -60, 5.5);
+			ItemStack sword = new ItemStack(Items.DIAMOND_SWORD);
+			sword.setDamageValue(sword.getMaxDamage() * 3 / 4);
+			ItemStack chest = new ItemStack(Items.NETHERITE_CHESTPLATE);
+			chest.setDamageValue(chest.getMaxDamage() / 2);
+			front.setItemSlot(EquipmentSlot.MAINHAND, sword);
+			front.setItemSlot(EquipmentSlot.HEAD, new ItemStack(Items.DIAMOND_HELMET));
+			front.setItemSlot(EquipmentSlot.CHEST, chest);
+			front.setItemSlot(EquipmentSlot.LEGS, new ItemStack(Items.IRON_LEGGINGS));
+			front.setItemSlot(EquipmentSlot.OFFHAND, new ItemStack(Items.TOTEM_OF_UNDYING)); // Füße bleiben leer
+			RemotePlayer behind = fakePlayer(c, 900_002, "Hinten", 503.5, -60, -6.5);
+			RemotePlayer invisible = fakePlayer(c, 900_003, "Unsichtbar", 497.5, -60, 7.5);
+			invisible.setInvisible(true);
+			return new RemotePlayer[] {front, behind, invisible};
+		});
+		context.runOnClient(c -> {
+			modules.setEnabled(tags, true);
+			modules.setEnabled(tracers, true);
+			set(tracers, "width", 2.0);
+		});
+		check(!setting(tags, "durability").isHidden(), "NameTags: durability hidden while items are on");
+		context.waitTicks(5);
+
+		boolean projected = context.computeOnClient(c -> {
+			if (!Projection.begin()) {
+				return false;
+			}
+			float w = c.getWindow().getGuiScaledWidth();
+			float h = c.getWindow().getGuiScaledHeight();
+			float[] out = new float[3];
+			boolean front = Projection.toGuiScaled(fakes[0].position().add(0, 2.3, 0), w, h, out)
+				&& out[0] > 0 && out[0] < w && out[1] > 0 && out[1] < h && out[2] > 0;
+			Projection.toGuiOrEdge(fakes[1].position(), w, h, out);
+			boolean behindOutside = out[0] < 0 || out[0] > w || out[1] < 0 || out[1] > h;
+			return front && behindOutside;
+		});
+		check(projected, "Projection: player in front not on screen or player behind not at the screen edge");
+
+		context.runOnClient(c -> set(tags, "range", 8.0));
+		check(!NameTagsModule.inRange(10 * 10) && NameTagsModule.inRange(5 * 5), "NameTags: range not applied");
+		context.runOnClient(c -> setting(tags, "range").resetAll());
+		context.waitTicks(3);
+		context.takeScreenshot("salami-64-nametag-items-tracers");
+
+		context.runOnClient(c -> {
+			for (RemotePlayer fake : fakes) {
+				c.level.removeEntity(fake.getId(), Entity.RemovalReason.DISCARDED);
+			}
+			setting(tracers, "width").resetAll();
+			modules.setEnabled(tracers, false);
+			modules.setEnabled(tags, false);
+		});
+		check(NameTagsModule.inRange(60 * 60), "NameTags: range still applied while off");
+	}
+
+	private static RemotePlayer fakePlayer(Minecraft c, int id, String name, double x, double y, double z) {
+		RemotePlayer player = new RemotePlayer(c.level, new GameProfile(UUID.nameUUIDFromBytes(name.getBytes(StandardCharsets.UTF_8)), name));
+		player.setId(id);
+		player.snapTo(x, y, z, 180F, 0F); // schaut zur Kamera
+		c.level.addEntity(player);
+		return player;
 	}
 
 	// ------------------------------------------------------------------ Helfer
