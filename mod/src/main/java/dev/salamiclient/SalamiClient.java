@@ -85,6 +85,7 @@ import dev.salamiclient.modules.utility.AutoElytraModule;
 import dev.salamiclient.modules.utility.AutoMaceModule;
 import dev.salamiclient.modules.utility.BlockEspModule;
 import dev.salamiclient.modules.utility.PlayerEspModule;
+import dev.salamiclient.modules.utility.TracersModule;
 import dev.salamiclient.modules.utility.TriggerBotModule;
 import dev.salamiclient.modules.utility.AimAssistModule;
 import dev.salamiclient.modules.utility.AutoDTapModule;
@@ -298,6 +299,7 @@ public final class SalamiClient implements ClientModInitializer {
 		modules.register(new SpeedLungeModule());
 		modules.register(new BlockEspModule());
 		modules.register(new PlayerEspModule());
+		modules.register(new TracersModule());
 		modules.register(new TriggerBotModule());
 		modules.register(new AimAssistModule());
 		modules.register(new AutoDTapModule());
