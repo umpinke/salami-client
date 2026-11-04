@@ -46,5 +46,24 @@ export const selectCape = (selection: string | null) => invoke<void>("salami_cap
 export const getCapeReviews = (ids: string[]) =>
   invoke<Record<string, SalamiCapeReview>>("salami_capes_review_status", { ids });
 
+/** Von Admins freigegebenes Cape eines anderen Spielers – jeder darf es selbst tragen. */
+export interface SalamiGalleryCape {
+  /** ID des Bildes auf dem Cape-Server, gleich `SalamiCape.share_id` bei denselben Pixeln. */
+  id: string;
+  /** Zeitpunkt der Freigabe (ISO 8601). */
+  approvedAt: string;
+  /** So viele Salami-Spieler tragen es gerade. */
+  wearers: number;
+}
+
+/** Galerie des Cape-Servers, neueste Freigabe zuerst. */
+export const getCapeGallery = () => invoke<SalamiGalleryCape[]>("salami_capes_gallery");
+
+/** Bild eines Galerie-Capes als Data-URL (der Launcher speichert es zwischen). */
+export const getGalleryCapeImage = (id: string) => invoke<string>("salami_capes_gallery_image", { id });
+
+/** Holt ein Galerie-Cape zu den eigenen Capes (oder liefert das eigene mit denselben Pixeln). */
+export const adoptGalleryCape = (id: string, name: string) => invoke<SalamiCape>("salami_capes_adopt", { id, name });
+
 /** Speichert die Vorlage im Download-Ordner und liefert den Pfad. */
 export const downloadCapeTemplate = () => invoke<string>("salami_capes_download_template");

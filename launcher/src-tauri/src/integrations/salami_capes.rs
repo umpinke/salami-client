@@ -6,6 +6,10 @@
 //! Code in `server/capes/`); eigene Bilder sehen andere erst nach Freigabe durch einen Admin.
 //! Der Launcher fragt dort den Prüfstatus ab ([`review_status`]) und reicht neue eigene Capes
 //! gleich zur Prüfung ein ([`submit_for_review`]), nicht erst wenn man damit spielt.
+//!
+//! Freigegebene Capes anderer Spieler zeigt die Galerie ([`gallery`]). Jeder kann sie zu den
+//! eigenen Capes holen ([`adopt_gallery_cape`]) und tragen – die Cape-ID hängt nur an den
+//! Pixeln, das Bild ist also schon geprüft und sofort für alle sichtbar.
 
 use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
@@ -34,6 +38,10 @@ const MAX_NAME_CHARS: usize = 40;
 const MOJANG_JOIN_URL: &str = "https://sessionserver.mojang.com/session/minecraft/join";
 /// Nach einem Einreichversuch (offline, Tageslimit …) so lange nicht erneut versuchen.
 const SUBMIT_RETRY: Duration = Duration::from_secs(10 * 60);
+/// Unterordner von `salami_capes/` für zwischengespeicherte Galerie-Bilder.
+const GALLERY_DIR: &str = "gallery";
+/// Größte Bilddatei aus der Galerie (wie auf dem Cape-Server).
+const MAX_GALLERY_PNG: usize = 4 * 1024 * 1024;
 
 /// share_id → letzter Einreichversuch in diesem Launcher-Lauf.
 static SUBMIT_ATTEMPTS: Lazy<Mutex<HashMap<String, Instant>>> = Lazy::new(Default::default);
@@ -79,6 +87,19 @@ pub struct CapeReview {
     /// Begründung des Admins bei `rejected`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
+}
+
+/// Freigegebenes Cape aus der Galerie des Cape-Servers, das jeder selbst tragen darf.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct GalleryCape {
+    /// ID des Bildes auf dem Cape-Server ([`share_id`]).
+    pub id: String,
+    /// Zeitpunkt der Freigabe (ISO 8601).
+    pub approved_at: String,
+    /// So viele Salami-Spieler tragen es gerade.
+    #[serde(default)]
+    pub wearers: u32,
 }
 
 #[derive(Serialize, Debug)]
@@ -403,6 +424,113 @@ pub async fn submit_for_review(
     .await
 }
 
+/// Cape-IDs des Servers: 64 Hex-Zeichen (SHA-256). Alles andere wird nie Teil von URL oder Pfad.
+pub fn is_share_id(id: &str) -> bool {
+    id.len() == 64 && id.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+
+fn gallery_png_path(dir: &Path, id: &str) -> PathBuf {
+    dir.join(GALLERY_DIR).join(format!("{id}.png"))
+}
+
+#[derive(Deserialize)]
+struct GalleryResponse {
+    capes: Vec<GalleryCape>,
+}
+
+/// Galerie: alle freigegebenen eigenen Capes auf dem Cape-Server, neueste zuerst.
+pub async fn gallery() -> Result<Vec<GalleryCape>> {
+    let Some(base) = server_url() else {
+        return Ok(Vec::new());
+    };
+    let response = HTTP_CLIENT
+        .get(format!("{base}/v1/capes/gallery"))
+        .timeout(Duration::from_secs(10))
+        .send()
+        .await
+        .map_err(|e| AppError::Other(format!("Cape-Server nicht erreichbar: {e}")))?;
+    let body: GalleryResponse = cape_server_json(response).await?;
+    Ok(body.capes.into_iter().filter(|c| is_share_id(&c.id)).collect())
+}
+
+/// Entfernt zwischengespeicherte Galerie-Bilder, die nicht mehr in der Galerie sind
+/// (z. B. wieder gesperrt). Eigene Capes liegen woanders und bleiben unberührt.
+pub fn prune_gallery_cache(dir: &Path, keep: &[GalleryCape]) {
+    let Ok(entries) = std::fs::read_dir(dir.join(GALLERY_DIR)) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let id = name.to_str().and_then(|n| n.strip_suffix(".png"));
+        if !id.is_some_and(|id| keep.iter().any(|c| c.id == id)) {
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
+}
+
+/// Bild eines Galerie-Capes, zwischengespeichert in `salami_capes/gallery/`. Die ID ist ein
+/// Hash über die Pixel – jedes Bild wird dagegen geprüft, bevor es benutzt wird.
+pub async fn gallery_image(dir: &Path, id: &str) -> Result<Vec<u8>> {
+    if !is_share_id(id) {
+        return Err(AppError::Other(format!("Ungültige Cape-ID: {id}")));
+    }
+    let cached = gallery_png_path(dir, id);
+    if let Ok(bytes) = std::fs::read(&cached) {
+        if share_id(&bytes).as_deref() == Some(id) {
+            return Ok(bytes);
+        }
+    }
+    let base = server_url().ok_or_else(|| AppError::Other("Kein Cape-Server eingerichtet".into()))?;
+    let response = HTTP_CLIENT
+        .get(format!("{base}/v1/capes/img/{id}.png"))
+        .timeout(Duration::from_secs(20))
+        .send()
+        .await
+        .map_err(|e| AppError::Other(format!("Cape-Server nicht erreichbar: {e}")))?;
+    if response.status() == reqwest::StatusCode::NOT_FOUND {
+        return Err(AppError::Other("Das Cape ist nicht mehr freigegeben".into()));
+    }
+    if !response.status().is_success() {
+        return Err(AppError::Other(format!("Cape-Server antwortet mit {}", response.status())));
+    }
+    if response.content_length().is_some_and(|len| len > MAX_GALLERY_PNG as u64) {
+        return Err(AppError::Other("Bild vom Cape-Server ist zu groß".into()));
+    }
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| AppError::Other(format!("Bild vom Cape-Server unvollständig: {e}")))?;
+    if bytes.len() > MAX_GALLERY_PNG {
+        return Err(AppError::Other("Bild vom Cape-Server ist zu groß".into()));
+    }
+    if share_id(&bytes).as_deref() != Some(id) {
+        return Err(AppError::Other("Bild vom Cape-Server passt nicht zur Cape-ID".into()));
+    }
+    std::fs::create_dir_all(dir.join(GALLERY_DIR))?;
+    let tmp = cached.with_extension("png.tmp");
+    std::fs::write(&tmp, &bytes)?;
+    std::fs::rename(&tmp, &cached)?;
+    Ok(bytes.to_vec())
+}
+
+/// Eigenes Cape mit genau diesen Pixeln, falls schon vorhanden.
+fn own_cape_with_share_id(dir: &Path, id: &str) -> Option<CapeView> {
+    CapeStore::load(dir).capes.iter().filter_map(|c| view(dir, c)).find(|v| v.share_id == id)
+}
+
+/// Holt ein Galerie-Cape zu den eigenen Capes – oder liefert das eigene Cape, das schon
+/// dieselben Pixel hat. Ausgewählt wird es danach wie jedes eigene Cape.
+pub async fn adopt_gallery_cape(dir: &Path, id: &str, name: &str) -> Result<CapeView> {
+    if !is_share_id(id) {
+        return Err(AppError::Other(format!("Ungültige Cape-ID: {id}")));
+    }
+    if let Some(existing) = own_cape_with_share_id(dir, id) {
+        return Ok(existing);
+    }
+    let png = gallery_image(dir, id).await?;
+    save_cape(dir, None, name, &png)
+}
+
 /// Wert für `-Dsalami.cape`: `none`, `builtin:<name>` oder der Pfad zur PNG-Datei.
 pub fn launch_arg(dir: &Path) -> String {
     let store = CapeStore::load(dir);
@@ -502,6 +630,43 @@ mod tests {
         assert!(select(&dir, Some("unbekannte-id")).is_err());
         select(&dir, None).unwrap();
         assert_eq!(launch_arg(&dir), "none");
+    }
+
+    #[test]
+    fn share_ids_are_validated() {
+        assert!(is_share_id(&"0a".repeat(32)));
+        assert!(!is_share_id(&"A".repeat(64))); // Server liefert nur Kleinbuchstaben
+        assert!(!is_share_id(&"a".repeat(63)));
+        assert!(!is_share_id(&format!("..\\{}", "a".repeat(61))));
+    }
+
+    #[tokio::test]
+    async fn adopting_a_known_cape_reuses_the_own_one() {
+        let dir = temp_dir("adopt");
+        let own = save_cape(&dir, None, "Schon da", &png(64, 32)).unwrap();
+        // Gleiche Pixel wie ein eigenes Cape → kein Download, kein zweiter Eintrag
+        let adopted = adopt_gallery_cape(&dir, &own.share_id, "Community-Cape").await.unwrap();
+        assert_eq!(adopted.id, own.id);
+        assert_eq!(overview(&dir).capes.len(), 1);
+        assert!(adopt_gallery_cape(&dir, "../../capes", "x").await.is_err());
+    }
+
+    #[tokio::test]
+    async fn gallery_cache_is_checked_and_pruned() {
+        let dir = temp_dir("gallery");
+        let bytes = png(128, 64);
+        let id = share_id(&bytes).unwrap();
+        std::fs::create_dir_all(dir.join(GALLERY_DIR)).unwrap();
+        std::fs::write(gallery_png_path(&dir, &id), &bytes).unwrap();
+        // aus dem Zwischenspeicher, ohne Cape-Server
+        assert_eq!(gallery_image(&dir, &id).await.unwrap(), bytes);
+
+        let stale = "f".repeat(64);
+        std::fs::write(gallery_png_path(&dir, &stale), &bytes).unwrap();
+        let keep = vec![GalleryCape { id: id.clone(), approved_at: "2026-11-04T00:00:00Z".into(), wearers: 0 }];
+        prune_gallery_cache(&dir, &keep);
+        assert!(gallery_png_path(&dir, &id).is_file());
+        assert!(!gallery_png_path(&dir, &stale).exists());
     }
 
     #[test]

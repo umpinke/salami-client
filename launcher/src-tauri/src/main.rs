@@ -97,8 +97,9 @@ use commands::path_commands::{get_launcher_directory, resolve_image_path};
 
 // Salami Capes (lokale Capes, Vorlage, Auswahl fürs Spiel)
 use commands::salami_cape_command::{
-    salami_capes_delete, salami_capes_download_template, salami_capes_import, salami_capes_overview,
-    salami_capes_rename, salami_capes_review_status, salami_capes_save, salami_capes_select,
+    salami_capes_adopt, salami_capes_delete, salami_capes_download_template, salami_capes_gallery,
+    salami_capes_gallery_image, salami_capes_import, salami_capes_overview, salami_capes_rename,
+    salami_capes_review_status, salami_capes_save, salami_capes_select,
 };
 
 // Import cape commands
@@ -765,6 +766,9 @@ async fn main() {
             salami_capes_select,
             salami_capes_download_template,
             salami_capes_review_status,
+            salami_capes_gallery,
+            salami_capes_gallery_image,
+            salami_capes_adopt,
             get_all_profiles_and_last_played,
             get_local_content,
             install_local_content_to_profile,

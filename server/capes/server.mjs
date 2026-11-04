@@ -17,6 +17,9 @@
  *   POST /v1/capes/lookup {"uuids":[…]}             → {"capes":{"<uuid>":{"builtin":"salami"}|{"id":"<capeId>"}}}
  *        nur sichtbare Capes: mitgelieferte und freigegebene
  *   GET  /v1/capes/img/<capeId>.png                 → freigegebenes Cape-Bild
+ *   GET  /v1/capes/gallery                          → {"capes":[{"id","approvedAt","wearers"}]}
+ *        alle freigegebenen eigenen Capes, neueste zuerst – der Launcher zeigt sie unter
+ *        „Von anderen Spielern“, jeder kann sie selbst tragen. Ohne Namen der Einreicher.
  *   GET  /v1/capes/events                           → Server-Sent Events, eine Zeile pro Änderung:
  *        data: {"uuid":"…","cape":{"builtin":"salami"}|{"id":"…"}|null}
  *        (Cape gewechselt oder von einem Admin freigegeben/gesperrt) – so sehen alle
@@ -86,6 +89,8 @@ const CHALLENGE_TTL_MS = 60_000;
 const MAX_CHALLENGES = 10_000;
 const MAX_LOOKUP = 200;
 const MAX_REASON = 200;
+/** Höchstens so viele Capes liefert die Galerie (neueste zuerst). */
+const MAX_GALLERY = 500;
 
 /** ADMIN_TOKENS="leo:langes-geheimnis,max:anderes-geheimnis" – Name nur fürs Protokoll. */
 const ADMINS = (process.env.ADMIN_TOKENS || "")
@@ -406,6 +411,25 @@ async function handleStatus(req, res) {
   send(res, 200, { status });
 }
 
+/**
+ * Galerie für den Launcher: freigegebene eigene Capes, die jeder selbst tragen kann.
+ * Trägt man eins davon, ist es sofort für alle sichtbar – die ID hängt nur an den Pixeln,
+ * das Bild ist also schon geprüft. Namen der Einreicher stehen absichtlich nicht drin.
+ */
+function handleGallery(res) {
+  const wearers = new Map();
+  for (const player of Object.values(db.players)) {
+    const id = player.cape?.id;
+    if (id) wearers.set(id, (wearers.get(id) ?? 0) + 1);
+  }
+  const capes = Object.entries(db.capes)
+    .filter(([, cape]) => cape.status === "approved")
+    .map(([id, cape]) => ({ id, approvedAt: cape.reviewedAt ?? cape.submittedAt, wearers: wearers.get(id) ?? 0 }))
+    .sort((a, b) => b.approvedAt.localeCompare(a.approvedAt))
+    .slice(0, MAX_GALLERY);
+  send(res, 200, { capes });
+}
+
 function handleImage(res, id, admin) {
   const cape = db.capes[id];
   if (!cape || (!admin && cape.status !== "approved")) return send(res, 404, { error: "nicht gefunden" });
@@ -587,6 +611,11 @@ async function route(req, res) {
   if (req.method === "POST" && path === "/v1/capes/lookup") {
     if (rateLimited("lookup", ip, LOOKUP_RATE_PER_MINUTE)) throw new HttpError(429, "zu viele Anfragen");
     return handleLookup(req, res);
+  }
+
+  if (req.method === "GET" && path === "/v1/capes/gallery") {
+    if (rateLimited("lookup", ip, LOOKUP_RATE_PER_MINUTE)) throw new HttpError(429, "zu viele Anfragen");
+    return handleGallery(res);
   }
 
   if (path.startsWith("/v1/admin/")) {

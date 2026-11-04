@@ -1,7 +1,7 @@
 //! Befehle für die Cape-Seite des Launchers (siehe `integrations::salami_capes`).
 
 use crate::error::{AppError, CommandError};
-use crate::integrations::salami_capes::{self, CapeOverview, CapeReview, CapeView};
+use crate::integrations::salami_capes::{self, CapeOverview, CapeReview, CapeView, GalleryCape};
 use crate::state::state_manager::State;
 use base64::Engine;
 use log::{debug, info, warn};
@@ -81,6 +81,28 @@ pub async fn salami_capes_review_status(ids: Vec<String>) -> CommandResult<HashM
         }
     }
     Ok(status)
+}
+
+/// Galerie: von Admins freigegebene Capes anderer Spieler, die jeder selbst tragen kann.
+#[tauri::command]
+pub async fn salami_capes_gallery() -> CommandResult<Vec<GalleryCape>> {
+    let capes = salami_capes::gallery().await?;
+    salami_capes::prune_gallery_cache(&salami_capes::capes_dir(), &capes);
+    Ok(capes)
+}
+
+/// Bild eines Galerie-Capes als Data-URL (wird zwischengespeichert).
+#[tauri::command]
+pub async fn salami_capes_gallery_image(id: String) -> CommandResult<String> {
+    let png = salami_capes::gallery_image(&salami_capes::capes_dir(), &id).await?;
+    Ok(format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(png)))
+}
+
+/// Galerie-Cape zu den eigenen Capes holen. Das Frontend wählt es danach aus.
+#[tauri::command]
+pub async fn salami_capes_adopt(id: String, name: String) -> CommandResult<CapeView> {
+    info!("Adopting gallery cape {}", id.get(..12).unwrap_or(&id));
+    Ok(salami_capes::adopt_gallery_cape(&salami_capes::capes_dir(), &id, &name).await?)
 }
 
 /// Legt die Vorlage in den Download-Ordner und zeigt sie im Explorer.

@@ -15,6 +15,7 @@ const ADMIN = "test-admin-token-1234567890";
 const PLAYERS = {
   Salamander: "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
   Pepper_99: "11111111222233334444555555555555",
+  Brotzeit: "22222222333344445555666666666666",
 };
 
 // ------------------------------------------------------------------ Schein-Mojang
@@ -396,6 +397,38 @@ test("Launcher: Einreichen ändert das getragene Cape nicht und bleibt in der Wa
   // nach der Prüfung liefert Einreichen den Status samt Grund
   await admin("POST", `/v1/admin/capes/${id}/reject`, { reason: "zu bunt" });
   assert.deepEqual((await submitCape("Pepper_99", png)).body, { status: "rejected", id, reason: "zu bunt" });
+});
+
+test("Galerie: nur freigegebene Capes, ohne Namen, jeder kann sie tragen", async () => {
+  const pixels = capePixels(64, 60);
+  const png = encodeRgba(64, 32, pixels.rgba).toString("base64");
+  const id = capeId(64, 32, pixels.rgba);
+  const gallery = async () => (await call("GET", "/v1/capes/gallery")).body.capes;
+  const listed = async () => (await gallery()).find((c) => c.id === id);
+
+  assert.deepEqual((await submitCape("Brotzeit", png)).body, { status: "pending", id });
+  assert.equal(await listed(), undefined);
+
+  await admin("POST", `/v1/admin/capes/${id}/approve`);
+  const entry = await listed();
+  assert.deepEqual(Object.keys(entry).sort(), ["approvedAt", "id", "wearers"]);
+  assert.equal(entry.wearers, 0);
+  assert.equal((await gallery())[0].id, id, "neueste Freigabe zuerst");
+  assert.ok((await gallery()).every((c) => c.id !== capeId(128, 64, capePixels(128, 2).rgba)), "gesperrte fehlen");
+
+  // Wie der Launcher: Bild aus der Galerie laden und selbst tragen – sofort für alle sichtbar,
+  // ohne neue Prüfung und ohne das Tageslimit (Salamander hat es schon ausgeschöpft)
+  const image = await call("GET", `/v1/capes/img/${id}.png`);
+  assert.equal(image.status, 200);
+  assert.deepEqual((await setCape("Salamander", { png: image.body.toString("base64") })).body, { status: "approved", id });
+  assert.deepEqual((await call("POST", "/v1/capes/lookup", { uuids: [uuidOf("Salamander")] })).body.capes, {
+    [uuidOf("Salamander")]: { id },
+  });
+  assert.equal((await listed()).wearers, 1);
+
+  // wieder gesperrt → nicht mehr in der Galerie
+  await admin("POST", `/v1/admin/capes/${id}/reject`, { reason: "doch nicht" });
+  assert.equal(await listed(), undefined);
 });
 
 test("Daten überstehen einen Neustart", async () => {
