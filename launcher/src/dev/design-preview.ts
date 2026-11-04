@@ -125,6 +125,17 @@ const capeReviews: Record<string, { status: string; reason?: string }> = {
   ["c".repeat(64)]: { status: "rejected", reason: "Bitte keine Werbung" },
 };
 
+/** Galerie: freigegebene Capes anderer Spieler („b…“ hat man schon als „Mein Brett“). */
+const capeGallery = [
+  { id: "e".repeat(64), approvedAt: now, wearers: 3 },
+  { id: "b".repeat(64), approvedAt: now, wearers: 1 },
+  { id: "9".repeat(64), approvedAt: now, wearers: 0 },
+];
+const capeGalleryImages: Record<string, string> = {
+  ["e".repeat(64)]: "/capes/salami.png",
+  ["9".repeat(64)]: "/src-tauri/assets/salami_cape_template.png",
+};
+
 mockWindows("main");
 mockIPC((cmd, args) => {
   const a = (args ?? {}) as Record<string, unknown>;
@@ -148,6 +159,19 @@ mockIPC((cmd, args) => {
       return null;
     case "salami_capes_review_status":
       return Object.fromEntries((a.ids as string[]).filter((id) => capeReviews[id]).map((id) => [id, capeReviews[id]]));
+    case "salami_capes_gallery":
+      return structuredClone(capeGallery);
+    case "salami_capes_gallery_image":
+      return capeGalleryImages[a.id as string] ?? Promise.reject(new Error("nicht gefunden"));
+    case "salami_capes_adopt": {
+      const id = a.id as string;
+      const own = capeStore.capes.find((c) => c.share_id === id);
+      if (own) return own;
+      const cape = { id: crypto.randomUUID(), name: String(a.name), created: now, image: capeGalleryImages[id], share_id: id };
+      capeStore.capes = [...capeStore.capes, cape];
+      capeReviews[id] = { status: "approved" };
+      return cape;
+    }
     case "salami_capes_download_template":
       return "C:\\Users\\Du\\Downloads\\salami_cape_vorlage.png";
     case "get_profile_log_files":

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { toast } from "react-hot-toast";
@@ -7,17 +7,21 @@ import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 import {
   BUILTIN_PREFIX,
+  adoptGalleryCape,
   builtinCapeImage,
   deleteCape,
   downloadCapeTemplate,
+  getCapeGallery,
   getCapeOverview,
   getCapeReviews,
+  getGalleryCapeImage,
   importCape,
   renameCape,
   selectCape,
   type SalamiCape,
   type SalamiCapeOverview,
   type SalamiCapeReview,
+  type SalamiGalleryCape,
 } from "../../services/salami-cape-service";
 import { Cape3D } from "./Cape3D";
 import { CapeFace } from "./CapeFace";
@@ -35,7 +39,20 @@ const REVIEW_STYLE: Record<ReviewState, { icon: string; className: string }> = {
   new: { icon: "solar:eye-closed-bold", className: "bg-white/10 text-white/70" },
 };
 
-/** Cape-Seite: Salami-Capes, eigene Capes, Vorlage, Import und Editor. */
+/** Vorschau-Auswahl für Galerie-Capes, die noch nicht bei den eigenen liegen. */
+const GALLERY_PREFIX = "gallery:";
+/** So viele Galerie-Capes auf einmal – die Bilder kommen einzeln vom Cape-Server. */
+const GALLERY_PAGE = 24;
+
+interface CardOptions {
+  extra?: React.ReactNode;
+  /** Statt die Auswahl zu setzen (z. B. Galerie-Cape erst holen). */
+  onPick?: () => void;
+  /** Icon, solange kein Bild da ist. */
+  placeholder?: string;
+}
+
+/** Cape-Seite: Salami-Capes, eigene Capes, Capes anderer Spieler, Vorlage, Import und Editor. */
 export function SalamiCapesTab() {
   const { t } = useTranslation();
   const accent = useThemeStore((s) => s.accentColor);
@@ -45,6 +62,13 @@ export function SalamiCapesTab() {
   const [editor, setEditor] = useState<CapeEditorTarget | null>(null);
   /** Prüfstatus vom Cape-Server; `null` = unbekannt (Server aus oder nicht erreichbar). */
   const [reviews, setReviews] = useState<Record<string, SalamiCapeReview> | null>(null);
+  /** Freigegebene Capes anderer Spieler; `null` = lädt, `"error"` = Cape-Server nicht erreichbar. */
+  const [gallery, setGallery] = useState<SalamiGalleryCape[] | "error" | null>(null);
+  /** Bilder der Galerie (Data-URL), `false` = konnte nicht geladen werden. */
+  const [galleryImages, setGalleryImages] = useState<Record<string, string | false>>({});
+  const [galleryShown, setGalleryShown] = useState(GALLERY_PAGE);
+  const [adopting, setAdopting] = useState<string | null>(null);
+  const requestedImages = useRef(new Set<string>());
 
   const reload = useCallback(async () => {
     try {
@@ -66,15 +90,57 @@ export function SalamiCapesTab() {
     void reload();
   }, [reload]);
 
+  const loadGallery = useCallback(async () => {
+    setGallery(null);
+    try {
+      const capes = await getCapeGallery();
+      setGallery(Array.isArray(capes) ? capes : []);
+    } catch {
+      setGallery("error");
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadGallery();
+  }, [loadGallery]);
+
+  /** Eigene Capes nach Bild-ID: ein Galerie-Cape mit denselben Pixeln liegt schon bei dir. */
+  const ownByShareId = new Map((overview?.capes ?? []).map((c) => [c.share_id, c] as const));
+  const visibleGallery = Array.isArray(gallery) ? gallery.slice(0, galleryShown) : [];
+  const missingImages = visibleGallery
+    .filter((c) => !ownByShareId.has(c.id))
+    .map((c) => c.id)
+    .join(",");
+
+  // Bilder der sichtbaren Galerie-Capes nacheinander laden (der Launcher speichert sie zwischen)
+  useEffect(() => {
+    if (!missingImages) return;
+    void (async () => {
+      for (const id of missingImages.split(",")) {
+        if (requestedImages.current.has(id)) continue;
+        requestedImages.current.add(id);
+        let image: string | false;
+        try {
+          image = await getGalleryCapeImage(id);
+        } catch {
+          image = false;
+        }
+        setGalleryImages((prev) => ({ ...prev, [id]: image }));
+      }
+    })();
+  }, [missingImages]);
+
   const imageOf = (selection: string | null): string | null => {
     if (!selection || !overview) return null;
     if (selection.startsWith(BUILTIN_PREFIX)) return builtinCapeImage(selection.slice(BUILTIN_PREFIX.length));
+    if (selection.startsWith(GALLERY_PREFIX)) return galleryImages[selection.slice(GALLERY_PREFIX.length)] || null;
     return overview.capes.find((c) => c.id === selection)?.image ?? null;
   };
 
   const nameOf = (selection: string | null): string => {
     if (!selection) return t("salami.capes.none");
     if (selection.startsWith(BUILTIN_PREFIX)) return t(`salami.capes.${selection.slice(BUILTIN_PREFIX.length)}`);
+    if (selection.startsWith(GALLERY_PREFIX)) return t("salami.capes.gallery.cape");
     return overview?.capes.find((c) => c.id === selection)?.name ?? "";
   };
 
@@ -109,6 +175,26 @@ export function SalamiCapesTab() {
       await reload();
     } catch (error) {
       toast.error(t("salami.capes.error", { error: errorText(error) }));
+    }
+  };
+
+  /** Galerie-Cape tragen: erst zu den eigenen Capes holen (falls nötig), dann auswählen. */
+  const handleAdopt = async (cape: SalamiGalleryCape) => {
+    const own = ownByShareId.get(cape.id);
+    if (own) return choose(own.id);
+    if (adopting) return;
+    setAdopting(cape.id);
+    try {
+      const adopted = await adoptGalleryCape(cape.id, t("salami.capes.gallery.default_name", { id: cape.id.slice(0, 4) }));
+      toast.success(t("salami.capes.gallery.adopted", { name: adopted.name }));
+      // Die Karte steht jetzt für das eigene Cape – Vorschau links mitziehen
+      setHovered((h) => (h === `${GALLERY_PREFIX}${cape.id}` ? adopted.id : h));
+      await choose(adopted.id);
+      await reload();
+    } catch (error) {
+      toast.error(t("salami.capes.error", { error: errorText(error) }));
+    } finally {
+      setAdopting(null);
     }
   };
 
@@ -165,7 +251,13 @@ export function SalamiCapesTab() {
     );
   };
 
-  const card = (key: string, selection: string | null, image: string | null, label: string, extra?: React.ReactNode) => {
+  const card = (
+    key: string,
+    selection: string | null,
+    image: string | null,
+    label: string,
+    { extra, onPick, placeholder = "solar:forbidden-circle-bold" }: CardOptions = {},
+  ) => {
     const isSelected = selected === selection;
     return (
       <div
@@ -180,7 +272,7 @@ export function SalamiCapesTab() {
       >
         <button
           type="button"
-          onClick={() => void choose(selection)}
+          onClick={onPick ?? (() => void choose(selection))}
           className="flex flex-col items-center gap-2 focus:outline-none"
           aria-pressed={isSelected}
         >
@@ -188,7 +280,7 @@ export function SalamiCapesTab() {
             {image ? (
               <CapeFace src={image} width={70} />
             ) : (
-              <Icon icon="solar:forbidden-circle-bold" className="h-8 w-8 text-white/40" />
+              <Icon icon={placeholder} className="h-8 w-8 text-white/40" />
             )}
           </div>
           <span className="max-w-[120px] truncate text-sm text-white">{label}</span>
@@ -275,6 +367,9 @@ export function SalamiCapesTab() {
         </div>
         <div className="px-1">
           <div className="text-lg font-semibold text-white">{nameOf(previewSelection)}</div>
+          {previewSelection?.startsWith(GALLERY_PREFIX) && (
+            <p className="mt-2 text-xs leading-relaxed text-white/70">{t("salami.capes.gallery.preview_hint")}</p>
+          )}
           {previewCape && reviewOf(previewCape) && (
             <div className="mt-2 flex flex-col items-start gap-1">
               {reviewBadge(previewCape)}
@@ -305,16 +400,14 @@ export function SalamiCapesTab() {
         {overview && overview.capes.length > 0 ? (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
             {overview.capes.map((cape) =>
-              card(
-                cape.id,
-                cape.id,
-                cape.image,
-                cape.name,
-                <>
-                  {reviewBadge(cape)}
-                  {ownCapeActions(cape)}
-                </>,
-              ),
+              card(cape.id, cape.id, cape.image, cape.name, {
+                extra: (
+                  <>
+                    {reviewBadge(cape)}
+                    {ownCapeActions(cape)}
+                  </>
+                ),
+              }),
             )}
           </div>
         ) : (
@@ -326,6 +419,71 @@ export function SalamiCapesTab() {
               <li>{t("salami.capes.empty_step3")}</li>
             </ol>
           </div>
+        )}
+
+        <h3 className="mt-7 text-base font-semibold text-white">{t("salami.capes.gallery.title")}</h3>
+        <p className="mb-3 mt-1 text-xs leading-relaxed text-white/55">{t("salami.capes.gallery.subtitle")}</p>
+        {gallery === null ? (
+          <div className="flex items-center gap-2 text-sm text-white/60">
+            <Icon icon="svg-spinners:ring-resize" className="h-4 w-4" />
+            {t("salami.capes.gallery.loading")}
+          </div>
+        ) : gallery === "error" ? (
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-dashed border-white/15 bg-black/20 p-4 text-sm text-white/75">
+            <span>{t("salami.capes.gallery.error")}</span>
+            {actionButton("solar:refresh-bold", t("salami.capes.gallery.retry"), () => void loadGallery())}
+          </div>
+        ) : gallery.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-white/15 bg-black/20 p-4 text-sm text-white/75">
+            {t("salami.capes.gallery.empty")}
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
+              {visibleGallery.map((entry) => {
+                const own = ownByShareId.get(entry.id);
+                const image = own?.image ?? galleryImages[entry.id];
+                return card(
+                  `gallery-${entry.id}`,
+                  own ? own.id : `${GALLERY_PREFIX}${entry.id}`,
+                  image || null,
+                  own?.name ?? t("salami.capes.gallery.cape"),
+                  {
+                    onPick: () => void handleAdopt(entry),
+                    placeholder: image === false ? "solar:forbidden-circle-bold" : "svg-spinners:ring-resize",
+                    extra: (
+                      <div className="flex flex-wrap items-center justify-center gap-1">
+                        {adopting === entry.id && <Icon icon="svg-spinners:ring-resize" className="h-3.5 w-3.5 text-white/70" />}
+                        {own && (
+                          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/80">
+                            {t("salami.capes.gallery.owned")}
+                          </span>
+                        )}
+                        {entry.wearers > 0 && (
+                          <span
+                            title={t("salami.capes.gallery.wearers", { count: entry.wearers })}
+                            className="flex items-center gap-1 rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-white/70"
+                          >
+                            <Icon icon="solar:users-group-rounded-bold" className="h-3 w-3" />
+                            {entry.wearers}
+                          </span>
+                        )}
+                      </div>
+                    ),
+                  },
+                );
+              })}
+            </div>
+            {gallery.length > galleryShown && (
+              <div className="mt-3">
+                {actionButton(
+                  "solar:alt-arrow-down-bold",
+                  t("salami.capes.gallery.more", { count: gallery.length - galleryShown }),
+                  () => setGalleryShown((n) => n + GALLERY_PAGE),
+                )}
+              </div>
+            )}
+          </>
         )}
       </section>
 
