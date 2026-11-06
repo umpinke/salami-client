@@ -1,41 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 // Import the actual type with corrected path
-import type { ProcessMetadata, CrashlogDto } from "../types/processState";
-import type { CrashCheckResult } from "../types/crash-analysis";
-import { getLauncherConfig } from "./launcher-config-service";
-import { hasPermission } from "./permission-service";
-import { PERMISSION } from "../constants/permissions";
-import { toast } from "react-hot-toast";
-import { logInfo, logWarn } from "../utils/logging-utils";
-import i18n from '../i18n/i18n';
-import { parseErrorMessage } from "../utils/error-utils";
-
-export interface LaunchOverrides {
-  game_version?: string;
-  loader?: string;
-  loader_version?: string;
-  pack?: string;
-}
-
-async function assertExperimentalLaunchAllowed(): Promise<boolean> {
-  try {
-    const config = await getLauncherConfig();
-    if (config?.is_experimental) {
-      logInfo("[ProcessService] Experimental mode is enabled in settings");
-      const isAllowed = await hasPermission(PERMISSION.EXPERIMENTAL_MODE);
-      logInfo(`[ProcessService] Permission check result: ${isAllowed}`);
-      if (!isAllowed) {
-        toast.error(i18n.t('settings.disable_experimental'));
-        return false;
-      }
-    }
-  } catch (e) {
-    logWarn(
-      `[ProcessService] Failed to check experimental permission: ${parseErrorMessage(e)}`,
-    );
-  }
-  return true;
-}
+import type { ProcessMetadata } from "../types/processState";
 
 export async function isMinecraftRunning(profileId: string): Promise<boolean> {
   try {
@@ -60,22 +25,7 @@ export async function launch(
   quickPlayMultiplayer?: string,
   migrationInfo?: any,
   skipLastPlayedUpdate?: boolean,
-  overrides?: LaunchOverrides,
 ): Promise<void> {
-  if (!(await assertExperimentalLaunchAllowed())) {
-    return;
-  }
-
-  if (overrides) {
-    return invoke<void>("launch_profile_with_overrides", {
-      profileRef: id,
-      overrides,
-      quickPlaySingleplayer,
-      quickPlayMultiplayer,
-      account: null,
-    });
-  }
-
   return invoke<void>("launch_profile", {
     id,
     quickPlaySingleplayer,
@@ -179,13 +129,4 @@ export async function fetchCrashReport(profileId: string, processId?: string, pr
     console.error(`[ProcessService] Failed to fetch crash report:`, error);
     return null;
   }
-}
-
-/**
- * Analyzes a crash log via the backend and returns the launcher-facing verdict.
- * The backend reports the crash to staff and returns a CrashCheckResult (see types/crash-analysis).
- */
-export async function checkCrashLog(payload: CrashlogDto): Promise<CrashCheckResult> {
-  logInfo(`[ProcessService] Checking crash log: ${payload.mcLogsUrl}`);
-  return invoke<CrashCheckResult>("check_crash_log_command", { payload });
 }

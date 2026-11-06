@@ -105,7 +105,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
       { id: "login_cache", label: t("settings.sections.login_cache") },
       { id: "gamedir", label: t("settings.game_data_dir.title") },
       { id: "hooks", label: t("settings.hooks.title") },
-      { id: "licenses", label: t("settings.licenses.title") },
+      { id: "about", label: t("settings.about.title") },
     ],
     debug: getDebugTabs(t),
   };

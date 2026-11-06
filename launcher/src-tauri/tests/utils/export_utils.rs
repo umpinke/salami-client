@@ -1,7 +1,7 @@
 use async_zip::tokio::read::seek::ZipFileReader;
 use async_zip::tokio::write::ZipFileWriter;
 use async_zip::{Compression, ZipEntryBuilder};
-use noriskclient_launcher_v3_lib::utils::export_utils::*;
+use salami_client_lib::utils::export_utils::*;
 use std::path::Path;
 use tokio::fs;
 use tokio::io::BufReader;

@@ -22,7 +22,6 @@ pub struct AccountInfo {
     pub minecraft_username: String,
     pub active: bool,
     pub expires_at: chrono::DateTime<Utc>,
-    pub ignore_child_protection_warning: bool,
 }
 
 impl From<&Credentials> for AccountInfo {
@@ -33,7 +32,6 @@ impl From<&Credentials> for AccountInfo {
             minecraft_username: c.username.clone(),
             active: c.active,
             expires_at: c.expires,
-            ignore_child_protection_warning: c.ignore_child_protection_warning,
         }
     }
 }

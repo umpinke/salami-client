@@ -1,38 +1,10 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { BlogPost } from '../types/wordPress';
 import type { UpdateInfo } from '../types/updater';
 import type { Profile } from '../types/profile';
-import type { AdventCalendarDay, Reward } from '../types/advent';
-import type { UserNotification } from '../types/notification';
-import type {
-  AfkPointsBalance,
-  AfkShopCatalogResponse,
-  AfkShopPurchaseResponse,
-  DailyClaimResult,
-  DailyClaimState,
-} from '../types/afkpoints';
 import { useProfileStore } from '../store/profile-store';
-import { getBlockedModsConfig, getPackRolloutConfig, getPackFallbackConfig } from './flagsmith-service';
-import { refreshPermissions } from './permission-service';
-import { logInfo, logError } from '../utils/logging-utils';
-
-/** Salami: NoRisk-Dienste (Werbung, Konto-Verknüpfungen, Mobile-App, Benachrichtigungen …) gibt es nicht. */
-const unavailable = <T>(): Promise<T> =>
-  Promise.reject(new Error("Not available in Salami Client"));
 
 /**
- * Fetches the latest news and changelog posts from the backend.
- *
- * @returns A promise that resolves to an array of BlogPost objects.
- * @throws If the backend command fails.
- */
-export const fetchNewsAndChangelogs = (): Promise<BlogPost[]> => {
-  // Directly invoke and return the promise. Errors will propagate to the caller.
-  return invoke('get_news_and_changelogs_command');
-};
-
-/**
- * Triggers a refresh of the Norisk packs configuration from the backend.
+ * Triggers a refresh of the pack configuration from the backend.
  *
  * @returns A promise that resolves when the refresh is complete.
  * @throws If the backend command fails.
@@ -52,177 +24,43 @@ export const refreshStandardVersions = (): Promise<Profile[]> => {
 };
 
 /**
- * Refreshes both Norisk packs and standard versions configurations.
- * Logs success or errors to the console.
+ * Refreshes both the packs and the standard versions configurations, then
+ * reloads the profile list.
  */
 export const refreshNrcDataOnMount = async (): Promise<void> => {
-  // Direkt setState verwenden, um den Ladezustand zu Beginn zu setzen
   useProfileStore.setState({ loading: true, error: null });
 
-  // Introduce a 5-second delay for testing
-  //console.log("[TEST] Starting 5-second delay in refreshNrcDataOnMount...");
-  //await new Promise(resolve => setTimeout(resolve, 5000));
-  //console.log("[TEST] 5-second delay finished.");
-
   try {
-    let nrcPacksSuccess = false;
-    let standardVersionsSuccess = false;
-
-    // Fire and forget: Load blocked mods config from Flagsmith
-    getBlockedModsConfig()
-      .then((config) => {
-        console.log("Blocked mods config loaded successfully:", config);
-      })
-      .catch((error) => {
-        console.error("Failed to load blocked mods config:", error);
-      });
-
-    // Fire and forget: Load pack rollout aliases from Flagsmith
-    getPackRolloutConfig()
-      .then((config) => {
-        logInfo(`Pack rollout config loaded: ${JSON.stringify(config)}`);
-      })
-      .catch((error) => {
-        logError(`Failed to load pack rollout config: ${error}`);
-      });
-
-    // Fire and forget: Load pack fallback id from Flagsmith
-    getPackFallbackConfig()
-      .then((config) => {
-        logInfo(`Pack fallback config loaded: ${JSON.stringify(config)}`);
-      })
-      .catch((error) => {
-        logError(`Failed to load pack fallback config: ${error}`);
-      });
-
-    // Fire and forget: Refresh user permissions from NoRisk backend
-    refreshPermissions()
-      .then(() => logInfo("User permissions refreshed on mount"))
-      .catch((error) => logError(`Failed to refresh permissions: ${error}`));
-
     try {
       await refreshNoriskPacks();
-      console.log("Norisk Packs updated successfully on mount!");
-      nrcPacksSuccess = true;
+      console.log("Packs updated successfully on mount!");
     } catch (error) {
-      console.error("Failed to refresh Norisk Packs on mount:", error);
+      console.error("Failed to refresh packs on mount:", error);
     }
 
     try {
       const standardProfiles = await refreshStandardVersions();
       console.log("Standard Versions updated successfully on mount!");
-      // Store the standard profiles in the profile store
       useProfileStore.setState({ standardProfiles });
-      standardVersionsSuccess = true;
     } catch (error) {
       console.error("Failed to refresh Standard Versions on mount:", error);
     }
 
-    // Fetch profiles from the store after NRC data is refreshed
-    // This ensures the profile list (including standard versions) and last played are up-to-date.
     // Salami: Profile immer laden – auch wenn Packs/Standardversionen nicht aktualisiert werden
-    // konnten (nrcPacksSuccess/standardVersionsSuccess), sonst bleibt die Startseite leer.
+    // konnten, sonst bleibt die Startseite leer. fetchProfiles setzt loading: false.
     try {
-      console.log("Refreshing profiles state after NRC data update...");
       await useProfileStore.getState().fetchProfiles();
-      console.log("Profiles state refreshed successfully.");
-      // fetchProfiles setzt loading: false bei Erfolg oder Fehler
     } catch (error) {
-      console.error("Failed to refresh profiles state after NRC data update:", error);
+      console.error("Failed to refresh profiles state after pack data update:", error);
     }
   } catch (error) {
-    // Dieser Catch fängt Fehler von refreshNoriskPacks, refreshStandardVersions
-    // oder wenn fetchProfiles selbst einen Fehler wirft, der nicht intern zu loading:false führt.
-    console.error("Error during NRC data refresh or profile fetching process:", error);
+    console.error("Error during pack data refresh or profile fetching process:", error);
     useProfileStore.setState({
       error: "Failed to initialize or refresh app data.",
-      loading: false, // Sicherstellen, dass der Ladezustand beendet wird
+      loading: false,
     });
   }
-  // Kein expliziter finally-Block hier nötig, um loading auf false zu setzen,
-  // da dies entweder durch fetchProfiles() oder den catch-Block oben abgedeckt wird.
 };
-
-export const showApplixirAd = (_resetConsent = false): Promise<void> => unavailable();
-
-export const mintApplixirSession = (): Promise<string | null> => Promise.resolve(null);
-
-export const getAfkPointsBalance = (): Promise<AfkPointsBalance | null> => Promise.resolve(null);
-
-export const getAfkDailyState = (): Promise<DailyClaimState | null> => Promise.resolve(null);
-
-export const claimAfkDaily = (): Promise<DailyClaimResult> => unavailable();
-
-export const getAfkShopCatalog = (): Promise<AfkShopCatalogResponse | null> => Promise.resolve(null);
-
-export const purchaseAfkShopItem = (
-  _itemId: string,
-  _purchaseId: string,
-): Promise<AfkShopPurchaseResponse> => unavailable();
-
-/**
- * Initiates the Discord account linking process.
- *
- * @returns A promise that resolves when the command is successfully sent.
- * @throws If the backend command fails.
- */
-export const discordAuthLink = (): Promise<void> => unavailable();
-
-/**
- * Checks the Discord account linking status.
- *
- * @returns A promise that resolves to a boolean indicating if a Discord account is linked.
- * @throws If the backend command fails.
- */
-export const discordAuthStatus = (): Promise<boolean> => Promise.resolve(false);
-
-/**
- * Unlinks the currently linked Discord account.
- *
- * @returns A promise that resolves when the unlinking process is successful.
- * @throws If the backend command fails.
- */
-export const discordAuthUnlink = (): Promise<void> => Promise.resolve();
-
-/**
- * Initiates the GitHub account linking process.
- *
- * @returns A promise that resolves when the command is successfully sent.
- * @throws If the backend command fails.
- */
-export const githubAuthLink = (): Promise<void> => unavailable();
-
-/**
- * Checks the GitHub account linking status.
- *
- * @returns A promise that resolves to a boolean indicating if a GitHub account is linked.
- * @throws If the backend command fails.
- */
-export const githubAuthStatus = (): Promise<boolean> => Promise.resolve(false);
-
-/**
- * Unlinks the currently linked GitHub account.
- *
- * @returns A promise that resolves when the unlinking process is successful.
- * @throws If the backend command fails.
- */
-export const githubAuthUnlink = (): Promise<void> => Promise.resolve();
-
-/**
- * Gets the mobile app token for NoRisk mobile app linking.
- *
- * @returns A promise that resolves to the mobile app token string.
- * @throws If the backend command fails.
- */
-export const getMobileAppToken = (): Promise<string> => unavailable();
-
-/**
- * Resets the mobile app token for NoRisk mobile app linking.
- *
- * @returns A promise that resolves to the new mobile app token string.
- * @throws If the backend command fails.
- */
-export const resetMobileAppToken = (): Promise<string> => unavailable();
 
 /**
  * Checks if an application update is available.
@@ -246,61 +84,3 @@ export const checkUpdateAvailable = (): Promise<UpdateInfo | null> => {
 export const downloadAndInstallUpdate = (): Promise<void> => {
   return invoke('download_and_install_update_command');
 };
-
-/**
- * Fetches the advent calendar data from the backend.
- *
- * @returns A promise that resolves to an array of AdventCalendarDay objects.
- * @throws If the backend command fails.
- */
-export const getAdventCalendar = (): Promise<AdventCalendarDay[]> => Promise.resolve([]);
-
-/**
- * Claims a reward for a specific day in the advent calendar.
- *
- * @param tag The day number (1-24) to claim.
- * @returns A promise that resolves to the claimed AdventCalendarDay.
- * @throws If the backend command fails.
- */
-export const claimAdventCalendarDay = (_tag: number): Promise<AdventCalendarDay> => unavailable();
-
-/**
- * Fetches all notifications for the current user.
- *
- * @returns A promise that resolves to an array of UserNotification objects.
- * @throws If the backend command fails.
- */
-export const getNotifications = (): Promise<UserNotification[]> => Promise.resolve([]);
-
-/**
- * Marks all notifications as read.
- *
- * @returns A promise that resolves when all notifications are marked as read.
- * @throws If the backend command fails.
- */
-export const markAllNotificationsRead = (): Promise<void> => Promise.resolve();
-
-/**
- * Marks a specific notification as read.
- *
- * @param notificationId The ID of the notification to mark as read.
- * @returns A promise that resolves when the notification is marked as read.
- * @throws If the backend command fails.
- */
-export const markNotificationRead = (_notificationId: string): Promise<void> => Promise.resolve();
-
-export interface UniquePlayersResponse {
-  count: number;
-  windowHours: number;
-  computedAtMs: number;
-}
-
-/**
- * Fetches the unique-players-in-the-last-24h stat from the backend
- * (cached server-side for 30 minutes).
- */
-export const getUniquePlayers24h = (): Promise<UniquePlayersResponse> => unavailable();
-
-
-// Re-export logging utilities for backward compatibility
-export { log as logMessage, logDebug as logMessageDebug, logInfo as logMessageInfo, logWarn as logMessageWarn, logError as logMessageError } from '../utils/logging-utils';

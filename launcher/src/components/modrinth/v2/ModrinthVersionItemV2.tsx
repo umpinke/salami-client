@@ -14,7 +14,6 @@ import { ActionButton } from "../../ui/ActionButton";
 import { TagBadge } from "../../ui/TagBadge";
 import { gsap } from "gsap";
 import { useIsFirstRender } from "../../../hooks/useIsFirstRender";
-import { Tooltip } from "../../ui/Tooltip";
 
 interface ModrinthVersionItemV2Props {
   version: UnifiedVersion;
@@ -47,8 +46,6 @@ interface ModrinthVersionItemV2Props {
     version: UnifiedVersion,
   ) => void;
   selectedProfileId?: string | null;
-  isBlocked?: boolean; // Deprecated, use noRiskStatus instead
-  noRiskStatus?: 'blocked' | 'warning' | null;
 }
 
 export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
@@ -67,8 +64,6 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
     onToggleEnableClick,
     onInstallModpackVersionAsProfileClick,
     selectedProfileId,
-    isBlocked = false, // Deprecated
-    noRiskStatus = null,
   }) => {
     const { t } = useTranslation();
     const isModpack = project.project_type === "modpack";
@@ -287,31 +282,6 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
           <div className="flex flex-col space-y-2">
             <div className="flex justify-between items-baseline gap-2">
               <div className="flex-shrink min-w-0 flex items-center gap-2">
-                {noRiskStatus === 'blocked' && (
-                  <Tooltip content={t('modrinth.blocked_mod_tooltip')}>
-                    <Icon
-                      icon="solar:danger-triangle-bold"
-                      className="w-4 h-4 text-red-500 flex-shrink-0"
-                    />
-                  </Tooltip>
-                )}
-                {noRiskStatus === 'warning' && (
-                  <Tooltip content={t('modrinth.warning_mod_tooltip')}>
-                    <Icon
-                      icon="solar:danger-triangle-bold"
-                      className="w-4 h-4 text-yellow-500 flex-shrink-0"
-                    />
-                  </Tooltip>
-                )}
-                {/* Fallback for deprecated isBlocked prop */}
-                {!noRiskStatus && isBlocked && (
-                  <Tooltip content={t('modrinth.blocked_mod_tooltip')}>
-                    <Icon
-                      icon="solar:danger-triangle-bold"
-                      className="w-4 h-4 text-red-500 flex-shrink-0"
-                    />
-                  </Tooltip>
-                )}
                 <div className="min-w-0">
                   <h5 className="text-gray-100 text-sm font-minecraft normal-case truncate">
                     {version.name}
@@ -441,11 +411,9 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
                     disabled={buttonDisabled || isInstalling}
                     className="min-w-[80px]"
                     icon={
-                      isInstalling || isInstallingModpackVersion 
-                        ? "solar:refresh-bold" 
-                        : (noRiskStatus === 'blocked' || noRiskStatus === 'warning')
-                          ? "solar:danger-triangle-bold"
-                          : "solar:download-minimalistic-bold"
+                      isInstalling || isInstallingModpackVersion
+                        ? "solar:refresh-bold"
+                        : "solar:download-minimalistic-bold"
                     }
                     iconClassName={(isInstalling || isInstallingModpackVersion) ? "animate-spin-slow" : ""}
                     label={buttonText}

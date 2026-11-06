@@ -1,5 +1,5 @@
-export const ENGINE_STAGED_NAME = "norisk-capture-x86_64-pc-windows-msvc.exe";
-export const ENGINE_SHIPPED_NAME = "norisk-capture.exe";
+export const ENGINE_STAGED_NAME = "salami-capture-x86_64-pc-windows-msvc.exe";
+export const ENGINE_SHIPPED_NAME = "salami-capture.exe";
 
 export const FFMPEG_DLLS = [
   "avcodec-62.dll",
@@ -16,4 +16,4 @@ export const LEGAL_FILES = [
   { dir: "ffmpeg", name: "LICENSE.txt", as: "ffmpeg-LICENSE.txt" },
 ];
 
-export const RUNTIME_ASSET_NAME = "NoRiskClient-Windows-capture-runtime.zip";
+export const RUNTIME_ASSET_NAME = "SalamiClient-Windows-capture-runtime.zip";

@@ -120,9 +120,7 @@ pub async fn install_minecraft_version(
         version_id, modloader_enum
     );
 
-    // Get experimental mode from global config
     let state = State::get().await?;
-    let is_experimental_mode = state.config_manager.is_experimental_mode().await;
     let launcher_config = state.config_manager.get_config().await;
 
     let profile_owned;
@@ -151,10 +149,6 @@ pub async fn install_minecraft_version(
         crate::utils::import_safety::require_version_like(loader_version)?;
     }
 
-    info!(
-        "[Launch] Setting experimental mode: {}",
-        is_experimental_mode
-    );
     info!(
         "[Launch] Using concurrent downloads: {}",
         launcher_config.concurrent_downloads
@@ -485,8 +479,7 @@ pub async fn install_minecraft_version(
 
     let mut launch_params = MinecraftLaunchParameters::new(profile.id, memory_max)
         .with_old_minecraft_arguments(piston_meta.minecraft_arguments.clone())
-        .with_resolution(profile.settings.resolution.clone())
-        .with_experimental_mode(is_experimental_mode);
+        .with_resolution(profile.settings.resolution.clone());
 
     // Add Quick Play parameters if provided
     if let Some(world_name) = quick_play_singleplayer {
@@ -602,10 +595,10 @@ pub async fn install_minecraft_version(
             "Loading pack config because pack '{}' is selected.",
             pack_id
         );
-        // Salami: Packs kommen ohne Token aus integrations::salami_packs.
+        // Salami: Packs kommen aus integrations::salami_packs.
         if let Err(update_err) = state
             .norisk_pack_manager
-            .fetch_and_update_config("", is_experimental_mode)
+            .fetch_and_update_config()
             .await
         {
             warn!(

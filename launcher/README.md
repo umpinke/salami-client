@@ -1,46 +1,26 @@
-## Issues
+# Salami Client Launcher
 
-If you notice any bugs or missing features, you can let us know by opening an issue [here](https://norisk.gg/issues).
+Der Launcher des Salami Client (Tauri 2, React, Rust). Wie man ihn baut und veröffentlicht, steht im [README im Hauptordner](../README.md).
 
-## License
-This code is originally forked and still uses a small amount of code from [LiquidLauncher](https://github.com/CCBlueX/LiquidLauncher).
+## Fehler melden
 
-Therefore, this project is also subject to the [GNU General Public License v3.0](LICENSE). This does only apply for source code located directly in this clean repository. During the development and compilation process, additional source code may be used to which we have obtained no rights. Such code is not covered by the GPL license.
-This project entirely or partially for free and even commercially. However, please consider the following:
+Fehler und Wünsche bitte als [Issue auf GitHub](https://github.com/umpinke/salami-client/issues) oder im Discord melden.
 
-- **You must disclose the source code of your modified work and the source code you took from this project. This means you are not allowed to use code from this project (even partially) in a closed-source (or even obfuscated) application.**
-- **Your modified application must also be licensed under the GPL** 
+## Selbst bauen
 
-Do the above and share your source code with everyone; just like we do.
+Voraussetzungen: Node.js 18 oder neuer, Rust (stable), Yarn 1 und für die Clip-Aufnahme LLVM.
 
-## Compile it yourself!
+```bash
+yarn install
+yarn tauri dev     # Entwicklung
+yarn tauri build   # Installer
+```
 
-### Prerequisites
-- **Node.js** (v18 or higher) - [Download here](https://nodejs.org/en/download)
-- **Rust** (latest stable) - [Install here](https://www.rust-lang.org/tools/install)
-- **Yarn** package manager - `npm install -g yarn`
+## Lizenz und Herkunft
 
-### Setup Instructions
-1. Clone the repository:
-   ```bash
-   git clone --recurse-submodules https://github.com/NoRiskClient/noriskclient-launcher
-   cd noriskclient-launcher
-   ```
+Der Launcher ist ein Fork des NoRisk Client Launchers, der wiederum teilweise auf [LiquidLauncher](https://github.com/CCBlueX/LiquidLauncher) basiert. Beide stehen unter der [GNU General Public License v3.0](LICENSE), deshalb gilt sie auch für diesen Launcher:
 
-2. Install dependencies:
-   ```bash
-   yarn install
-   ```
+- Der Quellcode ist öffentlich: https://github.com/umpinke/salami-client
+- Wer ihn weiterverwendet, muss seinen eigenen Quellcode ebenfalls unter der GPL veröffentlichen.
 
-3. Start development mode:
-   ```bash
-   yarn tauri dev
-   ```
-
-4. Build for production:
-   ```bash
-   yarn tauri build
-   ```
-
-## Contributing
-We appreciate contributions. So if you want to support us, feel free to make changes to NoRisk source code and submit a pull request.
+Der Salami Client nutzt keine Dienste, Server, Logos oder Pakete von NoRisk. „NoRisk“ ist eine Marke ihrer Inhaber.

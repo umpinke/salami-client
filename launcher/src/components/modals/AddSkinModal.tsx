@@ -14,10 +14,8 @@ import { Checkbox } from "../ui/Checkbox";
 import { toast } from "react-hot-toast";
 import { open } from "@tauri-apps/plugin-dialog";
 import { MinecraftSkinService } from "../../services/minecraft-skin-service";
-import { SkinRenderer } from "@noriskclient/nrc-skin-renderer/react";
 import { WebGLBoundary } from "../WebGLBoundary";
-import { FlatSkin } from "@noriskclient/nrc-skin-renderer/react";
-import { useIdleEmote } from "../../hooks/useIdleEmote";
+import { FlatSkin, SkinViewer3D } from "../../lib/skin3d";
 import { SearchStyleInput } from "../ui/Input";
 import { parseErrorMessage } from "../../utils/error-utils";
 
@@ -54,7 +52,6 @@ export const AddSkinModal = memo(
     const variant: SkinVariant = isSlimVariant ? "slim" : "classic";
     const accentColor = useThemeStore((state) => state.accentColor);
     const { hideModal } = useGlobalModal();
-    const idleEmote = useIdleEmote();
 
     const handleClose = () => {
       hideModal('add-skin-modal');
@@ -417,17 +414,13 @@ export const AddSkinModal = memo(
                     <FlatSkin textureUrl={previewBase64Url} variant={variant} />
                   }
                 >
-                  <SkinRenderer
-                  textureUrl={previewBase64Url}
-                  variant={variant}
-                  emote={idleEmote.urls}
-                  emoteLoop={idleEmote.loop}
-                  zoom={1.75}
-                  draggable
-                  dragAxis="yaw"
-                  fps={30}
-                  style={{ width: "100%", height: "100%" }}
-                />
+                  <SkinViewer3D
+                    textureUrl={previewBase64Url}
+                    variant={variant}
+                    animation="idle"
+                    draggable
+                    style={{ width: "100%", height: "100%" }}
+                  />
                 </WebGLBoundary>
               </div>
             </div>
@@ -464,17 +457,13 @@ export const AddSkinModal = memo(
                         <FlatSkin textureUrl={previewBase64Url} variant={variant} />
                       }
                     >
-                      <SkinRenderer
-                      textureUrl={previewBase64Url}
-                      variant={variant}
-                      emote={idleEmote.urls}
-                      emoteLoop={idleEmote.loop}
-                      zoom={1.75}
-                      draggable
-                      dragAxis="yaw"
-                      fps={30}
-                      style={{ width: "100%", height: "100%" }}
-                    />
+                      <SkinViewer3D
+                        textureUrl={previewBase64Url}
+                        variant={variant}
+                        animation="idle"
+                        draggable
+                        style={{ width: "100%", height: "100%" }}
+                      />
                     </WebGLBoundary>
                   </div>
                 </div>

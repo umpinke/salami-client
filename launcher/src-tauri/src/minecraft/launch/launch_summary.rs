@@ -71,7 +71,6 @@ pub struct LaunchSummary {
     pub libraries: Arc<DownloadStats>,
     pub client: Arc<DownloadStats>,
     pub assets: Arc<DownloadStats>,
-    pub nrc_assets: Arc<DownloadStats>,
     pub loader_libraries: Arc<DownloadStats>,
     pub mods: Arc<DownloadStats>,
     phases: Mutex<Vec<(String, u128)>>,
@@ -93,11 +92,10 @@ impl LaunchSummary {
             format_duration(total_ms)
         );
 
-        let sections: [(&str, &DownloadStats); 6] = [
+        let sections: [(&str, &DownloadStats); 5] = [
             ("libraries", &self.libraries),
             ("client", &self.client),
             ("assets", &self.assets),
-            ("nrc assets", &self.nrc_assets),
             ("loader libs", &self.loader_libraries),
             ("mods", &self.mods),
         ];

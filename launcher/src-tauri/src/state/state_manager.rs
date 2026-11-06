@@ -4,10 +4,8 @@ use crate::minecraft::minecraft_auth::MinecraftAuthStore;
 use crate::state::active_skin_state::{default_active_skins_path, ActiveSkinManager};
 use crate::state::config_state::ConfigManager;
 use crate::state::content_cache_state::ContentCacheManager;
-use crate::state::cosmetic_pack_state::CosmeticPackManager;
 use crate::state::discord_state::DiscordManager;
 use crate::state::event_state::{EventPayload, EventState};
-use crate::state::friends_state::FriendsState;
 use crate::state::norisk_packs_state::{default_norisk_packs_path, NoriskPackManager};
 use crate::state::norisk_versions_state::{default_norisk_versions_path, NoriskVersionManager};
 use crate::state::post_init::PostInitializationHandler;
@@ -34,8 +32,6 @@ pub struct State {
     pub skin_manager: SkinManager,
     pub active_skin_manager: ActiveSkinManager,
     pub discord_manager: DiscordManager,
-    pub cosmetic_pack_manager: CosmeticPackManager,
-    pub friends_state: FriendsState,
     pub content_cache: ContentCacheManager,
     pub capture_supervisor: Arc<crate::state::capture_state::CaptureSupervisor>,
     pub sync_pack_manager: SyncPackManager,
@@ -78,8 +74,6 @@ impl State {
                 let process_manager = ProcessManager::new(default_processes_path(), app.clone()).await?;
 
                 log::trace!("State::init - Primary initialization of managers complete (Phase 1). Constructing State struct with initialized: false.");
-                let friends_state = FriendsState::new();
-                let cosmetic_pack_manager = CosmeticPackManager::new();
                 let content_cache = ContentCacheManager::new(db.clone())?;
                 let sync_pack_manager = SyncPackManager::new(db.clone())?;
                 Ok::<Arc<State>, AppError>(Arc::new(Self {
@@ -94,8 +88,6 @@ impl State {
                     skin_manager,
                     active_skin_manager,
                     discord_manager,
-                    cosmetic_pack_manager,
-                    friends_state,
                     content_cache,
                     capture_supervisor: Arc::new(
                         crate::state::capture_state::CaptureSupervisor::new(),

@@ -533,7 +533,6 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
               onMouseLeave={() => setHoveredVersionId(null)}
               onInstallClick={handleContentInstall}
               onInstallModpackVersionAsProfileClick={isModpack ? handleModpackInstall : undefined}
-              noRiskStatus={version.isBlocked ? 'blocked' : null}
             />
           ))}
 

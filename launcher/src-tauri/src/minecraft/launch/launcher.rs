@@ -22,7 +22,6 @@ pub struct MinecraftLaunchParameters {
     pub old_minecraft_arguments: Option<String>,
     pub profile_id: Uuid,
     pub memory_max_mb: u32,
-    pub is_experimental_mode: bool,
     pub resolution: Option<WindowSize>,
     pub quick_play_singleplayer: Option<String>,
     pub quick_play_multiplayer: Option<String>,
@@ -40,7 +39,6 @@ impl MinecraftLaunchParameters {
             old_minecraft_arguments: None,
             profile_id,
             memory_max_mb,
-            is_experimental_mode: false,
             resolution: None,
             quick_play_singleplayer: None,
             quick_play_multiplayer: None,
@@ -85,11 +83,6 @@ impl MinecraftLaunchParameters {
 
     pub fn with_memory_max_mb(mut self, memory: u32) -> Self {
         self.memory_max_mb = memory;
-        self
-    }
-
-    pub fn with_experimental_mode(mut self, is_experimental: bool) -> Self {
-        self.is_experimental_mode = is_experimental;
         self
     }
 
@@ -227,9 +220,7 @@ impl MinecraftLauncher {
         while let Some(arg_os_str) = args_iter.next() {
             let arg_str = arg_os_str.to_string_lossy().into_owned();
 
-            if arg_str.starts_with("-Dnorisk.token=") {
-                parts.push("-Dnorisk.token=*****".to_string());
-            } else if arg_str == "--accessToken" {
+            if arg_str == "--accessToken" {
                 parts.push(arg_str); // Push "--accessToken"
                 if args_iter.peek().is_some() {
                     args_iter.next(); // Consume the actual token value

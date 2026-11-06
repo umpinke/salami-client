@@ -38,8 +38,6 @@ export interface ContentTileProps {
   quickUpdateDisabled?: boolean;
   quickUpdateTooltip?: React.ReactNode;
   isQuickUpdating?: boolean;
-  // NoRisk Compatibility-Status (null wenn Config nicht geladen oder ok)
-  noRiskStatus?: "blocked" | "warning" | null;
   // Version switching
   versionDropdownOpen: boolean;
   availableVersions: UnifiedVersion[] | null;
@@ -78,7 +76,6 @@ export function ContentTile({
   quickUpdateDisabled,
   quickUpdateTooltip,
   isQuickUpdating,
-  noRiskStatus,
 }: ContentTileProps) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((s) => s.accentColor);
@@ -134,20 +131,6 @@ export function ContentTile({
             <Icon icon="solar:bolt-bold-duotone" className="w-6 h-6 text-white/50" />
           )}
         </div>
-        {noRiskStatus === "blocked" && (
-          <div className="absolute top-0.5 left-0.5 z-10">
-            <Tooltip content={t("profiles.v3.tile.noriskBlocked")}>
-              <Icon icon="solar:danger-triangle-bold" className="w-4 h-4 text-red-500 drop-shadow-lg" />
-            </Tooltip>
-          </div>
-        )}
-        {noRiskStatus === "warning" && (
-          <div className="absolute top-0.5 left-0.5 z-10">
-            <Tooltip content={t("profiles.v3.tile.noriskWarning")}>
-              <Icon icon="solar:danger-triangle-bold" className="w-4 h-4 text-yellow-500 drop-shadow-lg" />
-            </Tooltip>
-          </div>
-        )}
       </div>
 
       {/* Identity */}

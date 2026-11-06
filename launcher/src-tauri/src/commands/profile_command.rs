@@ -14,7 +14,6 @@ use crate::state::profile_state::{
     ProfileState,
 };
 use crate::state::state_manager::State;
-use crate::commands::analytics_command::track_event as track_analytics;
 use crate::utils::datapack_utils::DataPackInfo;
 use crate::utils::mc_utils::{self, WorldInfo};
 use crate::utils::path_utils::{find_unique_profile_segment, copy_dir_recursively, count_files_recursively};
@@ -194,12 +193,6 @@ pub async fn create_profile(params: CreateProfileParams) -> Result<Uuid, Command
 
     let id = state.profile_manager.create_profile(profile.clone()).await?;
 
-    let mut props = std::collections::HashMap::new();
-    props.insert("profile_name".to_string(), serde_json::Value::String(profile.name.clone()));
-    props.insert("version".to_string(), serde_json::Value::String(profile.game_version.clone()));
-    props.insert("loader".to_string(), serde_json::Value::String(format!("{:?}", profile.loader).to_lowercase()));
-    track_analytics("profile_created", props);
-
     Ok(id)
 }
 
@@ -289,15 +282,8 @@ pub async fn launch_profile(
 
     let version = profile.game_version.clone();
     let modloader = profile.loader.clone();
-    
-    // Get experimental_mode from state config (needed for token refresh)
-    let is_experimental = state.config_manager.is_experimental_mode().await;
-    log::info!(
-        "[Command] Global experimental mode is: {}",
-        is_experimental
-    );
-    
-    let credentials = resolve_credentials_for_profile(&state, &profile, is_experimental).await?;
+
+    let credentials = resolve_credentials_for_profile(&state, &profile).await?;
 
     let profile_id = profile.id; // Store profile ID for later use
     let profile_clone = profile.clone();
@@ -370,20 +356,6 @@ pub async fn launch_profile(
                         "Successfully installed/launched Minecraft version {} for profile {}",
                         version, profile_id
                     );
-                    let mut props = std::collections::HashMap::new();
-                    props.insert("profile_id".to_string(), serde_json::Value::String(profile_id.to_string()));
-                    props.insert("version".to_string(), serde_json::Value::String(version.clone()));
-                    props.insert("loader".to_string(), serde_json::Value::String(modloader.as_str().to_string()));
-                    track_analytics("minecraft_started", props);
-
-                    if let Some(pack_id) = profile_clone.selected_norisk_pack_id.clone() {
-                        let mut pack_props = std::collections::HashMap::new();
-                        pack_props.insert("profile_id".to_string(), serde_json::Value::String(profile_id.to_string()));
-                        pack_props.insert("version".to_string(), serde_json::Value::String(version.clone()));
-                        pack_props.insert("loader".to_string(), serde_json::Value::String(modloader.as_str().to_string()));
-                        pack_props.insert("pack_id".to_string(), serde_json::Value::String(pack_id));
-                        track_analytics("play_norisk_pack", pack_props);
-                    }
                     // Emit the new LaunchSuccessful event
                     let success_payload = EventPayload {
                         event_id: uuid::Uuid::new_v4(),
@@ -1417,12 +1389,6 @@ pub async fn import_profile(
     )
     .await;
 
-    if let Ok(profile) = state.profile_manager.get_profile(new_profile_id).await {
-        let mut props = std::collections::HashMap::new();
-        props.insert("profile_name".to_string(), serde_json::Value::String(profile.name.clone()));
-        track_analytics("profile_imported", props);
-    }
-
     // Emit event to trigger UI update for the newly created profile (reusing state from disk space check)
     if let Err(e) = state
         .event_state
@@ -1863,16 +1829,15 @@ pub async fn is_profile_launching(profile_id: Uuid) -> Result<bool, CommandError
     Ok(state.process_manager.has_launching_process(profile_id))
 }
 
-/// Fetches the latest Norisk packs configuration from the API and updates the local cache.
+/// Lädt die Pack-Definitionen neu (`integrations::salami_packs`) und aktualisiert den Cache.
 #[tauri::command]
 pub async fn refresh_norisk_packs() -> Result<(), CommandError> {
     info!("Refreshing Norisk packs via command...");
     let state = State::get().await?;
-    let config = state.config_manager.get_config().await;
 
     match state
         .norisk_pack_manager
-        .fetch_and_update_config(&"", config.is_experimental)
+        .fetch_and_update_config()
         .await
     {
         Ok(_) => {
@@ -1886,17 +1851,16 @@ pub async fn refresh_norisk_packs() -> Result<(), CommandError> {
     }
 }
 
-/// Fetches the latest standard version profiles from the API and updates the local cache.
+/// Lädt die Standardprofile neu (`integrations::salami_packs`) und aktualisiert den Cache.
 /// Returns the standard profiles for immediate use.
 #[tauri::command]
 pub async fn refresh_standard_versions() -> Result<Vec<Profile>, CommandError> {
     info!("Refreshing standard versions via command...");
     let state = State::get().await?;
-    let config = state.config_manager.get_config().await;
 
     match state
         .norisk_version_manager
-        .fetch_and_update_config(&"", config.is_experimental)
+        .fetch_and_update_config()
         .await
     {
         Ok(_) => {
@@ -2803,10 +2767,9 @@ pub async fn launch_profile_with_overrides(
         qp_mp,
     );
 
-    let is_experimental = state.config_manager.is_experimental_mode().await;
     let credentials = match &account {
-        Some(acc) => Some(resolve_credentials_for_account(&state, acc, is_experimental).await?),
-        None => resolve_credentials_for_profile(&state, &profile, is_experimental).await?,
+        Some(acc) => Some(resolve_credentials_for_account(&state, acc).await?),
+        None => resolve_credentials_for_profile(&state, &profile).await?,
     };
 
     // Runtime-only local mods (referenced in place, never persisted to the profile).
@@ -2927,7 +2890,6 @@ fn apply_overrides(profile: &mut Profile, ov: LaunchOverrides) -> Result<(), Com
 async fn resolve_credentials_for_profile(
     state: &State,
     profile: &Profile,
-    is_experimental: bool,
 ) -> Result<Option<Credentials>, CommandError> {
     let get_active_account = || async {
         match state.minecraft_account_manager_v2.get_active_account().await {
@@ -2952,7 +2914,7 @@ async fn resolve_credentials_for_profile(
 
     match state
         .minecraft_account_manager_v2
-        .get_account_by_id_with_refresh(preferred_account_id, is_experimental)
+        .get_account_by_id_with_refresh(preferred_account_id)
         .await
     {
         Ok(Some(creds)) => {
@@ -2986,12 +2948,11 @@ async fn resolve_credentials_for_profile(
 async fn resolve_credentials_for_account(
     state: &State,
     account_ref: &str,
-    is_experimental: bool,
 ) -> Result<Credentials, CommandError> {
     let mgr = &state.minecraft_account_manager_v2;
 
     let creds = if let Ok(uuid) = Uuid::parse_str(account_ref) {
-        mgr.get_account_by_id_with_refresh(uuid, is_experimental)
+        mgr.get_account_by_id_with_refresh(uuid)
             .await?
             .ok_or_else(|| {
                 CommandError::from(AppError::Other(format!(
@@ -3017,7 +2978,7 @@ async fn resolve_credentials_for_account(
                     }
                 )))
             })?;
-        mgr.get_account_by_id_with_refresh(id, is_experimental)
+        mgr.get_account_by_id_with_refresh(id)
             .await?
             .ok_or_else(|| {
                 CommandError::from(AppError::Other(format!(
@@ -3125,10 +3086,9 @@ pub async fn launch_temp_profile(args: TempLaunchArgs) -> Result<(), CommandErro
         args.quick_play_multiplayer,
     );
 
-    let is_experimental = state.config_manager.is_experimental_mode().await;
     let credentials = match &args.account {
-        Some(acc) => Some(resolve_credentials_for_account(&state, acc, is_experimental).await?),
-        None => resolve_credentials_for_profile(&state, &profile, is_experimental).await?,
+        Some(acc) => Some(resolve_credentials_for_account(&state, acc).await?),
+        None => resolve_credentials_for_profile(&state, &profile).await?,
     };
 
     // Register in the in-memory profile map so by-id lookups during the install

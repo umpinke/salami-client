@@ -1,6 +1,6 @@
 use crate::harness::*;
-use noriskclient_launcher_v3_lib::sync::model::{AdoptStrategy, DetachMode, SyncTargetKind};
-use noriskclient_launcher_v3_lib::utils::symlink_utils;
+use salami_client_lib::sync::model::{AdoptStrategy, DetachMode, SyncTargetKind};
+use salami_client_lib::utils::symlink_utils;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -305,7 +305,7 @@ async fn a_nested_folder_is_moved_whole() {
 #[cfg(windows)]
 #[tokio::test]
 async fn a_pack_may_not_point_its_shared_folder_into_the_pack_storage_itself() {
-    use noriskclient_launcher_v3_lib::sync::paths::sync_packs_root;
+    use salami_client_lib::sync::paths::sync_packs_root;
 
     let forbidden = sync_packs_root().join("nrc-external-master-test");
     let _ = tokio::fs::remove_dir_all(&forbidden).await;

@@ -1,4 +1,4 @@
-use noriskclient_launcher_v3_lib::utils::disk_space_utils::*;
+use salami_client_lib::utils::disk_space_utils::*;
 
 #[test]
 fn sizes_are_shown_in_the_largest_unit_that_fits() {

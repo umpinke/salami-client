@@ -9,7 +9,7 @@ use crate::utils::api_utils;
 
 const NRC_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// Fluent wrapper over [`reqwest::RequestBuilder`] for the NoRisk backend lane:
+/// Fluent wrapper over [`reqwest::RequestBuilder`] for JSON/text API requests:
 /// build → header/query/body → send → uniform `AppError::RequestError` mapping →
 /// one of the shared response terminals in [`api_utils`]. Request-side only; the
 /// terminals delegate verbatim to `api_utils` (status-check, structured-error
@@ -67,12 +67,12 @@ impl NrcRequest {
     /// The single place that error is built for this lane.
     async fn send_inner(self, ctx: &str) -> Result<reqwest::Response> {
         let request = self.builder.try_clone().and_then(|b| b.build().ok());
-        // Salami: zentraler Kill-Switch – keine Requests an NoRisk-Server (siehe branding.rs).
+        // Salami: Sicherheitsnetz – keine Requests an NoRisk-Server (siehe branding.rs).
         if let Some(req) = request.as_ref() {
             if crate::branding::is_blocked_host(req.url().host_str()) {
-                debug!("[HTTP] {} blocked: NoRisk services disabled ({})", ctx, req.url());
+                debug!("[HTTP] {} blocked: NoRisk servers are blocked ({})", ctx, req.url());
                 return Err(AppError::RequestError(format!(
-                    "{} skipped: NoRisk online services are disabled in {}",
+                    "{} skipped: NoRisk servers are blocked in {}",
                     ctx,
                     crate::branding::PRODUCT_NAME
                 )));

@@ -1,5 +1,5 @@
-use noriskclient_launcher_v3_lib::integrations::curseforge::*;
-use noriskclient_launcher_v3_lib::state::profile_state::ModLoader;
+use salami_client_lib::integrations::curseforge::*;
+use salami_client_lib::state::profile_state::ModLoader;
 
 #[test]
 fn extracts_plain_loader_versions() {

@@ -61,7 +61,7 @@ npx yarn@1.22.22 install
 npx yarn@1.22.22 tauri dev
 ```
 
-Die Clip-Aufnahme (`norisk-capture`, FFmpeg) braucht zusätzlich **LLVM/libclang** (`winget install LLVM.LLVM`). Ohne LLVM startest du den Launcher ohne Clip-Funktion:
+Die Clip-Aufnahme (`salami-capture`, FFmpeg) braucht zusätzlich **LLVM/libclang** (`winget install LLVM.LLVM`). Ohne LLVM startest du den Launcher ohne Clip-Funktion:
 
 ```bash
 npx yarn@1.22.22 tauri dev --config src-tauri/tauri.dev-noclips.json
@@ -86,7 +86,7 @@ npx yarn@1.22.22 tauri build --config src-tauri/tauri.release-local.json --confi
 
 Der Build baut vorher `salami-core` für alle Versionen (`scripts/bundle-salami-core.mjs` → `./gradlew launcherBundle`). Der Installer legt die Jars als `mods\salami-core-<version>.jar` neben die Launcher-Exe, damit braucht der installierte Launcher keinen Dev-Ordner. Liegt zusätzlich eine Jar im Datenordner `dev\` (von `installDev`), nimmt der Launcher die neuere der beiden Dateien.
 
-Der Build braucht **LLVM** (`winget install LLVM.LLVM`), denn er baut auch das Clip-Aufnahmeprogramm (`yarn stage-native` → `norisk-capture`). Der Installer legt `norisk-capture.exe`, die FFmpeg-DLLs und den Grafik-Hook neben die Launcher-Exe. Clips sind standardmäßig aus; wer sie unter *Einstellungen → Clips* einschaltet, speichert mit **F8** die letzten 30 Sekunden. Der lokale Build lässt nur die Updater-Signatur weg.
+Der Build braucht **LLVM** (`winget install LLVM.LLVM`), denn er baut auch das Clip-Aufnahmeprogramm (`yarn stage-native` → `salami-capture`). Der Installer legt `salami-capture.exe`, die FFmpeg-DLLs und den Grafik-Hook neben die Launcher-Exe. Clips sind standardmäßig aus; wer sie unter *Einstellungen → Clips* einschaltet, speichert mit **F8** die letzten 30 Sekunden. Der lokale Build lässt nur die Updater-Signatur weg.
 
 ### macOS und Linux
 
@@ -98,7 +98,7 @@ Den Launcher gibt es auch für macOS (Apple Silicon und Intel, ab macOS 11) und 
 | macOS (Intel) | `Salami-Client_<version>_macOS-Intel.dmg` | wie oben |
 | Linux | `Salami-Client_<version>_Linux.AppImage` oder `_Linux.deb` | `~/.local/share/salamiclient` |
 
-Die mitgelieferten `salami-core`-Jars liegen in den App-Ressourcen: auf dem Mac in `Salami Client.app/Contents/Resources/mods/`, unter Linux in `/usr/lib/Salami Client/mods/`. Die Mac-App bringt die Clip-Aufnahme mit (`norisk-capture`); unter Linux gibt es keine Clips.
+Die mitgelieferten `salami-core`-Jars liegen in den App-Ressourcen: auf dem Mac in `Salami Client.app/Contents/Resources/mods/`, unter Linux in `/usr/lib/Salami Client/mods/`. Die Mac-App bringt die Clip-Aufnahme mit (`salami-capture`); unter Linux gibt es keine Clips.
 
 Die Mac-App ist nur ad hoc signiert, nicht von Apple notarisiert (dafür bräuchte es ein Apple-Developer-Konto). Beim ersten Öffnen blockiert macOS sie deshalb. Spieler öffnen sie einmal über *Systemeinstellungen → Datenschutz & Sicherheit → Trotzdem öffnen*. Danach startet sie normal, und Auto-Updates laufen ohne Nachfrage.
 
@@ -173,13 +173,10 @@ node --test "src/features/mod-downloader/*.test.ts"
 **Launcher**
 
 - Alles Markenspezifische steht zentral an zwei Stellen: `src-tauri/src/branding.rs` und `src/config/salami.ts`.
-- **NoRisk-Online-Dienste sind aus** (`NORISK_SERVICES_ENABLED = false`):
-  - Requests an `*.norisk.gg` blockiert das Backend zentral in `utils/http_client.rs`.
-  - Im Frontend blockiert sie die CSP.
-  - Es werden keine Login-Daten an NoRisk gemeldet.
-- Packs und Standardprofile kommen aus `packs/*.json` statt von `api.norisk.gg`. Optional lassen sie sich remote laden (`PACKS_URL`).
-- Der **Updater ist aus**, bis ein eigener Endpoint und ein eigener Signaturschlüssel existieren.
-- Die internen Crate-Namen (`noriskclient_launcher_v3_lib`) bleiben bewusst unverändert. So bleiben Upstream-Updates per `git subtree pull` mergebar.
+- **Keine NoRisk-Dienste**: Cape-Shop, Cosmetics, Freunde/Chat, News, Werbung, Analytics, Feature-Flags und der NoRisk-Login sind aus dem Code entfernt. Als Sicherheitsnetz lehnt `utils/http_client.rs` Anfragen an `*.norisk.gg` ab (etwa aus importierten Packs), im Frontend blockiert sie die CSP.
+- Die 3D-Skin-Ansicht und die Skin-Vorschaubilder nutzen [skinview3d](https://github.com/bs-community/skinview3d) (MIT, `src/lib/skin3d/`).
+- Packs und Standardprofile kommen aus `packs/*.json`. Optional lassen sie sich remote laden (`PACKS_URL`). Die Pack-Logik heißt intern noch `norisk_packs`, und `.noriskpack`-Dateien lassen sich weiter importieren.
+- Updates kommen über `latest.json` im neuesten GitHub-Release (`UPDATE_BASE_URL` in `branding.rs`), signiert mit dem eigenen Schlüssel.
 
 **Mod**
 
@@ -269,17 +266,10 @@ Kampf-Automatisierung (Auto Totem, Crystal Macro, Anchors …) ist auf den meist
 
 Der Salami Client enthält **keine** Funktionen, um Anti-Cheat oder Server-Moderation zu umgehen oder zu täuschen.
 
-## Upstream-Updates des Launchers holen
-
-```bash
-git subtree pull --prefix=launcher https://github.com/NoRiskClient/noriskclient-launcher.git v3 --squash
-python -I scripts/rebrand_translations.py
-```
-
 ## Lizenz
 
 GPL-3.0, siehe [LICENSE](LICENSE).
 
-Der Launcher basiert auf dem NoRisk Launcher (GPL-3.0). Dieser basiert wiederum teilweise auf [LiquidLauncher](https://github.com/CCBlueX/LiquidLauncher).
+Der Launcher basiert auf dem NoRisk Launcher (GPL-3.0). Dieser basiert wiederum teilweise auf [LiquidLauncher](https://github.com/CCBlueX/LiquidLauncher). Die 3D-Skin-Ansicht nutzt [skinview3d](https://github.com/bs-community/skinview3d) (MIT).
 
-„NoRisk“ und das NoRisk-Logo sind Marken ihrer Inhaber und werden im Salami Client nicht verwendet.
+Der Salami Client nutzt keine Dienste, Server, Pakete oder Logos von NoRisk. „NoRisk“ und das NoRisk-Logo sind Marken ihrer Inhaber.

@@ -22,22 +22,6 @@ pub struct Hooks {
     pub post_exit: Option<String>,
 }
 
-/// Referral tracking state - keeps code even after redemption for tracing
-#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
-pub struct ReferralState {
-    /// The download UUID from the installer filename
-    pub code: String,
-    /// Whether the code has been successfully reported to backend
-    #[serde(default)]
-    pub redeemed: bool,
-    /// Timestamp when the code was redeemed
-    #[serde(default)]
-    pub redeemed_at: Option<i64>,
-    /// Account UUID that redeemed the code
-    #[serde(default)]
-    pub redeemed_by_account: Option<String>,
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum QualityPreset {
@@ -116,13 +100,13 @@ pub struct ClipConfig {
     #[serde(default = "default_clip_bitrate")]
     pub bitrate_kbps: u32,
     #[serde(default)]
-    pub codec: norisk_ipc::ClipCodec,
+    pub codec: salami_ipc::ClipCodec,
     #[serde(default = "default_clip_encoder")]
     pub encoder: String,
     #[serde(default = "default_true_bool")]
     pub capture_audio: bool,
     #[serde(default)]
-    pub audio_source: norisk_ipc::AudioSourceChoice,
+    pub audio_source: salami_ipc::AudioSourceChoice,
     #[serde(default)]
     pub audio_device_id: Option<String>,
     #[serde(default = "default_volume")]
@@ -166,10 +150,10 @@ impl Default for ClipConfig {
             height: default_clip_height(),
             fps: default_clip_fps(),
             bitrate_kbps: default_clip_bitrate(),
-            codec: norisk_ipc::ClipCodec::default(),
+            codec: salami_ipc::ClipCodec::default(),
             encoder: default_clip_encoder(),
             capture_audio: true,
-            audio_source: norisk_ipc::AudioSourceChoice::default(),
+            audio_source: salami_ipc::AudioSourceChoice::default(),
             audio_device_id: None,
             game_volume: default_volume(),
             other_volume: default_volume(),
@@ -290,10 +274,10 @@ impl ClipConfig {
         video + audio
     }
 
-    pub fn to_capture_config(&self) -> norisk_ipc::CaptureConfig {
-        use norisk_ipc::EncoderPreference;
+    pub fn to_capture_config(&self) -> salami_ipc::CaptureConfig {
+        use salami_ipc::EncoderPreference;
         let quality = self.effective_quality();
-        norisk_ipc::CaptureConfig {
+        salami_ipc::CaptureConfig {
             width: quality.width,
             height: quality.height,
             fps: quality.fps,
@@ -362,6 +346,9 @@ fn default_true_bool() -> bool {
     true
 }
 
+/// Launcher-Einstellungen (`launcher_config.json`). Felder älterer Versionen, die es nicht
+/// mehr gibt (`enable_analytics`, `referral_state`, `pack_rollout_override` aus den
+/// NoRisk-Diensten), ignoriert serde beim Lesen.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LauncherConfig {
     #[serde(default = "default_config_version")]
@@ -395,18 +382,10 @@ pub struct LauncherConfig {
     pub global_custom_jvm_args: Option<String>,
     #[serde(default)]
     pub custom_game_directory: Option<PathBuf>,
-    #[serde(default = "default_enable_analytics")]
-    pub enable_analytics: bool,
     #[serde(default = "default_use_browser_based_login")]
     pub use_browser_based_login: bool,
     #[serde(default = "default_cache_natives_extraction")]
     pub cache_natives_extraction: bool,
-    /// Referral tracking state - code stays even after redemption
-    #[serde(default)]
-    pub referral_state: Option<ReferralState>,
-    /// Pack rollout override: "auto" | "off" | "on"
-    #[serde(default = "default_pack_rollout_override")]
-    pub pack_rollout_override: String,
     #[serde(default)]
     pub clips: ClipConfig,
     #[serde(default)]
@@ -479,20 +458,12 @@ fn default_global_memory_settings() -> MemorySettings {
     }
 }
 
-fn default_enable_analytics() -> bool {
-    false
-}
-
 fn default_use_browser_based_login() -> bool {
     false
 }
 
 fn default_cache_natives_extraction() -> bool {
     true
-}
-
-fn default_pack_rollout_override() -> String {
-    "auto".to_string()
 }
 
 impl Default for LauncherConfig {
@@ -513,11 +484,8 @@ impl Default for LauncherConfig {
             global_memory_settings: default_global_memory_settings(),
             global_custom_jvm_args: None,
             custom_game_directory: None,
-            enable_analytics: default_enable_analytics(),
             use_browser_based_login: default_use_browser_based_login(),
             cache_natives_extraction: default_cache_natives_extraction(),
-            referral_state: None,
-            pack_rollout_override: default_pack_rollout_override(),
             clips: ClipConfig::default(),
             log_level: LogLevel::default(),
             salami_theme: false,
@@ -615,9 +583,6 @@ impl ConfigManager {
                             }
                             if let Some(hide) = obj.get("hide_on_process_start").and_then(|v| v.as_bool()) {
                                 migrated_config.hide_on_process_start = hide;
-                            }
-                            if let Some(analytics) = obj.get("enable_analytics").and_then(|v| v.as_bool()) {
-                                migrated_config.enable_analytics = analytics;
                             }
                             if let Some(browser_login) = obj.get("use_browser_based_login").and_then(|v| v.as_bool()) {
                                 migrated_config.use_browser_based_login = browser_login;
@@ -775,16 +740,6 @@ impl ConfigManager {
                         "Changing beta channel check: {} -> {}",
                         current.check_beta_channel, new_config.check_beta_channel
                     );
-
-                    let mut props = std::collections::HashMap::new();
-                    props.insert("enabled".to_string(), serde_json::Value::Bool(new_config.check_beta_channel));
-                    crate::commands::analytics_command::track_event("beta_update_toggled", props);
-                }
-                if current.clips.enabled != new_config.clips.enabled {
-                    crate::commands::analytics_command::track(
-                        "clips_toggled",
-                        serde_json::json!({ "enabled": new_config.clips.enabled }),
-                    );
                 }
                 if current.profile_grouping_criterion != new_config.profile_grouping_criterion {
                     info!(
@@ -842,12 +797,6 @@ impl ConfigManager {
                         current.custom_game_directory, new_config.custom_game_directory
                     );
                 }
-                if current.enable_analytics != new_config.enable_analytics {
-                    info!(
-                        "Changing analytics: {} -> {}",
-                        current.enable_analytics, new_config.enable_analytics
-                    );
-                }
                 if current.use_browser_based_login != new_config.use_browser_based_login {
                     info!(
                         "Changing use browser based login: {} -> {}",
@@ -872,11 +821,8 @@ impl ConfigManager {
                     global_memory_settings: new_config.global_memory_settings,
                     global_custom_jvm_args: new_config.global_custom_jvm_args.clone(),
                     custom_game_directory: new_config.custom_game_directory.clone(),
-                    enable_analytics: new_config.enable_analytics,
                     use_browser_based_login: new_config.use_browser_based_login,
                     cache_natives_extraction: new_config.cache_natives_extraction,
-                    referral_state: new_config.referral_state.clone(),
-                    pack_rollout_override: new_config.pack_rollout_override.clone(),
                     clips: {
                         let mut clips = new_config.clips.clone();
                         clips.normalize();
@@ -1076,7 +1022,7 @@ mod clip_quality_tests {
 
         let mut config: ClipConfig = serde_json::from_value(stored).expect("parses");
         assert_eq!(config.quality, None, "the field is absent, not defaulted");
-        assert_eq!(config.codec, norisk_ipc::ClipCodec::H264);
+        assert_eq!(config.codec, salami_ipc::ClipCodec::H264);
 
         assert_eq!(
             config.effective_quality(),
@@ -1162,7 +1108,7 @@ mod clip_quality_tests {
             height: 1080,
             fps: 60,
             bitrate_kbps: 20_000,
-            codec: norisk_ipc::ClipCodec::Av1,
+            codec: salami_ipc::ClipCodec::Av1,
             encoder: "nvenc".to_string(),
             ..ClipConfig::default()
         };
@@ -1172,8 +1118,8 @@ mod clip_quality_tests {
         assert_eq!(capture.height, 360);
         assert_eq!(capture.fps, 24);
         assert_eq!(capture.bitrate_kbps, 2_000);
-        assert_eq!(capture.codec, norisk_ipc::ClipCodec::Av1);
-        assert_eq!(capture.encoder, norisk_ipc::EncoderPreference::Nvenc);
+        assert_eq!(capture.codec, salami_ipc::ClipCodec::Av1);
+        assert_eq!(capture.encoder, salami_ipc::EncoderPreference::Nvenc);
     }
 
     #[test]
@@ -1303,7 +1249,7 @@ mod clip_quality_tests {
         let changes: Vec<(&str, Box<dyn Fn(&mut ClipConfig)>)> = vec![
             ("enabled", Box::new(|c: &mut ClipConfig| c.enabled = !c.enabled)),
             ("quality", Box::new(|c: &mut ClipConfig| c.quality = Some(QualityPreset::Low))),
-            ("codec", Box::new(|c: &mut ClipConfig| c.codec = norisk_ipc::ClipCodec::Av1)),
+            ("codec", Box::new(|c: &mut ClipConfig| c.codec = salami_ipc::ClipCodec::Av1)),
             ("encoder", Box::new(|c: &mut ClipConfig| c.encoder = "nvenc".into())),
             ("bitrate", Box::new(|c: &mut ClipConfig| c.bitrate_kbps = 55_000)),
             ("resolution", Box::new(|c: &mut ClipConfig| c.width = 854)),
@@ -1312,7 +1258,7 @@ mod clip_quality_tests {
             ("audio", Box::new(|c: &mut ClipConfig| c.capture_audio = !c.capture_audio)),
             (
                 "audio source",
-                Box::new(|c: &mut ClipConfig| c.audio_source = norisk_ipc::AudioSourceChoice::GameOnly),
+                Box::new(|c: &mut ClipConfig| c.audio_source = salami_ipc::AudioSourceChoice::GameOnly),
             ),
             (
                 "audio device",
@@ -1391,5 +1337,21 @@ mod clip_quality_tests {
                 serde_json::json!(name)
             );
         }
+    }
+
+    #[test]
+    fn a_config_with_removed_norisk_fields_still_loads() {
+        let old = serde_json::json!({
+            "version": 1,
+            "is_experimental": false,
+            "enable_analytics": true,
+            "referral_state": { "code": "abc", "redeemed": true },
+            "pack_rollout_override": "off",
+            "concurrent_downloads": 4,
+            "salami_theme": true
+        });
+        let config: LauncherConfig = serde_json::from_value(old).expect("old config must load");
+        assert_eq!(config.concurrent_downloads, 4);
+        assert!(config.salami_theme);
     }
 }

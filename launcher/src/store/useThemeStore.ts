@@ -205,7 +205,6 @@ export const DEFAULT_BORDER_RADIUS = 10;
 export const MIN_BORDER_RADIUS = 0;
 export const MAX_BORDER_RADIUS = 32;
 
-let borderRadiusAnalyticsDebounceId: ReturnType<typeof setTimeout> | null = null;
 
 interface ThemeState {
   accentColor: AccentColor;
@@ -225,10 +224,6 @@ interface ThemeState {
   staticBackground: boolean;
   toggleStaticBackground: () => void;
   toggleBackgroundAnimation: () => void;
-  hasAcceptedTermsOfService: boolean;
-  acceptTermsOfService: () => void;
-  hasAcceptedCapeGuidelines: boolean;
-  acceptCapeGuidelines: () => void;
   borderRadius: number;
   setBorderRadius: (radius: number) => void;
   applyBorderRadiusToDOM: () => void;
@@ -251,27 +246,9 @@ interface ThemeState {
   // Mod source selection
   modSource: ModPlatform;
   setModSource: (source: ModPlatform) => void;
-  // News section width
-  newsSectionWidth: number;
-  setNewsSectionWidth: (width: number) => void;
-  // Featured HugoSMP card on Play tab
-  featureMode: boolean;
-  setFeatureMode: (enabled: boolean) => void;
   // Language
   language: SupportedLanguage;
   setLanguage: (lang: SupportedLanguage) => void;
-  // Analytics consent state
-  analyticsConsent: {
-    hasSeenBanner: boolean;
-    hasMadeDecision: boolean;
-    decision: 'accepted' | 'declined' | null;
-    lastShown: string | null;
-    reminderCount: number;
-    launchCount: number;
-  };
-  setAnalyticsConsent: (consent: Partial<ThemeState['analyticsConsent']>) => void;
-  incrementLaunchCount: () => void;
-  shouldShowAnalyticsBanner: () => boolean;
 }
 
 export const useThemeStore = create<ThemeState>()(
@@ -283,8 +260,6 @@ export const useThemeStore = create<ThemeState>()(
       isDetailViewSidebarOnLeft: true,
       profileGroupingCriterion: "group",
       staticBackground: true,
-      hasAcceptedTermsOfService: false,
-      hasAcceptedCapeGuidelines: false,
       customColorHistory: [],
       borderRadius: DEFAULT_BORDER_RADIUS,
       collapsedProfileGroups: [],
@@ -297,45 +272,18 @@ export const useThemeStore = create<ThemeState>()(
       openContextMenuId: null,
       // Mod source selection - defaults
       modSource: ModPlatform.Modrinth,
-      // News section width - defaults
-      newsSectionWidth: 375,
-      // Featured HugoSMP card - defaults
-      featureMode: false,
       // Language - defaults
       language: "en" as SupportedLanguage,
-      // Analytics consent state - defaults
-      analyticsConsent: {
-        hasSeenBanner: false,
-        hasMadeDecision: false,
-        decision: null,
-        lastShown: null,
-        reminderCount: 0,
-        launchCount: 0,
-      },
 
       setAccentColor: async (color: AccentColor) => {
         set({ accentColor: color });
         get().applyAccentColorToDOM();
-
-        const { trackEvent } = await import('../services/analytics-service');
-        const name = color.name?.trim() || 'Custom';
-        trackEvent('color_changed', { color: name, color_name: name }).catch(console.error);
       },
 
       setBorderRadius: (radius: number) => {
         const clampedRadius = Math.max(MIN_BORDER_RADIUS, Math.min(MAX_BORDER_RADIUS, radius));
         set({ borderRadius: clampedRadius });
         get().applyBorderRadiusToDOM();
-
-        if (borderRadiusAnalyticsDebounceId !== null) {
-          clearTimeout(borderRadiusAnalyticsDebounceId);
-        }
-        borderRadiusAnalyticsDebounceId = setTimeout(() => {
-          borderRadiusAnalyticsDebounceId = null;
-          void import("../services/analytics-service").then(({ trackEvent }) => {
-            trackEvent('border_radius_changed', { radius: clampedRadius, radius_px: clampedRadius }).catch(console.error);
-          });
-        }, 1000);
       },
 
       setCustomAccentColor: (hexColor: string) => {
@@ -402,12 +350,8 @@ export const useThemeStore = create<ThemeState>()(
 
       toggleStaticBackground: () => {
         set((state) => ({ staticBackground: !state.staticBackground }));
-      },      acceptTermsOfService: () => {
-        set({ hasAcceptedTermsOfService: true });
       },
-      acceptCapeGuidelines: () => {
-        set({ hasAcceptedCapeGuidelines: true });
-      },      applyAccentColorToDOM: () => {
+      applyAccentColorToDOM: () => {
         const { accentColor } = get();
 
         const hexToRgb = (hex: string) => {
@@ -508,56 +452,13 @@ export const useThemeStore = create<ThemeState>()(
         set({ modSource: source });
       },
 
-      // News section width
-      setNewsSectionWidth: (width: number) => {
-        set({ newsSectionWidth: width });
-      },
-
-      // Featured HugoSMP card
-      setFeatureMode: (enabled: boolean) => {
-        set({ featureMode: enabled });
-      },
-
       // Language
       setLanguage: (lang: SupportedLanguage) => {
         set({ language: lang });
         import("../i18n/i18n").then((mod) => mod.default.changeLanguage(lang));
-        void import("../services/analytics-service").then(({ trackEvent }) => {
-          trackEvent("language_changed", { language: lang }).catch(console.error);
-        });
       },
-
-      // Analytics consent functions
-      setAnalyticsConsent: (consentUpdate) => {
-        set((state) => ({
-          analyticsConsent: { ...state.analyticsConsent, ...consentUpdate }
-        }));
-      },
-
-      incrementLaunchCount: () => {
-        set((state) => ({
-          analyticsConsent: {
-            ...state.analyticsConsent,
-            launchCount: state.analyticsConsent.launchCount + 1
-          }
-        }));
-      },
-
-      shouldShowAnalyticsBanner: () => {
-        const state = get();
-        const consent = state.analyticsConsent;
-
-        if (consent.hasMadeDecision) return false;
-        if (consent.launchCount < 6) return false;
-        if (consent.reminderCount >= 3) return false;
-        if (consent.lastShown) {
-          const lastShown = new Date(consent.lastShown);
-          const daysSinceLastShown = (Date.now() - lastShown.getTime()) / (1000 * 60 * 60 * 24);
-          if (daysSinceLastShown < 30) return false;
-        }
-        return true;
-      },
-    }),    {
+    }),
+    {
       name: "norisk-theme-storage",
       version: 1,
       // Salami Client: einmalig von den eckigen NoRisk-Ecken (0) auf abgerundete wechseln
@@ -591,24 +492,10 @@ export const useThemeStore = create<ThemeState>()(
             state.profilesTabVersionFilters = [];
           }
 
-          const legacyFeaturedLaunchMode = (state as { featuredLaunchMode?: string }).featuredLaunchMode;
-          if (legacyFeaturedLaunchMode === "hugo") {
-            state.featureMode = true;
-          } else if (legacyFeaturedLaunchMode) {
-            state.featureMode = false;
-          }
-          delete (state as { featuredLaunchMode?: string }).featuredLaunchMode;
-
-          // Ensure analytics consent state exists for existing users
-          if (!state.analyticsConsent) {
-            state.analyticsConsent = {
-              hasSeenBanner: false,
-              hasMadeDecision: false,
-              decision: null,
-              lastShown: null,
-              reminderCount: 0,
-              launchCount: 0,
-            };
+          // Zustände entfernter NoRisk-Funktionen (Featured-Server, Analytics, AGB, News) verwerfen
+          const legacy = state as unknown as Record<string, unknown>;
+          for (const key of ["featuredLaunchMode", "featureMode", "analyticsConsent", "hasAcceptedTermsOfService", "hasAcceptedCapeGuidelines", "newsSectionWidth"]) {
+            delete legacy[key];
           }
         }
       },

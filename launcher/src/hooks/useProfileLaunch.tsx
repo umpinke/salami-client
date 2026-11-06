@@ -7,7 +7,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { LaunchState } from "../store/launch-state-store";
 import { useLaunchStateStore, DEFAULT_PROFILE_STATE } from "../store/launch-state-store";
 import * as ProcessService from "../services/process-service";
-import type { LaunchOverrides } from "../services/process-service";
 import { toast } from "react-hot-toast";
 import i18n from "../i18n/i18n";
 import { useGlobalModal } from "./useGlobalModal";
@@ -294,7 +293,6 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
   const handleQuickPlayLaunch = async (
       singleplayer?: string,
       multiplayer?: string,
-      overrides?: LaunchOverrides,
     ) => {
       const currentProfile = getProfileState(profileId);
 
@@ -318,32 +316,8 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
         return;
       }
 
-      if (!hasAccountOrPrompt(() => handleQuickPlayLaunch(singleplayer, multiplayer, overrides))) return;
+      if (!hasAccountOrPrompt(() => handleQuickPlayLaunch(singleplayer, multiplayer))) return;
       if (!(await ensureSyncConfirmed())) return;
-
-      if (overrides) {
-        initiateButtonLaunch(profileId);
-        try {
-          await ProcessService.launch(
-            profileId,
-            singleplayer,
-            multiplayer,
-            undefined,
-            skipLastPlayedUpdate,
-            overrides,
-          );
-        } catch (err: any) {
-          console.error("Failed to launch profile with overrides:", err);
-          const launchErrorMsg =
-            typeof err === "string"
-              ? err
-              : err.message || err.toString() || "Unknown error during launch.";
-          toast.error(i18n.t('launch.failed', { error: launchErrorMsg }), { id: `launch-error-${profileId}` });
-          setLaunchError(profileId, launchErrorMsg);
-          onLaunchError?.(launchErrorMsg);
-        }
-        return;
-      }
 
       // Check if migration is needed
       try {

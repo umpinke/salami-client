@@ -828,7 +828,7 @@ impl NoriskModpacksConfig {
     /// die es hier nicht gibt. Solche Profile laufen mit dem Salami-Pack, statt beim
     /// Start mit "Pack ID not found" abzubrechen.
     pub fn effective_pack_id<'a>(&'a self, pack_id: &'a str) -> &'a str {
-        if self.packs.contains_key(pack_id) || crate::branding::NORISK_SERVICES_ENABLED {
+        if self.packs.contains_key(pack_id) {
             return pack_id;
         }
         match self.packs.get_key_value(crate::branding::FALLBACK_PACK_ID) {

@@ -1,5 +1,5 @@
-use noriskclient_launcher_v3_lib::error::AppError;
-use noriskclient_launcher_v3_lib::minecraft::auth::minecraft_auth::*;
+use salami_client_lib::error::AppError;
+use salami_client_lib::minecraft::auth::minecraft_auth::*;
 use reqwest::StatusCode;
 
 fn deserialize_failure(status: StatusCode) -> AppError {
@@ -73,4 +73,26 @@ fn offline_toast_only_on_true_unreachable() {
         "boom".to_string()
     )));
     assert!(!is_offline_error(&AppError::NoCredentialsError));
+}
+
+#[test]
+fn reads_accounts_saved_with_norisk_token_fields() {
+    let saved = serde_json::json!({
+        "id": "069a79f4-44e9-4726-a5be-fca90e38aaf5",
+        "username": "Notch",
+        "access_token": "mc",
+        "refresh_token": "ms",
+        "expires": "2030-01-01T00:00:00Z",
+        "norisk_credentials": { "production": { "value": "jwt" }, "experimental": null },
+        "active": true,
+        "ignore_child_protection_warning": true,
+        "auth_flow": "Sisu"
+    });
+    let creds: Credentials = serde_json::from_value(saved).expect("old account must load");
+    assert_eq!(creds.username, "Notch");
+    assert!(creds.active);
+    assert_eq!(creds.auth_flow, Some(AuthFlow::Sisu));
+
+    let written = serde_json::to_value(&creds).unwrap();
+    assert!(written.get("norisk_credentials").is_none());
 }

@@ -1,5 +1,5 @@
-use noriskclient_launcher_v3_lib::integrations::mod_dependencies::*;
-use noriskclient_launcher_v3_lib::integrations::unified_mod::{
+use salami_client_lib::integrations::mod_dependencies::*;
+use salami_client_lib::integrations::unified_mod::{
     ModPlatform, UnifiedDependency, UnifiedDependencyType,
 };
 use std::collections::HashSet;

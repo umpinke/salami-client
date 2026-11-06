@@ -1,4 +1,4 @@
-use noriskclient_launcher_v3_lib::utils::download_utils::*;
+use salami_client_lib::utils::download_utils::*;
 use std::path::PathBuf;
 use tokio::fs;
 

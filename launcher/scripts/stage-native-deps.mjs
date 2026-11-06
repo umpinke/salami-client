@@ -37,7 +37,7 @@ if (process.platform === "darwin") {
     [
       "build",
       "-p",
-      "norisk-capture",
+      "salami-capture",
       ...(profile === "release" ? ["--release"] : []),
       ...(target ? ["--target", target] : []),
     ],
@@ -49,12 +49,12 @@ if (process.platform === "darwin") {
     "target",
     ...(target ? [target] : []),
     profile,
-    "norisk-capture",
+    "salami-capture",
   );
-  const destination = path.join(staging, `norisk-capture-${triple}`);
+  const destination = path.join(staging, `salami-capture-${triple}`);
   fs.copyFileSync(source, destination);
   fs.chmodSync(destination, 0o755);
-  ok(`norisk-capture-${triple}`);
+  ok(`salami-capture-${triple}`);
   process.exit(0);
 }
 
@@ -65,16 +65,16 @@ if (process.platform !== "win32") {
 
 console.log(`\nStaging capture binaries (${profile})`);
 
-step("building norisk-capture");
+step("building salami-capture");
 execFileSync(
   "cargo",
   [
     "build",
     ...(profile === "release" ? ["--release"] : []),
     "-p",
-    "norisk-capture",
+    "salami-capture",
     "--bin",
-    "norisk-capture",
+    "salami-capture",
   ],
   { cwd: srcTauri, stdio: "inherit" },
 );
@@ -84,15 +84,15 @@ freeLockedHooks();
 const triple = readHostTriple();
 fs.mkdirSync(staging, { recursive: true });
 
-const daemon = path.join(fromDir, "norisk-capture.exe");
+const daemon = path.join(fromDir, "salami-capture.exe");
 if (!fs.existsSync(daemon)) {
   throw new Error(
-    `norisk-capture.exe is not in ${fromDir} even after building.`,
+    `salami-capture.exe is not in ${fromDir} even after building.`,
   );
 }
-const daemonTarget = path.join(staging, `norisk-capture-${triple}.exe`);
+const daemonTarget = path.join(staging, `salami-capture-${triple}.exe`);
 fs.copyFileSync(daemon, daemonTarget);
-ok(`norisk-capture-${triple}.exe  (${mb(fs.statSync(daemonTarget).size)} MB)`);
+ok(`salami-capture-${triple}.exe  (${mb(fs.statSync(daemonTarget).size)} MB)`);
 
 const ffmpegBin = path.join(srcTauri, "third-party", "ffmpeg", "bin");
 const hookDir = path.join(srcTauri, "third-party", "graphics-hook");

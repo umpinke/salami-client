@@ -1,4 +1,4 @@
-use noriskclient_launcher_v3_lib::utils::path_utils::*;
+use salami_client_lib::utils::path_utils::*;
 
 #[test]
 fn keeps_names_the_jvm_can_receive() {

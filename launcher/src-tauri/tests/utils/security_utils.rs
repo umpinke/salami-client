@@ -1,4 +1,4 @@
-use noriskclient_launcher_v3_lib::utils::security_utils::{
+use salami_client_lib::utils::security_utils::{
     mask_identifier, mask_sensitive_data, set_known_accounts,
 };
 

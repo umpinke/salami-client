@@ -54,14 +54,14 @@ pub struct ClipAudioTrack {
     pub peaks: Vec<u8>,
 }
 
-impl From<&norisk_ipc::ClipManifest> for ClipDetails {
-    fn from(manifest: &norisk_ipc::ClipManifest) -> Self {
+impl From<&salami_ipc::ClipManifest> for ClipDetails {
+    fn from(manifest: &salami_ipc::ClipManifest) -> Self {
         Self {
             duration_seconds: manifest.duration_seconds,
             width: manifest.width,
             height: manifest.height,
             fps: manifest.fps,
-            peak_step_ms: norisk_ipc::PEAK_STEP_MS,
+            peak_step_ms: salami_ipc::PEAK_STEP_MS,
             game: None,
             favourite: false,
             audio_tracks: manifest

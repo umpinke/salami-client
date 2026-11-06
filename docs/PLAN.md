@@ -29,7 +29,7 @@ Die NoRisk-In-Game-Features (Cosmetics, Friends, Minigames, NoRisk-HUD) können 
   - `minecraft/`: Auth, Launch, Downloads, Modloader
   - `integrations/`: `modrinth.rs`, `curseforge.rs`, `norisk_packs.rs`, `mod_dependencies.rs`
   - `state/`: Profile (SQLite), Config
-  - Workspace-Crates: `norisk-ipc`, `norisk-logging`, `norisk-capture` (Clips)
+  - Workspace-Crates: `salami-ipc`, `salami-logging`, `salami-capture` (Clips)
 - `noriskclient-backend/` ist ein toter Gitlink auf ein privates Repo. Der Build braucht ihn nicht.
 
 ### 1.3 Pack-System – der Andockpunkt für `salami-core`

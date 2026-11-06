@@ -1,6 +1,6 @@
 use chrono::Utc;
-use noriskclient_launcher_v3_lib::sync::engine::build_plan;
-use noriskclient_launcher_v3_lib::sync::model::{
+use salami_client_lib::sync::engine::build_plan;
+use salami_client_lib::sync::model::{
     AdoptStrategy, SyncPack, SyncTarget, SyncTargetKind,
 };
 use std::collections::HashSet;
@@ -44,7 +44,7 @@ fn copied(path: &str) -> SyncTarget {
     target(path, SyncTargetKind::FileCopy)
 }
 
-fn planned_paths(plan: &noriskclient_launcher_v3_lib::sync::engine::Plan) -> HashSet<String> {
+fn planned_paths(plan: &salami_client_lib::sync::engine::Plan) -> HashSet<String> {
     plan.packs
         .iter()
         .flat_map(|p| p.targets.iter())

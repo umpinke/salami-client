@@ -1,6 +1,6 @@
-use noriskclient_launcher_v3_lib::state::content_cache_state::*;
-use noriskclient_launcher_v3_lib::state::db;
-use noriskclient_launcher_v3_lib::state::profile_state::ModPackSource;
+use salami_client_lib::state::content_cache_state::*;
+use salami_client_lib::state::db;
+use salami_client_lib::state::profile_state::ModPackSource;
 use sqlx::Row;
 
 async fn manager() -> ContentCacheManager {

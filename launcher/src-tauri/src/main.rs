@@ -4,8 +4,8 @@
     windows_subsystem = "windows"
 )]
 
-use noriskclient_launcher_v3_lib::*;
-use noriskclient_launcher_v3_lib::{cli, commands, logging, state, utils};
+use salami_client_lib::*;
+use salami_client_lib::{cli, commands, logging, state, utils};
 
 use log::{error, info, trace};
 use std::sync::Arc;
@@ -14,7 +14,6 @@ use tauri::Manager;
 use tauri_plugin_deep_link::DeepLinkExt;
 use utils::updater_utils;
 
-use crate::commands::analytics_command::track_analytics_event;
 use crate::commands::font_command::list_system_fonts;
 use crate::commands::process_command::{
     fetch_crash_report, focus_main_window, get_process, get_process_log_cursor,
@@ -102,31 +101,14 @@ use commands::salami_cape_command::{
     salami_capes_report, salami_capes_review_status, salami_capes_save, salami_capes_select,
 };
 
-// Import cape commands
-use commands::cape_command::{
-    browse_capes, check_is_moderator, delete_cape, download_template_and_open_explorer, equip_cape,
-    get_player_capes, unequip_cape, upload_cape, add_favorite_cape, remove_favorite_cape,
-    get_capes_by_hashes, get_owned_capes_list,
-};
-
-use commands::cosmetic_command::{
-    get_equipped_cosmetics, get_equipped_cosmetics_cached, get_random_local_emote,
-};
-use commands::icon_command::{
-    get_active_creator_code, get_selected_player_icon, get_selected_player_icon_cached,
-};
-
 // Import vanilla cape commands
 use commands::vanilla_cape_command::{
     get_owned_vanilla_capes, get_currently_equipped_vanilla_cape, equip_vanilla_cape,
     get_vanilla_cape_info, refresh_vanilla_cape_data,
 };
 
-// Import Assets commands
-use commands::assets_command::get_or_download_asset_model;
-
 // Import NRC commands
-use commands::nrc_commands::{check_update_available_command, download_and_install_update_command, get_news_and_changelogs_command};
+use commands::nrc_commands::{check_update_available_command, download_and_install_update_command};
 
 // Import Content commands
 use commands::content_command::{
@@ -144,16 +126,6 @@ use commands::java_command::{
     invalidate_java_cache_command, validate_java_path_command,
 };
 
-use commands::friends_command::{
-    get_friends, get_pending_requests, get_friends_user, send_friend_request,
-    accept_friend_request, deny_friend_request, remove_friend, set_online_status,
-    toggle_friend_ping, update_privacy_setting, connect_friends_websocket,
-    disconnect_friends_websocket, is_friends_websocket_connected, get_or_create_chat,
-    get_private_chats, get_chat_messages, send_chat_message, edit_chat_message,
-    delete_chat_message, send_typing_indicator, add_message_reaction,
-    remove_message_reaction,
-};
-
 #[tokio::main]
 async fn main() {
     if let Err(e) = logging::setup_logging().await {
@@ -164,7 +136,7 @@ async fn main() {
 
     tauri::Builder::default()
         // Salami: Fenster nur auf die eigene Oberfläche (bzw. Microsoft-Login) navigieren lassen
-        .plugin(noriskclient_launcher_v3_lib::nav_guard::init())
+        .plugin(salami_client_lib::nav_guard::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -694,22 +666,6 @@ async fn main() {
             remove_skin,
             update_skin_properties,
             set_discord_state,
-            browse_capes,
-            get_player_capes,
-            get_active_creator_code,
-            get_selected_player_icon,
-            get_selected_player_icon_cached,
-            get_equipped_cosmetics,
-            get_equipped_cosmetics_cached,
-            get_random_local_emote,
-            get_owned_capes_list,
-            equip_cape,
-            delete_cape,
-            check_is_moderator,
-            upload_cape,
-            unequip_cape,
-            add_favorite_cape,
-            remove_favorite_cape,
             refresh_norisk_packs,
             refresh_standard_versions,
             is_content_installed,
@@ -738,7 +694,6 @@ async fn main() {
 
             read_file_bytes,
             get_app_version,
-            get_news_and_changelogs_command,
             check_update_available_command,
             download_and_install_update_command,
             get_modrinth_tags_command,
@@ -757,7 +712,6 @@ async fn main() {
             commands::minecraft_command::add_skin_locally,
             commands::minecraft_command::get_base64_from_skin_source_command,
             commands::file_command::get_image_preview,
-            download_template_and_open_explorer,
             salami_capes_overview,
             salami_capes_import,
             salami_capes_save,
@@ -777,35 +731,14 @@ async fn main() {
             commands::minecraft_command::get_face_avatar,
             commands::skin_render_command::get_cached_skin_render,
             commands::skin_render_command::store_skin_render,
-            commands::nrc_commands::check_crash_log_command,
             commands::crash_fix_command::apply_crash_fix,
             commands::crash_fix_command::revert_crash_fix,
             commands::nrc_commands::log_message_command,
-            commands::flagsmith_commands::set_blocked_mods_config,
-            commands::flagsmith_commands::get_blocked_mods_config,
-            commands::flagsmith_commands::is_filename_blocked,
-            commands::flagsmith_commands::is_mod_id_blocked,
-            commands::flagsmith_commands::is_modrinth_project_id_blocked,
-            commands::flagsmith_commands::refresh_blocked_mods_config,
-            commands::pack_rollout_commands::set_pack_rollout_config,
-            commands::pack_rollout_commands::get_pack_rollout_config,
-            commands::pack_rollout_commands::get_pack_rollout_status,
-            commands::pack_rollout_commands::get_effective_pack_id,
-            commands::pack_rollout_commands::is_pack_rollout_active,
-            commands::pack_rollout_commands::is_pack_aliased,
-            commands::pack_fallback_commands::set_pack_fallback_config,
-            commands::pack_fallback_commands::get_pack_fallback_config,
-            commands::permission_commands::refresh_permissions,
-            commands::permission_commands::get_cached_permissions,
-            commands::permission_commands::has_permission,
-            get_capes_by_hashes,
             get_owned_vanilla_capes,
             get_currently_equipped_vanilla_cape,
             equip_vanilla_cape,
             get_vanilla_cape_info,
             refresh_vanilla_cape_data,
-            track_analytics_event,
-            commands::analytics_command::get_system_os_info,
             commands::profile_command::ipc::launch_profile_with_overrides,
             commands::profile_command::add_profile_symlink,
             commands::profile_command::remove_profile_symlink,
@@ -848,30 +781,6 @@ async fn main() {
             commands::profile_command::get_profile_instance_path,
             commands::profile_command::get_default_profile_path,
             commands::profile_command::get_profile_disk_size,
-            get_or_download_asset_model,
-            get_friends,
-            get_pending_requests,
-            get_friends_user,
-            send_friend_request,
-            accept_friend_request,
-            deny_friend_request,
-            remove_friend,
-            set_online_status,
-            toggle_friend_ping,
-            update_privacy_setting,
-            connect_friends_websocket,
-            disconnect_friends_websocket,
-            is_friends_websocket_connected,
-            get_or_create_chat,
-            get_private_chats,
-            get_chat_messages,
-            send_chat_message,
-            edit_chat_message,
-            delete_chat_message,
-            send_typing_indicator,
-            add_message_reaction,
-            remove_message_reaction,
-            commands::deep_link_handler::confirm_auth_bridge,
             commands::clip_commands::capture_apply_settings,
             commands::clip_commands::capture_release_hotkeys,
             commands::clip_commands::capture_status,

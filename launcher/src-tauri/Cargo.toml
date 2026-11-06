@@ -1,15 +1,15 @@
 [package]
-name = "noriskclient-launcher-v3"
+name = "salami-client-launcher"
 version = "1.5.0"
-description = "A Tauri App"
-authors = ["NoRiskk"]
+description = "Salami Client Launcher"
+authors = ["Salami Client"]
 edition = "2021"
 default-run = "salami-client"
 
 [workspace]
-members = ["crates/norisk-ipc", "crates/norisk-logging", "crates/norisk-capture"]
+members = ["crates/salami-ipc", "crates/salami-logging", "crates/salami-capture"]
 
-[profile.release.package.norisk-capture]
+[profile.release.package.salami-capture]
 opt-level = 3
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -18,7 +18,7 @@ opt-level = 3
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
-name = "noriskclient_launcher_v3_lib"
+name = "salami_client_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -30,8 +30,8 @@ name = "salami-client"
 path = "src/main.rs"
 
 [dependencies]
-norisk-ipc = { path = "crates/norisk-ipc" }
-norisk-logging = { path = "crates/norisk-logging" }
+salami-ipc = { path = "crates/salami-ipc" }
+salami-logging = { path = "crates/salami-logging" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream", "multipart"] }
@@ -67,9 +67,7 @@ rand = "0.8.5"
 sha2 = "0.10.8"
 p256 = "0.13.2"
 base64 = "0.21.7"
-jsonwebtoken = "9.3.0"
 fontdb = "0.18"
-machineid-rs = "1.2.4"
 byteorder = { version = "1.4" }
 tempfile = "3.8"
 anyhow = "1.0"
@@ -99,8 +97,6 @@ notify = "8.0.0"
 futures-lite = "2.6.0"
 tauri-plugin-process = "2.3.1"
 urlencoding = "2.1.3"
-tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
-futures-util = "0.3"
 axum = { version = "0.7", features = ["macros"] }
 tower = "0.4"
 tower-http = { version = "0.5", features = ["fs"] }
@@ -144,4 +140,4 @@ tauri-plugin-cli = "2"
 tauri = { version = "2.9.5", features = [ "tray-icon" ] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-norisk-capture = { path = "crates/norisk-capture" }
+salami-capture = { path = "crates/salami-capture" }

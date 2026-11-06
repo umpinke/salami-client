@@ -1,5 +1,5 @@
-use noriskclient_launcher_v3_lib::minecraft::downloads::logging_config_download::*;
-use noriskclient_launcher_v3_lib::minecraft::dto::piston_meta::{LoggingClient, LoggingFile};
+use salami_client_lib::minecraft::downloads::logging_config_download::*;
+use salami_client_lib::minecraft::dto::piston_meta::{LoggingClient, LoggingFile};
 use std::path::Path;
 use tokio::fs;
 

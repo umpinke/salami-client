@@ -1,4 +1,4 @@
-use noriskclient_launcher_v3_lib::state::event_state::*;
+use salami_client_lib::state::event_state::*;
 
 #[test]
 fn first_call_always_emits() {

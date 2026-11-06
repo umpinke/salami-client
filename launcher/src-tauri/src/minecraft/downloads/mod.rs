@@ -11,7 +11,6 @@ pub mod mod_downloader;
 pub mod mod_resolver;
 pub mod neo_forge_installer_download;
 pub mod neo_forge_libraries_download;
-pub mod norisk_assets_download;
 pub mod norisk_pack_downloader;
 pub mod quilt_libraries_download;
 
@@ -21,5 +20,4 @@ pub use logging_config_download::MinecraftLoggingDownloadService;
 pub use mod_downloader::ModDownloadService;
 pub use neo_forge_installer_download::*;
 pub use neo_forge_libraries_download::*;
-pub use norisk_assets_download::{client_managed_assets, NoriskClientAssetsDownloadService};
 pub use norisk_pack_downloader::NoriskPackDownloadService;

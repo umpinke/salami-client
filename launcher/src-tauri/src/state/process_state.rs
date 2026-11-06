@@ -1150,7 +1150,7 @@ impl ProcessManager {
                 if global_state.config_manager.get_config().await.clips.enabled {
                     let _ = global_state
                         .capture_supervisor
-                        .send(norisk_ipc::LauncherToCapture::DetachWindow);
+                        .send(salami_ipc::LauncherToCapture::DetachWindow);
                 }
             }
 

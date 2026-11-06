@@ -28,15 +28,10 @@ import { Snowfall } from "../../features/snow-effect/Snowfall";
 import { useSnowEffectStore } from "../../store/snow-effect-store";
 import { useLauncherTheme } from "../../hooks/useLauncherTheme";
 import * as ConfigService from "../../services/launcher-config-service";
-import { FriendsSidebar } from "../friends/FriendsSidebar";
-import { BRAND, FEATURES } from "../../config/salami";
+import { BRAND } from "../../config/salami";
 import { SalamiFall } from "../../themes/salami/SalamiFall";
 import { SALAMI_THEME_ID } from "../../themes/salami/salami-theme";
-// TODO: Re-enable when WebSocket is stable
-// import { useFriendsWebSocket } from "../../hooks/useFriendsWebSocket";
-import { useFriendsStore } from "../../store/friends-store";
 import { useClipsStore } from "../../store/clips-store";
-import { useChatStore } from "../../store/chat-store";
 import { checkUpdateAvailable, downloadAndInstallUpdate } from "../../services/nrc-service";
 import type { UpdateInfo } from "../../types/updater";
 import { ProfileWizardV2Modal } from "../modals/ProfileWizardV2Modal";
@@ -87,40 +82,16 @@ export function AppLayout({
     { id: "profiles", icon: "solar:user-id-bold", label: t("nav.profiles") },
     { id: "mods", icon: "solar:widget-bold", label: t("nav.mods") },
     { id: "skins", icon: "solar:emoji-funny-circle-bold", label: t("nav.skins") },
-    { id: "capes", icon: FEATURES.capes ? "solar:shop-bold" : "solar:hanger-2-bold", label: t("nav.capes") },
+    { id: "capes", icon: "solar:hanger-2-bold", label: t("nav.capes") },
     ...(clipsEnabled
       ? [{ id: "clips", icon: "solar:videocamera-record-bold", label: t("nav.clips") }]
       : []),
-    // DISABLED: Advent Calendar (seasonal feature)
-    // { id: "advent-calendar", icon: "solar:gift-bold", label: t("nav.advent") },
     { id: "settings", icon: "solar:settings-bold", label: t("nav.settings"), isAction: true },
   ];
   const { qualityLevel } = useQualitySettingsStore();
   const { isBackgroundAnimationEnabled, accentColor: themeAccentColor, accentColor } = useThemeStore();
   const { isEnabled: isSnowEnabled } = useSnowEffectStore();
   const { selectedTheme, isThemeActive } = useLauncherTheme();
-  const { connectWebSocket, loadCurrentUser, loadFriends } = useFriendsStore();
-  const { loadChats } = useChatStore();
-
-  // TODO: Re-enable when WebSocket is stable
-  // useFriendsWebSocket();
-
-  useEffect(() => {
-    if (!FEATURES.friends) return;
-    const initFriends = async () => {
-      try {
-        await loadCurrentUser();
-        await loadFriends();
-        await loadChats();
-        // TODO: Re-enable when WebSocket is stable
-        // await connectWebSocket();
-      } catch (e) {
-        // Silently fail - user might not be logged in yet
-      }
-    };
-    initFriends();
-  }, []);
-
   const getComplementaryBackground = () => {
     const hexToRgb = (hex: string) => {
       const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -381,7 +352,6 @@ export function AppLayout({
       <ProfileSettingsModal />
       <SettingsModal />
       <ProfileDuplicateModal />
-      {FEATURES.friends && <FriendsSidebar />}
     </div>
   );
 }

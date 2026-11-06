@@ -1,4 +1,4 @@
-use noriskclient_launcher_v3_lib::commands::process_command::*;
+use salami_client_lib::commands::process_command::*;
 
 #[test]
 fn a_session_id_that_could_escape_the_log_folder_is_rejected() {

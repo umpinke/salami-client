@@ -66,13 +66,3 @@ export interface CrashModInfo {
   filename?: string | null;
   overridden_by?: string | null;
 }
-
-/**
- * DTO for submitting crash logs.
- * Corresponds to the Rust struct `CrashlogDto`.
- */
-export interface CrashlogDto {
-  mcLogsUrl: string;
-  metadata: ProcessMetadata | null;
-  locale?: string | null;
-}

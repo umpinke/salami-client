@@ -1,36 +1,10 @@
 import { create } from "zustand";
 import { MinecraftAuthService } from "../services/minecraft-auth-service";
 import type { MinecraftAccount } from "../types/minecraft";
-import flagsmith from 'flagsmith';
 import { toast } from "react-hot-toast";
 import { getLauncherConfig } from "../services/launcher-config-service";
-import { refreshPermissions } from "../services/permission-service";
 import i18n from '../i18n/i18n';
 import { parseErrorMessage } from "../utils/error-utils";
-
-const setMojangTraits = (account: MinecraftAccount | null) => {
-  const uuid = account?.id ?? null;
-  const username = account?.username ?? null;
-  Promise.all([
-    flagsmith.setTrait('mojang_uuid', uuid),
-    flagsmith.setTrait('mojang_username', username),
-  ])
-    .then(() => {
-      if (uuid) {
-        console.log(`[AuthStore] Flagsmith mojang traits set for ${uuid}`);
-      } else {
-        console.log("[AuthStore] Flagsmith mojang traits cleared (no active account).");
-      }
-    })
-    .catch((error) => {
-      console.error("[AuthStore] Error updating Flagsmith mojang traits:", error);
-    });
-
-  // Re-fetch permissions whenever the active account changes (token & uuid differ).
-  refreshPermissions().catch((error) => {
-    console.error("[AuthStore] Error refreshing permissions:", error);
-  });
-};
 
 interface MinecraftAuthState {
   accounts: MinecraftAccount[];
@@ -85,14 +59,12 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
         activeAccount,
         isLoading: false,
       });
-      setMojangTraits(activeAccount);
     } catch (error) {
       console.error("Failed to initialize accounts:", error);
       set({
         error: i18n.t('auth.errors.load_accounts', { error: parseErrorMessage(error) }),
         isLoading: false,
       });
-      setMojangTraits(null);
     }
   },
 
@@ -117,8 +89,6 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
       // Step 2: Get all data needed for the state update
       const accounts = await MinecraftAuthService.getAccounts();
       const activeAccount = await MinecraftAuthService.getActiveAccount();
-
-      setMojangTraits(activeAccount);
 
       // Return a payload with all data needed for the success toast and the final state update
       return { newAccount, accounts, activeAccount };
@@ -200,7 +170,6 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
   removeAccount: async (accountId: string) => {
     try {
       set({ isLoading: true, error: null });
-      const wasActive = get().activeAccount?.id === accountId;
 
       await MinecraftAuthService.removeAccount(accountId);
 
@@ -217,9 +186,6 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
         activeAccount,
         isLoading: false,
       });
-      if (wasActive) {
-        setMojangTraits(activeAccount);
-      }
     } catch (error) {
       console.error("Failed to remove account:", error);
       set({
@@ -249,7 +215,6 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
         activeAccount,
         isLoading: false,
       });
-      setMojangTraits(activeAccount);
     } catch (error) {
       console.error("Failed to set active account:", error);
       const errorMsg = error instanceof Error ? error.message : String((error as any).message ?? error);
@@ -270,7 +235,6 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
             isLoading: false,
             error: null,
           });
-          setMojangTraits(activeAccount);
         } catch (removeErr) {
           console.error("Failed to remove expired account:", removeErr);
           set({ accounts: previousAccounts, activeAccount: previousAccount, isLoading: false });

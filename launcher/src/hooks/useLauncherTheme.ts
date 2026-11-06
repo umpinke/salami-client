@@ -3,16 +3,10 @@ import { useLauncherThemeStore, LAUNCHER_THEMES } from "../store/launcher-theme-
 import { useThemeStore, ACCENT_COLORS } from "../store/useThemeStore";
 
 export function useLauncherTheme() {
-  // Debug flag to allow opening themes without unlock
-  const debugFlag = true;
-  
   const {
     selectedThemeId,
-    openedAdventDoors,
     originalAccentColor,
     selectTheme,
-    markAdventDoorOpened,
-    isThemeUnlocked,
     setOriginalAccentColor,
     getSelectedTheme,
   } = useLauncherThemeStore();
@@ -58,24 +52,15 @@ export function useLauncherTheme() {
   }, [selectedThemeId, originalAccentColor, accentColor.value, setAccentColor, setOriginalAccentColor, getSelectedTheme]);
 
   const toggleTheme = (themeId: string) => {
-    if (selectedThemeId === themeId) {
-      selectTheme(null);
-    } else {
-      if (debugFlag || isThemeUnlocked(themeId)) {
-        selectTheme(themeId);
-      }
-    }
+    selectTheme(selectedThemeId === themeId ? null : themeId);
   };
 
   return {
     selectedThemeId,
     selectedTheme: getSelectedTheme(),
-    openedAdventDoors,
     isThemeActive: selectedThemeId !== null,
     themes: LAUNCHER_THEMES,
     toggleTheme,
-    markAdventDoorOpened,
-    isThemeUnlocked,
   };
 }
 

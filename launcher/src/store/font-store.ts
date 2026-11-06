@@ -22,10 +22,6 @@ export const useFontStore = create<FontState>()(
         const nextId = id === CUSTOM_FONT_ID || FONT_PRESETS[id] ? id : DEFAULT_FONT_ID;
         set({ fontId: nextId });
         get().applyFontToDOM();
-
-        void import("../services/analytics-service").then(({ trackEvent }) => {
-          trackEvent("font_changed", { font: nextId }).catch(console.error);
-        });
       },
 
       setCustomFamily: (name: string) => {

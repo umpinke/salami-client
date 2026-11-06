@@ -1,5 +1,5 @@
 use crate::harness::*;
-use noriskclient_launcher_v3_lib::sync::model::{DetachMode, MergeFormat, SyncTargetKind};
+use salami_client_lib::sync::model::{DetachMode, MergeFormat, SyncTargetKind};
 
 const TARGET: &str = "options.txt";
 

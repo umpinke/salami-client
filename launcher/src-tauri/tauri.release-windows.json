@@ -1,7 +1,7 @@
 {
   "bundle": {
     "resources": {
-      "binaries/norisk-capture-x86_64-pc-windows-msvc.exe": "norisk-capture.exe",
+      "binaries/salami-capture-x86_64-pc-windows-msvc.exe": "salami-capture.exe",
       "binaries/avcodec-62.dll": "avcodec-62.dll",
       "binaries/avformat-62.dll": "avformat-62.dll",
       "binaries/avutil-60.dll": "avutil-60.dll",

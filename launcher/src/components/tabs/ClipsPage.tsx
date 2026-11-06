@@ -23,7 +23,6 @@ import { allCapturePermissionsGranted, useCapturePermissionsStore } from "../../
 import { isMacOS, supportsClips } from "../../utils/platform";
 import { useClipsStore } from "../../store/clips-store";
 import { setDiscordState } from "../../utils/discordRpc";
-import { trackEvent } from "../../services/analytics-service";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { cn } from "../../lib/utils";
 
@@ -116,8 +115,7 @@ export function ClipsPage() {
 
   useEffect(() => {
     setDiscordState("Browsing Clips");
-    void trackEvent("clip_page_opened", { enabled });
-  }, [enabled]);
+  }, []);
 
   useEffect(() => {
     void refreshEnabled();

@@ -130,13 +130,6 @@ pub async fn import_external_instance(
         }
     }
 
-    let mut props = std::collections::HashMap::new();
-    props.insert(
-        "launcher".to_string(),
-        serde_json::Value::String(params.launcher.as_str().to_string()),
-    );
-    crate::commands::analytics_command::track_event("external_instance_imported", props);
-
     if let Err(e) = state.event_state.trigger_profile_update(profile_id).await {
         log::error!(
             "Failed to emit TriggerProfileUpdate for imported profile {}: {}",

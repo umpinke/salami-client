@@ -21,7 +21,6 @@ interface SalamiPlayViewProps {
   versions: LaunchVersion[];
   onVersionChange: (profileId: string) => void;
   playerName: string | null | undefined;
-  outline?: { strength: number; thickness: number; sensitivity: number };
 }
 
 const RECENT_COUNT = 4;
@@ -37,7 +36,7 @@ const LOADER_NAMES: Record<string, string> = {
  * Startseite im Salami-Layout: links Profil, Start-Knopf und zuletzt gespielte Profile,
  * rechts die Spielfigur – statt NoRisks zentrierter Figur mit Knopf darüber.
  */
-export function SalamiPlayView({ profiles, selectedProfile, versions, onVersionChange, playerName, outline }: SalamiPlayViewProps) {
+export function SalamiPlayView({ profiles, selectedProfile, versions, onVersionChange, playerName }: SalamiPlayViewProps) {
   const { t } = useTranslation();
   const accent = useThemeStore((s) => s.accentColor);
 
@@ -111,7 +110,7 @@ export function SalamiPlayView({ profiles, selectedProfile, versions, onVersionC
 
       <section className="relative flex h-full items-center justify-center">
         <div className="w-full max-w-[460px]">
-          <PlayerRig playerName={playerName} outline={outline} showNametag={false} />
+          <PlayerRig playerName={playerName} showNametag={false} />
         </div>
       </section>
     </div>

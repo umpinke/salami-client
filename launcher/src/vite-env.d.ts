@@ -1,7 +1,5 @@
 /// <reference types="vite/client" />
 
-declare const __SKIN_RENDERER_VERSION__: string;
-
 // Tauri environment detection for debug mode
 declare global {
   interface Window {

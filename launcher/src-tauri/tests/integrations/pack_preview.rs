@@ -1,4 +1,4 @@
-use noriskclient_launcher_v3_lib::integrations::pack_preview::*;
+use salami_client_lib::integrations::pack_preview::*;
 use std::io::Write;
 use std::path::PathBuf;
 
@@ -330,7 +330,7 @@ async fn streaming_hash_matches_the_buffered_one() {
     match outcome {
         HashOutcome::Complete(hash) => assert_eq!(
             hash,
-            noriskclient_launcher_v3_lib::utils::hash_utils::calculate_sha1_from_bytes(&payload)
+            salami_client_lib::utils::hash_utils::calculate_sha1_from_bytes(&payload)
         ),
         HashOutcome::BudgetExceeded => panic!("budget should not be hit"),
     }

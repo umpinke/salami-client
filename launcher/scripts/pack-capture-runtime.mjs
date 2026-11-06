@@ -54,8 +54,8 @@ console.log(`\n  ${RUNTIME_ASSET_NAME}  ${mb} MB`);
 console.log(`  sha256  ${sha256}`);
 console.log(`  written ${zip}\n`);
 console.log("To test the download path locally, serve the zip over HTTP and build with:");
-console.log(`  NRC_CAPTURE_RUNTIME_SHA256=${sha256}`);
-console.log(`  NRC_CAPTURE_RUNTIME_URL=http://localhost:8000/${RUNTIME_ASSET_NAME}`);
+console.log(`  SALAMI_CAPTURE_RUNTIME_SHA256=${sha256}`);
+console.log(`  SALAMI_CAPTURE_RUNTIME_URL=http://localhost:8000/${RUNTIME_ASSET_NAME}`);
 
 function copy(from, to) {
   if (!fs.existsSync(from)) {

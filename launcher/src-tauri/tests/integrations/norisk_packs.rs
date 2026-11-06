@@ -1,4 +1,4 @@
-use noriskclient_launcher_v3_lib::integrations::norisk_packs::LoaderStrategy;
+use salami_client_lib::integrations::norisk_packs::LoaderStrategy;
 use serde_json::Value;
 
 #[test]

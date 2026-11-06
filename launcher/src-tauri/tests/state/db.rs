@@ -1,4 +1,4 @@
-use noriskclient_launcher_v3_lib::state::db::*;
+use salami_client_lib::state::db::*;
 use sqlx::Row;
 
 #[tokio::test]

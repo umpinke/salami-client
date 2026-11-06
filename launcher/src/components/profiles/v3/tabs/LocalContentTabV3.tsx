@@ -29,7 +29,6 @@ import {
 } from "../../../../hooks/useLocalContentManager";
 import { useVersionOptions } from "../../../../hooks/useVersionOptions";
 import { getUpdateIdentifier } from "../../../../utils/update-identifier-utils";
-import * as FlagsmithService from "../../../../services/flagsmith-service";
 import UnifiedService from "../../../../services/unified-service";
 import { useThemeStore } from "../../../../store/useThemeStore";
 import { useAppDragDropStore } from "../../../../store/appStore";
@@ -67,7 +66,7 @@ preloadIcons([
 type SortKey = "name" | "size" | "type" | "updates";
 type FilterKey =
   | "all" | "enabled" | "disabled"
-  | "hasUpdate" | "fromModpack" | "manuallyAdded" | "updatesPaused" | "noriskIssues";
+  | "hasUpdate" | "fromModpack" | "manuallyAdded" | "updatesPaused";
 
 interface LocalContentTabV3Props<T extends LocalContentItem> {
   profile: Profile;
@@ -93,8 +92,6 @@ interface FilterOption {
   icon: string;
   /** Gruppen-Trennlinie VOR diesem Item einfuegen. */
   separator?: boolean;
-  /** Wenn true, nur zeigen wenn NRC-Pack aktiv. */
-  nrcOnly?: boolean;
 }
 
 const FILTER_OPTIONS: FilterOption[] = [
@@ -105,7 +102,6 @@ const FILTER_OPTIONS: FilterOption[] = [
   { value: "updatesPaused", labelKey: "profiles.v3.filter.updatesPaused",  icon: "solar:volume-cross-bold" },
   { value: "fromModpack",   labelKey: "profiles.v3.filter.fromModpack",    icon: "solar:box-bold",             separator: true },
   { value: "manuallyAdded", labelKey: "profiles.v3.filter.manuallyAdded",  icon: "solar:hand-stars-bold" },
-  { value: "noriskIssues",  labelKey: "profiles.v3.filter.noriskIssues",   icon: "solar:danger-triangle-bold", separator: true, nrcOnly: true },
 ];
 
 export function LocalContentTabV3<T extends LocalContentItem>({
@@ -261,22 +257,6 @@ export function LocalContentTabV3<T extends LocalContentItem>({
   const isNrc = contentType === "NoRiskMod";
   const selectedPackId = profile?.selected_norisk_pack_id ?? null;
 
-  // Flagsmith blocked-mods Config laden wenn ein NRC-Pack aktiv ist.
-  // Beeinflusst die Warn-Overlays auf Mods die mit NoRisk inkompatibel sind.
-  const [isBlockedConfigLoaded, setIsBlockedConfigLoaded] = useState(false);
-  useEffect(() => {
-    if (profile?.selected_norisk_pack_id) {
-      FlagsmithService.getBlockedModsConfig()
-        .then(() => setIsBlockedConfigLoaded(true))
-        .catch((err) => {
-          console.error("[V3] Failed to load NoRisk blocked mods config:", err);
-          setIsBlockedConfigLoaded(false);
-        });
-    } else {
-      setIsBlockedConfigLoaded(false);
-    }
-  }, [profile?.selected_norisk_pack_id]);
-
   // Helper: hat ein Item ein verfuegbares Update? Matched die Logik aus dem
   // Render-Loop (siehe `updateAvailable` unten) — manager.contentUpdates wird
   // per `update-identifier` indiziert.
@@ -295,15 +275,6 @@ export function LocalContentTabV3<T extends LocalContentItem>({
       case "fromModpack":   list = list.filter(i => !!i.modpack_origin); break;
       case "manuallyAdded": list = list.filter(i => !i.modpack_origin && !i.norisk_info); break;
       case "updatesPaused": list = list.filter(i => i.updates_enabled === false); break;
-      case "noriskIssues":  list = list.filter(i => {
-        if (!isBlockedConfigLoaded) return false;
-        const status = FlagsmithService.getModNoRiskStatus(
-          i.filename,
-          i.modrinth_info?.project_id || i.curseforge_info?.project_id,
-          i.modrinth_info?.version_id || (i.curseforge_info as any)?.file_id,
-        );
-        return status === "blocked" || status === "warning";
-      }); break;
     }
 
     const sorted = [...list];
@@ -328,7 +299,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
         break;
     }
     return sorted;
-  }, [manager.filteredItems, manager.getItemPlatformDisplayName, filter, sortBy, getDisplayFileName, hasUpdate, isBlockedConfigLoaded]);
+  }, [manager.filteredItems, manager.getItemPlatformDisplayName, filter, sortBy, getDisplayFileName, hasUpdate]);
 
   // "Add content" opens an in-place side sheet instead of navigating to a
   // dedicated browse route, so the profile view stays mounted and the
@@ -352,9 +323,8 @@ export function LocalContentTabV3<T extends LocalContentItem>({
   );
   const filterDropdownOptions: DropdownOption[] = useMemo(
     () => FILTER_OPTIONS
-      .filter(opt => !opt.nrcOnly || isBlockedConfigLoaded)
       .map(o => ({ value: o.value, label: t(o.labelKey), icon: o.icon, separator: o.separator })),
-    [t, isBlockedConfigLoaded],
+    [t],
   );
 
   // Loading-Spinner erst nach 500ms zeigen: schnelle Loads (Cache-Hit etc.)
@@ -519,13 +489,6 @@ export function LocalContentTabV3<T extends LocalContentItem>({
               const key = tileKey(item);
               const updateKey = getUpdateIdentifier(item);
               const updateAvailable = updateKey ? manager.contentUpdates[updateKey] ?? null : null;
-              const noRiskStatus = isBlockedConfigLoaded
-                ? FlagsmithService.getModNoRiskStatus(
-                    item.filename,
-                    item.modrinth_info?.project_id || item.curseforge_info?.project_id,
-                    item.modrinth_info?.version_id || (item.curseforge_info as any)?.file_id,
-                  )
-                : null;
               return (
                 <ContentTile
                   key={key}
@@ -567,7 +530,6 @@ export function LocalContentTabV3<T extends LocalContentItem>({
                     )
                     : undefined}
                   isQuickUpdating={manager.itemsBeingUpdated.has(item.filename)}
-                  noRiskStatus={noRiskStatus}
                   versionDropdownOpen={versionOptions.openKey === key}
                   availableVersions={versionOptions.versionsFor(key)}
                   isLoadingVersions={versionOptions.loadingFor(key)}

@@ -21,7 +21,6 @@ import type {
   UnifiedVersion
 } from '../../../types/unified';
 import { ModPlatform, UnifiedSortType, UnifiedProjectType } from '../../../types/unified';
-import { getBlockedModsConfig, getModNoRiskStatus } from '../../../services/flagsmith-service';
 import type {
   ModrinthProjectType,
   ModrinthSearchResponse,
@@ -205,9 +204,6 @@ export function ModrinthSearchV2({
     { value: UnifiedSortType.Updated, label: t('content.search.sort.updated'), icon: 'solar:refresh-bold' },
   ];
 
-  // State for blocked mods configuration
-  const [blockedModsConfigLoaded, setBlockedModsConfigLoaded] = useState(false);
-
   const [allCategoriesData, setAllCategoriesData] = useState<ModrinthCategory[]>([]);
   const [gameVersionsData, setGameVersionsData] = useState<ModrinthGameVersion[]>([]);
   const [allLoadersData, setAllLoadersData] = useState<ModrinthLoader[]>([]);
@@ -307,25 +303,6 @@ export function ModrinthSearchV2({
         applyTags(tags);
       })
       .catch((err) => console.error("Failed to load filter data:", err));
-  }, []);
-
-  // Load blocked mods config on mount (cached from nrc-service if already loaded)
-  useEffect(() => {
-    const loadBlockedModsConfig = async () => {
-      try {
-        console.log('[ModrinthSearchV2] Getting blocked mods config (cached if already loaded)...');
-        const config = await getBlockedModsConfig();
-        console.log('[ModrinthSearchV2] Blocked mods config available:', config);
-        setBlockedModsConfigLoaded(true);
-      } catch (error) {
-        console.error('[ModrinthSearchV2] Failed to load blocked mods config:', error);
-        console.error('[ModrinthSearchV2] Error details:', error);
-        // Set to true anyway so we can use the hardcoded test ID
-        console.log('[ModrinthSearchV2] Setting blockedModsConfigLoaded to true anyway for hardcoded IDs');
-        setBlockedModsConfigLoaded(true);
-      }
-    };
-    loadBlockedModsConfig();
   }, []);
 
   // Define preferred loader order
@@ -718,19 +695,7 @@ export function ModrinthSearchV2({
         project_id: projectId
       });
       
-      // Add NoRisk status to each version
-      const versionsWithNoRiskStatus = response.versions.map(version => {
-        const primaryFile = version.files.find(file => file.primary) || version.files[0];
-        const filename = primaryFile?.filename || '';
-        const noRiskStatus = getModNoRiskStatus(filename, projectId, version.id);
-        
-        return {
-          ...version,
-          noRiskStatus // Add this property ('blocked' | 'warning' | null)
-        };
-      });
-      
-      const sortedVersions = versionsWithNoRiskStatus.sort((a, b) => new Date(b.date_published).getTime() - new Date(a.date_published).getTime());
+      const sortedVersions = [...response.versions].sort((a, b) => new Date(b.date_published).getTime() - new Date(a.date_published).getTime());
 
       setExpandedVersions(prev => ({ ...prev, [projectId]: sortedVersions }));
       // Initialize the number of displayed versions for this project
@@ -2970,26 +2935,6 @@ export function ModrinthSearchV2({
     norisk_pack_item_details: null,
   };
 
-  // Helper function to get NoRisk status for a project
-  const getProjectNoRiskStatus = (project: UnifiedModSearchResult): 'blocked' | 'warning' | null => {
-    console.log('[getProjectNoRiskStatus] Checking project:', project.title, 'ID:', project.project_id);
-    console.log('[getProjectNoRiskStatus] Config loaded:', blockedModsConfigLoaded);
-    
-    if (!blockedModsConfigLoaded) {
-      console.log('[getProjectNoRiskStatus] Config not loaded yet, returning null');
-      return null;
-    }
-    
-    const result = getModNoRiskStatus('', project.project_id, null);
-    console.log('[getProjectNoRiskStatus] Result for', project.project_id, ':', result);
-    return result;
-  };
-
-  // Helper function to check if a project is blocked (for backward compatibility)
-  const isProjectBlocked = (project: UnifiedModSearchResult): boolean => {
-    return getProjectNoRiskStatus(project) === 'blocked';
-  };
-
   return (
     // Overall container: now flex-row to place left content and sidebar side-by-side
     <div className={`modrinth-search-v2 flex flex-row h-full gap-3 ${className}`}> {/* Added gap-3 */} 
@@ -3055,7 +3000,6 @@ export function ModrinthSearchV2({
                   const currentVersionFilters = versionFilters[hit.project_id] || { gameVersions: [], loaders: [], versionType: 'all' };
                   const currentVersionDropdownUIState = versionDropdownUIState[hit.project_id] || { showAllGameVersions: false, gameVersionSearchTerm: '' };
                   const currentOpenVersionDropdowns = openVersionDropdowns[hit.project_id] || { type: false, gameVersion: false, loader: false };
-                  const projectNoRiskStatus = getProjectNoRiskStatus(hit);
 
                   return (
                     <ModrinthProjectCardV2
@@ -3099,8 +3043,6 @@ export function ModrinthSearchV2({
                           ? undefined
                           : handleToggleEnableVersion
                       }
-                      isBlocked={isProjectBlocked(hit)}
-                      projectNoRiskStatus={projectNoRiskStatus}
                       onProjectClick={onProjectClick}
                     />
                   );
@@ -3152,7 +3094,6 @@ export function ModrinthSearchV2({
                   const currentVersionFilters = versionFilters[hit.project_id] || { gameVersions: [], loaders: [], versionType: 'all' };
                   const currentVersionDropdownUIState = versionDropdownUIState[hit.project_id] || { showAllGameVersions: false, gameVersionSearchTerm: '' };
                   const currentOpenVersionDropdowns = openVersionDropdowns[hit.project_id] || { type: false, gameVersion: false, loader: false };
-                  const projectNoRiskStatus = getProjectNoRiskStatus(hit);
 
                   return (
                     <ModrinthProjectCardV2
@@ -3196,8 +3137,6 @@ export function ModrinthSearchV2({
                           ? undefined
                           : handleToggleEnableVersion
                       }
-                      isBlocked={isProjectBlocked(hit)}
-                      projectNoRiskStatus={projectNoRiskStatus}
                       onProjectClick={onProjectClick}
                     />
                   );

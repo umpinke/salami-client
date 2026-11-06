@@ -10,8 +10,8 @@ import { SettingRow } from "../../ui/settings/SettingRow";
 import { ToggleSwitch } from "../../ui/ToggleSwitch";
 import { useConfirmDialog } from "../../../hooks/useConfirmDialog";
 import { openExternalUrl } from "../../../services/tauri-service";
-import { isApplixirEnabled } from "../../../services/flagsmith-service";
-import { showApplixirAd } from "../../../services/nrc-service";
+import { getAppVersion } from "../../../services/launcher-config-service";
+import { BRAND } from "../../../config/salami";
 import { useSettingsConfig, useSettingsKeywords } from "./settings-context";
 
 export function AdvancedTab() {
@@ -24,7 +24,11 @@ export function AdvancedTab() {
   const [isPreLaunchEditEnabled, setIsPreLaunchEditEnabled] = useState(false);
   const [isWrapperEditEnabled, setIsWrapperEditEnabled] = useState(false);
   const [isPostExitEditEnabled, setIsPostExitEditEnabled] = useState(false);
-  const [adsEnabled, setAdsEnabled] = useState(false);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    getAppVersion().then(setAppVersion).catch(() => setAppVersion(null));
+  }, []);
 
   // Salami: Start-Befehle werden erst beim Verlassen des Feldes gespeichert – das Backend
   // fragt dann einmal per nativem Dialog nach (nicht bei jedem Tastendruck).
@@ -35,39 +39,8 @@ export function AdvancedTab() {
     setTempConfig({ ...tempConfig, hooks: { ...tempConfig.hooks, [hook]: next } });
   };
 
-  useEffect(() => {
-    isApplixirEnabled().then(setAdsEnabled).catch(() => setAdsEnabled(false));
-  }, []);
-
   return (
     <div className="space-y-6">
-      {adsEnabled && (
-        <SettingsSection
-          id="settings-section-ads"
-          title={t("settings.sections.ads")}
-          icon="solar:play-circle-bold"
-          keywords={kw("settings.sections.ads", "ads", "werbung", "consent", "privacy", "gdpr", "dsgvo")}
-        >
-          <SettingRow
-            label={t("settings.ads.reset_consent")}
-            description={t("settings.ads.reset_consent.tooltip")}
-            searchKeywords={kw("settings.ads.reset_consent", "consent", "werbung", "privacy", "reset", "widerruf")}
-          >
-            <Button
-              variant="ghost"
-              className="px-4 py-3 border border-[#ffffff20] hover:bg-white/5 transition-colors"
-              onClick={() => {
-                showApplixirAd(true).catch((error) => {
-                  console.error("[AdvancedTab] Failed to open ad window for consent reset:", error);
-                  toast.error(t("applixir.failed"));
-                });
-              }}
-            >
-              {t("settings.ads.reset_consent.button")}
-            </Button>
-          </SettingRow>
-        </SettingsSection>
-      )}
       <SettingsSection id="settings-section-login_cache" title={t("settings.sections.login_cache")} icon="solar:login-3-bold" keywords={kw("settings.sections.login_cache", "login", "cache", "anmeldung")}>
         <SettingRow
           label={t("settings.browser_login")}
@@ -371,25 +344,35 @@ export function AdvancedTab() {
       </SettingsSection>
 
       <SettingsSection
-        id="settings-section-licenses"
-        title={t("settings.licenses.title")}
-        icon="solar:document-text-bold"
-        keywords={kw("settings.licenses.title", "license", "licenses", "lizenz", "lizenzen", "credits")}
-        description={t("settings.licenses.description")}
-        headerActions={
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              openExternalUrl("https://github.com/umpinke/salami-client/blob/main/launcher/LICENSE")
-            }}
-            icon={<Icon icon="solar:arrow-right-up-bold" className="w-5 h-5" />}
-          >
-            {t("settings.licenses.view")}
-          </Button>
-        }
+        id="settings-section-about"
+        title={t("settings.about.title")}
+        icon="solar:info-circle-bold"
+        keywords={kw("settings.about.title", "about", "info", "version", "license", "licenses", "lizenz", "lizenzen", "gpl", "source", "quellcode", "credits")}
       >
-        <div className="py-1" />
+        <div className="space-y-3 py-3">
+          <p className="text-sm text-white/80 font-minecraft">
+            {BRAND.name} {appVersion ? `v${appVersion}` : ""}
+          </p>
+          <p className="text-sm text-white/60 font-minecraft">{t("about.attribution")}</p>
+          <div className="flex flex-wrap gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => void openExternalUrl(BRAND.sourceUrl)}
+              icon={<Icon icon="solar:code-bold" className="w-5 h-5" />}
+            >
+              {t("about.source_code")}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => void openExternalUrl(`${BRAND.sourceUrl}/blob/main/launcher/LICENSE`)}
+              icon={<Icon icon="solar:document-text-bold" className="w-5 h-5" />}
+            >
+              {t("settings.licenses.view")}
+            </Button>
+          </div>
+        </div>
       </SettingsSection>
 
       {confirmDialog}

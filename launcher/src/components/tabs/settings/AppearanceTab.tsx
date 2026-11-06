@@ -12,7 +12,7 @@ import EffectPreviewCard from "../../EffectPreviewCard";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { BACKGROUND_EFFECTS, useBackgroundEffectStore } from "../../../store/background-effect-store";
 import { useQualitySettingsStore } from "../../../store/quality-settings-store";
-import { isWebGLAvailable } from "@noriskclient/nrc-skin-renderer";
+import { isWebGLAvailable } from "../../../lib/skin3d";
 import { useSettingsConfig, useSettingsKeywords } from "./settings-context";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "../../ui/buttons/Button";

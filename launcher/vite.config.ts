@@ -1,12 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { resolve } from 'path';
-import { readFileSync } from 'fs';
-
-const pkg = JSON.parse(
-  readFileSync(resolve(__dirname, 'package.json'), 'utf-8'),
-) as { dependencies: Record<string, string> };
-const skinRendererVersion = pkg.dependencies['@noriskclient/nrc-skin-renderer'];
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
@@ -14,10 +8,6 @@ const host = process.env.TAURI_DEV_HOST;
 // https://vitejs.dev/config/
 export default defineConfig(async () => ({
   plugins: [react()],
-
-  define: {
-    __SKIN_RENDERER_VERSION__: JSON.stringify(skinRendererVersion),
-  },
 
   resolve: {
     dedupe: ["three", "react", "react-dom", "@react-three/fiber", "@react-three/drei"],
@@ -56,9 +46,7 @@ export default defineConfig(async () => ({
         main: resolve(__dirname, 'index.html'),
         updater: resolve(__dirname, 'updater.html'),
         minecraftLogWindow: resolve(__dirname, 'minecraft-log-window.html'),
-        singleLogWindow: resolve(__dirname, 'single-log-window.html'),
-        testerWindow: resolve(__dirname, 'tester-window.html'),
-        applixirWindow: resolve(__dirname, 'applixir-window.html')
+        singleLogWindow: resolve(__dirname, 'single-log-window.html')
       }
     }
   }

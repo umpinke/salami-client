@@ -1,5 +1,5 @@
-use noriskclient_launcher_v3_lib::state::profile_state::Profile;
-use noriskclient_launcher_v3_lib::utils::import_safety::*;
+use salami_client_lib::state::profile_state::Profile;
+use salami_client_lib::utils::import_safety::*;
 use std::path::PathBuf;
 
 #[test]

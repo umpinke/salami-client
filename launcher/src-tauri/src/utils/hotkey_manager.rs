@@ -155,10 +155,10 @@ async fn dispatch(app: &AppHandle, action: Action) {
 
     match action {
         Action::SaveClip => {
-            let request = norisk_ipc::LauncherToCapture::SaveClip(norisk_ipc::SaveClipRequest {
+            let request = salami_ipc::LauncherToCapture::SaveClip(salami_ipc::SaveClipRequest {
                 pre_roll_seconds: clips.pre_roll_seconds,
                 post_roll_seconds: clips.post_roll_seconds,
-                reason: norisk_ipc::ClipReason::Manual,
+                reason: salami_ipc::ClipReason::Manual,
             });
             match state.capture_supervisor.send(request) {
                 Ok(()) => log::info!("Clip requested by hotkey"),
@@ -167,7 +167,7 @@ async fn dispatch(app: &AppHandle, action: Action) {
         }
         Action::ToggleBuffering => {
             let resume = !state.capture_supervisor.buffering_wanted();
-            let request = norisk_ipc::LauncherToCapture::SetBufferEnabled { enabled: resume };
+            let request = salami_ipc::LauncherToCapture::SetBufferEnabled { enabled: resume };
             match state.capture_supervisor.send(request) {
                 Ok(()) => log::info!("Buffering {}", if resume { "resumed" } else { "paused" }),
                 Err(e) => log::warn!("Buffer toggle went nowhere: {e}"),

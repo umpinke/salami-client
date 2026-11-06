@@ -1,4 +1,4 @@
-use noriskclient_launcher_v3_lib::state::db::{self, DbHandle};
+use salami_client_lib::state::db::{self, DbHandle};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 

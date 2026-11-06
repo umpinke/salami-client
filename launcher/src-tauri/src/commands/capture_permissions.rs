@@ -43,7 +43,7 @@ pub async fn read_permissions(
 ) -> Result<Option<CapturePermissions>> {
     #[cfg(target_os = "macos")]
     {
-        if !norisk_capture::macos::capture_supported() {
+        if !salami_capture::macos::capture_supported() {
             return Ok(None);
         }
         let engine = crate::utils::capture_runtime::ensure_engine().await?;
@@ -65,7 +65,7 @@ pub async fn read_permissions(
             ));
         }
         let mut permissions: CapturePermissions = serde_json::from_slice(&output.stdout)?;
-        permissions.input_monitoring = norisk_capture::macos::input_monitoring(matches!(
+        permissions.input_monitoring = salami_capture::macos::input_monitoring(matches!(
             request,
             Some(CapturePermission::InputMonitoring)
         ));
@@ -96,7 +96,7 @@ pub fn capture_open_permission_settings(
             CapturePermission::Microphone => 1,
             CapturePermission::InputMonitoring => 2,
         };
-        if !norisk_capture::macos::open_permission_settings(kind) {
+        if !salami_capture::macos::open_permission_settings(kind) {
             return Err(AppError::Other("Could not open macOS privacy settings.".into()).into());
         }
     }

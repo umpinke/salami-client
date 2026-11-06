@@ -17,12 +17,6 @@ pub const DIRS_APPLICATION: &str = "SalamiClient";
 /// URL-Schema für Deep-Links (`salami://…`), muss zu `plugins.deep-link` in `tauri.conf.json` passen.
 pub const DEEP_LINK_SCHEME: &str = "salami";
 
-/// NoRisk-Online-Dienste (NoRisk-Token, Capes, Cosmetics, Friends, News,
-/// Werbung, Analytics …). Im Salami Client aus: kein Zugriff auf fremde
-/// Infrastruktur und keine Login-Daten an NoRisk. Greift zentral in
-/// `utils::http_client` (alle Requests an `*.norisk.gg` werden abgelehnt).
-pub const NORISK_SERVICES_ENABLED: bool = false;
-
 /// Update-Quelle des Launchers. Endet sie auf `.json`, ist es ein statisches
 /// Tauri-Manifest – hier `latest.json` des neuesten GitHub-Releases (erstellt von
 /// `launcher/scripts/release.mjs`). Sonst ein dynamischer Server `{base}/{target}/…`.
@@ -71,13 +65,15 @@ pub const BUNDLED_PACKS_JSON: &str = include_str!("../../../packs/salami-packs.j
 pub const BUNDLED_VERSIONS_JSON: &str = include_str!("../../../packs/salami-versions.json");
 
 /// `true`, wenn ein Request an diesen Host blockiert werden soll: NoRisk-Server
-/// (`norisk.gg` und alle Subdomains) sind im Salami Client immer gesperrt.
+/// (`norisk.gg` und alle Subdomains) sind im Salami Client immer gesperrt. Der Launcher
+/// selbst spricht nicht mehr mit NoRisk; die Sperre fängt Adressen ab, die z. B. aus
+/// importierten Packs oder Profilen stammen. Greift in `config::BlockingResolver`
+/// (alle HTTP-Clients) und in `utils::http_client`.
 pub fn is_blocked_host(host: Option<&str>) -> bool {
-    !NORISK_SERVICES_ENABLED
-        && host.is_some_and(|h| {
-            let h = h.trim_end_matches('.').to_ascii_lowercase();
-            h == "norisk.gg" || h.ends_with(".norisk.gg")
-        })
+    host.is_some_and(|h| {
+        let h = h.trim_end_matches('.').to_ascii_lowercase();
+        h == "norisk.gg" || h.ends_with(".norisk.gg")
+    })
 }
 
 #[cfg(test)]

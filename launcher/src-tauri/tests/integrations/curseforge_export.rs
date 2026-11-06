@@ -1,6 +1,6 @@
-use noriskclient_launcher_v3_lib::integrations::curseforge;
-use noriskclient_launcher_v3_lib::integrations::curseforge_export::*;
-use noriskclient_launcher_v3_lib::state::profile_state::ModLoader;
+use salami_client_lib::integrations::curseforge;
+use salami_client_lib::integrations::curseforge_export::*;
+use salami_client_lib::state::profile_state::ModLoader;
 
 fn entry(project_id: u32, file_name: &str, display_name: Option<&str>) -> IndexEntry {
     IndexEntry {

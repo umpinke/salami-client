@@ -1,16 +1,16 @@
 use chrono::Utc;
-use noriskclient_launcher_v3_lib::state::db;
-use noriskclient_launcher_v3_lib::state::profile_state::{
+use salami_client_lib::state::db;
+use salami_client_lib::state::profile_state::{
     ModLoader, Profile, ProfileSettings, ProfileState,
 };
-use noriskclient_launcher_v3_lib::state::sync_pack_state::SyncPackManager;
-use noriskclient_launcher_v3_lib::sync::context::SyncContext;
-use noriskclient_launcher_v3_lib::sync::handlers::dir_link::DirLinkHandler;
-use noriskclient_launcher_v3_lib::sync::handlers::file_copy::FileCopyHandler;
-use noriskclient_launcher_v3_lib::sync::handlers::options_merge::OptionsMergeHandler;
-use noriskclient_launcher_v3_lib::sync::handlers::SyncHandler;
-use noriskclient_launcher_v3_lib::sync::model::{DetachMode, SyncPack, SyncTarget, SyncTargetKind};
-use noriskclient_launcher_v3_lib::sync::report::HandlerOutcome;
+use salami_client_lib::state::sync_pack_state::SyncPackManager;
+use salami_client_lib::sync::context::SyncContext;
+use salami_client_lib::sync::handlers::dir_link::DirLinkHandler;
+use salami_client_lib::sync::handlers::file_copy::FileCopyHandler;
+use salami_client_lib::sync::handlers::options_merge::OptionsMergeHandler;
+use salami_client_lib::sync::handlers::SyncHandler;
+use salami_client_lib::sync::model::{DetachMode, SyncPack, SyncTarget, SyncTargetKind};
+use salami_client_lib::sync::report::HandlerOutcome;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -126,7 +126,7 @@ impl Shared {
     pub async fn try_launch(
         &self,
         player: &Player,
-    ) -> noriskclient_launcher_v3_lib::error::Result<HandlerOutcome> {
+    ) -> salami_client_lib::error::Result<HandlerOutcome> {
         self.handler()
             .apply_pre_launch(&self.context(player, &[], &HashSet::new()))
             .await

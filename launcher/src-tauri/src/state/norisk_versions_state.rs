@@ -1,7 +1,6 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::Result;
 use crate::integrations::norisk_versions::NoriskVersionsConfig;
-use crate::minecraft::api::norisk_api::NoRiskApi;
 use crate::state::post_init::PostInitializationHandler;
 use crate::state::state_manager::State;
 use async_trait::async_trait;
@@ -49,21 +48,15 @@ impl NoriskVersionManager {
         })
     }
 
-    /// Fetches the latest Norisk versions configuration from the API and updates the local state.
-    /// Saves the updated configuration to the file on success.
-    pub async fn fetch_and_update_config(
-        &self,
-        // Assuming no token/experimental needed based on previous confirmation for packs
-        norisk_token: &str,
-        is_experimental: bool,
-    ) -> Result<()> {
-        info!("Fetching latest Norisk versions config from API...");
+    /// Lädt die Standardprofile neu aus `integrations::salami_packs` (Remote-URL aus
+    /// `branding`, sonst eingebettet), übernimmt sie in den Zustand und speichert sie.
+    pub async fn fetch_and_update_config(&self) -> Result<()> {
+        info!("Loading Salami standard versions config...");
 
-        // Assuming placeholder token/flag is okay, like for packs
-        match NoRiskApi::get_standard_versions(norisk_token, is_experimental).await {
+        match crate::integrations::salami_packs::load_versions().await {
             Ok(new_config) => {
                 debug!(
-                    "Successfully fetched {} standard profile definitions from API.",
+                    "Successfully loaded {} standard profile definitions.",
                     new_config.profiles.len()
                 );
                 {
@@ -75,12 +68,12 @@ impl NoriskVersionManager {
                 // Save the newly fetched config
                 match self.save_config().await {
                     Ok(_) => {
-                        info!("Successfully updated and saved Norisk versions config from API.");
+                        info!("Successfully updated and saved standard versions config.");
                         Ok(())
                     }
                     Err(e) => {
                         error!(
-                            "Fetched versions config from API, but failed to save it: {}",
+                            "Loaded standard versions config, but failed to save it: {}",
                             e
                         );
                         Err(e) // Return the save error
@@ -88,7 +81,7 @@ impl NoriskVersionManager {
                 }
             }
             Err(e) => {
-                error!("Failed to fetch Norisk versions config from API: {}", e);
+                error!("Failed to load standard versions config: {}", e);
                 Err(e) // Return the fetch error
             }
         }
@@ -194,15 +187,9 @@ impl PostInitializationHandler for NoriskVersionManager {
     async fn on_state_ready(&self, _app_handle: Arc<tauri::AppHandle>) -> Result<()> {
         trace!("NoriskVersionManager: on_state_ready called. Loading configuration...");
         // Salami: Standardprofile sind eingebettet – direkt laden statt auf einen Cache zu warten.
-        if !crate::branding::NORISK_SERVICES_ENABLED {
-            let is_exp = match State::get().await {
-                Ok(state) => state.config_manager.is_experimental_mode().await,
-                Err(_) => false,
-            };
-            match self.fetch_and_update_config("", is_exp).await {
-                Ok(()) => return Ok(()),
-                Err(e) => log::warn!("NoriskVersionManager: Salami versions could not be loaded ({}), falling back to cache", e),
-            }
+        match self.fetch_and_update_config().await {
+            Ok(()) => return Ok(()),
+            Err(e) => log::warn!("NoriskVersionManager: Salami versions could not be loaded ({}), falling back to cache", e),
         }
         // Load initial config. If loading fails critically (e.g., IO error other than NotFound), propagate the error.
         // If parsing fails or file not found, use default. This logic is now effectively in load_config_internal.

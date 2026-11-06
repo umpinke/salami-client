@@ -1,7 +1,7 @@
-use noriskclient_launcher_v3_lib::state::profile_state::{
+use salami_client_lib::state::profile_state::{
     MemorySettings, Profile, LEGACY_DEFAULT_MEMORY_MAX_MB, LEGACY_DEFAULT_MEMORY_MIN_MB,
 };
-use noriskclient_launcher_v3_lib::utils::migration_utils::*;
+use salami_client_lib::utils::migration_utils::*;
 use std::collections::HashMap;
 use std::path::Path;
 use uuid::Uuid;

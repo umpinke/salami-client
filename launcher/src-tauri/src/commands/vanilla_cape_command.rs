@@ -101,13 +101,6 @@ pub async fn equip_vanilla_cape(cape_id: Option<String>) -> Result<(), CommandEr
 
     if result.is_ok() {
         debug!("Command completed: equip_vanilla_cape");
-
-        let cape_hash = cape_id.unwrap_or_else(|| "unequipped".to_string());
-        let mut props = std::collections::HashMap::new();
-        props.insert("cape_hash".to_string(), serde_json::Value::String(cape_hash.clone()));
-        props.insert("cape_source".to_string(), serde_json::Value::String("vanilla".to_string()));
-        props.insert("cape_name".to_string(), serde_json::Value::String(cape_hash));
-        crate::commands::analytics_command::track_event("cape_selected", props);
     } else {
         debug!("Command failed: equip_vanilla_cape");
     }

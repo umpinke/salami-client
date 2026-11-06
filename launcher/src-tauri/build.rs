@@ -82,8 +82,8 @@ fn curseforge_api_key() {
 }
 
 fn main() {
-    println!("cargo:rerun-if-env-changed=NRC_CAPTURE_RUNTIME_SHA256");
-    println!("cargo:rerun-if-env-changed=NRC_CAPTURE_RUNTIME_URL");
+    println!("cargo:rerun-if-env-changed=SALAMI_CAPTURE_RUNTIME_SHA256");
+    println!("cargo:rerun-if-env-changed=SALAMI_CAPTURE_RUNTIME_URL");
     println!("cargo:rerun-if-changed=src/main.rs");
     curseforge_api_key();
 

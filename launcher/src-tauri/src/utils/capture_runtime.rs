@@ -4,23 +4,22 @@ use std::sync::RwLock;
 use once_cell::sync::Lazy;
 use serde::Serialize;
 
-use crate::commands::analytics_command::{megabytes, tenths, track};
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::utils::download_utils::{DownloadConfig, DownloadUtils};
 
 #[cfg(not(target_os = "macos"))]
 const ENGINE_NAMES: [&str; 2] = [
-    "norisk-capture.exe",
-    "norisk-capture-x86_64-pc-windows-msvc.exe",
+    "salami-capture.exe",
+    "salami-capture-x86_64-pc-windows-msvc.exe",
 ];
 #[cfg(target_os = "macos")]
 const ENGINE_NAMES: [&str; 2] = [
-    "norisk-capture",
+    "salami-capture",
     if cfg!(target_arch = "aarch64") {
-        "norisk-capture-aarch64-apple-darwin"
+        "salami-capture-aarch64-apple-darwin"
     } else {
-        "norisk-capture-x86_64-apple-darwin"
+        "salami-capture-x86_64-apple-darwin"
     },
 ];
 const COMPLETE_MARKER: &str = ".complete";
@@ -57,8 +56,8 @@ static PINNED: Lazy<Option<(&'static str, &'static str)>> = Lazy::new(|| {
     if cfg!(target_os = "macos") {
         return None;
     }
-    let sha = option_env!("NRC_CAPTURE_RUNTIME_SHA256")?;
-    let url = option_env!("NRC_CAPTURE_RUNTIME_URL")?;
+    let sha = option_env!("SALAMI_CAPTURE_RUNTIME_SHA256")?;
+    let url = option_env!("SALAMI_CAPTURE_RUNTIME_URL")?;
 
     if !is_sha256(sha) {
         log::error!("Ignoring a capture runtime pin: the hash is not a SHA256 digest");
@@ -209,7 +208,7 @@ async fn download_and_unpack(sha: &str, url: &str) -> Result<PathBuf> {
     let _ = tokio::fs::remove_file(&archive).await;
 
     let engine = engine_in(&dir).ok_or_else(|| {
-        AppError::Other("the capture runtime archive holds no norisk-capture.exe".into())
+        AppError::Other("the capture runtime archive holds no salami-capture.exe".into())
     })?;
     tokio::fs::write(dir.join(COMPLETE_MARKER), sha).await?;
     remove_stale_runtimes(&dir).await;
@@ -222,13 +221,6 @@ async fn download_and_unpack(sha: &str, url: &str) -> Result<PathBuf> {
         dir.display(),
         size as f64 / 1e6,
         started.elapsed().as_secs_f64()
-    );
-    track(
-        "clip_runtime_downloaded",
-        serde_json::json!({
-            "seconds": tenths(started.elapsed().as_secs_f64()),
-            "size_mb": megabytes(size),
-        }),
     );
 
     Ok(engine)

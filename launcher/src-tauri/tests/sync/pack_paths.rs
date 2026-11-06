@@ -1,5 +1,5 @@
-use noriskclient_launcher_v3_lib::sync::model::{AdoptStrategy, SyncTargetKind};
-use noriskclient_launcher_v3_lib::sync::paths;
+use salami_client_lib::sync::model::{AdoptStrategy, SyncTargetKind};
+use salami_client_lib::sync::paths;
 use std::path::Path;
 use uuid::Uuid;
 

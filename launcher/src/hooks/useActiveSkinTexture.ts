@@ -2,7 +2,6 @@ import { MinecraftSkinService } from "../services/minecraft-skin-service";
 import { useSkinStore } from "../store/useSkinStore";
 import { useMinecraftAuthStore } from "../store/minecraft-auth-store";
 import type { SkinVariant } from "../types/localSkin";
-import { cosmeticCacheKeys } from "../services/cosmetic-cache";
 import { useAsyncResource } from "./useAsyncResource";
 
 export interface ActiveSkinTexture {
@@ -14,6 +13,9 @@ export interface ActiveSkinTexture {
 type SkinTexture = Omit<ActiveSkinTexture, "loading">;
 
 const EMPTY: SkinTexture = { textureUrl: null, variant: "classic" };
+
+const activeSkinCacheKey = (playerId: string) =>
+  `active-skin:${playerId.replace(/-/g, "").toLowerCase()}`;
 
 function toDataUrl(base64: string): string {
   return base64.startsWith("data:") ? base64 : `data:image/png;base64,${base64}`;
@@ -34,7 +36,7 @@ export function useActiveSkinTexture(): ActiveSkinTexture {
     },
     [activeAccount?.id, skinRevision],
     EMPTY,
-    { cacheKey: activeAccount?.id ? cosmeticCacheKeys.activeSkin(activeAccount.id) : undefined },
+    { cacheKey: activeAccount?.id ? activeSkinCacheKey(activeAccount.id) : undefined },
   );
 
   return { ...data, loading };

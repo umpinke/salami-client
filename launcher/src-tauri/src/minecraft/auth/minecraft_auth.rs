@@ -7,12 +7,10 @@ use base64::prelude::{BASE64_STANDARD, BASE64_URL_SAFE_NO_PAD};
 use base64::Engine;
 
 use chrono::{DateTime, Duration, Utc};
-use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use log::debug;
 use log::error;
 use log::info;
 use log::trace;
-use machineid_rs::{Encryption, HWIDComponent, IdBuilder};
 use p256::ecdsa::signature::Signer;
 use p256::ecdsa::{Signature, SigningKey, VerifyingKey};
 use p256::pkcs8::{DecodePrivateKey, EncodePrivateKey, LineEnding};
@@ -37,16 +35,9 @@ use axum::{
 use tokio::net::TcpListener;
 
 use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
-use crate::minecraft::api::NoRiskApi;
 use crate::state::event_state::{EventPayload, EventType};
 use crate::state::state_manager::State;
 use crate::utils::file_utils::write_atomic;
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct NoRiskTokenClaims {
-    exp: usize,
-    username: String,
-}
 
 /// Represents the authentication flow used to create an account
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
@@ -58,6 +49,8 @@ pub enum AuthFlow {
     Direct,
 }
 
+/// Gespeicherter Minecraft-Account. Ältere Dateien enthalten noch `norisk_credentials` und
+/// `ignore_child_protection_warning` (NoRisk-Token-Login); serde ignoriert diese Felder beim Lesen.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Credentials {
     pub id: Uuid,
@@ -65,11 +58,7 @@ pub struct Credentials {
     pub access_token: String,
     pub refresh_token: String,
     pub expires: DateTime<Utc>,
-    pub norisk_credentials: NoRiskCredentials,
     pub active: bool,
-    /// If true, the launcher will not show the child-protection multiplayer warning modal for this account
-    #[serde(default)]
-    pub ignore_child_protection_warning: bool,
     /// The authentication flow used to create this account (optional for backwards compatibility)
     #[serde(default)]
     pub auth_flow: Option<AuthFlow>,
@@ -77,63 +66,6 @@ pub struct Credentials {
     /// token). `None` for accounts from older launcher versions → treated as stale to refresh once.
     #[serde(default)]
     pub mc_access_token_expires: Option<DateTime<Utc>>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct NoRiskCredentials {
-    pub production: Option<NoRiskToken>,
-    pub experimental: Option<NoRiskToken>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct NoRiskToken {
-    pub value: String,
-    //TODO habs nichts hinbekommen jetzt erstmal bei jedem restart, pub expires: DateTime<Utc>,
-}
-
-impl NoRiskCredentials {
-    pub async fn get_token(&self) -> Result<String> {
-        Ok(self
-            .production
-            .as_ref()
-            .ok_or(AppError::NoCredentialsError)?
-            .value
-            .clone())
-    }
-
-    /// Gets the appropriate NoRisk token based on the experimental mode setting.
-    ///
-    /// # Arguments
-    /// * `is_experimental` - Whether to retrieve the experimental token.
-    ///
-    /// # Returns
-    /// A `Result` containing the token string if found, or an `AppError::NoCredentialsError`
-    /// if the required token is not present.
-    pub fn get_token_for_mode(&self, is_experimental: bool) -> Result<String> {
-        let token_option = if is_experimental {
-            self.experimental.as_ref()
-        } else {
-            self.production.as_ref()
-        };
-
-        token_option
-            .map(|token| token.value.clone())
-            .ok_or_else(|| {
-                // Salami: ohne NoRisk-Dienste ist ein fehlendes Token der Normalfall
-                if !crate::branding::NORISK_SERVICES_ENABLED {
-                    return AppError::NoCredentialsError;
-                }
-                error!(
-                    "No NoRisk token found for {} mode.",
-                    if is_experimental {
-                        "experimental"
-                    } else {
-                        "production"
-                    }
-                );
-                AppError::NoCredentialsError
-            })
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -694,8 +626,7 @@ impl MinecraftAuthStore {
         );
         
         let profile_id = profile.id.unwrap_or_default();
-        let existing_account = self.get_account_by_id(profile_id).await?;
-        
+
         let credentials = Credentials {
             id: profile_id,
             active: true,
@@ -703,14 +634,6 @@ impl MinecraftAuthStore {
             access_token: minecraft_token.access_token,
             refresh_token: oauth_token.value.refresh_token,
             expires: oauth_token.date + Duration::seconds(oauth_token.value.expires_in as i64),
-            norisk_credentials: match existing_account {
-                Some(ref account) => account.norisk_credentials.clone(),
-                None => NoRiskCredentials {
-                    production: None,
-                    experimental: None,
-                },
-            },
-            ignore_child_protection_warning: existing_account.as_ref().map(|a| a.ignore_child_protection_warning).unwrap_or(false),
             auth_flow: Some(AuthFlow::Direct),
             mc_access_token_expires: Some(mc_token_expiry(minecraft_token.expires_in)),
         };
@@ -764,12 +687,6 @@ impl MinecraftAuthStore {
         let profile_id = profile.id.unwrap_or_default();
         info!("[Auth Flow] Using profile ID: {}", profile_id);
 
-        let existing_account = self.get_account_by_id(profile_id).await?;
-        info!(
-            "[Auth Flow] Existing account found: {}",
-            existing_account.is_some()
-        );
-
         let credentials = Credentials {
             id: profile_id,
             active: true,
@@ -777,14 +694,6 @@ impl MinecraftAuthStore {
             access_token: minecraft_token.access_token,
             refresh_token: oauth_token.value.refresh_token,
             expires: oauth_token.date + Duration::seconds(oauth_token.value.expires_in as i64),
-            norisk_credentials: match existing_account {
-                Some(ref account) => account.norisk_credentials.clone(),
-                None => NoRiskCredentials {
-                    production: None,
-                    experimental: None,
-                },
-            },
-            ignore_child_protection_warning: existing_account.as_ref().map(|a| a.ignore_child_protection_warning).unwrap_or(false),
             auth_flow: Some(AuthFlow::Sisu),
             mc_access_token_expires: Some(mc_token_expiry(minecraft_token.expires_in)),
         };
@@ -797,150 +706,6 @@ impl MinecraftAuthStore {
         info!("[Auth Flow] Login process completed successfully (auth_flow: Sisu)");
 
         Ok(credentials)
-    }
-
-    /// Returns the (possibly refreshed) credentials plus whether they actually changed,
-    /// so callers can skip redundant persistence when nothing was updated.
-    pub(crate) async fn refresh_norisk_token_if_necessary(
-        &self,
-        creds: &Credentials,
-        force_update: bool,
-        experimental_mode: bool,
-    ) -> Result<(Credentials, bool)> {
-        trace!(
-            "[Token Refresh] Starting NoRisk token refresh check for user: {}",
-            creds.username
-        );
-        let mut maybe_update = false;
-
-        if !force_update {
-            // Choose token based on experimental mode
-            let token_ref = if experimental_mode {
-                &creds.norisk_credentials.experimental
-            } else {
-                &creds.norisk_credentials.production
-            };
-
-            if let Some(token) = token_ref {
-                let key = DecodingKey::from_secret(&[]);
-                let mut validation = Validation::new(Algorithm::HS256);
-                validation.insecure_disable_signature_validation();
-                match decode::<NoRiskTokenClaims>(&token.value, &key, &validation) {
-                    Ok(data) => {
-                        trace!(
-                            "[Token Refresh] Token expiration check - Expires at: {}",
-                            data.claims.exp
-                        );
-                        if data.claims.username != creds.username {
-                            info!(
-                                "[Token Refresh] Username mismatch detected - Old: {}, New: {}",
-                                data.claims.username, creds.username
-                            );
-                            maybe_update = true;
-                        }
-                    }
-                    Err(error) => {
-                        maybe_update = true;
-                        info!("[Token Refresh] Error decoding token: {:?}", error);
-                    }
-                };
-            } else {
-                debug!("[Token Refresh] No token found for the selected mode");
-                maybe_update = true;
-            }
-        }
-
-        // Salami: keine NoRisk-Dienste → kein NoRisk-Token, nicht erst versuchen
-        // (spart HWID-Hash, Request-Versuch und Fehlermeldungen im Log).
-        if !crate::branding::NORISK_SERVICES_ENABLED {
-            return Ok((creds.clone(), false));
-        }
-
-        if force_update || maybe_update {
-            // Generate privacy-friendly hashed system identifier
-            // Hash a salt string with HWID for consistent but anonymous identification
-            let hwid = IdBuilder::new(Encryption::SHA256)
-                .add_component(HWIDComponent::SystemID)
-                .build("NRC")
-                .map_err(|e| AppError::Other(format!("HWID Error {:?}", e)))?;
-
-            // Create deterministic hash by combining salt with HWID
-            use sha2::{Sha256, Digest};
-            let mut hasher = Sha256::new();
-            hasher.update(b"norisk-device-salt");
-            hasher.update(&hwid);
-            let system_id = format!("{:x}", hasher.finalize());
-
-            info!(
-                "[Token Refresh] Refreshing token - Force: {}, Maybe: {}, SystemID: {}",
-                force_update, maybe_update, system_id
-            );
-
-            // Use NoRiskApi for token refresh with proper error handling
-            info!("[NoRisk Token] Starting token refresh using NoRiskApi");
-
-            // Use the experimental_mode parameter instead of hardcoded value
-            info!(
-                "[NoRisk Token] Mode: {}",
-                if experimental_mode {
-                    "Experimental"
-                } else {
-                    "Production"
-                }
-            );
-
-            info!("[NoRisk Token] Account is known to have child protection enabled: {}", creds.ignore_child_protection_warning);
-
-            match NoRiskApi::refresh_norisk_token_v3(
-                &system_id,
-                &creds.username,
-                &creds.access_token,
-                &creds.id.to_string().replace("-", ""), // UUID without dashes
-                true,
-                experimental_mode,
-            )
-            .await
-            {
-                Ok(norisk_token) => {
-                    info!("[NoRisk Token] Successfully refreshed token");
-                    let mut copied_credentials = creds.clone();
-
-                    if experimental_mode {
-                        info!("[NoRisk Token] Storing token in experimental credentials");
-                        copied_credentials.norisk_credentials.experimental = Some(norisk_token);
-                    } else {
-                        info!("[NoRisk Token] Storing token in production credentials");
-                        copied_credentials.norisk_credentials.production = Some(norisk_token);
-                    }
-
-                    // reset child protection warning flag on successful token refresh
-                    copied_credentials.ignore_child_protection_warning = false;
-
-                    // Update the account in storage
-                    info!("[NoRisk Token] Updating account in storage");
-                    self.update_or_insert(copied_credentials.clone()).await?;
-
-                    info!("[Token Refresh] Token refresh completed successfully");
-                    Ok((copied_credentials, true))
-                }
-                Err(e) => {
-                    info!("[NoRisk Token] Token refresh failed: {:?}", e);
-                    info!("[NoRisk Token] Falling back to original credentials");
-                    // Return the original credentials if token refresh fails
-                    let creds_mut =  &mut creds.clone();
-                    let mut changed = false;
-                    if e.to_string().contains("InsufficientPrivilegesException") && e.to_string().contains("/session/minecraft/join") {
-                        info!("[NoRisk Token] Detected child protection restriction, setting ignore_child_protection_warning to true");
-                        changed = !creds_mut.ignore_child_protection_warning;
-                        creds_mut.ignore_child_protection_warning = true;
-                    }
-                    Ok((creds_mut.clone(), changed))
-                }
-            }
-        } else {
-            debug!("[Token Refresh] Token is still valid, no refresh needed");
-            Ok((creds.clone(), false))
-        }
     }
 
     async fn refresh_token(&self, creds: &Credentials) -> Result<Option<Credentials>> {
@@ -1001,9 +766,7 @@ impl MinecraftAuthStore {
             access_token: minecraft_token.access_token,
             refresh_token: oauth_token.value.refresh_token,
             expires: oauth_token.date + Duration::seconds(oauth_token.value.expires_in as i64),
-            norisk_credentials: creds.norisk_credentials.clone(),
             active: creds.active,
-            ignore_child_protection_warning: creds.ignore_child_protection_warning,
             auth_flow: Some(AuthFlow::Direct),
             mc_access_token_expires: Some(mc_token_expiry(minecraft_token.expires_in)),
         };
@@ -1054,9 +817,7 @@ impl MinecraftAuthStore {
             access_token: minecraft_token.access_token,
             refresh_token: oauth_token.value.refresh_token,
             expires: oauth_token.date + Duration::seconds(oauth_token.value.expires_in as i64),
-            norisk_credentials: creds.norisk_credentials.clone(),
             active: creds.active,
-            ignore_child_protection_warning: creds.ignore_child_protection_warning,
             auth_flow: Some(AuthFlow::Sisu),
             mc_access_token_expires: Some(mc_token_expiry(minecraft_token.expires_in)),
         };
@@ -1074,14 +835,13 @@ impl MinecraftAuthStore {
     }
 
     /// Gets an account by ID and refreshes its tokens if necessary.
-    /// 
-    /// This method retrieves an account by its ID, refreshes Microsoft and NoRisk tokens
+    ///
+    /// This method retrieves an account by its ID, refreshes the Microsoft/Minecraft token
     /// if needed, updates the account in storage, and returns the refreshed credentials.
-    /// 
+    ///
     /// # Arguments
     /// * `id` - The UUID of the account to retrieve
-    /// * `experimental_mode` - Whether to use experimental mode for NoRisk token refresh
-    /// 
+    ///
     /// # Returns
     /// * `Ok(Some(Credentials))` - The refreshed account credentials
     /// * `Ok(None)` - Account not found
@@ -1089,7 +849,6 @@ impl MinecraftAuthStore {
     pub async fn get_account_by_id_with_refresh(
         &self,
         id: Uuid,
-        experimental_mode: bool,
     ) -> Result<Option<Credentials>> {
         info!(
             "[Account Manager] Getting account by ID with refresh: {}",
@@ -1107,7 +866,7 @@ impl MinecraftAuthStore {
 
             // Refresh tokens if needed
             let updated_account = self
-                .update_norisk_and_microsoft_token(&creds, experimental_mode)
+                .update_norisk_and_microsoft_token(&creds)
                 .await?;
 
             if let Some(updated) = updated_account {
@@ -1118,12 +877,7 @@ impl MinecraftAuthStore {
                     debug!("[Account Manager] Successfully acquired write lock");
                     if let Some(existing) = accounts.iter_mut().find(|acc| acc.id == updated.id) {
                         debug!("[Account Manager] Updating account in list");
-                        // Preserve ignore flag from in-memory existing account to avoid
-                        // overwriting a recent user 'ignore' action performed concurrently.
-                        let existing_flag = existing.ignore_child_protection_warning;
-                        let mut merged = updated.clone();
-                        merged.ignore_child_protection_warning = existing_flag || merged.ignore_child_protection_warning;
-                        *existing = merged;
+                        *existing = updated.clone();
                     }
                     debug!("[Account Manager] Releasing write lock");
                 } // Write-Lock wird hier freigegeben
@@ -1162,14 +916,8 @@ impl MinecraftAuthStore {
             // Wenn der Account existiert, aktualisiere ihn
             if let Some(existing) = accounts.iter_mut().find(|acc| acc.id == credentials.id) {
                 debug!("[Account Manager] Found existing account, updating credentials");
-                // Preserve the existing ignore_child_protection_warning flag to avoid
-                // races where another concurrent flow set the flag while this flow
-                // was constructing credentials from stale data.
-                let existing_flag = existing.ignore_child_protection_warning;
-                let mut merged = credentials.clone();
-                merged.ignore_child_protection_warning = existing_flag || merged.ignore_child_protection_warning;
-                *existing = merged;
-                info!("[Account Manager] Account successfully updated (merged ignore flag)");
+                *existing = credentials;
+                info!("[Account Manager] Account successfully updated");
             } else {
                 // Wenn der Account nicht existiert, füge ihn hinzu
                 debug!("[Account Manager] No existing account found, creating new account");
@@ -1185,10 +933,12 @@ impl MinecraftAuthStore {
         Ok(())
     }
 
+    /// Erneuert das Microsoft-/Minecraft-Token, wenn es bald abläuft. `Ok(None)` heißt:
+    /// nichts geändert, die gespeicherten Daten gelten weiter. (Der Name stammt noch aus der
+    /// Zeit mit NoRisk-Token; das gibt es nicht mehr.)
     pub async fn update_norisk_and_microsoft_token(
         &self,
         creds: &Credentials,
-        experimental_mode: bool,
     ) -> Result<Option<Credentials>> {
         trace!(
             "[Token Check] Starting token validation check for user: {}",
@@ -1212,22 +962,13 @@ impl MinecraftAuthStore {
             let res = self.refresh_token(&old_credentials).await;
 
             match res {
-                Ok(val) => {
-                    return if val.is_some() {
-                        info!("[Token Check] Successfully refreshed Microsoft token");
-                        // Microsoft token was refreshed, so credentials changed either way
-                        let (refreshed, _) = self
-                            .refresh_norisk_token_if_necessary(
-                                &val.unwrap().clone(),
-                                false,
-                                experimental_mode,
-                            )
-                            .await?;
-                        Ok(Some(refreshed))
-                    } else {
-                        info!("[Token Check] Failed to refresh Microsoft token - No credentials found");
-                        Err(AppError::NoCredentialsError)
-                    };
+                Ok(Some(refreshed)) => {
+                    info!("[Token Check] Successfully refreshed Microsoft token");
+                    Ok(Some(refreshed))
+                }
+                Ok(None) => {
+                    info!("[Token Check] Failed to refresh Microsoft token - No credentials found");
+                    Err(AppError::NoCredentialsError)
                 }
                 Err(err) => {
                     if let Some(reason) = keep_cached_credentials_reason(&err) {
@@ -1246,34 +987,13 @@ impl MinecraftAuthStore {
             }
         } else {
             debug!("[Token Check] Microsoft token valid until {}", creds.expires);
-            if creds.ignore_child_protection_warning {
-                debug!("[Token Check] Skipping NoRisk token check due to child protection warning ignore flag");
-                Ok(None)
-            } else {
-                trace!("[Token Check] Checking NoRisk token status");
-                let (refreshed, changed) = self
-                    .refresh_norisk_token_if_necessary(&creds.clone(), false, experimental_mode)
-                    .await?;
-                if changed {
-                    Ok(Some(refreshed))
-                } else {
-                    // Nothing changed — signal callers to skip the redundant save
-                    Ok(None)
-                }
-            }
+            // Nothing changed — signal callers to skip the redundant save
+            Ok(None)
         }
     }
 
     pub async fn get_active_account(&self) -> Result<Option<Credentials>> {
         trace!("[Account Manager] Starting get_active_account process");
-
-        // Get the global state to check the experimental mode
-        let state = crate::state::State::get().await?;
-        let is_experimental = state.config_manager.is_experimental_mode().await;
-        trace!(
-            "[Account Manager] Global experimental mode is: {}",
-            is_experimental
-        );
 
         // Zuerst nur lesen um den aktiven Account zu finden
         let active_account = {
@@ -1295,7 +1015,7 @@ impl MinecraftAuthStore {
             );
             // Refresh credentials if needed
             let updated_account = self
-                .update_norisk_and_microsoft_token(&account, is_experimental)
+                .update_norisk_and_microsoft_token(&account)
                 .await?;
 
             if let Some(updated) = updated_account {
@@ -1306,12 +1026,7 @@ impl MinecraftAuthStore {
                     debug!("[Account Manager] Successfully acquired write lock");
                     if let Some(existing) = accounts.iter_mut().find(|acc| acc.id == updated.id) {
                         debug!("[Account Manager] Updating account in list");
-                        // Preserve ignore flag from in-memory existing account to avoid
-                        // overwriting a recent user 'ignore' action performed concurrently.
-                        let existing_flag = existing.ignore_child_protection_warning;
-                        let mut merged = updated.clone();
-                        merged.ignore_child_protection_warning = existing_flag || merged.ignore_child_protection_warning;
-                        *existing = merged;
+                        *existing = updated.clone();
                     }
                     debug!("[Account Manager] Releasing write lock");
                 } // Write-Lock wird hier freigegeben

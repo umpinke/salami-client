@@ -1,7 +1,7 @@
-use noriskclient_launcher_v3_lib::state::db;
-use noriskclient_launcher_v3_lib::state::profile_state::{Mod, ModSource};
-use noriskclient_launcher_v3_lib::state::sync_pack_state::SyncPackManager;
-use noriskclient_launcher_v3_lib::sync::model::{
+use salami_client_lib::state::db;
+use salami_client_lib::state::profile_state::{Mod, ModSource};
+use salami_client_lib::state::sync_pack_state::SyncPackManager;
+use salami_client_lib::sync::model::{
     AdoptStrategy, SyncTarget, SyncTargetKind, SyncTargetState, VersionOverride,
 };
 use std::path::PathBuf;

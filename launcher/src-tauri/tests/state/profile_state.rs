@@ -1,5 +1,5 @@
-use noriskclient_launcher_v3_lib::state::profile_state::*;
-use noriskclient_launcher_v3_lib::utils::profile_utils::{
+use salami_client_lib::state::profile_state::*;
+use salami_client_lib::utils::profile_utils::{
     ContentType, GenericModrinthInfo, LocalContentItem,
 };
 use std::collections::HashSet;
@@ -157,7 +157,7 @@ fn replacing_keeps_the_entry_identity_and_user_choices() {
     existing.modpack_origin = Some("modrinth:abc".to_string());
     let original_id = existing.id;
 
-    let payload = noriskclient_launcher_v3_lib::commands::content_command::InstallContentPayload {
+    let payload = salami_client_lib::commands::content_command::InstallContentPayload {
         profile_id: Uuid::new_v4(),
         project_id: "7P86n6Vg".to_string(),
         version_id: "MtfON55Y".to_string(),
@@ -170,7 +170,7 @@ fn replacing_keeps_the_entry_identity_and_user_choices() {
         content_type: ContentType::Mod,
         loaders: Some(vec!["fabric".to_string()]),
         game_versions: Some(vec!["26.1".to_string()]),
-        source: noriskclient_launcher_v3_lib::integrations::unified_mod::ModPlatform::Modrinth,
+        source: salami_client_lib::integrations::unified_mod::ModPlatform::Modrinth,
     };
 
     let new_source = ModSource::Modrinth {

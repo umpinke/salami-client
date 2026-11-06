@@ -14,6 +14,12 @@ pub fn uses_own_meta_dir() -> bool {
 
 /// Läuft beim Start im Hintergrund; Fehler werden nur protokolliert.
 pub async fn remove_norisk_leftovers() {
+    // Bis 1.5.0 hieß die Clip-Aufnahme norisk-capture.exe. Ein Update legt salami-capture.exe
+    // daneben, die alte Datei bliebe sonst im Installationsordner liegen.
+    #[cfg(windows)]
+    if let Some(install_dir) = std::env::current_exe().ok().and_then(|exe| exe.parent().map(Path::to_path_buf)) {
+        remove_file(&install_dir.join("norisk-capture.exe")).await;
+    }
     if !uses_own_meta_dir() {
         info!("[Cleanup] Custom game folder in use – leaving its files untouched");
         return;

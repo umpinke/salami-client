@@ -18,10 +18,7 @@ import { Modal } from "../ui/Modal";
 import { Button } from "../ui/buttons/Button";
 import { useThemeStore } from "../../store/useThemeStore";
 import { toast } from "react-hot-toast";
-import { usePermission } from '../../hooks/usePermission';
-import { PERMISSION } from '../../constants/permissions';
 import { useTranslation } from "react-i18next";
-import { DesignerSettingsTab } from './settings/DesignerSettingsTab';
 import { cn } from "../../lib/utils";
 import { parseErrorMessage } from "../../utils/error-utils";
 
@@ -36,7 +33,6 @@ type SettingsTab =
   | "java"
   | "window"
   | "nrc"
-  | "designer"
   | "symlinks";
 
 export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
@@ -57,7 +53,6 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
     (state) => state.isBackgroundAnimationEnabled,
   );
 
-  const showDesignerTab = usePermission(PERMISSION.DESIGNER_TAB);
   const [tempRamMb, setTempRamMb] = useState(profile.settings?.memory?.max ?? 0);
 
   useEffect(() => {
@@ -200,18 +195,7 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
     { id: "symlinks", label: t('profiles.settings.symlinks'), icon: "solar:link-bold" },
   ];
 
-  const tabConfig = showDesignerTab
-    ? [
-        ...baseTabConfig,
-        { id: "designer", label: t('profiles.settings.designer'), icon: "solar:palette-bold" },
-      ]
-    : baseTabConfig;
-
-  useEffect(() => {
-    if (activeTab === "designer" && !showDesignerTab) {
-      setActiveTab("general");
-    }
-  }, [activeTab, showDesignerTab]);
+  const tabConfig = baseTabConfig;
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -262,17 +246,6 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
             onRefresh={handleRefresh}
           />
         );
-
-      case "designer":
-        if (showDesignerTab) {
-          return (
-            <DesignerSettingsTab
-              editedProfile={editedProfile}
-              updateProfile={updateProfileData}
-            />
-          );
-        }
-        return null;
       case "symlinks":
         return (
           <SymlinkSettingsTab

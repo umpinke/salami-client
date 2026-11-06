@@ -1,7 +1,7 @@
 use log::{Level, Record};
 use log4rs::encode::writer::simple::SimpleWriter;
 use log4rs::encode::Encode;
-use noriskclient_launcher_v3_lib::logging::*;
+use salami_client_lib::logging::*;
 
 #[test]
 fn encoder_masks_the_rendered_line() {

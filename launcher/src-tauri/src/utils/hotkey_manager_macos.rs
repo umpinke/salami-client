@@ -1,6 +1,6 @@
 use crate::error::{AppError, Result};
 use crate::state::config_state::ClipConfig;
-use norisk_capture::macos::HotkeyError;
+use salami_capture::macos::HotkeyError;
 use std::sync::Mutex;
 
 static CURRENT: Mutex<Option<Vec<String>>> = Mutex::new(None);
@@ -13,7 +13,7 @@ pub fn apply(_app: &tauri::AppHandle, config: &ClipConfig) -> Result<Vec<String>
     };
     let mut current = CURRENT.lock().unwrap_or_else(|e| e.into_inner());
     if current.as_ref() != Some(&wanted) {
-        norisk_capture::macos::hotkeys(&serde_json::to_string(&wanted)?, pressed).map_err(|error| {
+        salami_capture::macos::hotkeys(&serde_json::to_string(&wanted)?, pressed).map_err(|error| {
             AppError::Other(match error {
                 HotkeyError::InvalidShortcut => "A clip shortcut is invalid. Choose a supported key or mouse button and apply the settings again.",
                 HotkeyError::PermissionDenied => "Allow the launcher in System Settings > Privacy & Security > Input Monitoring, then apply the settings again.",
@@ -26,7 +26,7 @@ pub fn apply(_app: &tauri::AppHandle, config: &ClipConfig) -> Result<Vec<String>
 }
 
 pub fn clear() {
-    let _ = norisk_capture::macos::hotkeys("[]", pressed);
+    let _ = salami_capture::macos::hotkeys("[]", pressed);
     *CURRENT.lock().unwrap_or_else(|e| e.into_inner()) = None;
 }
 
@@ -40,12 +40,12 @@ extern "C" fn pressed(tag: u8) {
             return;
         }
         let request = match tag {
-            0 => norisk_ipc::LauncherToCapture::SaveClip(norisk_ipc::SaveClipRequest {
+            0 => salami_ipc::LauncherToCapture::SaveClip(salami_ipc::SaveClipRequest {
                 pre_roll_seconds: clips.pre_roll_seconds,
                 post_roll_seconds: clips.post_roll_seconds,
-                reason: norisk_ipc::ClipReason::Manual,
+                reason: salami_ipc::ClipReason::Manual,
             }),
-            1 => norisk_ipc::LauncherToCapture::SetBufferEnabled {
+            1 => salami_ipc::LauncherToCapture::SetBufferEnabled {
                 enabled: !state.capture_supervisor.buffering_wanted(),
             },
             _ => return,

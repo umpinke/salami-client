@@ -44,11 +44,6 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        norisk: {
-          DEFAULT: "#125a9d",
-          light: "#1a6ebd",
-          dark: "#0e4678",
-        },
         panel: {
           DEFAULT: "#1e1e1e",
           light: "#262626",

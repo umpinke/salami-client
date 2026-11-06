@@ -231,40 +231,8 @@ impl ContentCacheManager {
         found.remove(key)
     }
 
-    pub async fn get_player_outfit<T: DeserializeOwned + Clone>(&self, uuid: &Uuid) -> Option<T> {
-        self.get_entry::<T>(kind::PLAYER_OUTFIT, &player_key(uuid))
-            .await
-            .and_then(|entry| entry.data)
-    }
-
-    pub async fn put_player_outfit<T: Serialize>(&self, uuid: &Uuid, outfit: &T) {
-        self.put_entry(
-            kind::PLAYER_OUTFIT,
-            &player_key(uuid),
-            None,
-            Some(outfit),
-            TTL_IMMUTABLE_MS,
-        )
-        .await;
-    }
-
-    pub async fn get_player_icon<T: DeserializeOwned + Clone>(&self, uuid: &Uuid) -> Option<T> {
-        self.get_entry::<T>(kind::PLAYER_ICON, &player_key(uuid))
-            .await
-            .and_then(|entry| entry.data)
-    }
-
-    pub async fn put_player_icon<T: Serialize>(&self, uuid: &Uuid, icon: &T) {
-        self.put_entry(
-            kind::PLAYER_ICON,
-            &player_key(uuid),
-            None,
-            Some(icon),
-            TTL_IMMUTABLE_MS,
-        )
-        .await;
-    }
-
+    /// Salami: Entfernt beim Abmelden eines Accounts alte Cache-Einträge zu NoRisk-Cosmetics
+    /// und -Spielericons. Neue werden nicht mehr geschrieben.
     pub async fn forget_player(&self, uuid: &Uuid) {
         let ids = vec![player_key(uuid)];
         self.delete_ids(kind::PLAYER_OUTFIT, &ids).await;

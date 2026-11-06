@@ -3114,21 +3114,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jsonwebtoken"
-version = "9.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a87cc7a48537badeae96744432de36f4be2b4a34a05a5ef32e9dd8a1c169dde"
-dependencies = [
- "base64 0.22.1",
- "js-sys",
- "pem",
- "ring",
- "serde",
- "serde_json",
- "simple_asn1",
-]
-
-[[package]]
 name = "junction"
 version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3414,26 +3399,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c41e0c4fef86961ac6d6f8a82609f55f31b05e4fce149ac5710e439df7619ba4"
 
 [[package]]
-name = "machineid-rs"
-version = "1.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "35ceb4d434d69d7199abc3036541ba6ef86767a4356e3077d5a3419f85b70b14"
-dependencies = [
- "hex",
- "hmac",
- "md-5",
- "serde",
- "serde_json",
- "sha-1",
- "sha2",
- "sysinfo 0.29.11",
- "uuid 1.16.0",
- "whoami",
- "winreg 0.11.0",
- "wmi",
-]
-
-[[package]]
 name = "markup5ever"
 version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3659,126 +3624,6 @@ name = "noop_proc_macro"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0676bb32a98c1a483ce53e500a81ad9c3d5b3f7c920c28c24e9cb0980d0b5bc8"
-
-[[package]]
-name = "norisk-capture"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "ffmpeg-next",
- "log",
- "norisk-ipc",
- "norisk-logging",
- "tokio",
- "windows 0.58.0",
- "windows-core 0.58.0",
-]
-
-[[package]]
-name = "norisk-ipc"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "norisk-logging"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "lazy_static",
- "log",
- "log4rs",
- "once_cell",
- "regex",
-]
-
-[[package]]
-name = "noriskclient-launcher-v3"
-version = "1.5.0"
-dependencies = [
- "anyhow",
- "async-compression",
- "async-trait",
- "async_zip",
- "axum",
- "base64 0.21.7",
- "byteorder",
- "chrono",
- "craftping",
- "dashmap",
- "deunicode",
- "directories",
- "dirs",
- "discord-rich-presence",
- "fast_image_resize",
- "fastnbt",
- "flate2",
- "fontdb",
- "fs4",
- "fs_extra",
- "futures",
- "futures-lite",
- "futures-util",
- "hex",
- "hyper",
- "hyper-util",
- "image",
- "jsonwebtoken",
- "junction",
- "lazy_static",
- "libc",
- "log",
- "log4rs",
- "machineid-rs",
- "norisk-capture",
- "norisk-ipc",
- "norisk-logging",
- "notify",
- "once_cell",
- "p256",
- "quick-xml 0.31.0",
- "rand 0.8.5",
- "regex",
- "reqwest 0.12.15",
- "sanitize-filename",
- "semver",
- "serde",
- "serde_json",
- "sha1",
- "sha2",
- "sqlx",
- "sysinfo 0.34.2",
- "tar",
- "tauri",
- "tauri-build",
- "tauri-plugin-cli",
- "tauri-plugin-clipboard-manager",
- "tauri-plugin-deep-link",
- "tauri-plugin-dialog",
- "tauri-plugin-fs",
- "tauri-plugin-opener",
- "tauri-plugin-process",
- "tauri-plugin-single-instance",
- "tauri-plugin-updater",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
- "tokio-stream",
- "tokio-tungstenite",
- "tokio-util",
- "tower 0.4.13",
- "tower-http 0.5.2",
- "tracing",
- "tracing-subscriber",
- "trust-dns-resolver",
- "url",
- "urlencoding",
- "uuid 1.16.0",
- "windows 0.58.0",
- "zip 2.6.1",
-]
 
 [[package]]
 name = "notify"
@@ -4409,16 +4254,6 @@ checksum = "f8ed6a7761f76e3b9f92dfb0a60a6a6477c61024b775147ff0973a02653abaf2"
 dependencies = [
  "digest",
  "hmac",
-]
-
-[[package]]
-name = "pem"
-version = "3.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38af38e8470ac9dee3ce1bae1af9c1671fffc44ddfd8bd1d0a3445bf349a8ef3"
-dependencies = [
- "base64 0.22.1",
- "serde",
 ]
 
 [[package]]
@@ -5450,6 +5285,122 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 
 [[package]]
+name = "salami-capture"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ffmpeg-next",
+ "log",
+ "salami-ipc",
+ "salami-logging",
+ "tokio",
+ "windows 0.58.0",
+ "windows-core 0.58.0",
+]
+
+[[package]]
+name = "salami-client-launcher"
+version = "1.5.0"
+dependencies = [
+ "anyhow",
+ "async-compression",
+ "async-trait",
+ "async_zip",
+ "axum",
+ "base64 0.21.7",
+ "byteorder",
+ "chrono",
+ "craftping",
+ "dashmap",
+ "deunicode",
+ "directories",
+ "dirs",
+ "discord-rich-presence",
+ "fast_image_resize",
+ "fastnbt",
+ "flate2",
+ "fontdb",
+ "fs4",
+ "fs_extra",
+ "futures",
+ "futures-lite",
+ "hex",
+ "hyper",
+ "hyper-util",
+ "image",
+ "junction",
+ "lazy_static",
+ "libc",
+ "log",
+ "log4rs",
+ "notify",
+ "once_cell",
+ "p256",
+ "quick-xml 0.31.0",
+ "rand 0.8.5",
+ "regex",
+ "reqwest 0.12.15",
+ "salami-capture",
+ "salami-ipc",
+ "salami-logging",
+ "sanitize-filename",
+ "semver",
+ "serde",
+ "serde_json",
+ "sha1",
+ "sha2",
+ "sqlx",
+ "sysinfo",
+ "tar",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-cli",
+ "tauri-plugin-clipboard-manager",
+ "tauri-plugin-deep-link",
+ "tauri-plugin-dialog",
+ "tauri-plugin-fs",
+ "tauri-plugin-opener",
+ "tauri-plugin-process",
+ "tauri-plugin-single-instance",
+ "tauri-plugin-updater",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tower 0.4.13",
+ "tower-http 0.5.2",
+ "tracing",
+ "tracing-subscriber",
+ "trust-dns-resolver",
+ "url",
+ "urlencoding",
+ "uuid 1.16.0",
+ "windows 0.58.0",
+ "zip 2.6.1",
+]
+
+[[package]]
+name = "salami-ipc"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "salami-logging"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "lazy_static",
+ "log",
+ "log4rs",
+ "once_cell",
+ "regex",
+]
+
+[[package]]
 name = "same-file"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5783,17 +5734,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sha-1"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5058ada175748e33390e40e872bd0fe59a19f265d0158daa551c5a88a76009c"
-dependencies = [
- "cfg-if",
- "cpufeatures",
- "digest",
-]
-
-[[package]]
 name = "sha1"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5862,18 +5802,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95890f873bec569a0362c235787f3aca6e1e887302ba4840839bcc6459c42da6"
 dependencies = [
  "quote",
-]
-
-[[package]]
-name = "simple_asn1"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "297f631f50729c8c99b84667867963997ec0b50f32b2a7dbcab828ef0541e8bb"
-dependencies = [
- "num-bigint",
- "num-traits",
- "thiserror 2.0.12",
- "time",
 ]
 
 [[package]]
@@ -6296,21 +6224,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.100",
-]
-
-[[package]]
-name = "sysinfo"
-version = "0.29.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd727fc423c2060f6c92d9534cef765c65a6ed3f428a03d7def74a8c4348e666"
-dependencies = [
- "cfg-if",
- "core-foundation-sys",
- "libc",
- "ntapi",
- "once_cell",
- "rayon",
- "winapi",
 ]
 
 [[package]]
@@ -7054,22 +6967,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio-tungstenite"
-version = "0.24.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edc5f74e248dc973e0dbb7b74c7e0d6fcc301c694ff50049504004ef4d0cdcd9"
-dependencies = [
- "futures-util",
- "log",
- "rustls",
- "rustls-pki-types",
- "tokio",
- "tokio-rustls",
- "tungstenite",
- "webpki-roots",
-]
-
-[[package]]
 name = "tokio-util"
 version = "0.7.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7417,26 +7314,6 @@ name = "ttf-parser"
 version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2c591d83f69777866b9126b24c6dd9a18351f177e49d625920d19f989fd31cf8"
-
-[[package]]
-name = "tungstenite"
-version = "0.24.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18e5b8366ee7a95b16d32197d0b2604b43a0be89dc5fac9f8e96ccafbaedda8a"
-dependencies = [
- "byteorder",
- "bytes",
- "data-encoding",
- "http",
- "httparse",
- "log",
- "rand 0.8.5",
- "rustls",
- "rustls-pki-types",
- "sha1",
- "thiserror 1.0.69",
- "utf-8",
-]
 
 [[package]]
 name = "typeid"
@@ -8023,7 +7900,6 @@ checksum = "5d4a4db5077702ca3015d3d02d74974948aba2ad9e12ab7df718ee64ccd7e97d"
 dependencies = [
  "libredox",
  "wasite",
- "web-sys",
 ]
 
 [[package]]
@@ -8076,17 +7952,6 @@ dependencies = [
  "raw-window-handle",
  "windows-sys 0.59.0",
  "windows-version",
-]
-
-[[package]]
-name = "windows"
-version = "0.48.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e686886bc078bc1b0b600cac0147aadb815089b6e4da64016cbd754b6342700f"
-dependencies = [
- "windows-implement 0.48.0",
- "windows-interface 0.48.0",
- "windows-targets 0.48.5",
 ]
 
 [[package]]
@@ -8181,17 +8046,6 @@ dependencies = [
 
 [[package]]
 name = "windows-implement"
-version = "0.48.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e2ee588991b9e7e6c8338edf3333fbe4da35dc72092643958ebb43f0ab2c49c"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
-name = "windows-implement"
 version = "0.57.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9107ddc059d5b6fbfbffdfa7a7fe3e22a226def0b2608f72e9d552763d3e1ad7"
@@ -8221,17 +8075,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.100",
-]
-
-[[package]]
-name = "windows-interface"
-version = "0.48.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6fb8df20c9bcaa8ad6ab513f7b40104840c8867d5751126e4df3b08388d0cc7"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -8692,16 +8535,6 @@ dependencies = [
 
 [[package]]
 name = "winreg"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76a1a57ff50e9b408431e8f97d5456f2807f8eb2a2cd79b06068fc87f8ecf189"
-dependencies = [
- "cfg-if",
- "winapi",
-]
-
-[[package]]
-name = "winreg"
 version = "0.50.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "524e57b2c537c0f9b1e69f1965311ec12182b4122e45035b1508cd24d2adadb1"
@@ -8746,20 +8579,6 @@ dependencies = [
  "wayland-client",
  "wayland-protocols",
  "wayland-protocols-wlr",
-]
-
-[[package]]
-name = "wmi"
-version = "0.12.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "daffb44abb7d2e87a1233aa17fdbde0d55b890b32a23a1f908895b87fa6f1a00"
-dependencies = [
- "chrono",
- "futures",
- "log",
- "serde",
- "thiserror 1.0.69",
- "windows 0.48.0",
 ]
 
 [[package]]

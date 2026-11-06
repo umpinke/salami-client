@@ -7,6 +7,7 @@ import { useThemeStore } from "../../store/useThemeStore";
 import { IconButton } from "../ui/buttons/IconButton";
 import { Button } from "../ui/buttons/Button";
 import { openExternalUrl } from "../../services/tauri-service";
+import { BRAND } from "../../config/salami";
 
 interface CreditsModalProps {
   isOpen: boolean;
@@ -81,10 +82,10 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
               />
             </div>
           </div>
-            <div className="flex items-center justify-between p-4 rounded-lg bg-black/20 border-2 border-white/20 transition-colors">
-            <div className="flex items-center gap-4">
-              <div 
-                className="w-10 h-10 rounded-full flex items-center justify-center"
+          <div className="flex items-center justify-between gap-4 p-4 rounded-lg bg-black/20 border-2 border-white/20 transition-colors">
+            <div className="flex items-center gap-4 min-w-0">
+              <div
+                className="w-10 h-10 shrink-0 rounded-full flex items-center justify-center"
                 style={{ backgroundColor: `${accentColor.value}40` }}
               >
                 <Icon
@@ -93,19 +94,17 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
                   style={{ color: accentColor.value }}
                 />
               </div>
-              <div className="min-h-[3rem] flex flex-col justify-center">
-                <div className="flex items-baseline gap-2">
-                  <h4 className="text-base font-smallcaps text-white tracking-wider">
-                    NoRisk Client Launcher
-                  </h4>
-                </div>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-white/80 font-smallcaps text-xs tracking-wide">
-                {t('credits_modal.based_on')}
+              <p className="text-sm text-white/80 font-minecraft">
+                {t("about.attribution")}
               </p>
             </div>
+            <IconButton
+              icon={<Icon icon="solar:code-bold" className="w-4 h-4" />}
+              onClick={() => handleOpenUrl(BRAND.sourceUrl)}
+              variant="default"
+              size="sm"
+              title={t("about.source_code")}
+            />
           </div>
 
           {/* Open Source Licenses Button */}
@@ -113,7 +112,7 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
             <Button
               variant="ghost"
               className="flex items-center gap-2 px-6 py-3 border border-[#ffffff20] hover:bg-white/5 transition-colors"
-              onClick={() => handleOpenUrl("https://github.com/umpinke/salami-client/blob/main/launcher/LICENSE")}
+              onClick={() => handleOpenUrl(`${BRAND.sourceUrl}/blob/main/launcher/LICENSE`)}
             >
               <Icon icon="solar:arrow-right-up-bold" className="w-5 h-5" />
               <span className="font-smallcaps text-xs">{t('credits_modal.view_licenses')}</span>

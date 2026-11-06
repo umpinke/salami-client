@@ -19,8 +19,8 @@ const ARCHIVE = {
     "norisk-native-deps-win64-v1.zip",
   sha256: "3c5ff4ed9e243a0b7374ac5b9c7342d9b2983098ed765c0ce6b95a7754ef8463",
   abi: [
-    "src-tauri/crates/norisk-capture/src/encoder/d3d11_ffi.rs",
-    "src-tauri/crates/norisk-capture/src/capture/hook/info.rs",
+    "src-tauri/crates/salami-capture/src/encoder/d3d11_ffi.rs",
+    "src-tauri/crates/salami-capture/src/capture/hook/info.rs",
   ],
   expect: [
     ...FFMPEG_DLLS.map((dll) => `ffmpeg/bin/${dll}`),

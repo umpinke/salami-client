@@ -1,7 +1,7 @@
 use chrono::DateTime;
-use noriskclient_launcher_v3_lib::state::db;
-use noriskclient_launcher_v3_lib::state::profile_state::{ModLoader, NoriskModIdentifier, Profile};
-use noriskclient_launcher_v3_lib::state::profile_store::*;
+use salami_client_lib::state::db;
+use salami_client_lib::state::profile_state::{ModLoader, NoriskModIdentifier, Profile};
+use salami_client_lib::state::profile_store::*;
 use sqlx::Row;
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
@@ -307,7 +307,7 @@ async fn the_lookup_columns_agree_with_the_stored_source() {
 
     assert!(!rows.is_empty(), "the corpus must contribute mods");
     for row in rows {
-        let source: noriskclient_launcher_v3_lib::state::profile_state::ModSource =
+        let source: salami_client_lib::state::profile_state::ModSource =
             serde_json::from_str(&row.get::<String, _>("source")).unwrap();
         let (expected_type, expected_project, _, _) = source_lookup(&source);
         assert_eq!(row.get::<String, _>("source_type"), expected_type);

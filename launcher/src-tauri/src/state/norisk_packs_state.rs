@@ -1,7 +1,6 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::Result;
 use crate::integrations::norisk_packs::NoriskModpacksConfig;
-use crate::minecraft::api::norisk_api::NoRiskApi;
 use crate::state::post_init::PostInitializationHandler;
 use async_trait::async_trait;
 use log::{debug, error, info, trace};
@@ -74,19 +73,15 @@ impl NoriskPackManager {
         }
     }
 
-    /// Fetches the latest Norisk packs configuration from the API and updates the local state.
-    /// Saves the updated configuration to the file on success.
-    pub async fn fetch_and_update_config(
-        &self,
-        norisk_token: &str,
-        is_experimental: bool,
-    ) -> Result<()> {
-        info!("Fetching latest Norisk packs config from API...");
+    /// Lädt die Pack-Definitionen neu aus `integrations::salami_packs` (Remote-URL aus
+    /// `branding`, sonst eingebettet), übernimmt sie in den Zustand und speichert sie.
+    pub async fn fetch_and_update_config(&self) -> Result<()> {
+        info!("Loading Salami packs config...");
 
-        match NoRiskApi::get_modpacks(norisk_token, is_experimental).await {
+        match crate::integrations::salami_packs::load_packs().await {
             Ok(new_config) => {
                 debug!(
-                    "Successfully fetched {} packs definitions from API.",
+                    "Successfully loaded {} packs definitions.",
                     new_config.packs.len()
                 );
                 {
@@ -95,21 +90,21 @@ impl NoriskPackManager {
                     *config_guard = new_config;
                 } // Write lock released here
 
-                // Save the newly fetched config
+                // Save the newly loaded config
                 match self.save_config().await {
                     Ok(_) => {
-                        info!("Successfully updated and saved Norisk packs config from API.");
+                        info!("Successfully updated and saved packs config.");
                         Ok(())
                     }
                     Err(e) => {
-                        error!("Fetched config from API, but failed to save it: {}", e);
+                        error!("Loaded packs config, but failed to save it: {}", e);
                         Err(e) // Return the save error
                     }
                 }
             }
             Err(e) => {
-                error!("Failed to fetch Norisk packs config from API: {}", e);
-                Err(e) // Return the fetch error
+                error!("Failed to load packs config: {}", e);
+                Err(e) // Return the load error
             }
         }
     }
@@ -187,15 +182,9 @@ impl PostInitializationHandler for NoriskPackManager {
     async fn on_state_ready(&self, _app_handle: Arc<tauri::AppHandle>) -> Result<()> {
         trace!("NoriskPackManager: on_state_ready called. Loading configuration...");
         // Salami: Packs sind eingebettet – direkt laden statt auf einen Cache zu warten.
-        if !crate::branding::NORISK_SERVICES_ENABLED {
-            let is_exp = match crate::state::state_manager::State::get().await {
-                Ok(state) => state.config_manager.is_experimental_mode().await,
-                Err(_) => false,
-            };
-            match self.fetch_and_update_config("", is_exp).await {
-                Ok(()) => return Ok(()),
-                Err(e) => log::warn!("NoriskPackManager: Salami packs could not be loaded ({}), falling back to cache", e),
-            }
+        match self.fetch_and_update_config().await {
+            Ok(()) => return Ok(()),
+            Err(e) => log::warn!("NoriskPackManager: Salami packs could not be loaded ({}), falling back to cache", e),
         }
         // Select load path based on experimental mode if accessible
         let load_path = if let Ok(state) = crate::state::state_manager::State::get().await {

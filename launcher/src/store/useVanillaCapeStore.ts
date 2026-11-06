@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { VanillaCapeService } from "../services/vanilla-cape-service";
-import { invalidateEquippedCosmetics } from "../services/cosmetic-cache";
 import type { VanillaCape, VanillaCapeInfo } from "../types/vanillaCapes";
 import { toast } from "react-hot-toast";
 import i18n from '../i18n/i18n';
@@ -93,7 +92,6 @@ export const useVanillaCapeStore = create<VanillaCapeState>()(
           }
 
           await VanillaCapeService.equipVanillaCape(capeId);
-          invalidateEquippedCosmetics();
 
           set(state => ({
             ownedCapes: state.ownedCapes.map(cape => ({

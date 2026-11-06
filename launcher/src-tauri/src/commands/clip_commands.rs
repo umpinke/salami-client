@@ -2,7 +2,7 @@ use serde::Serialize;
 
 use crate::error::CommandError;
 use crate::state::State;
-use norisk_ipc::{
+use salami_ipc::{
     AudioDeviceInfo, CaptureState, ClipCodec, EncoderCapability, EncoderPreference,
     LauncherToCapture,
 };
@@ -10,7 +10,7 @@ use norisk_ipc::{
 #[tauri::command]
 pub fn capture_supported() -> bool {
     #[cfg(target_os = "macos")]
-    return norisk_capture::macos::capture_supported();
+    return salami_capture::macos::capture_supported();
     #[cfg(not(target_os = "macos"))]
     cfg!(windows)
 }
@@ -268,7 +268,6 @@ pub async fn clip_delete(path: std::path::PathBuf) -> Result<(), CommandError> {
     let dir = clip_dir().await?;
     crate::utils::clip_library::delete(&dir, &path)?;
     log::info!("Deleted clip {}", path.display());
-    crate::commands::analytics_command::track("clip_deleted", serde_json::json!({}));
     Ok(())
 }
 
@@ -305,7 +304,7 @@ pub async fn clip_prepare_preview(path: std::path::PathBuf) -> Result<(), Comman
     state
         .capture_supervisor
         .send(LauncherToCapture::PrepareAudioPreview(
-            norisk_ipc::AudioPreviewRequest { source: path },
+            salami_ipc::AudioPreviewRequest { source: path },
         ))?;
     Ok(())
 }
@@ -319,7 +318,7 @@ pub async fn clip_export_vertical(
 
     let state = State::get().await?;
     state.capture_supervisor.send(LauncherToCapture::ExportVertical(
-        norisk_ipc::ExportVerticalRequest {
+        salami_ipc::ExportVerticalRequest {
             source: path,
             destination: destination.clone(),
         },
@@ -333,7 +332,7 @@ pub async fn clip_trim(
     path: std::path::PathBuf,
     start_seconds: f64,
     end_seconds: f64,
-    levels: Option<Vec<norisk_ipc::TrackLevel>>,
+    levels: Option<Vec<salami_ipc::TrackLevel>>,
 ) -> Result<std::path::PathBuf, CommandError> {
     if !start_seconds.is_finite() || !end_seconds.is_finite() || end_seconds <= start_seconds {
         return Err(crate::error::AppError::Other(
@@ -348,7 +347,7 @@ pub async fn clip_trim(
     let state = State::get().await?;
     state
         .capture_supervisor
-        .send(LauncherToCapture::TrimClip(norisk_ipc::TrimClipRequest {
+        .send(LauncherToCapture::TrimClip(salami_ipc::TrimClipRequest {
             source: path,
             destination: destination.clone(),
             start_seconds,
@@ -405,10 +404,6 @@ pub async fn clip_set_favourite(
 ) -> Result<(), CommandError> {
     let dir = clip_dir().await?;
     crate::utils::clip_library::set_favourite(&dir, &path, favourite)?;
-    crate::commands::analytics_command::track(
-        "clip_favourited",
-        serde_json::json!({ "favourite": favourite }),
-    );
     Ok(())
 }
 
@@ -420,7 +415,6 @@ pub async fn clip_rename(
     let dir = clip_dir().await?;
     let renamed = crate::utils::clip_library::rename(&dir, &path, &name)?;
     log::info!("Renamed {} to {}", path.display(), renamed.display());
-    crate::commands::analytics_command::track("clip_renamed", serde_json::json!({}));
     Ok(renamed)
 }
 
