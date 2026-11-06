@@ -14,6 +14,13 @@ pub const DIRS_QUALIFIER: &str = "dev";
 pub const DIRS_ORGANIZATION: &str = "salamiclient";
 pub const DIRS_APPLICATION: &str = "SalamiClient";
 
+/// Reservierter Ordner unter `profiles/`: gemeinsame Spielordner der Client-Gruppe
+/// (`new`/`legacy`), Wegwerf-Profile (`temp`) und die Standard-Profile (`<version>`).
+pub const PROFILES_NAMESPACE: &str = "salamiclient";
+/// Bis 1.6.0 hießen `new`, `legacy` und `temp` noch `noriskclient/…`; beim Start
+/// verschiebt `legacy_cleanup::migrate_profile_folders` sie nach [`PROFILES_NAMESPACE`].
+pub const LEGACY_PROFILES_NAMESPACE: &str = "noriskclient";
+
 /// URL-Schema für Deep-Links (`salami://…`), muss zu `plugins.deep-link` in `tauri.conf.json` passen.
 pub const DEEP_LINK_SCHEME: &str = "salami";
 

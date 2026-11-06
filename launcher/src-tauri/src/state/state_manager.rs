@@ -107,6 +107,12 @@ impl State {
         // Must run after ConfigManager: meta_dir() resolves CUSTOM_GAME_DIR_CACHE.
         crate::state::db::open_or_reopen(&initial_state_arc.db).await?;
 
+        // Salami: alte Ordnernamen (noriskclient/, NoRiskClientLauncher/, *.nrc.json) umstellen,
+        // bevor Profile geladen werden. Braucht den Spielordner aus der Config (siehe oben).
+        if let Err(e) = tokio::task::spawn_blocking(crate::utils::legacy_cleanup::migrate_profile_folders).await {
+            log::warn!("State::init - folder migration failed: {}", e);
+        }
+
         ready_step("ContentCacheManager", initial_state_arc.content_cache.on_state_ready(app.clone())).await?;
 
         let loaded_config = initial_state_arc.config_manager.get_config().await;

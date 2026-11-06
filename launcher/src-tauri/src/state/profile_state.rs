@@ -2395,15 +2395,22 @@ impl ProfileManager {
 
     /// Builds the default path using profile.path segments
     pub fn build_path_from_profile_path(profile: &Profile) -> PathBuf {
-        let mut path = default_profile_path();
-        
-        // Explicitly split profile.path by '/' and push each segment
-        for segment in profile.path.split('/') {
-            if !segment.is_empty() {
-                path.push(segment);
-            }
+        Self::resolve_profile_path(&default_profile_path(), &profile.path)
+    }
+
+    /// `profiles/` + gespeicherter Profilpfad. Gespeicherte Pfade unter `noriskclient/…` (bis 1.6.0)
+    /// zeigen auf `salamiclient/…`, sobald der alte Ordner nicht mehr da ist – den verschiebt
+    /// `legacy_cleanup::migrate_profile_folders` beim Start.
+    pub fn resolve_profile_path(profiles: &std::path::Path, stored: &str) -> PathBuf {
+        let segments: Vec<&str> = stored.split('/').filter(|s| !s.is_empty()).collect();
+        let mut path = profiles.to_path_buf();
+        path.extend(&segments);
+        if segments.first() != Some(&crate::branding::LEGACY_PROFILES_NAMESPACE) || path.exists() {
+            return path;
         }
-        path
+        let mut renamed = profiles.join(crate::branding::PROFILES_NAMESPACE);
+        renamed.extend(&segments[1..]);
+        renamed
     }
 
     /// Calculates the group directory for a profile when using shared folder logic.
@@ -2411,11 +2418,13 @@ impl ProfileManager {
     pub fn calculate_group_directory(&self, profile: &Profile) -> Result<PathBuf> {
         if let Some(group) = &profile.group {
             if Self::is_norisk_client_group(group) {
-                // NoRisk Client groups go to "noriskclient/legacy" for MC < 1.13, "noriskclient/new" otherwise
+                // Client groups go to "salamiclient/legacy" for MC < 1.13, "salamiclient/new" otherwise
+                // (bis 1.6.0 "noriskclient/…", siehe legacy_cleanup::migrate_profile_folders)
+                let namespace = default_profile_path().join(crate::branding::PROFILES_NAMESPACE);
                 if mc_utils::is_legacy_minecraft_version(&profile.game_version) {
-                    Ok(default_profile_path().join("noriskclient").join("legacy"))
+                    Ok(namespace.join("legacy"))
                 } else {
-                    Ok(default_profile_path().join("noriskclient").join("new"))
+                    Ok(namespace.join("new"))
                 }
             } else {
                 // Other custom groups go to "groups/{sanitized_group_name}"
@@ -3763,7 +3772,10 @@ impl PostInitializationHandler for ProfileManager {
 const PRE_MIGRATION_SNAPSHOT: &str = "pre-profiles";
 
 pub fn should_persist(profile: &Profile, transient: &HashSet<Uuid>) -> bool {
-    if transient.contains(&profile.id) || profile.path.starts_with("noriskclient/temp/") {
+    let temp_profile = [crate::branding::PROFILES_NAMESPACE, crate::branding::LEGACY_PROFILES_NAMESPACE]
+        .iter()
+        .any(|ns| profile.path.starts_with(&format!("{ns}/temp/")));
+    if transient.contains(&profile.id) || temp_profile {
         return false;
     }
     !(profile.is_standard_version && profile.source_standard_profile_id.is_none())

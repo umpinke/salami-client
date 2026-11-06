@@ -153,6 +153,9 @@ fn two_packs_never_share_a_folder_on_disk() {
 #[test]
 fn a_throwaway_profile_is_recognised_so_it_is_left_out_of_syncing() {
     assert!(paths::is_temp_profile_path("noriskclient/temp/abc"));
+    assert!(paths::is_temp_profile_path("salamiclient/temp/abc"));
     assert!(!paths::is_temp_profile_path("noriskclient/new"));
+    assert!(!paths::is_temp_profile_path("salamiclient/new"));
+    assert!(!paths::is_temp_profile_path("salamiclient/1.21.11"));
     assert!(!paths::is_temp_profile_path("my-temp-favourites"));
 }

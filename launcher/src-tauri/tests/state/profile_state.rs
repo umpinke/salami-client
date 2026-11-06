@@ -537,11 +537,13 @@ fn a_transient_profile_is_never_persisted() {
 
 #[test]
 fn a_temp_path_profile_is_never_persisted() {
-    let profile = persistence_fixture("noriskclient/temp/whatever");
-    assert!(
-        !should_persist(&profile, &HashSet::new()),
-        "the temp path alone must keep a profile out of the database"
-    );
+    for path in ["noriskclient/temp/whatever", "salamiclient/temp/whatever"] {
+        let profile = persistence_fixture(path);
+        assert!(
+            !should_persist(&profile, &HashSet::new()),
+            "the temp path alone must keep a profile out of the database ({path})"
+        );
+    }
 }
 
 #[test]

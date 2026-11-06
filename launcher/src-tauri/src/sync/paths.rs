@@ -197,9 +197,10 @@ pub fn instance_path_for(instance_dir: &std::path::Path, target_path: &str) -> R
 
 pub fn is_temp_profile_path(profile_path: &str) -> bool {
     let normalized = profile_path.replace('\\', "/").to_ascii_lowercase();
-    normalized.starts_with("noriskclient/temp/")
-        || normalized.starts_with("temp/")
-        || normalized.contains("/noriskclient/temp/")
+    normalized.starts_with("temp/")
+        || [crate::branding::PROFILES_NAMESPACE, crate::branding::LEGACY_PROFILES_NAMESPACE]
+            .iter()
+            .any(|ns| normalized.starts_with(&format!("{ns}/temp/")) || normalized.contains(&format!("/{ns}/temp/")))
 }
 
 pub async fn list_pack_local_jars(pack_id: Uuid) -> Result<Vec<PathBuf>> {

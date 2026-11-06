@@ -191,8 +191,35 @@ pub fn write_thumbnail(dir: &Path, clip: &Path, jpeg: &[u8]) -> Result<PathBuf> 
 
 const MAX_THUMBNAIL_BYTES: usize = 2 * 1024 * 1024;
 
+/// Endung der Clip-Infos; bis 1.6.0 hieß sie [`LEGACY_DETAILS_EXTENSION`].
+const DETAILS_EXTENSION: &str = "salami.json";
+const LEGACY_DETAILS_EXTENSION: &str = "nrc.json";
+
 pub fn details_path(clip: &Path) -> PathBuf {
-    meta_path(clip, "nrc.json")
+    meta_path(clip, DETAILS_EXTENSION)
+}
+
+/// Benennt alte Clip-Infos (`*.nrc.json`) in `*.salami.json` um. Gibt es die neue Datei
+/// schon, bleibt die alte liegen (nichts wird gelöscht).
+pub fn migrate_legacy_details() {
+    let Ok(entries) = std::fs::read_dir(meta_dir()) else {
+        return;
+    };
+    let legacy_suffix = format!(".{LEGACY_DETAILS_EXTENSION}");
+    let mut renamed = 0;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Some(stem) = path.file_name().and_then(|n| n.to_str()).and_then(|n| n.strip_suffix(&legacy_suffix)) else {
+            continue;
+        };
+        let target = meta_dir().join(format!("{stem}.{DETAILS_EXTENSION}"));
+        if !target.exists() && std::fs::rename(&path, &target).is_ok() {
+            renamed += 1;
+        }
+    }
+    if renamed > 0 {
+        log::info!("Renamed {renamed} clip detail file(s) to .{DETAILS_EXTENSION}");
+    }
 }
 
 pub fn tidy_clip_folder(dir: &Path) {
@@ -200,18 +227,21 @@ pub fn tidy_clip_folder(dir: &Path) {
         return;
     };
 
+    let details_suffix = format!(".{DETAILS_EXTENSION}");
+    let legacy_suffix = format!(".{LEGACY_DETAILS_EXTENSION}");
     let mut moved = 0;
     for entry in entries.filter_map(|entry| entry.ok()) {
         let path = entry.path();
         let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
             continue;
         };
-        if !name.ends_with(".nrc.json") && !name.ends_with(".thumb.jpg") {
+        let details_stem = name.strip_suffix(&details_suffix).or_else(|| name.strip_suffix(&legacy_suffix));
+        if details_stem.is_none() && !name.ends_with(".thumb.jpg") {
             continue;
         }
 
-        let (stem, extension) = match name.strip_suffix(".nrc.json") {
-            Some(stem) => (stem, "nrc.json"),
+        let (stem, extension) = match details_stem {
+            Some(stem) => (stem, DETAILS_EXTENSION),
             None => (name.trim_end_matches(".thumb.jpg"), "thumb.jpg"),
         };
         let target = meta_path(&dir.join(format!("{stem}.mp4")), extension);
@@ -714,6 +744,27 @@ mod tests {
             "a clip must still open when only its description is broken"
         );
 
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn details_from_before_1_6_1_are_renamed_and_still_read() {
+        let dir = temp_dir("sidecar-legacy");
+        let clip = write_clip(&dir, "legacy.mp4", 10);
+        write_details(&clip, &details_with(Vec::new())).unwrap();
+        let current = details_path(&clip);
+        let legacy = current.with_file_name(
+            current.file_name().unwrap().to_string_lossy().replace(".salami.json", ".nrc.json"),
+        );
+        std::fs::rename(&current, &legacy).unwrap();
+
+        migrate_legacy_details();
+
+        assert!(current.exists(), "old .nrc.json must become .salami.json");
+        assert!(!legacy.exists());
+        assert!(read_details(&clip).is_some());
+
+        let _ = std::fs::remove_file(&current);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

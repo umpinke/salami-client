@@ -46,6 +46,99 @@ pub async fn remove_norisk_leftovers() {
     remove_matching(&meta.join("auth"), |n| n.starts_with("handback.") && n.ends_with(".json")).await;
 }
 
+/// Ordnernamen aus der NoRisk-Zeit auf „salami“ umstellen. Läuft beim Start, bevor Profile
+/// geladen oder gestartet werden (sonst legt der Launcher die neuen Ordner leer an). Es wird
+/// nur umbenannt und verschoben, nie gelöscht – außer leeren Ordnern. In einem eigenen
+/// Spielordner (z. B. einer NoRisk-Installation) bleibt alles, wie es ist.
+pub fn migrate_profile_folders() {
+    // Clip-Infos liegen immer im Launcher-Ordner, nicht im Spielordner
+    crate::utils::clip_library::migrate_legacy_details();
+    if !uses_own_meta_dir() {
+        return;
+    }
+    let profiles = crate::state::profile_state::default_profile_path();
+    migrate_profile_namespace(&profiles);
+    migrate_profile_image_dirs(&profiles);
+}
+
+/// `profiles/noriskclient/{new,legacy}` → `profiles/salamiclient/{new,legacy}` (gemeinsame
+/// Spielordner der Client-Gruppe). `temp/` räumt `trash_utils::reap_temp_profiles` auf.
+pub fn migrate_profile_namespace(profiles: &Path) {
+    let legacy = profiles.join(crate::branding::LEGACY_PROFILES_NAMESPACE);
+    if !is_real_dir(&legacy) {
+        return;
+    }
+    let current = profiles.join(crate::branding::PROFILES_NAMESPACE);
+    for name in ["new", "legacy"] {
+        let from = legacy.join(name);
+        let to = current.join(name);
+        if !is_real_dir(&from) {
+            continue;
+        }
+        if to.exists() {
+            warn!("[Cleanup] {:?} and {:?} both exist – leaving the old folder in place", from, to);
+            continue;
+        }
+        match std::fs::create_dir_all(&current).and_then(|_| std::fs::rename(&from, &to)) {
+            Ok(()) => info!("[Cleanup] moved {:?} -> {:?}", from, to),
+            Err(e) => warn!("[Cleanup] could not move {:?} -> {:?}: {}", from, to, e),
+        }
+    }
+    // leere Reste entfernen (remove_dir schlägt bei nicht leeren Ordnern fehl)
+    let _ = std::fs::remove_dir(legacy.join("temp"));
+    let _ = std::fs::remove_dir(&legacy);
+}
+
+/// Profilbild-Ordner `NoRiskClientLauncher/` → `SalamiClient/` in jedem Profil (auch in
+/// Gruppen- und Standard-Profilordnern eine Ebene tiefer). Gespeicherte Pfade mit dem alten
+/// Präfix löst `path_commands::resolve_profile_image` weiter auf.
+pub fn migrate_profile_image_dirs(profiles: &Path) {
+    let mut instances = Vec::new();
+    for entry in read_dirs(profiles) {
+        instances.extend(read_dirs(&entry));
+        instances.push(entry);
+    }
+    for instance in instances {
+        let from = instance.join(crate::commands::path_commands::LEGACY_PROFILE_IMAGE_DIR);
+        if !is_real_dir(&from) {
+            continue;
+        }
+        let to = instance.join(crate::commands::path_commands::PROFILE_IMAGE_DIR);
+        if !to.exists() {
+            match std::fs::rename(&from, &to) {
+                Ok(()) => info!("[Cleanup] moved {:?} -> {:?}", from, to),
+                Err(e) => warn!("[Cleanup] could not move {:?} -> {:?}: {}", from, to, e),
+            }
+            continue;
+        }
+        // Beide da: fehlende Bilder hinüberschieben, gleichnamige bleiben im alten Ordner
+        for file in std::fs::read_dir(&from).into_iter().flatten().flatten() {
+            let target = to.join(file.file_name());
+            if !target.exists() {
+                if let Err(e) = std::fs::rename(file.path(), &target) {
+                    warn!("[Cleanup] could not move {:?} -> {:?}: {}", file.path(), target, e);
+                }
+            }
+        }
+        let _ = std::fs::remove_dir(&from);
+    }
+}
+
+/// Unterordner (keine Verknüpfungen).
+fn read_dirs(dir: &Path) -> Vec<std::path::PathBuf> {
+    std::fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|entry| entry.file_type().map(|t| t.is_dir()).unwrap_or(false))
+        .map(|entry| entry.path())
+        .collect()
+}
+
+fn is_real_dir(path: &Path) -> bool {
+    std::fs::symlink_metadata(path).map(|m| m.is_dir()).unwrap_or(false)
+}
+
 async fn remove_file(path: &Path) {
     if path.is_file() {
         match tokio::fs::remove_file(path).await {

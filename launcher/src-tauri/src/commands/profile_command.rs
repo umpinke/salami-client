@@ -3020,7 +3020,7 @@ pub struct TempLaunchArgs {
 
 /// Spin up a throwaway MC instance with the given overrides. Builds an
 /// in-memory Profile, never touches profiles.json. Instance directory lives
-/// at `<root>/profiles/noriskclient/temp/<uuid>/` and is swept into the trash
+/// at `<root>/profiles/salamiclient/temp/<uuid>/` and is swept into the trash
 /// on the next launcher start by `utils::trash_utils::reap_temp_profiles`; the
 /// trash's own 30-day retention then deletes it for good.
 /// Salami: nur für die Kommandozeile (`cli.rs`), nicht aus der Oberfläche aufrufbar.
@@ -3040,10 +3040,10 @@ pub async fn launch_temp_profile(args: TempLaunchArgs) -> Result<(), CommandErro
         id,
         name: display_name.clone(),
         // Relative segment. calculate_instance_path_for_profile resolves this to
-        // <root>/profiles/noriskclient/temp/<uuid>/. The `noriskclient/` prefix
+        // <root>/profiles/salamiclient/temp/<uuid>/. The `salamiclient/` prefix
         // is a reserved namespace (also used for grouped profiles) so it can't
         // collide with a user profile literally named "temp".
-        path: format!("noriskclient/temp/{}", id),
+        path: format!("{}/temp/{}", crate::branding::PROFILES_NAMESPACE, id),
         game_version: args.game_version.clone(),
         loader: loader.clone(),
         loader_version: args.loader_version.clone(),

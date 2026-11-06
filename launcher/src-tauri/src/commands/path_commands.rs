@@ -24,7 +24,7 @@ pub struct UploadProfileImagesPayload {
 /// Ordner für Profilbilder (Icon/Banner) im Profilordner.
 pub const PROFILE_IMAGE_DIR: &str = "SalamiClient";
 /// Früherer Name (NoRisk-Fork). Gespeicherte Pfade mit diesem Präfix funktionieren weiter.
-const LEGACY_PROFILE_IMAGE_DIR: &str = "NoRiskClientLauncher";
+pub const LEGACY_PROFILE_IMAGE_DIR: &str = "NoRiskClientLauncher";
 
 /// Profilbild-Pfad relativ zum Profilordner auflösen. Ein alter Ordner `NoRiskClientLauncher/`
 /// wird beim ersten Zugriff in `SalamiClient/` umbenannt; alte Pfade zeigen dann dorthin.
