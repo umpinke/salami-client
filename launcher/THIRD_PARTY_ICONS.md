@@ -1,6 +1,6 @@
 # Third-party icon artwork
 
-The launcher bundles 304 icons from the sets below. The artwork is redistributed
+The launcher bundles 260 icons from the sets below. The artwork is redistributed
 unmodified; only the icons actually used are included, extracted from the `@iconify-json/*`
 packages by `scripts/generate-icon-bundle.mjs`.
 
@@ -8,19 +8,19 @@ GENERATED — run `yarn icons` to refresh.
 
 ## Solar (`solar`)
 
-- 253 icons used of 7401
+- 218 icons used of 7401
 - Author: [480 Design](https://www.figma.com/community/file/1166831539721848736)
 - Licence: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (`CC-BY-4.0`)
 
 ## Pixel Icon (`pixel`)
 
-- 10 icons used of 578
+- 9 icons used of 578
 - Author: [HackerNoon](https://github.com/hackernoon/pixel-icon-library)
 - Licence: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (`CC-BY-4.0`)
 
 ## Material Design Icons (`mdi`)
 
-- 6 icons used of 7447
+- 4 icons used of 7447
 - Author: [Pictogrammers](https://github.com/Templarian/MaterialDesign)
 - Licence: [Apache 2.0](https://github.com/Templarian/MaterialDesign/blob/master/LICENSE) (`Apache-2.0`)
 
@@ -38,7 +38,7 @@ GENERATED — run `yarn icons` to refresh.
 
 ## Phosphor (`ph`)
 
-- 7 icons used of 9072
+- 2 icons used of 9072
 - Author: [Phosphor Icons](https://github.com/phosphor-icons/core)
 - Licence: [MIT](https://github.com/phosphor-icons/core/blob/main/LICENSE) (`MIT`)
 
@@ -53,12 +53,6 @@ GENERATED — run `yarn icons` to refresh.
 - 3 icons used of 46
 - Author: [Utkarsh Verma](https://github.com/n3r4zzurr0/svg-spinners)
 - Licence: [MIT](https://github.com/n3r4zzurr0/svg-spinners/blob/main/LICENSE) (`MIT`)
-
-## Noto Emoji (`noto`)
-
-- 1 icon used of 3710
-- Author: [Google Inc](https://github.com/googlefonts/noto-emoji)
-- Licence: [Apache 2.0](https://github.com/googlefonts/noto-emoji/blob/main/svg/LICENSE) (`Apache-2.0`)
 
 ## Lucide (`lucide`)
 
