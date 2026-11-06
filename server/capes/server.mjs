@@ -30,10 +30,15 @@
  *        eigenes Cape gleich nach dem Hinzufügen zur Prüfung einreichen, ohne das getragene
  *        Cape zu ändern. Anmeldung wie bei PUT /v1/capes/me. Solche Capes bleiben in der
  *        Warteschlange, auch wenn sie (noch) keiner trägt.
+ *   POST /v1/capes/report {"name","serverId","id","reason","note"?} → {"status":"reported"|"already_reported"}
+ *        freigegebenes Cape melden, das gegen die Cape-Regeln verstößt (reason: REPORT_REASONS).
+ *        Eine Meldung pro Spieler und Cape. Ab REPORTS_TO_HIDE Meldungen ist es sofort für alle
+ *        unsichtbar, bis ein Admin es behält oder sperrt.
  * Admins (Authorization: Bearer <token>, siehe ADMIN_TOKENS):
  *   GET  /admin/                                    → Prüf-Webseite
  *   GET  /v1/admin/me                               → {"name":"…"}
  *   GET  /v1/admin/capes?status=pending             → {"capes":[…],"counts":{…}}
+ *        status: pending | approved | rejected | reported (alle mit offenen Meldungen)
  *   GET  /v1/admin/img/<capeId>.png                 → Bild, egal welcher Status
  *   POST /v1/admin/capes/<capeId>/approve
  *   POST /v1/admin/capes/<capeId>/reject {"reason":"…"}
@@ -76,9 +81,21 @@ const MAX_STREAMS = env("MAX_STREAMS", 5_000);
 const MAX_STREAMS_PER_IP = env("MAX_STREAMS_PER_IP", 10);
 /** Lebenszeichen auf offenen Live-Verbindungen, damit Proxy und Spiel tote Verbindungen erkennen. */
 const HEARTBEAT_MS = 20_000;
+/** Ab so vielen Meldungen verschiedener Spieler ist ein freigegebenes Cape sofort versteckt. */
+const REPORTS_TO_HIDE = env("REPORTS_TO_HIDE", 3);
+/** Meldungen pro Spieler und Tag. */
+const REPORTS_PER_DAY = env("REPORTS_PER_DAY", 20);
 
 const BUILTIN = new Set(["salami", "pepperoni", "board"]);
 const STATUSES = ["pending", "approved", "rejected"];
+/** Reiter der Prüf-Webseite: die drei Status und alle Capes mit offenen Meldungen. */
+const ADMIN_TABS = [...STATUSES, "reported"];
+/**
+ * Gründe für Meldungen (Texte im Launcher und auf der Prüf-Webseite): fremdes Logo/Marke/Figur,
+ * verbotene Symbole/Hass, Sexuelles/brutale Gewalt, echte Person/Beleidigung, anderes.
+ */
+const REPORT_REASONS = ["logo", "hate", "sexual", "person", "other"];
+const MAX_REPORT_NOTE = 200;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const CAPE_ID = /^[0-9a-f]{64}$/;
 const PLAYER_NAME = /^[A-Za-z0-9_]{1,16}$/;
@@ -109,8 +126,12 @@ const ADMINS = (process.env.ADMIN_TOKENS || "")
 /**
  * players: uuid → { name, cape: {builtin} | {id}, updatedAt }
  * capes:   capeId → { status, width, height, submittedAt, submittedBy, submittedName,
- *                     viaLauncher?, reviewedAt?, reviewedBy?, reason? }
+ *                     viaLauncher?, reviewedAt?, reviewedBy?, reason?, approvedAt?,
+ *                     reports?, hiddenByReports? }
  *          viaLauncher: im Launcher eingereicht – bleibt in der Warteschlange, auch ungetragen
+ *          approvedAt: Freigabe (Reihenfolge der Galerie), bleibt beim Behalten nach Meldungen
+ *          reports: offene Meldungen [{ by, name, reason, note?, at }], bis ein Admin entscheidet
+ *          hiddenByReports: Zeitpunkt, an dem Meldungen das Cape versteckt haben (Status pending)
  */
 let db = { players: {}, capes: {} };
 
@@ -137,11 +158,11 @@ const imagePath = (id) => join(IMAGE_DIR, `${id}.png`);
 
 /**
  * Warteschlange sauber halten: ungeprüfte Capes, die niemand mehr trägt, verschwinden –
- * außer sie wurden ausdrücklich im Launcher eingereicht.
+ * außer sie wurden ausdrücklich im Launcher eingereicht oder warten wegen Meldungen.
  */
 function dropIfOrphanedPending(id) {
   const cape = db.capes[id];
-  if (!cape || cape.status !== "pending" || cape.viaLauncher) return;
+  if (!cape || cape.status !== "pending" || cape.viaLauncher || cape.reports?.length) return;
   if (Object.values(db.players).some((p) => p.cape?.id === id)) return;
   delete db.capes[id];
   try {
@@ -183,13 +204,18 @@ function rateLimited(bucket, ip, limit, windowMs = 60_000, now = Date.now()) {
   return r.count > limit;
 }
 
+/** Hält in `log` (uuid → Zeitpunkte) nur die letzten 24 h; true, solange `limit` nicht erreicht ist. */
+function underDailyLimit(log, uuid, limit, now = Date.now()) {
+  const recent = (log.get(uuid) ?? []).filter((t) => now - t < 86_400_000);
+  log.set(uuid, recent);
+  return recent.length < limit;
+}
+
 /** uuid → Zeitpunkte neuer Einreichungen (letzte 24 h) */
 const uploads = new Map();
-function uploadAllowed(uuid, now = Date.now()) {
-  const recent = (uploads.get(uuid) ?? []).filter((t) => now - t < 86_400_000);
-  uploads.set(uuid, recent);
-  return recent.length < UPLOADS_PER_DAY;
-}
+const uploadAllowed = (uuid) => underDailyLimit(uploads, uuid, UPLOADS_PER_DAY);
+/** uuid → Zeitpunkte eigener Meldungen (letzte 24 h) */
+const reportLog = new Map();
 
 /** serverId → Ablaufzeit */
 const challenges = new Map();
@@ -197,7 +223,9 @@ const challenges = new Map();
 function sweep(now = Date.now()) {
   for (const [id, expires] of challenges) if (expires < now) challenges.delete(id);
   for (const [key, r] of rate) if (now - r.windowStart > r.windowMs) rate.delete(key);
-  for (const [uuid, list] of uploads) if (!list.some((t) => now - t < 86_400_000)) uploads.delete(uuid);
+  for (const log of [uploads, reportLog]) {
+    for (const [uuid, list] of log) if (!list.some((t) => now - t < 86_400_000)) log.delete(uuid);
+  }
   for (const [ip, f] of adminFailures) if (now - f.since >= ADMIN_LOCK_MS) adminFailures.delete(ip);
 }
 
@@ -386,6 +414,51 @@ async function handleSubmit(req, res) {
   send(res, 200, capeResult(id));
 }
 
+/** Schickt allen Live-Verbindungen, was Mitspieler jetzt von den Trägern dieses Capes sehen. */
+function broadcastWearers(id) {
+  for (const [uuid, player] of Object.entries(db.players)) {
+    if (player.cape?.id === id) broadcast(uuid, visibleCape(player));
+  }
+}
+
+/**
+ * Launcher: ein freigegebenes Cape melden, das gegen die Cape-Regeln verstößt. Angemeldet wird
+ * wie beim Einreichen, damit jede Meldung zu einem echten Account gehört und niemand mit
+ * vielen Anfragen Capes verstecken kann. Ab REPORTS_TO_HIDE Meldungen verschiedener Spieler
+ * geht das Cape zurück in die Warteschlange (für alle unsichtbar, nicht in der Galerie), bis
+ * ein Admin es behält oder sperrt.
+ */
+async function handleReport(req, res) {
+  const body = await readJson(req, MAX_SMALL_BODY);
+  const id = typeof body.id === "string" ? body.id : "";
+  if (!CAPE_ID.test(id)) throw new HttpError(400, "id fehlt");
+  if (!REPORT_REASONS.includes(body.reason)) throw new HttpError(400, "unbekannter Grund");
+  const note = typeof body.note === "string" ? body.note.trim().slice(0, MAX_REPORT_NOTE) : "";
+  const { uuid, name } = await verifyPlayer(body.name, body.serverId);
+
+  const cape = db.capes[id];
+  if (!cape || (cape.status !== "approved" && !cape.hiddenByReports)) {
+    throw new HttpError(404, "das Cape ist nicht (mehr) freigegeben");
+  }
+  cape.reports ??= [];
+  if (cape.reports.some((report) => report.by === uuid)) return send(res, 200, { status: "already_reported" });
+  if (!underDailyLimit(reportLog, uuid, REPORTS_PER_DAY)) throw new HttpError(429, "heute schon zu viele Capes gemeldet");
+  reportLog.get(uuid).push(Date.now());
+
+  const now = new Date().toISOString();
+  cape.reports.push({ by: uuid, name, reason: body.reason, ...(note ? { note } : {}), at: now });
+  console.log(`[salami-capes] Cape ${id.slice(0, 12)} gemeldet von ${name} (${body.reason}), ${cape.reports.length} offen`);
+  if (cape.status === "approved" && cape.reports.length >= REPORTS_TO_HIDE) {
+    cape.approvedAt ??= cape.reviewedAt ?? cape.submittedAt;
+    cape.status = "pending";
+    cape.hiddenByReports = now;
+    broadcastWearers(id);
+    console.log(`[salami-capes] Cape ${id.slice(0, 12)} nach ${cape.reports.length} Meldungen versteckt, wartet auf Prüfung`);
+  }
+  scheduleSave();
+  send(res, 200, { status: "reported" });
+}
+
 async function handleLookup(req, res) {
   const body = await readJson(req, MAX_SMALL_BODY);
   if (!Array.isArray(body.uuids) || body.uuids.length > MAX_LOOKUP) throw new HttpError(400, "uuids fehlt oder zu lang");
@@ -424,7 +497,11 @@ function handleGallery(res) {
   }
   const capes = Object.entries(db.capes)
     .filter(([, cape]) => cape.status === "approved")
-    .map(([id, cape]) => ({ id, approvedAt: cape.reviewedAt ?? cape.submittedAt, wearers: wearers.get(id) ?? 0 }))
+    .map(([id, cape]) => ({
+      id,
+      approvedAt: cape.approvedAt ?? cape.reviewedAt ?? cape.submittedAt,
+      wearers: wearers.get(id) ?? 0,
+    }))
     .sort((a, b) => b.approvedAt.localeCompare(a.approvedAt))
     .slice(0, MAX_GALLERY);
   send(res, 200, { capes });
@@ -474,16 +551,21 @@ function adminList(status) {
     if (!users.has(player.cape.id)) users.set(player.cape.id, []);
     users.get(player.cape.id).push({ uuid, name: player.name });
   }
-  const counts = Object.fromEntries(STATUSES.map((s) => [s, 0]));
+  const counts = Object.fromEntries(ADMIN_TABS.map((s) => [s, 0]));
   const list = [];
   for (const [id, cape] of Object.entries(db.capes)) {
     counts[cape.status] = (counts[cape.status] ?? 0) + 1;
-    if (cape.status === status) list.push({ id, ...cape, users: users.get(id) ?? [] });
+    const reported = (cape.reports?.length ?? 0) > 0;
+    if (reported) counts.reported += 1;
+    if (status === "reported" ? reported : cape.status === status) list.push({ id, ...cape, users: users.get(id) ?? [] });
   }
+  const lastReport = (cape) => cape.reports.at(-1).at;
   list.sort((a, b) =>
-    status === "pending"
-      ? a.submittedAt.localeCompare(b.submittedAt)
-      : (b.reviewedAt ?? b.submittedAt).localeCompare(a.reviewedAt ?? a.submittedAt),
+    status === "reported"
+      ? b.reports.length - a.reports.length || lastReport(b).localeCompare(lastReport(a))
+      : status === "pending"
+        ? a.submittedAt.localeCompare(b.submittedAt)
+        : (b.reviewedAt ?? b.submittedAt).localeCompare(a.reviewedAt ?? a.submittedAt),
   );
   return { capes: list.slice(0, 200), counts };
 }
@@ -494,21 +576,35 @@ async function handleReview(req, res, admin, id, action) {
   const body = action === "reject" ? await readJson(req, MAX_SMALL_BODY).catch(() => ({})) : {};
   const wearers = Object.entries(db.players).filter(([, player]) => player.cape?.id === id);
   const visibleBefore = new Map(wearers.map(([uuid, player]) => [uuid, JSON.stringify(visibleCape(player))]));
+  const now = new Date().toISOString();
+  const reports = cape.reports?.length ?? 0;
+  if (action === "approve") {
+    // Behalten nach Meldungen: das Cape bleibt an seinem Platz in der Galerie
+    if (cape.status === "approved" || cape.hiddenByReports) cape.approvedAt ??= cape.reviewedAt ?? cape.submittedAt;
+    else cape.approvedAt = now;
+  } else {
+    delete cape.approvedAt;
+  }
   cape.status = action === "approve" ? "approved" : "rejected";
-  cape.reviewedAt = new Date().toISOString();
+  cape.reviewedAt = now;
   cape.reviewedBy = admin;
   if (action === "reject" && typeof body.reason === "string" && body.reason.trim()) {
     cape.reason = body.reason.trim().slice(0, MAX_REASON);
   } else {
     delete cape.reason;
   }
+  // Entschieden: offene Meldungen sind erledigt (das Protokoll steht im Journal)
+  delete cape.reports;
+  delete cape.hiddenByReports;
   scheduleSave();
   // Alle, die das Cape tragen: Mitspieler sehen die Freigabe (oder Sperre) sofort
   for (const [uuid, player] of wearers) {
     const visible = visibleCape(player);
     if (JSON.stringify(visible) !== visibleBefore.get(uuid)) broadcast(uuid, visible);
   }
-  console.log(`[salami-capes] ${admin}: Cape ${id.slice(0, 12)} ${cape.status}`);
+  console.log(
+    `[salami-capes] ${admin}: Cape ${id.slice(0, 12)} ${cape.status}${reports ? ` (${reports} Meldungen erledigt)` : ""}`,
+  );
   send(res, 200, { id, status: cape.status });
 }
 
@@ -623,7 +719,7 @@ async function route(req, res) {
     if (req.method === "GET" && path === "/v1/admin/me") return send(res, 200, { name: admin });
     if (req.method === "GET" && path === "/v1/admin/capes") {
       const status = url.searchParams.get("status") ?? "pending";
-      if (!STATUSES.includes(status)) throw new HttpError(400, "unbekannter Status");
+      if (!ADMIN_TABS.includes(status)) throw new HttpError(400, "unbekannter Status");
       return send(res, 200, adminList(status));
     }
     const review = /^\/v1\/admin\/capes\/([0-9a-f]{64})\/(approve|reject)$/.exec(path);
@@ -636,6 +732,7 @@ async function route(req, res) {
   if (req.method === "PUT" && path === "/v1/capes/me") return handleSetCape(req, res);
   if (req.method === "POST" && path === "/v1/capes/submit") return handleSubmit(req, res);
   if (req.method === "POST" && path === "/v1/capes/status") return handleStatus(req, res);
+  if (req.method === "POST" && path === "/v1/capes/report") return handleReport(req, res);
 
   send(res, 404, { error: "nicht gefunden" });
 }

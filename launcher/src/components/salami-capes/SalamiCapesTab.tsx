@@ -26,9 +26,42 @@ import {
 import { Cape3D } from "./Cape3D";
 import { CapeFace } from "./CapeFace";
 import { CapeEditor, type CapeEditorTarget } from "./CapeEditor";
+import { CapeReportDialog } from "./CapeReportDialog";
 import "./i18n";
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+/** Nummern der Cape-Regeln in i18n.ts (`salami.capes.rules.<n>`), wie in server/capes/README.md. */
+const RULES = [1, 2, 3, 4, 5, 6] as const;
+/** Bestätigte Version der Cape-Regeln – ändern sich die Regeln, Version erhöhen. */
+const RULES_ACCEPTED_KEY = "salami.capes.rulesAccepted";
+const RULES_VERSION = "1";
+/** Selbst gemeldete Galerie-Capes, die der Spieler nicht mehr sehen will. */
+const REPORTED_KEY = "salami.capes.reported";
+const MAX_REPORTED = 500;
+
+function readStored(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStored(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {}
+}
+
+function readReported(): Set<string> {
+  try {
+    const list: unknown = JSON.parse(readStored(REPORTED_KEY) ?? "[]");
+    return new Set(Array.isArray(list) ? list.filter((id): id is string => typeof id === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
 
 type ReviewState = SalamiCapeReview["status"] | "new";
 
@@ -68,6 +101,10 @@ export function SalamiCapesTab() {
   const [galleryImages, setGalleryImages] = useState<Record<string, string | false>>({});
   const [galleryShown, setGalleryShown] = useState(GALLERY_PAGE);
   const [adopting, setAdopting] = useState<string | null>(null);
+  /** Galerie-Cape, das gerade gemeldet wird (Dialog offen). */
+  const [reporting, setReporting] = useState<string | null>(null);
+  /** Selbst gemeldete Galerie-Capes – sind für diesen Spieler ausgeblendet. */
+  const [reported, setReported] = useState<Set<string>>(readReported);
   const requestedImages = useRef(new Set<string>());
 
   const reload = useCallback(async () => {
@@ -106,7 +143,8 @@ export function SalamiCapesTab() {
 
   /** Eigene Capes nach Bild-ID: ein Galerie-Cape mit denselben Pixeln liegt schon bei dir. */
   const ownByShareId = new Map((overview?.capes ?? []).map((c) => [c.share_id, c] as const));
-  const visibleGallery = Array.isArray(gallery) ? gallery.slice(0, galleryShown) : [];
+  const galleryList = Array.isArray(gallery) ? gallery.filter((c) => !reported.has(c.id)) : [];
+  const visibleGallery = galleryList.slice(0, galleryShown);
   const missingImages = visibleGallery
     .filter((c) => !ownByShareId.has(c.id))
     .map((c) => c.id)
@@ -162,7 +200,44 @@ export function SalamiCapesTab() {
     }
   };
 
+  /**
+   * Vor dem ersten eigenen Cape (Import oder Editor) einmal die Cape-Regeln zeigen. Eigene
+   * Capes reicht der Launcher gleich zur Prüfung ein – damit bestätigt der Spieler die Regeln.
+   */
+  const acceptRules = async (): Promise<boolean> => {
+    if (readStored(RULES_ACCEPTED_KEY) === RULES_VERSION) return true;
+    const text = [
+      t("salami.capes.rules.intro"),
+      RULES.map((n) => `• ${t(`salami.capes.rules.${n}`)}`).join("\n"),
+      t("salami.capes.rules.confirm"),
+    ].join("\n\n");
+    const accepted = await ask(text, {
+      title: t("salami.capes.rules.title"),
+      kind: "info",
+      okLabel: t("salami.capes.rules.accept"),
+      cancelLabel: t("salami.capes.rules.cancel"),
+    });
+    if (accepted) writeStored(RULES_ACCEPTED_KEY, RULES_VERSION);
+    return accepted;
+  };
+
+  const handleCreate = async () => {
+    if (await acceptRules()) setEditor({});
+  };
+
+  /** Gemeldetes Cape für diesen Spieler ausblenden (bleibt über Neustarts gemerkt). */
+  const hideReported = (id: string) => {
+    setReporting(null);
+    setHovered((h) => (h === `${GALLERY_PREFIX}${id}` ? null : h));
+    setReported((prev) => {
+      const next = new Set(prev).add(id);
+      writeStored(REPORTED_KEY, JSON.stringify([...next].slice(-MAX_REPORTED)));
+      return next;
+    });
+  };
+
   const handleImport = async () => {
+    if (!(await acceptRules())) return;
     const picked = await open({ multiple: false, filters: [{ name: "PNG", extensions: ["png"] }] });
     if (typeof picked !== "string") return;
     const fileName = picked.split(/[\\/]/).pop() ?? "Cape";
@@ -383,10 +458,20 @@ export function SalamiCapesTab() {
       <section className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
         <p className="text-sm text-white/70">{t("salami.capes.subtitle")}</p>
         <div className="mt-4 flex flex-wrap gap-2">
-          {actionButton("solar:pen-new-square-bold", t("salami.capes.create"), () => setEditor({}), true)}
+          {actionButton("solar:pen-new-square-bold", t("salami.capes.create"), () => void handleCreate(), true)}
           {actionButton("solar:gallery-add-bold", t("salami.capes.import"), () => void handleImport())}
           {actionButton("solar:download-minimalistic-bold", t("salami.capes.template"), () => void handleTemplate())}
         </div>
+        <details className="mt-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/75">
+          <summary className="cursor-pointer select-none font-semibold text-white">{t("salami.capes.rules.title")}</summary>
+          <p className="mt-2">{t("salami.capes.rules.intro")}</p>
+          <ul className="mt-1 list-disc space-y-1 pl-5">
+            {RULES.map((n) => (
+              <li key={n}>{t(`salami.capes.rules.${n}`)}</li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs leading-relaxed text-white/55">{t("salami.capes.rules.outro")}</p>
+        </details>
 
         <h3 className="mb-3 mt-7 text-base font-semibold text-white">{t("salami.capes.builtin")}</h3>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
@@ -433,7 +518,7 @@ export function SalamiCapesTab() {
             <span>{t("salami.capes.gallery.error")}</span>
             {actionButton("solar:refresh-bold", t("salami.capes.gallery.retry"), () => void loadGallery())}
           </div>
-        ) : gallery.length === 0 ? (
+        ) : galleryList.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-white/15 bg-black/20 p-4 text-sm text-white/75">
             {t("salami.capes.gallery.empty")}
           </div>
@@ -468,17 +553,28 @@ export function SalamiCapesTab() {
                             {entry.wearers}
                           </span>
                         )}
+                        {!own && (
+                          <button
+                            type="button"
+                            title={t("salami.capes.gallery.report")}
+                            aria-label={t("salami.capes.gallery.report")}
+                            onClick={() => setReporting(entry.id)}
+                            className="rounded-md p-1 text-white/60 opacity-60 transition-opacity hover:bg-white/10 hover:text-red-300 focus:opacity-100 group-hover:opacity-100"
+                          >
+                            <Icon icon="solar:flag-bold" className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                       </div>
                     ),
                   },
                 );
               })}
             </div>
-            {gallery.length > galleryShown && (
+            {galleryList.length > galleryShown && (
               <div className="mt-3">
                 {actionButton(
                   "solar:alt-arrow-down-bold",
-                  t("salami.capes.gallery.more", { count: gallery.length - galleryShown }),
+                  t("salami.capes.gallery.more", { count: galleryList.length - galleryShown }),
                   () => setGalleryShown((n) => n + GALLERY_PAGE),
                 )}
               </div>
@@ -497,6 +593,15 @@ export function SalamiCapesTab() {
             await choose(cape.id);
             await reload();
           }}
+        />
+      )}
+
+      {reporting && (
+        <CapeReportDialog
+          id={reporting}
+          image={galleryImages[reporting] || null}
+          onClose={() => setReporting(null)}
+          onReported={hideReported}
         />
       )}
     </div>

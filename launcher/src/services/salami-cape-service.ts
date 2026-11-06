@@ -65,5 +65,16 @@ export const getGalleryCapeImage = (id: string) => invoke<string>("salami_capes_
 /** Holt ein Galerie-Cape zu den eigenen Capes (oder liefert das eigene mit denselben Pixeln). */
 export const adoptGalleryCape = (id: string, name: string) => invoke<SalamiCape>("salami_capes_adopt", { id, name });
 
+/** Gründe für Meldungen, wie `REPORT_REASONS` in `server/capes/server.mjs`. */
+export const CAPE_REPORT_REASONS = ["logo", "hate", "sexual", "person", "other"] as const;
+export type CapeReportReason = (typeof CAPE_REPORT_REASONS)[number];
+
+/**
+ * Meldet ein Galerie-Cape, das gegen die Cape-Regeln verstößt (braucht einen angemeldeten
+ * Account). Liefert `reported` oder `already_reported`.
+ */
+export const reportCape = (id: string, reason: CapeReportReason, note: string) =>
+  invoke<"reported" | "already_reported">("salami_capes_report", { id, reason, note });
+
 /** Speichert die Vorlage im Download-Ordner und liefert den Pfad. */
 export const downloadCapeTemplate = () => invoke<string>("salami_capes_download_template");

@@ -182,6 +182,7 @@ permissions = [
   "allow-salami-capes-gallery",
   "allow-salami-capes-gallery-image",
   "allow-salami-capes-adopt",
+  "allow-salami-capes-report",
   "allow-get-all-profiles-and-last-played",
   "allow-get-local-content",
   "allow-install-local-content-to-profile",

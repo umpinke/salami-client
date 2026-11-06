@@ -118,6 +118,7 @@ input {
   text-align: center;
 }
 .tabs [data-status="pending"] .count:not(:empty):not([data-zero]) { background: var(--warn); color: var(--pepper); font-weight: 700; }
+.tabs [data-status="reported"] .count:not(:empty):not([data-zero]) { background: var(--red-strong); font-weight: 700; }
 
 .grid {
   display: grid;
@@ -136,6 +137,12 @@ input {
   align-content: start;
 }
 .card.busy { opacity: 0.6; pointer-events: none; }
+.card.reported { border-color: var(--red-strong); box-shadow: 0 0 0 1px var(--red-strong); }
+
+.reports { background: var(--panel-2); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+.reports-title { margin: 0 0 6px; font-weight: 600; color: #ff8a80; }
+.reports ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.reports .note { color: var(--muted); }
 
 .previews { display: flex; gap: 14px; justify-content: center; align-items: flex-end; }
 figure { margin: 0; text-align: center; }

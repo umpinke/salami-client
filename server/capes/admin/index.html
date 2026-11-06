@@ -37,6 +37,7 @@
         <button type="button" role="tab" data-status="pending">Wartet <span class="count" data-count="pending">0</span></button>
         <button type="button" role="tab" data-status="approved">Freigegeben <span class="count" data-count="approved">0</span></button>
         <button type="button" role="tab" data-status="rejected">Abgelehnt <span class="count" data-count="rejected">0</span></button>
+        <button type="button" role="tab" data-status="reported">Gemeldet <span class="count" data-count="reported">0</span></button>
       </nav>
       <p class="hint" id="hint"></p>
       <p class="error" id="list-error" role="alert"></p>
@@ -60,6 +61,10 @@
         <dt class="reviewed-label">Geprüft</dt><dd class="reviewed"></dd>
         <dt class="reason-label">Grund</dt><dd class="reason"></dd>
       </dl>
+      <div class="reports" hidden>
+        <p class="reports-title"></p>
+        <ul></ul>
+      </div>
       <div class="actions">
         <button type="button" class="primary approve">Freigeben</button>
         <button type="button" class="danger reject">Ablehnen</button>

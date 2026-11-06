@@ -105,6 +105,30 @@ pub async fn salami_capes_adopt(id: String, name: String) -> CommandResult<CapeV
     Ok(salami_capes::adopt_gallery_cape(&salami_capes::capes_dir(), &id, &name).await?)
 }
 
+/// Galerie-Cape melden, das gegen die Cape-Regeln verstößt (`reason`: siehe
+/// [`salami_capes::REPORT_REASONS`]). Braucht einen angemeldeten Account – jede Meldung gehört
+/// zu einem echten Spieler. → `reported` oder `already_reported`
+#[tauri::command]
+pub async fn salami_capes_report(id: String, reason: String, note: Option<String>) -> CommandResult<String> {
+    let state = State::get().await?;
+    let account = state
+        .minecraft_account_manager_v2
+        .get_active_account()
+        .await?
+        .ok_or_else(|| AppError::Other("Zum Melden bitte im Launcher mit einem Minecraft-Account anmelden".into()))?;
+    let status = salami_capes::report_cape(
+        account.id,
+        &account.username,
+        &account.access_token,
+        &id,
+        &reason,
+        note.as_deref().unwrap_or(""),
+    )
+    .await?;
+    info!("Cape {} reported ({reason}): {status}", id.get(..12).unwrap_or(&id));
+    Ok(status)
+}
+
 /// Legt die Vorlage in den Download-Ordner und zeigt sie im Explorer.
 #[tauri::command]
 pub async fn salami_capes_download_template(app_handle: tauri::AppHandle) -> CommandResult<String> {

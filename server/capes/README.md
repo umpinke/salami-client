@@ -14,6 +14,7 @@ Adresse: **https://salami-client-zaehler.umpinke.de/capes** – derselbe nginx u
 - **Freigegebene Capes kann jeder tragen**: Der Launcher zeigt sie unter „Von anderen Spielern“ (`/v1/capes/gallery`, ohne Namen der Einreicher). Ein Klick holt das Bild zu den eigenen Capes und zieht es an. Weil die Cape-ID nur an den Pixeln hängt, ist es sofort für alle sichtbar, ohne neue Prüfung und ohne das Tageslimit. Wird ein Cape wieder gesperrt, verschwindet es aus der Galerie und ist bei allen, die es tragen, wieder unsichtbar.
 - **Ungeprüfte Capes, die niemand mehr trägt**, verschwinden automatisch aus der Warteschlange – außer sie wurden im Launcher eingereicht (Prüfseite: „niemand (im Launcher eingereicht)“).
 - Gespeichert wird pro Spieler: UUID, Name, gewähltes Cape. Mitspieler-Abfragen (welche UUIDs auf deinem Server sind) werden nicht protokolliert.
+- **Melden**: Ein freigegebenes Cape, das gegen die Cape-Regeln verstößt, kann jeder Salami-Spieler im Launcher unter „Von anderen Spielern“ melden (`/v1/capes/report`, angemeldet wie beim Einreichen, eine Meldung pro Spieler und Cape). Ab 3 Meldungen verschiedener Spieler ist das Cape sofort für alle versteckt und wartet wieder auf Prüfung. Auf der Prüf-Webseite steht es unter „Gemeldet“.
 - Grenzen: 10 neue Capes pro Spieler und Tag, höchstens 500 Capes in der Warteschlange, Anfragen pro IP begrenzt, nach 10 falschen Admin-Schlüsseln ist die IP 10 Minuten gesperrt.
 
 Benötigt **Node.js 18 oder neuer**. Es gibt keine Abhängigkeiten und kein `npm install`.
@@ -82,6 +83,20 @@ Logs: `journalctl -u salami-capes -f`. Nach einem Update der Dateien: `sudo syst
 - **Freigeben**: ab sofort für alle sichtbar – Mitspieler bekommen es live, der Spieler selbst eine Chat-Meldung.
 - **Ablehnen**: optional mit Grund. Der Spieler sieht den Grund im Spiel und im Launcher.
 - Unter „Freigegeben“ lassen sich Capes wieder **sperren**, unter „Abgelehnt“ **doch freigeben**.
+- Unter **„Gemeldet“** stehen alle Capes mit offenen Meldungen: Grund, wer gemeldet hat, Notiz und Datum. **Behalten** verwirft die Meldungen (ein verstecktes Cape ist danach wieder für alle sichtbar, an seinem alten Platz in der Galerie), **Sperren** nimmt das Cape zurück. Beides wird im Log festgehalten (`journalctl -u salami-capes`).
+
+## Cape-Regeln
+
+Diese Regeln zeigt der Launcher beim ersten eigenen Cape und auf der Cape-Seite. Daran richtet sich die Prüfung:
+
+1. Nur Bilder, die du selbst gemacht hast oder benutzen darfst.
+2. Keine fremden Logos, Marken oder Figuren (z. B. Firmen, Vereine, Anime, Filme, andere Creator).
+3. Keine verbotenen Symbole (z. B. Hakenkreuz, SS-Runen) und nichts, was Hass gegen Menschen verbreitet.
+4. Nichts Sexuelles und keine brutale Gewalt.
+5. Keine echten Personen ohne deren Erlaubnis, keine Beleidigungen.
+6. Keine Werbung, keine Server-Adressen oder Discord-Links.
+
+Verstößt ein freigegebenes Cape doch dagegen und jemand meldet es: schnell prüfen und sperren. Wer als Rechteinhaber oder ohne Launcher etwas meldet (z. B. per Discord), das Cape unter „Freigegeben“ sperren.
 
 ## Einstellungen (Umgebungsvariablen)
 
@@ -98,6 +113,8 @@ Logs: `journalctl -u salami-capes -f`. Nach einem Update der Dateien: `sudo syst
 | `MAX_PENDING` | `500` | Höchstens so viele Capes in der Warteschlange |
 | `MAX_STREAMS` | `5000` | Höchstens so viele Live-Verbindungen insgesamt |
 | `MAX_STREAMS_PER_IP` | `10` | Live-Verbindungen pro IP |
+| `REPORTS_TO_HIDE` | `3` | Ab so vielen Meldungen verschiedener Spieler ist ein Cape sofort versteckt |
+| `REPORTS_PER_DAY` | `20` | Meldungen pro Spieler und Tag |
 
 ## Testen
 
@@ -105,7 +122,7 @@ Logs: `journalctl -u salami-capes -f`. Nach einem Update der Dateien: `sudo syst
 node --test server/capes/test.mjs
 ```
 
-Startet den Server mit einem nachgebauten Mojang-Dienst und prüft Anmeldung, Warteschlange, Freigabe, PNG-Prüfung und Admin-Sperre.
+Startet den Server mit einem nachgebauten Mojang-Dienst und prüft Anmeldung, Warteschlange, Freigabe, Galerie, Meldungen, PNG-Prüfung und Admin-Sperre.
 
 ## API
 
@@ -119,7 +136,8 @@ Startet den Server mit einem nachgebauten Mojang-Dienst und prüft Anmeldung, Wa
 | `GET /v1/capes/events` | Server-Sent Events: `data: {"uuid":"…","cape":{…}\|null}` bei jeder sichtbaren Änderung, `: ping` alle 20 s |
 | `POST /v1/capes/status` mit `{"ids":[…]}` (max. 100) | `{"status":{"<capeId>":{"status":"pending",…}}}` – für den Launcher |
 | `POST /v1/capes/submit` mit `{"name","serverId","png"}` | `{"status":"approved"\|"pending"\|"rejected","id","reason"?}` – Launcher reicht ein eigenes Cape zur Prüfung ein, das getragene Cape bleibt |
+| `POST /v1/capes/report` mit `{"name","serverId","id","reason","note"?}` | `{"status":"reported"\|"already_reported"}` – freigegebenes Cape melden; `reason`: `logo`, `hate`, `sexual`, `person` oder `other`, `note` höchstens 200 Zeichen |
 | `GET /admin/` | Prüf-Webseite |
-| `GET /v1/admin/capes?status=pending` | Liste für Admins (`Authorization: Bearer <schlüssel>`) |
+| `GET /v1/admin/capes?status=pending` | Liste für Admins (`Authorization: Bearer <schlüssel>`), `status`: `pending`, `approved`, `rejected` oder `reported` |
 | `POST /v1/admin/capes/<capeId>/approve` \| `/reject` mit `{"reason"}` | Freigeben / Ablehnen |
 | `GET /health` | `ok` |

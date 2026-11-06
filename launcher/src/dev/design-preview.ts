@@ -172,6 +172,8 @@ mockIPC((cmd, args) => {
       capeReviews[id] = { status: "approved" };
       return cape;
     }
+    case "salami_capes_report":
+      return new Promise((resolve) => setTimeout(() => resolve("reported"), 400));
     case "salami_capes_download_template":
       return "C:\\Users\\Du\\Downloads\\salami_cape_vorlage.png";
     case "get_profile_log_files":

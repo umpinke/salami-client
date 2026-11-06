@@ -9,7 +9,9 @@
 //!
 //! Freigegebene Capes anderer Spieler zeigt die Galerie ([`gallery`]). Jeder kann sie zu den
 //! eigenen Capes holen ([`adopt_gallery_cape`]) und tragen – die Cape-ID hängt nur an den
-//! Pixeln, das Bild ist also schon geprüft und sofort für alle sichtbar.
+//! Pixeln, das Bild ist also schon geprüft und sofort für alle sichtbar. Verstößt eins gegen
+//! die Cape-Regeln, kann man es melden ([`report_cape`]); ab einigen Meldungen versteckt der
+//! Cape-Server es, bis ein Admin entscheidet.
 
 use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
@@ -371,25 +373,21 @@ async fn cape_server_json<T: DeserializeOwned>(response: reqwest::Response) -> R
         .map_err(|e| AppError::Other(format!("Antwort des Cape-Servers unlesbar: {e}")))
 }
 
-/// Reicht ein eigenes Cape zur Prüfung ein, ohne das getragene Cape zu ändern. Angemeldet
-/// wird wie beim Betreten eines Minecraft-Servers: der Launcher meldet eine serverId bei
-/// Mojang an, der Cape-Server fragt dort nach. Das Zugangstoken geht nur an Mojang.
-pub async fn submit_for_review(
-    player_id: Uuid,
-    player_name: &str,
-    access_token: &str,
-    png: &[u8],
-) -> Result<CapeReview> {
-    let base = server_url().ok_or_else(|| AppError::Other("Kein Cape-Server eingerichtet".into()))?;
-    let server_down = |e: reqwest::Error| AppError::Other(format!("Cape-Server nicht erreichbar: {e}"));
+fn cape_server_down(e: reqwest::Error) -> AppError {
+    AppError::Other(format!("Cape-Server nicht erreichbar: {e}"))
+}
 
+/// Anmeldung beim Cape-Server wie beim Betreten eines Minecraft-Servers: der Launcher meldet
+/// eine serverId bei Mojang an, der Cape-Server fragt dort nach. Das Zugangstoken geht nur an
+/// Mojang. → serverId für die eigentliche Anfrage (nur einmal verwendbar)
+async fn authenticate(base: &str, player_id: Uuid, access_token: &str) -> Result<String> {
     let challenge: Challenge = cape_server_json(
         HTTP_CLIENT
             .post(format!("{base}/v1/auth/challenge"))
             .timeout(Duration::from_secs(10))
             .send()
             .await
-            .map_err(server_down)?,
+            .map_err(cape_server_down)?,
     )
     .await?;
 
@@ -407,21 +405,80 @@ pub async fn submit_for_review(
     if !joined.status().is_success() {
         return Err(AppError::Other(format!("Anmeldung bei Mojang fehlgeschlagen ({})", joined.status())));
     }
+    Ok(challenge.server_id)
+}
 
+/// Reicht ein eigenes Cape zur Prüfung ein, ohne das getragene Cape zu ändern
+/// (Anmeldung siehe [`authenticate`]).
+pub async fn submit_for_review(
+    player_id: Uuid,
+    player_name: &str,
+    access_token: &str,
+    png: &[u8],
+) -> Result<CapeReview> {
+    let base = server_url().ok_or_else(|| AppError::Other("Kein Cape-Server eingerichtet".into()))?;
+    let server_id = authenticate(&base, player_id, access_token).await?;
     cape_server_json(
         HTTP_CLIENT
             .post(format!("{base}/v1/capes/submit"))
             .timeout(Duration::from_secs(30))
             .json(&serde_json::json!({
                 "name": player_name,
-                "serverId": challenge.server_id,
+                "serverId": server_id,
                 "png": base64::engine::general_purpose::STANDARD.encode(png),
             }))
             .send()
             .await
-            .map_err(server_down)?,
+            .map_err(cape_server_down)?,
     )
     .await
+}
+
+/// Gründe für Meldungen, wie `REPORT_REASONS` in `server/capes/server.mjs`.
+pub const REPORT_REASONS: [&str; 5] = ["logo", "hate", "sexual", "person", "other"];
+const MAX_REPORT_NOTE_CHARS: usize = 200;
+
+#[derive(Deserialize)]
+struct ReportResponse {
+    status: String,
+}
+
+/// Meldet ein freigegebenes Cape aus der Galerie, das gegen die Cape-Regeln verstößt
+/// (Anmeldung siehe [`authenticate`]). → `reported` oder `already_reported`
+pub async fn report_cape(
+    player_id: Uuid,
+    player_name: &str,
+    access_token: &str,
+    id: &str,
+    reason: &str,
+    note: &str,
+) -> Result<String> {
+    if !is_share_id(id) {
+        return Err(AppError::Other(format!("Ungültige Cape-ID: {id}")));
+    }
+    if !REPORT_REASONS.contains(&reason) {
+        return Err(AppError::Other(format!("Unbekannter Grund: {reason}")));
+    }
+    let note: String = note.trim().chars().take(MAX_REPORT_NOTE_CHARS).collect();
+    let base = server_url().ok_or_else(|| AppError::Other("Kein Cape-Server eingerichtet".into()))?;
+    let server_id = authenticate(&base, player_id, access_token).await?;
+    let body: ReportResponse = cape_server_json(
+        HTTP_CLIENT
+            .post(format!("{base}/v1/capes/report"))
+            .timeout(Duration::from_secs(10))
+            .json(&serde_json::json!({
+                "name": player_name,
+                "serverId": server_id,
+                "id": id,
+                "reason": reason,
+                "note": note,
+            }))
+            .send()
+            .await
+            .map_err(cape_server_down)?,
+    )
+    .await?;
+    Ok(body.status)
 }
 
 /// Cape-IDs des Servers: 64 Hex-Zeichen (SHA-256). Alles andere wird nie Teil von URL oder Pfad.

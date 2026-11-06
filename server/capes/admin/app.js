@@ -15,11 +15,22 @@ const HINTS = {
   pending: "Diese Capes sieht bisher nur der Spieler selbst. Freigegebene Capes sehen alle Salami-Spieler.",
   approved: "Für alle sichtbar. „Sperren“ nimmt ein Cape wieder zurück.",
   rejected: "Abgelehnte Capes sieht nur der Spieler selbst. Er bekommt den Grund im Spiel angezeigt.",
+  reported:
+    "Von Spielern gemeldete Capes. Ab 3 Meldungen ist ein Cape sofort für alle versteckt, bis du entscheidest. „Behalten“ verwirft die Meldungen, „Sperren“ nimmt das Cape zurück.",
 };
 const EMPTY = {
   pending: "Alles geprüft – keine Capes in der Warteschlange.",
   approved: "Noch keine freigegebenen Capes.",
   rejected: "Keine abgelehnten Capes.",
+  reported: "Keine offenen Meldungen.",
+};
+/** Gründe wie REPORT_REASONS in server.mjs. */
+const REPORT_REASONS = {
+  logo: "Fremdes Logo, Marke oder Figur",
+  hate: "Verbotene Symbole oder Hass",
+  sexual: "Sexuelles oder brutale Gewalt",
+  person: "Echte Person oder Beleidigung",
+  other: "Etwas anderes",
 };
 
 const $ = (id) => document.getElementById(id);
@@ -140,7 +151,12 @@ async function load() {
       badge.textContent = String(value);
       badge.toggleAttribute("data-zero", value === 0);
     }
-    document.title = data.counts.pending > 0 ? `(${data.counts.pending}) Salami Capes – Prüfung` : "Salami Capes – Prüfung";
+    // Von Meldungen versteckte Capes stehen in beiden Zahlen – getrennt zeigen statt addieren
+    const open = [
+      data.counts.pending > 0 ? String(data.counts.pending) : "",
+      data.counts.reported > 0 ? `${data.counts.reported} gemeldet` : "",
+    ].filter(Boolean);
+    document.title = open.length > 0 ? `(${open.join(", ")}) Salami Capes – Prüfung` : "Salami Capes – Prüfung";
     render(data.capes);
   } catch (e) {
     if (e instanceof AuthError) {
@@ -158,7 +174,8 @@ function render(capes) {
   const grid = $("grid");
   const existing = new Map([...grid.children].map((card) => [card.dataset.key, card]));
   const cards = capes.map((cape) => {
-    const key = `${cape.id}:${cape.status}:${cape.reviewedAt || ""}:${cape.users.map((u) => u.uuid).join(",")}`;
+    const reports = (cape.reports || []).length;
+    const key = `${cape.id}:${cape.status}:${cape.reviewedAt || ""}:${reports}:${cape.users.map((u) => u.uuid).join(",")}`;
     return existing.get(key) || buildCard(cape, key);
   });
   grid.replaceChildren(...cards);
@@ -199,13 +216,40 @@ function buildCard(cape, key) {
   card.querySelector(".reason").textContent = cape.reason || "";
   card.querySelector(".reason-label").hidden = card.querySelector(".reason").hidden = !cape.reason;
 
+  const reports = cape.reports || [];
+  card.classList.toggle("reported", reports.length > 0);
+  if (reports.length > 0) {
+    const box = card.querySelector(".reports");
+    box.hidden = false;
+    box.querySelector(".reports-title").textContent = cape.hiddenByReports
+      ? `${reports.length} Meldungen – für alle versteckt seit ${formatDate(cape.hiddenByReports)}`
+      : `${reports.length} ${reports.length === 1 ? "Meldung" : "Meldungen"} – noch für alle sichtbar`;
+    const list = box.querySelector("ul");
+    for (const report of reports) {
+      const item = document.createElement("li");
+      item.append(`${REPORT_REASONS[report.reason] || report.reason} – `, playerLink(report.name, report.by), `, ${formatDate(report.at)}`);
+      if (report.note) {
+        const note = document.createElement("div");
+        note.className = "note";
+        note.textContent = `„${report.note}“`;
+        item.append(note);
+      }
+      list.append(item);
+    }
+  }
+
   const approve = card.querySelector(".approve");
   const reject = card.querySelector(".reject");
   const form = card.querySelector(".reject-form");
-  approve.hidden = cape.status === "approved";
+  // Freigegeben oder von Meldungen versteckt: Admin behält es (Meldungen weg) oder sperrt es
+  const wasApproved = cape.status === "approved" || Boolean(cape.hiddenByReports);
+  approve.hidden = cape.status === "approved" && reports.length === 0;
   reject.hidden = cape.status === "rejected";
   if (cape.status === "rejected") approve.textContent = "Doch freigeben";
-  if (cape.status === "approved") reject.textContent = "Sperren";
+  if (wasApproved) {
+    approve.textContent = "Behalten";
+    reject.textContent = "Sperren";
+  }
 
   approve.addEventListener("click", () => review(card, cape.id, "approve"));
   reject.addEventListener("click", () => {

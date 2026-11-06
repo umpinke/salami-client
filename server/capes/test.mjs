@@ -60,6 +60,7 @@ async function startServer(port, mojangPort) {
       MOJANG_SESSION_URL: `http://127.0.0.1:${mojangPort}`,
       RATE_PER_MINUTE: "1000",
       UPLOADS_PER_DAY: "3",
+      REPORTS_TO_HIDE: "2",
     },
     stdio: ["ignore", "pipe", "inherit"],
   });
@@ -429,6 +430,74 @@ test("Galerie: nur freigegebene Capes, ohne Namen, jeder kann sie tragen", async
   // wieder gesperrt → nicht mehr in der Galerie
   await admin("POST", `/v1/admin/capes/${id}/reject`, { reason: "doch nicht" });
   assert.equal(await listed(), undefined);
+});
+
+test("Melden: eine Meldung pro Spieler, ab REPORTS_TO_HIDE sofort versteckt, Admin entscheidet", async () => {
+  const pixels = capePixels(64, 70);
+  const png = encodeRgba(64, 32, pixels.rgba).toString("base64");
+  const id = capeId(64, 32, pixels.rgba);
+  /** Wie der Launcher: Challenge holen, bei „Mojang“ anmelden, melden. */
+  const report = async (name, body, { join = true } = {}) => {
+    const { body: challenge } = await call("POST", "/v1/auth/challenge");
+    if (join) joined.add(`${name}|${challenge.serverId}`);
+    return call("POST", "/v1/capes/report", { name, serverId: challenge.serverId, ...body });
+  };
+  const inGallery = async () => (await call("GET", "/v1/capes/gallery")).body.capes.find((c) => c.id === id);
+  const adminEntry = async (tab) => (await admin("GET", `/v1/admin/capes?status=${tab}`)).body.capes.find((c) => c.id === id);
+
+  // ungeprüft (für andere ohnehin unsichtbar): nicht meldbar
+  await submitCape("Brotzeit", png);
+  assert.equal((await report("Salamander", { id, reason: "logo" })).status, 404);
+
+  await admin("POST", `/v1/admin/capes/${id}/approve`);
+  const approvedAt = (await inGallery()).approvedAt;
+  await setCape("Brotzeit", { png });
+
+  // Eingaben und Anmeldung
+  assert.equal((await report("Salamander", { id, reason: "weil" })).status, 400);
+  assert.equal((await report("Salamander", { id: "kaputt", reason: "logo" })).status, 400);
+  assert.equal((await report("Salamander", { id, reason: "logo" }, { join: false })).status, 401);
+
+  // erste Meldung: bleibt sichtbar, steht unter „Gemeldet“; doppelt melden zählt nicht
+  assert.deepEqual((await report("Salamander", { id, reason: "logo", note: "  Nike-Logo  " })).body, { status: "reported" });
+  assert.deepEqual((await report("Salamander", { id, reason: "hate" })).body, { status: "already_reported" });
+  assert.ok(await inGallery());
+  const reported = await admin("GET", "/v1/admin/capes?status=reported");
+  assert.equal(reported.body.counts.reported, 1);
+  const entry = reported.body.capes.find((c) => c.id === id);
+  assert.equal(entry.status, "approved");
+  assert.deepEqual(
+    entry.reports.map((r) => [r.name, r.reason, r.note]),
+    [["Salamander", "logo", "Nike-Logo"]],
+  );
+
+  // zweite Meldung eines anderen Spielers (REPORTS_TO_HIDE=2 im Test): sofort für alle weg
+  const live = await openEvents();
+  try {
+    assert.deepEqual((await report("Pepper_99", { id, reason: "logo" })).body, { status: "reported" });
+    const brotzeit = uuidOf("Brotzeit");
+    assert.deepEqual(await live.next((e) => e.uuid === brotzeit), { uuid: brotzeit, cape: null });
+  } finally {
+    live.close();
+  }
+  assert.equal(await inGallery(), undefined);
+  assert.equal((await call("GET", `/v1/capes/img/${id}.png`)).status, 404);
+  assert.deepEqual((await call("POST", "/v1/capes/status", { ids: [id] })).body.status, { [id]: { status: "pending" } });
+  // wartet auf einen Admin, auch wenn es keiner mehr trägt
+  await setCape("Brotzeit", { builtin: "salami" });
+  assert.ok((await adminEntry("pending")).hiddenByReports);
+
+  // Admin behält es: Meldungen erledigt, wieder sichtbar, alter Platz in der Galerie
+  await admin("POST", `/v1/admin/capes/${id}/approve`);
+  assert.equal((await inGallery()).approvedAt, approvedAt);
+  assert.equal((await admin("GET", "/v1/admin/capes?status=reported")).body.counts.reported, 0);
+
+  // wieder meldbar; nach dem Sperren nicht mehr, und die Meldungen sind erledigt
+  assert.deepEqual((await report("Salamander", { id, reason: "other" })).body, { status: "reported" });
+  await admin("POST", `/v1/admin/capes/${id}/reject`, { reason: "fremdes Logo" });
+  assert.equal((await report("Pepper_99", { id, reason: "other" })).status, 404);
+  assert.equal((await adminEntry("rejected")).reports, undefined);
+  assert.equal((await admin("GET", "/v1/admin/capes?status=bogus")).status, 400);
 });
 
 test("Daten überstehen einen Neustart", async () => {
