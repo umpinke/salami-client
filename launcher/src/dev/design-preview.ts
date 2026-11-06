@@ -120,6 +120,9 @@ const capeReviews: Record<string, { status: string; reason?: string }> = {
   ["a".repeat(64)]: { status: "pending" },
   ["b".repeat(64)]: { status: "approved" },
   ["c".repeat(64)]: { status: "rejected", reason: "Bitte keine Werbung" },
+  // Galerie-Capes sind freigegeben
+  ["e".repeat(64)]: { status: "approved" },
+  ["9".repeat(64)]: { status: "approved" },
 };
 
 /** Galerie: freigegebene Capes anderer Spieler („b…“ hat man schon als „Mein Brett“). */

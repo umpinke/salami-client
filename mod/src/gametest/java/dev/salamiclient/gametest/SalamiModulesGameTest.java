@@ -2,6 +2,7 @@ package dev.salamiclient.gametest;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.SalamiClient;
+import dev.salamiclient.capes.SharedCapes;
 import dev.salamiclient.gui.clickgui.ClickGuiScreen;
 import dev.salamiclient.module.HudModule;
 import dev.salamiclient.module.Module;
@@ -474,6 +475,16 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 			writeCapeStore(dir, "\"meins\"", 3);
 			check(waitFor(context, 40, c -> ownCape(c).equals(Identifier.fromNamespaceAndPath("salami", "cape/custom"))),
 				"Launcher live: own cape from the launcher not applied (" + context.computeOnClient(SalamiModulesGameTest::ownCape) + ")");
+			// Ohne Freigabe (hier gar kein Cape-Server) trägt man ein eigenes Bild nicht – auch nicht selbst
+			System.setProperty(SharedCapes.REQUIRE_APPROVAL_PROPERTY, "true");
+			try {
+				check(waitFor(context, 20, c -> !ownCape(c).getNamespace().equals("salami")),
+					"Launcher live: own cape is shown before it was approved (" + context.computeOnClient(SalamiModulesGameTest::ownCape) + ")");
+			} finally {
+				System.clearProperty(SharedCapes.REQUIRE_APPROVAL_PROPERTY);
+			}
+			check(waitFor(context, 20, c -> ownCape(c).equals(Identifier.fromNamespaceAndPath("salami", "cape/custom"))),
+				"Launcher live: own cape missing again in the development environment");
 			writeCapeStore(dir, "null", 4);
 			check(waitFor(context, 40, c -> !ownCape(c).getNamespace().equals("salami")),
 				"Launcher live: 'no cape' still shows a salami cape");

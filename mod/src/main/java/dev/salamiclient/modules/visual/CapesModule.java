@@ -39,8 +39,9 @@ import java.util.function.Supplier;
  * oder ein Vielfaches).
  *
  * <p>Andere Salami-Spieler sehen dein Cape über den Cape-Server ({@link SharedCapes}):
- * mitgelieferte sofort, eigene Bilder erst nach Freigabe durch einen Admin. Spieler ohne
- * Salami Client sehen weiter dein Mojang-Cape.
+ * mitgelieferte sofort, eigene Bilder erst nach Freigabe durch einen Admin. Ein eigenes Bild
+ * trägst auch du selbst erst nach der Freigabe; bis dahin wird es nur zur Prüfung eingereicht.
+ * Spieler ohne Salami Client sehen weiter dein Mojang-Cape.
  */
 public final class CapesModule extends Module {
 	public enum Cape { LAUNCHER, SALAMI, PEPPERONI, BOARD, CUSTOM }
@@ -149,13 +150,16 @@ public final class CapesModule extends Module {
 			customTried = false; // anderes oder geändertes Bild neu laden
 		}
 		Cape selected = cape.get();
+		ClientAsset.Texture texture;
 		if (selected == Cape.LAUNCHER) {
-			return fromLauncher(launcher);
+			texture = fromLauncher(launcher);
+		} else if (selected == Cape.CUSTOM) {
+			texture = customFrom(CapesModule::customCapeFile);
+		} else {
+			texture = own(selected);
 		}
-		if (selected == Cape.CUSTOM) {
-			return customFrom(CapesModule::customCapeFile);
-		}
-		return own(selected);
+		// Eigenes Bild: geteilt (= eingereicht) wird es sofort, angezeigt erst nach der Freigabe
+		return texture != null && SharedCapes.ownApproved(share) ? texture : null;
 	}
 
 	/** Live-Auswahl aus dem Launcher-Ordner, sonst {@code -Dsalami.cape} vom Spielstart. */

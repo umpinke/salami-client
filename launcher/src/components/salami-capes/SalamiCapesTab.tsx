@@ -83,7 +83,11 @@ interface CardOptions {
   onPick?: () => void;
   /** Icon, solange kein Bild da ist. */
   placeholder?: string;
+  /** Eigenes Cape ohne Freigabe: abgeblendet, Klick erklärt nur den Grund. */
+  locked?: boolean;
 }
+
+type Reviews = Record<string, SalamiCapeReview>;
 
 /** Cape-Seite: Salami-Capes, eigene Capes, Capes anderer Spieler, Vorlage, Import und Editor. */
 export function SalamiCapesTab() {
@@ -93,8 +97,8 @@ export function SalamiCapesTab() {
   const [hovered, setHovered] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [editor, setEditor] = useState<CapeEditorTarget | null>(null);
-  /** Prüfstatus vom Cape-Server; `null` = unbekannt (Server aus oder nicht erreichbar). */
-  const [reviews, setReviews] = useState<Record<string, SalamiCapeReview> | null>(null);
+  /** Prüfstatus vom Cape-Server; `undefined` = lädt, `null` = Server aus oder nicht erreichbar. */
+  const [reviews, setReviews] = useState<Reviews | null | undefined>(undefined);
   /** Freigegebene Capes anderer Spieler; `null` = lädt, `"error"` = Cape-Server nicht erreichbar. */
   const [gallery, setGallery] = useState<SalamiGalleryCape[] | "error" | null>(null);
   /** Bilder der Galerie (Data-URL), `false` = konnte nicht geladen werden. */
@@ -107,19 +111,27 @@ export function SalamiCapesTab() {
   const [reported, setReported] = useState<Set<string>>(readReported);
   const requestedImages = useRef(new Set<string>());
 
-  const reload = useCallback(async () => {
+  /** Lädt Capes und Prüfstatus neu (reicht dabei neue Capes ein); liefert den Prüfstatus, `null` = unbekannt. */
+  const reload = useCallback(async (): Promise<Reviews | null> => {
     try {
       const next = await getCapeOverview();
       setOverview(next);
       const ids = next.capes.map((c) => c.share_id).filter(Boolean);
-      if (ids.length === 0) return;
+      if (ids.length === 0) {
+        setReviews({});
+        return {};
+      }
       try {
-        setReviews(await getCapeReviews(ids));
+        const status = await getCapeReviews(ids);
+        setReviews(status);
+        return status;
       } catch {
         setReviews(null);
+        return null;
       }
     } catch (error) {
       toast.error(t("salami.capes.error", { error: errorText(error) }));
+      return null;
     }
   }, [t]);
 
@@ -191,6 +203,18 @@ export function SalamiCapesTab() {
     }
   };
 
+  /**
+   * Eigene Capes darf man erst tragen, wenn ein Admin sie freigegeben hat – auch das eigene
+   * Bild nicht. Nach Import, Editor oder Galerie: freigegeben → gleich tragen, sonst Hinweis.
+   */
+  const wearIfApproved = async (cape: SalamiCape, status: Reviews | null) => {
+    if (status?.[cape.share_id]?.status === "approved") {
+      await choose(cape.id);
+      return;
+    }
+    toast(t("salami.capes.review.waiting", { name: cape.name }), { duration: 6000 });
+  };
+
   const handleTemplate = async () => {
     try {
       const path = await downloadCapeTemplate();
@@ -245,9 +269,8 @@ export function SalamiCapesTab() {
     try {
       const cape = await importCape(picked, name);
       toast.success(t("salami.capes.imported", { name: cape.name }));
-      // erst auswählen, dann neu laden – das Neuladen reicht das Cape zur Prüfung ein
-      await choose(cape.id);
-      await reload();
+      // Neu laden reicht das Cape zur Prüfung ein
+      await wearIfApproved(cape, await reload());
     } catch (error) {
       toast.error(t("salami.capes.error", { error: errorText(error) }));
     }
@@ -256,7 +279,7 @@ export function SalamiCapesTab() {
   /** Galerie-Cape tragen: erst zu den eigenen Capes holen (falls nötig), dann auswählen. */
   const handleAdopt = async (cape: SalamiGalleryCape) => {
     const own = ownByShareId.get(cape.id);
-    if (own) return choose(own.id);
+    if (own) return pickOwn(own);
     if (adopting) return;
     setAdopting(cape.id);
     try {
@@ -264,8 +287,7 @@ export function SalamiCapesTab() {
       toast.success(t("salami.capes.gallery.adopted", { name: adopted.name }));
       // Die Karte steht jetzt für das eigene Cape – Vorschau links mitziehen
       setHovered((h) => (h === `${GALLERY_PREFIX}${cape.id}` ? adopted.id : h));
-      await choose(adopted.id);
-      await reload();
+      await wearIfApproved(adopted, await reload());
     } catch (error) {
       toast.error(t("salami.capes.error", { error: errorText(error) }));
     } finally {
@@ -311,6 +333,14 @@ export function SalamiCapesTab() {
       ? t("salami.capes.review.rejected_reason", { reason: review.reason })
       : t(`salami.capes.review.${review.state}_hint`);
 
+  /** Klick auf ein eigenes Cape: nur freigegebene werden getragen, sonst steht da, warum nicht. */
+  const pickOwn = (cape: SalamiCape) => {
+    if (reviews === undefined) return;
+    const review = reviewOf(cape);
+    if (review?.state === "approved") return void choose(cape.id);
+    toast(review ? reviewHint(review) : t("salami.capes.review.unknown_hint"), { duration: 6000 });
+  };
+
   const reviewBadge = (cape: SalamiCape) => {
     const review = reviewOf(cape);
     if (!review) return null;
@@ -331,7 +361,7 @@ export function SalamiCapesTab() {
     selection: string | null,
     image: string | null,
     label: string,
-    { extra, onPick, placeholder = "solar:forbidden-circle-bold" }: CardOptions = {},
+    { extra, onPick, placeholder = "solar:forbidden-circle-bold", locked = false }: CardOptions = {},
   ) => {
     const isSelected = selected === selection;
     return (
@@ -348,10 +378,16 @@ export function SalamiCapesTab() {
         <button
           type="button"
           onClick={onPick ?? (() => void choose(selection))}
-          className="flex flex-col items-center gap-2 focus:outline-none"
+          className={cn("flex flex-col items-center gap-2 focus:outline-none", locked && "cursor-not-allowed")}
           aria-pressed={isSelected}
+          aria-disabled={locked || undefined}
         >
-          <div className="flex h-[112px] w-[70px] items-center justify-center rounded-lg bg-black/30">
+          <div
+            className={cn(
+              "flex h-[112px] w-[70px] items-center justify-center rounded-lg bg-black/30",
+              locked && "opacity-45 grayscale",
+            )}
+          >
             {image ? (
               <CapeFace src={image} width={70} />
             ) : (
@@ -445,10 +481,12 @@ export function SalamiCapesTab() {
           {previewSelection?.startsWith(GALLERY_PREFIX) && (
             <p className="mt-2 text-xs leading-relaxed text-white/70">{t("salami.capes.gallery.preview_hint")}</p>
           )}
-          {previewCape && reviewOf(previewCape) && (
+          {previewCape && reviews !== undefined && (
             <div className="mt-2 flex flex-col items-start gap-1">
               {reviewBadge(previewCape)}
-              <p className="text-xs leading-relaxed text-white/70">{reviewHint(reviewOf(previewCape)!)}</p>
+              <p className="text-xs leading-relaxed text-white/70">
+                {reviewOf(previewCape) ? reviewHint(reviewOf(previewCape)!) : t("salami.capes.review.unknown_hint")}
+              </p>
             </div>
           )}
           <p className="mt-2 text-xs leading-relaxed text-white/55">{t("salami.capes.visibility")}</p>
@@ -486,6 +524,8 @@ export function SalamiCapesTab() {
           <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
             {overview.capes.map((cape) =>
               card(cape.id, cape.id, cape.image, cape.name, {
+                onPick: () => pickOwn(cape),
+                locked: reviews !== undefined && reviewOf(cape)?.state !== "approved",
                 extra: (
                   <>
                     {reviewBadge(cape)}
@@ -590,8 +630,7 @@ export function SalamiCapesTab() {
           onSaved={async (cape) => {
             setEditor(null);
             toast.success(t("salami.capes.saved", { name: cape.name }));
-            await choose(cape.id);
-            await reload();
+            await wearIfApproved(cape, await reload());
           }}
         />
       )}

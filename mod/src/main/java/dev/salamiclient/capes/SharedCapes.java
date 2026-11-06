@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.NativeImage;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.modules.visual.CapesModule;
 import dev.salamiclient.util.Chat;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.core.ClientAsset;
@@ -27,7 +28,8 @@ import java.util.regex.Pattern;
 /**
  * Salami Capes für alle: zeigt die Capes anderer Salami-Spieler und teilt das eigene
  * über den Cape-Server ({@link CapeServer}). Mitgelieferte Capes sehen andere sofort,
- * eigene Bilder erst, nachdem ein Admin sie auf der Prüf-Webseite freigegeben hat.
+ * eigene Bilder erst, nachdem ein Admin sie auf der Prüf-Webseite freigegeben hat – und
+ * der Spieler selbst auch erst dann ({@link #ownApproved}).
  *
  * <p>Wechselt jemand sein Cape (oder gibt ein Admin eines frei), meldet der Server das
  * sofort über eine Live-Verbindung; ohne sie wird regelmäßig neu gefragt.
@@ -55,6 +57,8 @@ public final class SharedCapes {
 	private static final int MAX_PLAYERS = 5_000;
 	private static final int MAX_IMAGES = 128;
 	private static final Pattern CAPE_ID = Pattern.compile("[0-9a-f]{64}");
+	/** Gametests: Freigabe auch in der Entwicklungsumgebung verlangen. */
+	public static final String REQUIRE_APPROVAL_PROPERTY = "salami.capes.requireApproval";
 
 	private record Entry(CapeServer.@Nullable Remote remote, long fetchedAt) {}
 
@@ -91,8 +95,15 @@ public final class SharedCapes {
 	private static long publishRetryMs = PUBLISH_RETRY_MIN_MS;
 	private static boolean publishing;
 	private static @Nullable String loggedFailure;
-	/** Eigenes Bild, das gerade geprüft wird – kommt die Freigabe live, gibt es eine Chat-Meldung. */
-	private static @Nullable String pendingId;
+	/** Cape-ID des zuletzt geteilten eigenen Bildes ({@code null} = kein eigenes Bild). */
+	private static @Nullable String ownId;
+	/**
+	 * Prüfstatus dazu: {@code approved}, {@code pending}, {@code rejected} oder {@code null} =
+	 * unbekannt. Wird live nachgeführt (Freigabe, Sperre, Verstecken nach Meldungen).
+	 */
+	private static volatile @Nullable String ownStatus;
+	/** Schlüssel ({@link CapeShare#key()}) des Bildes, zu dem {@link #ownStatus} gehört. */
+	private static volatile @Nullable String ownKey;
 
 	private SharedCapes() {}
 
@@ -105,6 +116,10 @@ public final class SharedCapes {
 			}
 			initialized = true;
 			serverProperty = property;
+			// Anderer Server: dort neu teilen, der alte Prüfstatus gilt nicht mehr
+			publishedKey = null;
+			wantedKey = null;
+			forgetOwn();
 			server = CapeServer.fromProperty();
 			if (server != null) {
 				SalamiClient.LOG.info("Salami Capes werden mit anderen Salami-Spielern geteilt");
@@ -139,6 +154,27 @@ public final class SharedCapes {
 		}
 		String id = entry.remote().id();
 		return id != null && CAPE_ID.matcher(id).matches() ? image(cs, id, now) : null;
+	}
+
+	/**
+	 * Darf der Spieler sein eigenes Bild selbst tragen? Erst, wenn ein Admin es freigegeben hat –
+	 * bis dahin (und ohne erreichbaren Cape-Server) zeigt das Spiel es auch bei ihm nicht.
+	 * In der Entwicklungsumgebung (kein echter Account, keine Prüfung möglich) gilt das nicht.
+	 */
+	public static boolean ownApproved(CapeShare share) {
+		if (share.png() == null) {
+			return true;
+		}
+		if (FabricLoader.getInstance().isDevelopmentEnvironment() && !Boolean.getBoolean(REQUIRE_APPROVAL_PROPERTY)) {
+			return true;
+		}
+		return share.key().equals(ownKey) && "approved".equals(ownStatus);
+	}
+
+	private static void forgetOwn() {
+		ownId = null;
+		ownKey = null;
+		ownStatus = null;
 	}
 
 	/** Jeden Client-Tick: Mitspieler-Capes abfragen und das eigene Cape teilen. */
@@ -206,10 +242,15 @@ public final class SharedCapes {
 
 	private static void onEvent(Minecraft mc, UUID player, CapeServer.@Nullable Remote remote) {
 		if (player.equals(mc.getUser().getProfileId())) {
-			// Das eigene Cape zeigt der Client selbst – hier nur die Freigabe melden
-			if (remote != null && remote.id() != null && remote.id().equals(pendingId)) {
-				pendingId = null;
-				Chat.info("salami.capes.shared.approved");
+			// Eigenes Bild: Freigabe (oder Sperre/Verstecken) gilt sofort auch für einen selbst
+			if (ownId != null) {
+				boolean visible = remote != null && ownId.equals(remote.id());
+				if (visible && !"approved".equals(ownStatus)) {
+					ownStatus = "approved";
+					Chat.info("salami.capes.shared.approved");
+				} else if (!visible && "approved".equals(ownStatus)) {
+					ownStatus = null;
+				}
 			}
 			return;
 		}
@@ -368,7 +409,13 @@ public final class SharedCapes {
 			if (error == null) {
 				publishedKey = wanted.key();
 				publishRetryMs = PUBLISH_RETRY_MIN_MS;
-				pendingId = "pending".equals(result.status()) ? result.id() : null;
+				if (wanted.png() != null && result.id() != null) {
+					ownId = result.id();
+					ownKey = wanted.key();
+					ownStatus = result.status();
+				} else {
+					forgetOwn();
+				}
 				announce(wanted, result);
 				return;
 			}
@@ -376,6 +423,7 @@ public final class SharedCapes {
 			if (cause instanceof CapeServer.ServerException server && server.permanent()) {
 				// Bild ungültig: nicht endlos neu versuchen
 				publishedKey = wanted.key();
+				forgetOwn();
 				Chat.warn("salami.capes.shared.failed", server.getMessage());
 				return;
 			}
