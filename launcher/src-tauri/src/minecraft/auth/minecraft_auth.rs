@@ -66,6 +66,18 @@ pub struct Credentials {
     /// token). `None` for accounts from older launcher versions → treated as stale to refresh once.
     #[serde(default)]
     pub mc_access_token_expires: Option<DateTime<Utc>>,
+    /// Nur für ältere Launcher bis 1.5.0: Die verlangen das Feld `norisk_credentials` beim
+    /// Einlesen und verwerfen sonst alle Accounts (z. B. nach einer manuellen Neuinstallation
+    /// von 1.5.0). Geschrieben wird immer der leere Wert, gelesen wird es nie.
+    #[serde(rename = "norisk_credentials", skip_deserializing)]
+    legacy_credentials: LegacyCredentials,
+}
+
+/// Leerer Platzhalter für `Credentials::legacy_credentials`.
+#[derive(Serialize, Debug, Clone, Default)]
+struct LegacyCredentials {
+    production: Option<()>,
+    experimental: Option<()>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -636,6 +648,7 @@ impl MinecraftAuthStore {
             expires: oauth_token.date + Duration::seconds(oauth_token.value.expires_in as i64),
             auth_flow: Some(AuthFlow::Direct),
             mc_access_token_expires: Some(mc_token_expiry(minecraft_token.expires_in)),
+            legacy_credentials: LegacyCredentials::default(),
         };
 
         self.update_or_insert(credentials.clone()).await?;
@@ -696,6 +709,7 @@ impl MinecraftAuthStore {
             expires: oauth_token.date + Duration::seconds(oauth_token.value.expires_in as i64),
             auth_flow: Some(AuthFlow::Sisu),
             mc_access_token_expires: Some(mc_token_expiry(minecraft_token.expires_in)),
+            legacy_credentials: LegacyCredentials::default(),
         };
 
         info!(
@@ -769,6 +783,7 @@ impl MinecraftAuthStore {
             active: creds.active,
             auth_flow: Some(AuthFlow::Direct),
             mc_access_token_expires: Some(mc_token_expiry(minecraft_token.expires_in)),
+            legacy_credentials: LegacyCredentials::default(),
         };
 
         info!("[Token Refresh] Updating account in storage");
@@ -820,6 +835,7 @@ impl MinecraftAuthStore {
             active: creds.active,
             auth_flow: Some(AuthFlow::Sisu),
             mc_access_token_expires: Some(mc_token_expiry(minecraft_token.expires_in)),
+            legacy_credentials: LegacyCredentials::default(),
         };
 
         info!("[Token Refresh] Updating account in storage");

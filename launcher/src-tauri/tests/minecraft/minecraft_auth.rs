@@ -93,6 +93,10 @@ fn reads_accounts_saved_with_norisk_token_fields() {
     assert!(creds.active);
     assert_eq!(creds.auth_flow, Some(AuthFlow::Sisu));
 
+    // Leerer Platzhalter für Launcher bis 1.5.0 (die verlangen das Feld), ohne den alten Token
     let written = serde_json::to_value(&creds).unwrap();
-    assert!(written.get("norisk_credentials").is_none());
+    assert_eq!(
+        written.get("norisk_credentials"),
+        Some(&serde_json::json!({ "production": null, "experimental": null }))
+    );
 }
