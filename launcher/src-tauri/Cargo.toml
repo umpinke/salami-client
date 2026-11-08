@@ -1,6 +1,6 @@
 [package]
 name = "salami-client-launcher"
-version = "1.6.1"
+version = "1.7.0"
 description = "Salami Client Launcher"
 authors = ["Salami Client"]
 edition = "2021"
