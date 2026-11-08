@@ -1,0 +1,101 @@
+import i18n from "../../i18n/i18n";
+
+/** Texte für die Kopplung mit der Salami-App (andere Sprachen fallen auf Englisch zurück). */
+const STRINGS: Record<string, Record<string, string>> = {
+  de: {
+    "salami.app.title": "Salami-App fürs Handy",
+    "salami.app.description": "Die Salami-App zeigt auf deinem Handy deine Spielzeit, deine Login-Streak, deine Screenshots und deine Capes.",
+    "salami.app.sync": "Spielzeit & Screenshots synchronisieren",
+    "salami.app.sync.description": "Schickt Start und Ende jeder Spielsitzung und die Screenshots aller Profile an den Salami-Server, damit sie in der App erscheinen. Aus: Der Launcher sendet nichts mehr.",
+    "salami.app.privacy": "Datenschutz",
+    "salami.app.pair": "Handy koppeln",
+    "salami.app.pair.description": "Verbindet die Salami-App mit deinem Minecraft-Konto {{name}}.",
+    "salami.app.pair.description_no_account": "Melde dich im Launcher mit einem Minecraft-Konto an, um dein Handy zu koppeln.",
+    "salami.app.delete": "Daten löschen",
+    "salami.app.delete.description": "Löscht deine Spielzeit, Screenshots und gekoppelten Handys auf dem Salami-Server und schaltet die Synchronisierung aus.",
+    "salami.app.delete.confirm_title": "Daten der Salami-App löschen?",
+    "salami.app.delete.confirm_message": "Spielzeit, Streak, alle hochgeladenen Screenshots und die gekoppelten Handys werden auf dem Salami-Server gelöscht. Die Screenshots auf diesem PC bleiben erhalten. Die Synchronisierung wird ausgeschaltet.",
+    "salami.app.delete.confirm_button": "Endgültig löschen",
+    "salami.app.delete.done": "Deine Daten in der Salami-App sind gelöscht.",
+    "salami.app.delete.failed": "Löschen fehlgeschlagen: {{error}}",
+    "salami.app.storage_full": "Dein Speicher in der Salami-App ist voll (3 GB oder 5000 Bilder). Lösche in der App alte Screenshots, dann lädt der Launcher wieder hoch.",
+    "salami.app.modal.title": "Handy koppeln",
+    "salami.app.modal.account": "Konto: {{name}}",
+    "salami.app.modal.steps": "Öffne die Salami-App und scanne den QR-Code oder gib den Code ein.",
+    "salami.app.modal.code": "Kopplungscode",
+    "salami.app.modal.valid_for": "Noch {{time}} gültig",
+    "salami.app.modal.expired": "Der Code ist abgelaufen.",
+    "salami.app.modal.new_code": "Neuer Code",
+    "salami.app.modal.loading": "Code wird erstellt …",
+    "salami.app.modal.error": "Kopplung gerade nicht möglich: {{error}}",
+    "salami.app.modal.retry": "Nochmal versuchen",
+    "salami.app.modal.sync_off": "Die Synchronisierung ist aus. Die App zeigt deine Capes, aber keine Spielzeit und keine neuen Screenshots.",
+    "salami.app.modal.paired": "„{{name}}“ ist gekoppelt.",
+    "salami.app.modal.get_app": "Salami-App fürs Handy",
+    "salami.app.modal.get_app_hint": "Noch nicht installiert? Hier gibt es die App für Android.",
+    "salami.app.devices.title": "Gekoppelte Geräte",
+    "salami.app.devices.empty": "Noch kein Handy gekoppelt.",
+    "salami.app.devices.paired_at": "gekoppelt {{date}}",
+    "salami.app.devices.last_seen": "zuletzt aktiv {{date}}",
+    "salami.app.devices.remove": "Entfernen",
+    "salami.app.devices.remove_title": "Gerät entfernen?",
+    "salami.app.devices.remove_confirm": "„{{name}}“ entfernen? Das Handy sieht deine Daten danach nicht mehr.",
+    "salami.app.devices.removed": "Gerät entfernt.",
+    "salami.app.devices.failed": "Geräte konnten nicht geladen werden: {{error}}",
+    "salami.app.devices.unknown": "Unbekanntes Gerät",
+  },
+  en: {
+    "salami.app.title": "Salami App for your phone",
+    "salami.app.description": "The Salami App shows your playtime, your login streak, your screenshots and your capes on your phone.",
+    "salami.app.sync": "Sync playtime & screenshots",
+    "salami.app.sync.description": "Sends the start and end of every game session and the screenshots of all profiles to the Salami server so they show up in the app. Off: the launcher sends nothing.",
+    "salami.app.privacy": "Privacy",
+    "salami.app.pair": "Pair phone",
+    "salami.app.pair.description": "Connects the Salami App with your Minecraft account {{name}}.",
+    "salami.app.pair.description_no_account": "Sign in to the launcher with a Minecraft account to pair your phone.",
+    "salami.app.delete": "Delete data",
+    "salami.app.delete.description": "Deletes your playtime, screenshots and paired phones on the Salami server and turns syncing off.",
+    "salami.app.delete.confirm_title": "Delete your Salami App data?",
+    "salami.app.delete.confirm_message": "Playtime, streak, all uploaded screenshots and the paired phones are deleted from the Salami server. The screenshots on this PC stay. Syncing is turned off.",
+    "salami.app.delete.confirm_button": "Delete for good",
+    "salami.app.delete.done": "Your Salami App data has been deleted.",
+    "salami.app.delete.failed": "Could not delete: {{error}}",
+    "salami.app.storage_full": "Your Salami App storage is full (3 GB or 5000 pictures). Delete old screenshots in the app and the launcher uploads again.",
+    "salami.app.modal.title": "Pair phone",
+    "salami.app.modal.account": "Account: {{name}}",
+    "salami.app.modal.steps": "Open the Salami App and scan the QR code or enter the code.",
+    "salami.app.modal.code": "Pairing code",
+    "salami.app.modal.valid_for": "Valid for {{time}}",
+    "salami.app.modal.expired": "The code has expired.",
+    "salami.app.modal.new_code": "New code",
+    "salami.app.modal.loading": "Creating code …",
+    "salami.app.modal.error": "Pairing is not possible right now: {{error}}",
+    "salami.app.modal.retry": "Try again",
+    "salami.app.modal.sync_off": "Syncing is off. The app shows your capes, but no playtime and no new screenshots.",
+    "salami.app.modal.paired": "“{{name}}” is paired.",
+    "salami.app.modal.get_app": "Salami App for your phone",
+    "salami.app.modal.get_app_hint": "Not installed yet? Get the Android app here.",
+    "salami.app.devices.title": "Paired devices",
+    "salami.app.devices.empty": "No phone paired yet.",
+    "salami.app.devices.paired_at": "paired {{date}}",
+    "salami.app.devices.last_seen": "last active {{date}}",
+    "salami.app.devices.remove": "Remove",
+    "salami.app.devices.remove_title": "Remove device?",
+    "salami.app.devices.remove_confirm": "Remove “{{name}}”? The phone can no longer see your data.",
+    "salami.app.devices.removed": "Device removed.",
+    "salami.app.devices.failed": "Could not load devices: {{error}}",
+    "salami.app.devices.unknown": "Unknown device",
+  },
+};
+
+let registered = false;
+
+export function registerSalamiAppStrings(): void {
+  if (registered) return;
+  for (const [lng, strings] of Object.entries(STRINGS)) {
+    i18n.addResourceBundle(lng, "translation", strings, true, false);
+  }
+  registered = true;
+}
+
+registerSalamiAppStrings();

@@ -76,6 +76,7 @@ const launcherConfig = {
   log_level: "info",
   salami_theme: true,
   combat_modules: true,
+  salami_app_sync: true,
 };
 
 /** Beispiel-Log für die Log-Ansichten. */
@@ -136,10 +137,68 @@ const capeGalleryImages: Record<string, string> = {
   ["9".repeat(64)]: "/src-tauri/assets/salami_cape_template.png",
 };
 
+/** Salami-App: gekoppelte Handys; beim dritten Abruf „koppelt“ sich ein zweites. */
+let appDevices = [
+  { id: "d_galaxy", name: "Galaxy S24", pairedAt: "2026-11-05T18:12:00Z", lastSeen: now },
+];
+let appDeviceCalls = 0;
+/** Platzhalter-QR (nur fürs Layout, der echte kommt aus dem Rust-Backend). */
+function previewQr(): string {
+  const n = 25;
+  let path = "";
+  for (let y = 0; y < n; y++)
+    for (let x = 0; x < n; x++) {
+      const finder = (x < 7 || x >= n - 7) && y < 7 || x < 7 && y >= n - 7;
+      if (finder ? Math.max(Math.abs((x % (n - 7)) - 3), Math.abs((y % (n - 7)) - 3)) !== 2 : (x * 7 + y * 13 + x * y) % 3 === 0)
+        path += `M${x + 2},${y + 2}h1v1h-1z`;
+    }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n + 4} ${n + 4}" shape-rendering="crispEdges"><rect width="${n + 4}" height="${n + 4}" fill="#fff"/><path d="${path}" fill="#000"/></svg>`;
+}
+
 mockWindows("main");
 mockIPC((cmd, args) => {
   const a = (args ?? {}) as Record<string, unknown>;
   switch (cmd) {
+    case "salami_app_status":
+      return {
+        available: true,
+        enabled: launcherConfig.salami_app_sync ?? true,
+        linked: true,
+        accountName: sampleAccount.username,
+        pendingSessions: 0,
+        storageFull: new URLSearchParams(location.search).has("full"),
+        downloadUrl: "https://salami-client.umpinke.de/#download",
+        privacyUrl: "https://salami-client.umpinke.de/#info",
+      };
+    case "salami_app_pair_code": {
+      const code = String(Math.floor(100000 + Math.random() * 900000));
+      const minutes = new URLSearchParams(location.search).has("expiring") ? 0.1 : 10;
+      return new Promise((resolve) =>
+        setTimeout(
+          () =>
+            resolve({
+              code,
+              expiresAt: new Date(Date.now() + minutes * 60_000).toISOString(),
+              url: `salami://pair?code=${code}`,
+              qrSvg: previewQr(),
+            }),
+          300,
+        ),
+      );
+    }
+    case "salami_app_devices":
+      appDeviceCalls += 1;
+      if (appDeviceCalls === 3) {
+        appDevices = [...appDevices, { id: "d_pixel", name: "Pixel 8", pairedAt: new Date().toISOString(), lastSeen: new Date().toISOString() }];
+      }
+      return structuredClone(appDevices);
+    case "salami_app_remove_device":
+      appDevices = appDevices.filter((d) => d.id !== a.id);
+      return null;
+    case "salami_app_delete_data":
+      launcherConfig.salami_app_sync = false;
+      appDevices = [];
+      return new Promise((resolve) => setTimeout(() => resolve(1), 500));
     case "salami_capes_overview":
       return structuredClone(capeStore);
     case "salami_capes_select":

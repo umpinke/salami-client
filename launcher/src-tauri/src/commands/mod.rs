@@ -1,4 +1,5 @@
 pub mod salami_cape_command;
+pub mod salami_app_command;
 pub mod launcher_import_command;
 pub mod clip_commands;
 pub mod config_commands;

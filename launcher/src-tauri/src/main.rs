@@ -101,6 +101,12 @@ use commands::salami_cape_command::{
     salami_capes_report, salami_capes_review_status, salami_capes_save, salami_capes_select,
 };
 
+// Salami-App fürs Handy (Kopplung, Geräte, Daten löschen)
+use commands::salami_app_command::{
+    salami_app_delete_data, salami_app_devices, salami_app_pair_code, salami_app_remove_device,
+    salami_app_status,
+};
+
 // Import vanilla cape commands
 use commands::vanilla_cape_command::{
     get_owned_vanilla_capes, get_currently_equipped_vanilla_cape, equip_vanilla_cape,
@@ -724,6 +730,11 @@ async fn main() {
             salami_capes_gallery_image,
             salami_capes_adopt,
             salami_capes_report,
+            salami_app_status,
+            salami_app_pair_code,
+            salami_app_devices,
+            salami_app_remove_device,
+            salami_app_delete_data,
             get_all_profiles_and_last_played,
             get_local_content,
             install_local_content_to_profile,

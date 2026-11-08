@@ -57,6 +57,15 @@ pub const ONLINE_COUNTER_URL: Option<&str> = Some("https://salami-client-zaehler
 /// DNS-Eintrag nötig). `None` = Capes sind nur für den Spieler selbst sichtbar.
 pub const CAPE_SERVER_URL: Option<&str> = Some("https://salami-client-zaehler.umpinke.de/capes");
 
+/// Sync-Server der Salami-App fürs Handy (Android). Der Launcher meldet dort Spielzeit und
+/// Screenshots und erzeugt Kopplungscodes (`integrations::salami_app`). Läuft unter `/app` auf
+/// derselben Domain wie der Online-Zähler. `None` = keine Kopplung, nichts wird gesendet.
+pub const APP_SERVER_URL: Option<&str> = Some("https://salami-client-zaehler.umpinke.de/app");
+/// Download der Salami-App (Link im Dialog „Handy koppeln“).
+pub const APP_DOWNLOAD_PAGE: &str = "https://salami-client.umpinke.de/#download";
+/// Datenschutz-Hinweise der Website, mit dem Absatz „Salami-App und Launcher“.
+pub const APP_PRIVACY_PAGE: &str = "https://salami-client.umpinke.de/#info";
+
 /// Pack für Profile, die auf unbekannte Packs verweisen (z. B. aus importierten Profilen
 /// anderer Launcher).
 pub const FALLBACK_PACK_ID: &str = "salami";

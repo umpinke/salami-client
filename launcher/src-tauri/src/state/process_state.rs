@@ -927,6 +927,9 @@ impl ProcessManager {
 
         self.schedule_auto_open_log_window(process_id);
 
+        // Salami-App: Spielzeit-Sitzung beginnt (meldet im Hintergrund, wenn der Sync an ist)
+        crate::integrations::salami_app::game_started(&metadata);
+
         let processes_arc_clone = Arc::clone(&self.processes);
         // Klon für active_watchers und den Manager selbst (oder dessen relevante Teile)
         let _active_watchers_clone_for_monitor = Arc::clone(&self.active_watchers);
@@ -1033,6 +1036,11 @@ impl ProcessManager {
                         }
                     }
                 }
+            }
+
+            // Salami-App: Sitzung abschließen, danach neue Screenshots hochladen (im Hintergrund)
+            if let Some(metadata) = &exiting_process_metadata_clone {
+                crate::integrations::salami_app::game_exited(metadata);
             }
 
             if let Some(metadata) = &exiting_process_metadata_clone {

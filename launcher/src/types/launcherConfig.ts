@@ -141,6 +141,8 @@ export interface LauncherConfig {
   salami_theme?: boolean;
   /** Kampf-Module in salami-core erlauben, wird als -Dsalami.combat übergeben (Standard: an). */
   combat_modules?: boolean;
+  /** Spielzeit und Screenshots mit der Salami-App fürs Handy synchronisieren (Standard: an). */
+  salami_app_sync?: boolean;
 }
 
 export type LogLevel = "error" | "warn" | "info" | "debug" | "trace";

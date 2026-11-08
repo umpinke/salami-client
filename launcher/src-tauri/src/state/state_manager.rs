@@ -140,6 +140,10 @@ impl State {
         ready_step("SyncPackManager", initial_state_arc.sync_pack_manager.on_state_ready(app.clone())).await?;
         ready_step("ProcessManager", initial_state_arc.process_manager.on_state_ready(app.clone())).await?;
 
+        // Salami-App: Spielzeit und Screenshots im Hintergrund melden (nach den Prozessen, damit
+        // ein beim Start schon laufendes Spiel seine Sitzung behält)
+        crate::integrations::salami_app::start_background_sync();
+
         // Salami: Kein Token-Rückkanal aus dem Spiel mehr (NoRisk-Client) – sonst könnte jedes
         // lokale Programm per Datei die Account-Token austauschen.
 

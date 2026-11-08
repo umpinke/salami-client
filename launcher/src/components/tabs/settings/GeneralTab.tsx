@@ -15,6 +15,7 @@ import { useGlobalModal } from "../../../hooks/useGlobalModal";
 import { useLauncherTheme } from "../../../hooks/useLauncherTheme";
 import { LANGUAGE_OPTIONS, type SupportedLanguage } from "../../../i18n";
 import { useSettingsConfig, useSettingsKeywords } from "./settings-context";
+import { SalamiAppSettings } from "../../salami-app/SalamiAppSettings";
 import { isWindows } from "../../../utils/platform";
 import { useEffect, useRef, useState } from "react";
 import { UI_SCALE_MAX, UI_SCALE_MIN, UI_SCALE_STEP, useUiScaleStore } from "../../../store/ui-scale-store";
@@ -267,6 +268,8 @@ export function GeneralTab() {
           />
         </SettingRow>
       </SettingsSection>
+
+      <SalamiAppSettings />
 
       <SettingsSection id="settings-section-interface" title={t("settings.sections.interface")} icon="solar:slider-horizontal-bold" keywords={kw("settings.sections.interface", "downloads", "interface", "oberfläche", "performance")}>
         <SettingRow
