@@ -519,6 +519,20 @@ test("Admin-Seite wird mit CSP ausgeliefert", async () => {
   assert.equal((await fetch(`${base}/admin/../server.mjs`)).status, 404);
 });
 
+test("Admin-Seite ist als App installierbar", async () => {
+  const manifest = await fetch(`${base}/admin/manifest.webmanifest`);
+  assert.equal(manifest.status, 200);
+  assert.match(manifest.headers.get("content-type"), /application\/manifest\+json/);
+  assert.match(manifest.headers.get("content-security-policy"), /manifest-src 'self'; worker-src 'self'/);
+  assert.ok((await manifest.json()).icons.some((icon) => icon.purpose === "maskable"));
+  assert.match((await fetch(`${base}/admin/sw.js`)).headers.get("content-type"), /text\/javascript/);
+  for (const icon of ["icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png", "badge-96.png"]) {
+    const response = await fetch(`${base}/admin/${icon}`);
+    assert.equal(response.status, 200, icon);
+    assert.equal(response.headers.get("content-type"), "image/png");
+  }
+});
+
 test("Admin-Sperre nach 10 falschen Schlüsseln", async () => {
   for (let i = 0; i < 10; i++) {
     await call("GET", "/v1/admin/me", undefined, { Authorization: `Bearer falsch-${i}` });

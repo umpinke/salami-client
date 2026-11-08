@@ -85,6 +85,8 @@ Logs: `journalctl -u salami-capes -f`. Nach einem Update der Dateien: `sudo syst
 - Unter „Freigegeben“ lassen sich Capes wieder **sperren**, unter „Abgelehnt“ **doch freigeben**.
 - Unter **„Gemeldet“** stehen alle Capes mit offenen Meldungen: Grund, wer gemeldet hat, Notiz und Datum. **Behalten** verwirft die Meldungen (ein verstecktes Cape ist danach wieder für alle sichtbar, an seinem alten Platz in der Galerie), **Sperren** nimmt das Cape zurück. Beides wird im Log festgehalten (`journalctl -u salami-capes`).
 
+Die Seite lässt sich als App aufs Handy legen (PWA: `manifest.webmanifest`, Service Worker `sw.js`, der nur die Oberfläche zwischenspeichert, nie `/v1/`). Der Admin-Schlüssel bleibt im Browser gespeichert. Die Glocke abonniert Web-Push für neue Capes. Das Backend dafür ist **nicht** Teil dieses Servers, sondern der Host-Dienst `salami-cape-mail` (nginx `/capes/push/`). Er prüft Admin-Schlüssel über `/v1/admin/me` und liest die Log-Zeile „neues Cape … wartet auf Prüfung“, also diese Zeile in `server.mjs` nicht umformulieren.
+
 ## Cape-Regeln
 
 Diese Regeln zeigt der Launcher beim ersten eigenen Cape und auf der Cape-Seite. Daran richtet sich die Prüfung:

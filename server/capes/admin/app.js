@@ -39,9 +39,10 @@ let status = "pending";
 let refreshTimer = null;
 let loading = false;
 
+// Angemeldet bleiben (auch in der Handy-App), bis man sich abmeldet.
 function readToken() {
   try {
-    return sessionStorage.getItem(TOKEN_KEY) || "";
+    return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || "";
   } catch {
     return "";
   }
@@ -50,8 +51,9 @@ function readToken() {
 function storeToken(value) {
   token = value;
   try {
-    if (value) sessionStorage.setItem(TOKEN_KEY, value);
-    else sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(TOKEN_KEY);
+    if (value) localStorage.setItem(TOKEN_KEY, value);
+    else localStorage.removeItem(TOKEN_KEY);
   } catch {}
 }
 
@@ -92,6 +94,7 @@ async function start() {
     const me = await api("admin/me");
     $("admin-name").textContent = me.name;
     $("who").hidden = false;
+    setupPush();
     $("login").hidden = true;
     $("review").hidden = false;
     selectTab(status);
@@ -143,6 +146,7 @@ for (const tab of document.querySelectorAll(".tabs button")) {
 async function load() {
   if (loading) return;
   loading = true;
+  $("refresh").classList.add("spin");
   try {
     const data = await api(`admin/capes?status=${status}`);
     $("list-error").textContent = "";
@@ -156,6 +160,7 @@ async function load() {
       data.counts.pending > 0 ? String(data.counts.pending) : "",
       data.counts.reported > 0 ? `${data.counts.reported} gemeldet` : "",
     ].filter(Boolean);
+    setBadge(data.counts.pending + data.counts.reported);
     document.title = open.length > 0 ? `(${open.join(", ")}) Salami Capes – Prüfung` : "Salami Capes – Prüfung";
     render(data.capes);
   } catch (e) {
@@ -166,6 +171,7 @@ async function load() {
     $("list-error").textContent = `Liste konnte nicht geladen werden: ${e.message}`;
   } finally {
     loading = false;
+    $("refresh").classList.remove("spin");
   }
 }
 
@@ -314,6 +320,137 @@ async function drawPreviews(card, id) {
     ctx.drawImage(bitmap, x * scale, y * scale, w * scale, h * scale, 0, 0, canvas.width, canvas.height);
   }
   bitmap.close();
+}
+
+// ------------------------------------------------------------------ App (Handy / Desktop)
+
+/** Zahl offener Capes am App-Symbol (wo das Gerät es kann). */
+function setBadge(n) {
+  try {
+    if (!("setAppBadge" in navigator)) return;
+    if (n > 0) navigator.setAppBadge(n).catch(() => {});
+    else navigator.clearAppBadge().catch(() => {});
+  } catch {}
+}
+
+$("refresh").addEventListener("click", () => load());
+
+// ------------------------------------------------------------------ Push-Benachrichtigungen
+
+const PUSH_API = new URL("../push/", location.href);
+const pushSupported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+
+function toKey(base64) {
+  const raw = atob((base64 + "=".repeat((4 - (base64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+}
+
+async function pushPost(path, body) {
+  const response = await fetch(new URL(path, PUSH_API), {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || `Fehler ${response.status}`);
+}
+
+async function currentSubscription() {
+  const registration = await navigator.serviceWorker.ready;
+  return registration.pushManager.getSubscription();
+}
+
+function showPushState(on) {
+  const button = $("push");
+  button.classList.toggle("on", on);
+  button.title = on ? "Push ist an – tippen zum Ausschalten" : "Push-Benachrichtigungen einschalten";
+  button.setAttribute("aria-label", button.title);
+}
+
+async function setupPush() {
+  if (!pushSupported) return;
+  $("push").hidden = false;
+  const sub = await currentSubscription().catch(() => null);
+  const on = Boolean(sub) && Notification.permission === "granted";
+  showPushState(on);
+  // Anmeldung beim Server auffrischen (falls der Server sie verloren hat)
+  if (on) pushPost("subscribe", { subscription: sub.toJSON() }).catch(() => {});
+  else if (Notification.permission === "default" && standalone) $("hint").textContent = "Tipp: Mit der Glocke oben bekommst du bei neuen Capes eine Push-Nachricht.";
+}
+
+$("push").addEventListener("click", async () => {
+  const button = $("push");
+  button.disabled = true;
+  try {
+    const existing = await currentSubscription();
+    if (existing && Notification.permission === "granted") {
+      await pushPost("unsubscribe", { endpoint: existing.endpoint }).catch(() => {});
+      await existing.unsubscribe();
+      showPushState(false);
+      $("list-error").textContent = "";
+      $("hint").textContent = "Push-Benachrichtigungen sind aus.";
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      $("list-error").textContent =
+        "Benachrichtigungen sind blockiert. Erlaube sie in den Einstellungen des Handys für diese App (bzw. Chrome) und tippe dann nochmal auf die Glocke.";
+      return;
+    }
+    const { key } = await (await fetch(new URL("key", PUSH_API))).json();
+    const registration = await navigator.serviceWorker.ready;
+    const sub = existing || (await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: toKey(key) }));
+    await pushPost("subscribe", { subscription: sub.toJSON() });
+    await pushPost("test", { endpoint: sub.endpoint });
+    showPushState(true);
+    $("list-error").textContent = "";
+    $("hint").textContent = "Push ist an. Du bekommst gleich eine Test-Nachricht, danach eine bei jedem neuen Cape.";
+  } catch (e) {
+    $("list-error").textContent = `Push konnte nicht eingeschaltet werden: ${e.message}`;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+// Antippen einer Benachrichtigung bei offener App: Liste neu laden
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("message", (event) => {
+    if (event.data === "reload" && refreshTimer) {
+      selectTab("pending");
+    }
+  });
+}
+
+// Kommt die App aus dem Hintergrund zurück, sofort neu laden statt bis zu 30 s zu warten.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && refreshTimer) load();
+});
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+
+const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+let installPrompt = null;
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  installPrompt = event;
+  $("install").hidden = false;
+  $("install-hint").hidden = true;
+});
+$("install").addEventListener("click", async () => {
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  await installPrompt.userChoice.catch(() => {});
+  installPrompt = null;
+  $("install").hidden = true;
+});
+window.addEventListener("appinstalled", () => {
+  $("install").hidden = true;
+  $("install-hint").hidden = true;
+});
+if (!standalone && /iphone|ipad|ipod/i.test(navigator.userAgent)) {
+  $("install-hint").textContent = "Als App aufs iPhone: unten auf „Teilen“ tippen, dann „Zum Home-Bildschirm“.";
+  $("install-hint").hidden = false;
 }
 
 start();

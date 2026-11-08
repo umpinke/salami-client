@@ -648,12 +648,20 @@ const ADMIN_FILES = {
   "index.html": "text/html; charset=utf-8",
   "app.js": "text/javascript; charset=utf-8",
   "app.css": "text/css; charset=utf-8",
+  // Als Handy-App installierbar (PWA); Web-Push kommt vom Host-Dienst salami-cape-mail (/capes/push/)
+  "manifest.webmanifest": "application/manifest+json; charset=utf-8",
+  "sw.js": "text/javascript; charset=utf-8",
+  "icon-192.png": "image/png",
+  "icon-512.png": "image/png",
+  "icon-maskable-512.png": "image/png",
+  "apple-touch-icon.png": "image/png",
+  "badge-96.png": "image/png",
 };
 const adminFiles = Object.fromEntries(
   Object.entries(ADMIN_FILES).map(([file, type]) => [file, { type, data: readFileSync(new URL(`./admin/${file}`, import.meta.url)) }]),
 );
 const ADMIN_CSP =
-  "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+  "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
 function serveAdminFile(res, file) {
   const entry = adminFiles[file];
