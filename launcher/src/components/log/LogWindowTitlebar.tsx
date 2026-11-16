@@ -26,23 +26,23 @@ export function LogWindowTitlebar({ title }: LogWindowTitlebarProps) {
 
   return (
     <div
-      className="flex items-center justify-between h-11 px-3 select-none border-b border-white/[0.06]"
+      className="flex items-center justify-between h-11 pl-4 pr-1 select-none border-b border-white/[0.08]"
       data-tauri-drag-region
     >
-      {/* Left: Title */}
-      <div className="flex items-center gap-2.5 flex-1 h-full pointer-events-none">
-        <img src="/salami-logo-64.png" alt="" className="w-6 h-6 rounded-full" />
-        <span className="text-sm font-semibold text-white">Salami Client</span>
-        <span className="h-4 w-px bg-white/15" />
-        <span className="text-sm text-white/60 truncate">{displayTitle}</span>
+      {/* Links: Wortmarke und Fenstertitel */}
+      <div className="flex items-baseline gap-2.5 flex-1 min-w-0 pointer-events-none">
+        <img src="/salami-logo-64.png" alt="" className="w-5 h-5 rounded-full self-center" />
+        <span className="font-minecraft text-xl lowercase leading-none text-white">salami</span>
+        <span className="font-minecraft text-xl leading-none text-white/20">/</span>
+        <span className="font-minecraft text-xl lowercase leading-none text-white/55 truncate">{displayTitle}</span>
       </div>
 
       {/* Right: Window Controls */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center">
         {/* Minimize */}
         <button
           onClick={handleMinimize}
-          className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors"
+          className="w-10 h-9 flex items-center justify-center hover:bg-white/10 transition-colors"
           title={t('window.minimize')}
         >
           <Icon icon="mdi:minus" className="w-4 h-4 text-white/70" />
@@ -51,7 +51,7 @@ export function LogWindowTitlebar({ title }: LogWindowTitlebarProps) {
         {/* Maximize */}
         <button
           onClick={handleMaximize}
-          className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors"
+          className="w-10 h-9 flex items-center justify-center hover:bg-white/10 transition-colors"
           title={t('window.maximize')}
         >
           <Icon icon="mdi:checkbox-blank-outline" className="w-3.5 h-3.5 text-white/70" />
@@ -60,7 +60,7 @@ export function LogWindowTitlebar({ title }: LogWindowTitlebarProps) {
         {/* Close */}
         <button
           onClick={handleClose}
-          className="w-8 h-8 flex items-center justify-center rounded hover:bg-red-500/80 transition-colors"
+          className="w-10 h-9 flex items-center justify-center hover:bg-red-500/80 transition-colors"
           title={t('window.close')}
         >
           <Icon icon="mdi:close" className="w-4 h-4 text-white/70" />

@@ -145,10 +145,10 @@ function InstanceItem({
 
   return (
     <div
-      className="relative p-3 rounded-lg bg-black/20 border border-white/10 hover:border-white/20 cursor-pointer transition-all duration-200"
+      className="relative cursor-pointer border-b border-white/[0.08] py-3 pl-4 pr-3 transition-colors duration-150 hover:bg-white/[0.04]"
       style={{
-        borderColor: isSelected ? `${accentColor.value}60` : undefined,
-        backgroundColor: isSelected ? `${accentColor.value}10` : undefined,
+        backgroundColor: isSelected ? `${accentColor.value}14` : undefined,
+        boxShadow: isSelected ? `inset 3px 0 0 ${accentColor.value}` : undefined,
       }}
       onClick={onSelect}
       onMouseEnter={() => onHover(true)}
@@ -435,18 +435,15 @@ export function InstanceSidebar({
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="px-4 py-3">
-        <span
-          className="font-minecraft text-sm tracking-wider flex items-center gap-2"
-          style={{ color: accentColor.value }}
-        >
-          <Icon icon="solar:monitor-bold" className="w-4 h-4" />
+      <div className="flex items-end border-b border-white/[0.08] px-4 pt-3">
+        <span className="relative pb-2.5 font-minecraft text-xl lowercase leading-none text-white">
           {t('instances.title')}
+          <span className="absolute inset-x-0 -bottom-px h-[3px]" style={{ backgroundColor: accentColor.value }} />
         </span>
       </div>
 
       {/* Instance List */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
         {isLoading && instances.length === 0 ? (
           <div className="flex items-center justify-center py-8 text-white/50 text-sm font-minecraft">
             <Icon icon="svg-spinners:pulse-3" className="w-6 h-6 mr-2" />
@@ -485,7 +482,7 @@ export function InstanceSidebar({
 
       {/* Actions Footer - for selected instance */}
       {selectedInstance && (
-        <div className="px-3 py-3 bg-black/30 rounded-lg mx-3 mb-3">
+        <div className="border-t border-white/[0.08] px-4 py-3">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-minecraft text-white/50 truncate">
               {selectedInstance.name}
@@ -625,7 +622,7 @@ export function InstanceSidebar({
       )}
 
       {/* Status Footer */}
-      <div className="px-4 py-2 text-xs font-minecraft text-white/50">
+      <div className="border-t border-white/[0.08] px-4 py-2 text-xs font-minecraft lowercase text-white/45">
         {instances.filter((i) => i.status === "running").length} {t('instances.running')}
       </div>
     </div>

@@ -21,6 +21,7 @@ import {
   LogToolButton,
   countLevels,
 } from "./salami-log-ui";
+import { SURFACE } from "../ui/design-system";
 
 interface DisplayLogLine {
   id: string;
@@ -496,6 +497,7 @@ export function LogViewerCore({
         showThread={showThreadPrefix}
         query={deferredSearchTerm}
         selected={isSelected}
+        lineNumber={index + 1}
         rowProps={{ "data-log-id": log.id, "data-log-index": index }}
       />
     );
@@ -507,45 +509,49 @@ export function LogViewerCore({
   );
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 gap-3">
-      {/* Kopf: Datei, Suche, Anzeige-Optionen */}
-      <div className="flex flex-wrap items-center gap-2">
-        {logFiles && logFiles.length > 0 && onLogSelect && (
-          <button
-            ref={fileDropdownButtonRef}
-            onClick={() => setIsFileDropdownOpen(!isFileDropdownOpen)}
-            className="flex h-9 max-w-[260px] items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 text-sm text-white/85 hover:bg-white/[0.08]"
-          >
-            <Icon icon="solar:document-text-linear" className="h-4 w-4 shrink-0 text-white/50" />
-            <span className="truncate">
-              {selectedLogPath ? (selectedLogPath.split(/[\\/]/).pop() || selectedLogPath) : t("salami_logs.choose_file")}
-            </span>
-            <Icon icon="solar:alt-arrow-down-linear" className="h-3.5 w-3.5 shrink-0 text-white/40" />
-          </button>
-        )}
+    <div className="flex-1 flex flex-col min-h-0">
+      {/* Kopf: Stufen als Textreiter, rechts Datei und Anzeige-Optionen */}
+      <div className="flex items-end justify-between gap-4 border-b px-4 pt-3" style={{ borderColor: SURFACE.line }}>
+        <LevelChips
+          enabled={levelFilters}
+          counts={levelCounts}
+          onToggle={(level) => toggleLevelFilter(level as LogLevel)}
+        />
+        <div className="mb-1.5 flex flex-shrink-0 items-center gap-1">
+          {logFiles && logFiles.length > 0 && onLogSelect && (
+            <button
+              ref={fileDropdownButtonRef}
+              onClick={() => setIsFileDropdownOpen(!isFileDropdownOpen)}
+              className="flex h-8 max-w-[240px] items-center gap-2 px-2.5 font-minecraft text-sm lowercase text-white/55 transition-colors hover:bg-white/[0.06] hover:text-white"
+            >
+              <Icon icon="solar:document-text-linear" className="h-4 w-4 shrink-0" />
+              <span className="truncate">
+                {selectedLogPath ? (selectedLogPath.split(/[\\/]/).pop() || selectedLogPath) : t("salami_logs.choose_file")}
+              </span>
+              <Icon icon="solar:alt-arrow-down-linear" className="h-3.5 w-3.5 shrink-0 opacity-60" />
+            </button>
+          )}
+          <span ref={settingsButtonRef as unknown as React.RefObject<HTMLSpanElement>}>
+            <LogToolButton
+              icon="solar:tuning-2-linear"
+              title={t("salami_logs.options")}
+              onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+              active={isSettingsOpen}
+            />
+          </span>
+        </div>
+      </div>
+
+      {/* Suche über die ganze Breite */}
+      <div className="px-4 py-2.5">
         <LogSearchField
           value={searchTerm}
           onChange={setSearchTerm}
           matches={searchTerm ? filteredLogs.length : undefined}
-          className="min-w-[200px] flex-1"
         />
-        <span ref={settingsButtonRef as unknown as React.RefObject<HTMLSpanElement>}>
-          <LogToolButton
-            icon="solar:tuning-2-linear"
-            title={t("salami_logs.options")}
-            onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-            active={isSettingsOpen}
-          />
-        </span>
       </div>
 
-      <LevelChips
-        enabled={levelFilters}
-        counts={levelCounts}
-        onToggle={(level) => toggleLevelFilter(level as LogLevel)}
-      />
-
-      {/* Log-Inhalt */}
+      {/* Log-Inhalt – ohne Kasten, Zeilen laufen bis an den Rand */}
       <div
         ref={logContainerRef}
         tabIndex={0}
@@ -555,7 +561,8 @@ export function LogViewerCore({
         onWheel={markUserScroll}
         onTouchMove={markUserScroll}
         onPointerDown={markUserScroll}
-        className="flex-1 min-h-0 flex flex-col rounded-2xl border border-white/[0.06] bg-black/30 p-2 outline-none focus-visible:ring-1 focus-visible:ring-white/20"
+        className="flex-1 min-h-0 flex flex-col border-y bg-black/20 py-1 outline-none"
+        style={{ borderColor: SURFACE.line }}
       >
         {filteredLogs.length === 0 ? (
           showNoLogs && showNoLogsMessage && (
@@ -581,20 +588,28 @@ export function LogViewerCore({
       </div>
 
       {/* Statuszeile */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <LogSummary lines={filteredLogs.length} counts={levelCounts} />
-          <LogToolButton
-            icon={isAutoscrollEnabled ? "solar:play-circle-linear" : "solar:pause-circle-linear"}
-            label={isAutoscrollEnabled ? t("salami_logs.live") : t("salami_logs.paused")}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+        <div className="flex items-center gap-2 pl-1">
+          <button
+            type="button"
             onClick={() => (isAutoscrollEnabled ? setIsAutoscrollEnabled(false) : scrollToBottom())}
-            active={isAutoscrollEnabled}
-          />
+            title={isAutoscrollEnabled ? t("salami_logs.live") : t("salami_logs.paused")}
+            className="flex h-8 items-center gap-2 pr-2 font-minecraft text-sm lowercase transition-colors"
+            style={{ color: isAutoscrollEnabled ? "#4ade80" : "rgba(255,255,255,0.45)" }}
+          >
+            <span
+              className={`h-2 w-2 ${isAutoscrollEnabled ? "animate-pulse" : ""}`}
+              style={{ borderRadius: 999, backgroundColor: "currentColor" }}
+            />
+            {isAutoscrollEnabled ? t("salami_logs.live") : t("salami_logs.paused")}
+          </button>
+          <span className="h-4 w-px bg-white/10" />
+          <LogSummary lines={filteredLogs.length} counts={levelCounts} />
           {!isAutoscrollEnabled && (
             <LogToolButton icon="solar:arrow-down-linear" label={t("salami_logs.to_bottom")} onClick={scrollToBottom} />
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           {onClear && <LogToolButton icon="solar:trash-bin-minimalistic-linear" label={t("salami_logs.clear")} onClick={onClear} />}
           {onOpenFolder && <LogToolButton icon="solar:folder-open-linear" label={t("salami_logs.open_folder")} onClick={onOpenFolder} />}
           <LogToolButton
@@ -603,6 +618,7 @@ export function LogViewerCore({
             title={t("salami_logs.share_tooltip")}
             onClick={handleUpload}
             busy={isUploading}
+            primary
           />
         </div>
       </div>
@@ -611,7 +627,7 @@ export function LogViewerCore({
       {isSettingsOpen && settingsButtonRef.current && createPortal(
         <div
           ref={settingsPopupRef}
-          className="fixed min-w-[240px] rounded-xl border border-white/10 bg-[#141010]/95 p-1 shadow-2xl backdrop-blur"
+          className="fixed min-w-[240px] border border-white/10 bg-[#151213] p-1 shadow-2xl"
           style={{
             top: settingsButtonRef.current.getBoundingClientRect().bottom + 8,
             right: window.innerWidth - settingsButtonRef.current.getBoundingClientRect().right,
@@ -620,7 +636,7 @@ export function LogViewerCore({
         >
           <button
             onClick={toggleShowThreadPrefix}
-            className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm text-white/80 transition-colors hover:bg-white/5 hover:text-white"
+            className="flex w-full items-center justify-between gap-3 px-3 py-2 text-sm text-white/80 transition-colors hover:bg-white/5 hover:text-white"
           >
             <span>{t("salami_logs.show_thread")}</span>
             <Icon
@@ -636,7 +652,7 @@ export function LogViewerCore({
       {isFileDropdownOpen && fileDropdownButtonRef.current && createPortal(
         <div
           ref={fileDropdownRef}
-          className="fixed min-w-[220px] max-w-[400px] max-h-[300px] overflow-y-auto rounded-xl border border-white/10 bg-[#141010]/95 p-1 shadow-2xl backdrop-blur custom-scrollbar"
+          className="fixed min-w-[220px] max-w-[400px] max-h-[300px] overflow-y-auto border border-white/10 bg-[#151213] p-1 shadow-2xl custom-scrollbar"
           style={{
             top: fileDropdownButtonRef.current.getBoundingClientRect().bottom + 8,
             left: fileDropdownButtonRef.current.getBoundingClientRect().left,
@@ -650,7 +666,7 @@ export function LogViewerCore({
               <button
                 key={path}
                 onClick={() => { onLogSelect?.(path); setIsFileDropdownOpen(false); }}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-white/5"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-white/5"
                 style={{ color: isSelected ? accentColor.value : "rgba(255,255,255,0.75)" }}
               >
                 <Icon icon={name === "latest.log" ? "solar:pin-bold" : "solar:document-text-linear"} className="h-4 w-4 shrink-0" />

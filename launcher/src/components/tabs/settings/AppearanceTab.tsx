@@ -30,7 +30,7 @@ export function AppearanceTab() {
     setCustomMedia, setCustomMediaOpacity, setCustomMediaBlur, setCustomMediaQuality, setCustomMediaOnlyOnPlay, setCustomMediaHideEffects
   } = useBackgroundEffectStore();
   const webglOk = isWebGLAvailable();
-  const { qualityLevel, setQualityLevel, cosmeticRenderer3d, setCosmeticRenderer3d } =
+  const { qualityLevel, setQualityLevel } =
     useQualitySettingsStore();
 
   const backgroundOptions = [
@@ -89,14 +89,6 @@ export function AppearanceTab() {
               toggleBackgroundAnimation();
             }}
             disabled={saving}
-            size="md"
-          />
-        </SettingRow>
-        <SettingRow label={t("settings.background.skin_animation")} description={webglOk ? undefined : t("webgl.unavailable")} searchKeywords={kw("settings.background.skin_animation", "skin", "animation", "cape", "3d")} disabled={saving}>
-          <ToggleSwitch
-            checked={cosmeticRenderer3d && webglOk}
-            onChange={() => setCosmeticRenderer3d(!cosmeticRenderer3d)}
-            disabled={saving || !webglOk}
             size="md"
           />
         </SettingRow>

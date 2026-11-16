@@ -36,8 +36,6 @@ export function PlayTab() {
   const { currentEffect, customMediaUrl, customMediaHideEffects } = useBackgroundEffectStore();
   const shouldShowEffects = !(customMediaUrl && customMediaHideEffects);
   const { isThemeActive, selectedTheme } = useLauncherTheme();
-  const { cosmeticRenderer3d, setCosmeticRenderer3d } = useQualitySettingsStore();
-  const webglOk = isWebGLAvailable();
 
   useEffect(() => { setDiscordState("Idling"); }, []);
 
@@ -84,18 +82,9 @@ export function PlayTab() {
           />
         )}
 
-        {/* Online-Zähler + 3D Render Toggle - Top Right */}
+        {/* Online-Zähler unten rechts */}
         <div className="absolute bottom-6 right-8 z-20 flex items-center gap-5">
           <OnlineCountBadge />
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-white/50 font-minecraft">{t("settings.background.skin_animation")}</span>
-            <ToggleSwitch
-              checked={cosmeticRenderer3d && webglOk}
-              onChange={() => setCosmeticRenderer3d(!cosmeticRenderer3d)}
-              disabled={!webglOk}
-              size="sm"
-            />
-          </div>
         </div>
 
         {/* <VersionInfo

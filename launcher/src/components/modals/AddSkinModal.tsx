@@ -417,7 +417,7 @@ export const AddSkinModal = memo(
                   <SkinViewer3D
                     textureUrl={previewBase64Url}
                     variant={variant}
-                    animation="idle"
+                    animation="none"
                     draggable
                     style={{ width: "100%", height: "100%" }}
                   />
@@ -460,7 +460,7 @@ export const AddSkinModal = memo(
                       <SkinViewer3D
                         textureUrl={previewBase64Url}
                         variant={variant}
-                        animation="idle"
+                        animation="none"
                         draggable
                         style={{ width: "100%", height: "100%" }}
                       />

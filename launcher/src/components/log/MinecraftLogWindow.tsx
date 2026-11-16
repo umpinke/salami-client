@@ -7,6 +7,7 @@ import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import { LogWindowTitlebar } from "./LogWindowTitlebar";
 import { InstanceSidebar } from "./InstanceSidebar";
 import { LogViewerCore } from "./LogViewerCore";
+import { hexAlpha, mixHex, SURFACE } from "../ui/design-system";
 import { useProcessEvents, useProcessLogs } from "../../hooks/useProcessEvents";
 import { useProcessLogCursor } from "../../hooks/useProcessLogCursor";
 import { useProcessStore } from "../../store/useProcessStore";
@@ -118,15 +119,15 @@ export function MinecraftLogWindow({ crashedProcess }: MinecraftLogWindowProps) 
     <div
       className="h-screen flex flex-col"
       style={{
-        background: `radial-gradient(120% 60% at 50% -10%, ${accentColor.value}26 0%, transparent 60%), #0f0b0b`,
+        background: `radial-gradient(90% 45% at 18% -12%, ${hexAlpha(accentColor.value, 0.14)} 0%, transparent 70%), ${mixHex("#0f0d0e", accentColor.value, 0.04)}`,
       }}
     >
       <LogWindowTitlebar />
 
-      <div className="flex-1 flex min-h-0 p-3 gap-3">
-        <div className="flex-[7] flex flex-col min-w-0">
+      <div className="flex-1 flex min-h-0">
+        <div className="flex-1 flex flex-col min-w-0">
           {!selectedInstanceId ? (
-            <div className="flex-1 rounded-2xl border border-white/[0.06] bg-black/30">
+            <div className="flex-1">
               <LogEmptyState title={t('logs.select_instance')} hint={t('logs.select_instance_hint')} />
             </div>
           ) : (
@@ -139,7 +140,7 @@ export function MinecraftLogWindow({ crashedProcess }: MinecraftLogWindowProps) 
           )}
         </div>
 
-        <div className="flex-[3] min-w-[280px] max-w-[350px]">
+        <div className="w-[300px] flex-shrink-0 border-l" style={{ borderColor: SURFACE.line }}>
           <InstanceSidebar
             selectedInstanceId={selectedInstanceId || undefined}
             onSelectInstance={handleSelectInstance}

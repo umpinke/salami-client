@@ -47,10 +47,10 @@ function Preview() {
   return (
     <div
       className="h-screen flex flex-col text-white"
-      style={{ background: "radial-gradient(120% 60% at 50% -10%, #b23a3a26 0%, transparent 60%), #0f0b0b" }}
+      style={{ background: "radial-gradient(90% 45% at 18% -12%, #b23a3a24 0%, transparent 70%), #150f10" }}
     >
       <LogWindowTitlebar title="PVP · SalamiFan" />
-      <div className="flex-1 flex min-h-0 p-3">
+      <div className="flex-1 flex min-h-0">
         <LogViewerCore
           logs={logs}
           onClear={() => {}}

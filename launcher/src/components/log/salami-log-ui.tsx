@@ -1,7 +1,7 @@
 /**
  * Gemeinsame Bausteine der Salami-Log-Ansichten (Profil-Tab „Logs“ und Log-Fenster):
- * Filter-Chips mit Zählern, Suchfeld mit Trefferzahl, Log-Zeile mit Farbleiste und
- * Hervorhebung, Statuszeile und Werkzeugknöpfe.
+ * Stufenfilter als Textreiter, Suchfeld mit Trefferzahl, Log-Zeile mit Farbleiste und
+ * Zeilennummer, Statuszeile und flache Werkzeugknöpfe – Haarlinien statt Kästen.
  */
 import type React from "react";
 import { Fragment } from "react";
@@ -9,6 +9,7 @@ import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
+import { hexAlpha, readableOn } from "../ui/design-system";
 
 export type LevelKey = "ERROR" | "WARN" | "INFO" | "DEBUG" | "TRACE";
 export const LEVEL_ORDER: LevelKey[] = ["ERROR", "WARN", "INFO", "DEBUG", "TRACE"];
@@ -28,7 +29,7 @@ function isLevelKey(level: string | undefined | null): level is LevelKey {
   return !!level && (LEVEL_ORDER as string[]).includes(level);
 }
 
-/** Filter-Chips „● Fehler 3“; aktive Chips in der Farbe ihrer Stufe. */
+/** Stufenfilter als Textreiter: aktive Stufen weiß mit Strich in ihrer Farbe, dahinter die Anzahl. */
 export function LevelChips({
   enabled,
   counts,
@@ -40,7 +41,7 @@ export function LevelChips({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <div className="flex flex-wrap items-end gap-x-5 gap-y-1">
       {LEVEL_ORDER.map((level) => {
         const active = !!enabled[level];
         const { color } = LEVEL_STYLE[level];
@@ -53,14 +54,19 @@ export function LevelChips({
             aria-pressed={active}
             title={t(`salami_logs.toggle_${active ? "hide" : "show"}`, { level: t(`salami_logs.level.${level}`) })}
             className={cn(
-              "flex h-8 items-center gap-2 rounded-full border px-3 text-xs transition-colors",
-              active ? "text-white" : "border-white/[0.06] bg-white/[0.03] text-white/40 hover:text-white/70",
+              "relative flex flex-shrink-0 items-baseline gap-1.5 pb-2.5 font-minecraft text-xl lowercase leading-none transition-colors duration-150",
+              active ? "text-white" : "text-white/35 hover:text-white/70",
             )}
-            style={active ? { backgroundColor: `${color}1f`, borderColor: `${color}55` } : undefined}
+            style={{ borderRadius: 0 }}
           >
-            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: active ? color : "rgba(255,255,255,0.25)" }} />
             {t(`salami_logs.level.${level}`)}
-            <span className={cn("tabular-nums", active ? "text-white/60" : "text-white/30")}>{count}</span>
+            <span
+              className="text-xs tabular-nums"
+              style={{ color: active && count > 0 ? color : "rgba(255,255,255,0.3)" }}
+            >
+              {count}
+            </span>
+            {active && <span className="absolute inset-x-0 -bottom-px h-[3px]" style={{ backgroundColor: color }} />}
           </button>
         );
       })}
@@ -84,9 +90,10 @@ export function LogSearchField({
   return (
     <label
       className={cn(
-        "flex h-9 items-center gap-2 rounded-full border border-white/[0.08] bg-black/30 px-3 focus-within:border-white/25",
+        "flex h-9 items-center gap-2 border border-white/[0.08] bg-black/25 px-3 transition-colors focus-within:border-white/25",
         className,
       )}
+      style={{ borderRadius: "var(--border-radius)" }}
     >
       <Icon icon="solar:magnifer-linear" className="h-4 w-4 shrink-0 text-white/40" />
       <input
@@ -129,7 +136,7 @@ export function Highlight({ text, query }: { text: string; query: string }) {
   while (hit !== -1) {
     if (hit > from) parts.push(<Fragment key={`t${from}`}>{text.slice(from, hit)}</Fragment>);
     parts.push(
-      <mark key={`m${hit}`} className="rounded px-0.5 text-white" style={{ backgroundColor: `${accent}66` }}>
+      <mark key={`m${hit}`} className="px-0.5 text-white" style={{ backgroundColor: `${accent}66` }}>
         {text.slice(hit, hit + needle.length)}
       </mark>,
     );
@@ -140,7 +147,7 @@ export function Highlight({ text, query }: { text: string; query: string }) {
   return <>{parts}</>;
 }
 
-/** Eine Log-Zeile: Farbleiste, Uhrzeit-Spalte, optional Thread, Nachricht. */
+/** Eine Log-Zeile: Farbleiste, optional Zeilennummer, Uhrzeit, optional Thread, Nachricht. */
 export function LogRowView({
   level,
   timestamp,
@@ -150,6 +157,7 @@ export function LogRowView({
   wrap = true,
   query = "",
   selected = false,
+  lineNumber,
   rowProps,
 }: {
   level?: string | null;
@@ -160,6 +168,8 @@ export function LogRowView({
   wrap?: boolean;
   query?: string;
   selected?: boolean;
+  /** Laufende Nummer am linken Rand (Log-Fenster). */
+  lineNumber?: number;
   rowProps?: React.HTMLAttributes<HTMLDivElement> & Record<string, unknown>;
 }) {
   const accent = useThemeStore((s) => s.accentColor.value);
@@ -168,14 +178,19 @@ export function LogRowView({
   return (
     <div
       {...rowProps}
-      className={cn("group flex items-stretch gap-3 rounded-md pr-2", !selected && "hover:bg-white/[0.04]")}
+      className={cn("group flex items-stretch gap-3 pr-3", !selected && "hover:bg-white/[0.04]")}
       style={{ backgroundColor: selected ? `${accent}33` : style?.rowTint }}
     >
       <span
-        className="w-[3px] shrink-0 rounded-full"
+        className="w-[3px] shrink-0"
         style={{ backgroundColor: style?.rowTint ? style.color : "transparent" }}
       />
-      <span className="w-[62px] shrink-0 select-none py-[3px] text-[11px] tabular-nums text-white/30">
+      {lineNumber !== undefined && (
+        <span className="w-9 shrink-0 select-none py-[3px] text-right font-mono text-[11px] tabular-nums leading-[1.75] text-white/[0.18] transition-colors group-hover:text-white/45">
+          {lineNumber}
+        </span>
+      )}
+      <span className="w-[62px] shrink-0 select-none py-[3px] font-mono text-[11px] tabular-nums leading-[1.75] text-white/35">
         {timestamp ?? ""}
       </span>
       <span
@@ -187,9 +202,7 @@ export function LogRowView({
         )}
       >
         {showThread && thread && !continuation && (
-          <span className="mr-2 select-none rounded bg-white/[0.06] px-1.5 py-px align-middle text-[10px] text-white/45">
-            {thread}
-          </span>
+          <span className="mr-2 select-none text-[11px] text-white/35">{thread} ›</span>
         )}
         <Highlight text={message} query={query} />
       </span>
@@ -197,7 +210,7 @@ export function LogRowView({
   );
 }
 
-/** Kleiner Knopf mit Symbol und Text für Log-Werkzeugleisten. */
+/** Flacher Knopf mit Symbol und Text für Log-Werkzeugleisten; `primary` füllt ihn mit der Akzentfarbe. */
 export function LogToolButton({
   icon,
   label,
@@ -205,6 +218,7 @@ export function LogToolButton({
   disabled,
   busy,
   active,
+  primary,
   title,
 }: {
   icon: string;
@@ -213,6 +227,7 @@ export function LogToolButton({
   disabled?: boolean;
   busy?: boolean;
   active?: boolean;
+  primary?: boolean;
   title?: string;
 }) {
   const accent = useThemeStore((s) => s.accentColor.value);
@@ -224,10 +239,20 @@ export function LogToolButton({
       title={title ?? label}
       aria-label={title ?? label}
       className={cn(
-        "flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs transition-colors disabled:opacity-40",
-        active ? "text-white" : "border-white/[0.06] bg-white/[0.04] text-white/70 hover:bg-white/[0.08] hover:text-white",
+        "flex h-8 items-center gap-1.5 px-2.5 font-minecraft text-sm lowercase transition-[color,background-color,filter] duration-150 disabled:opacity-40",
+        primary
+          ? "hover:brightness-110"
+          : active
+            ? "text-white"
+            : "text-white/55 hover:bg-white/[0.06] hover:text-white",
       )}
-      style={active ? { backgroundColor: `${accent}33`, borderColor: `${accent}66` } : undefined}
+      style={
+        primary
+          ? { backgroundColor: accent, color: readableOn(accent) }
+          : active
+            ? { backgroundColor: hexAlpha(accent, 0.16) }
+            : undefined
+      }
     >
       <Icon icon={busy ? "svg-spinners:ring-resize" : icon} className="h-4 w-4 shrink-0" />
       {label && <span className="whitespace-nowrap">{label}</span>}
@@ -269,18 +294,16 @@ export function countLevels(levels: Iterable<string | undefined | null>): LevelC
   return counts;
 }
 
-/** Leerer Zustand im Salami-Look. */
+/** Leerer Zustand: blasses Logo, Titel in der Schriftart des Launchers, Hinweis darunter. */
 export function LogEmptyState({ icon, title, hint }: { icon?: string; title: string; hint?: string }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.04]">
-        {icon ? (
-          <Icon icon={icon} className="h-7 w-7 text-white/40" />
-        ) : (
-          <img src="/salami-logo-64.png" alt="" className="h-8 w-8 rounded-full opacity-70" />
-        )}
-      </div>
-      <p className="text-sm text-white/70">{title}</p>
+    <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+      {icon ? (
+        <Icon icon={icon} className="mb-1 h-9 w-9 text-white/20" />
+      ) : (
+        <img src="/salami-logo-64.png" alt="" className="mb-1 h-10 w-10 rounded-full opacity-40 grayscale" />
+      )}
+      <p className="font-minecraft text-2xl lowercase leading-none text-white/75">{title}</p>
       {hint && <p className="max-w-sm text-xs text-white/40">{hint}</p>}
     </div>
   );
