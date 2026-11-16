@@ -549,6 +549,7 @@ impl CaptureSupervisor {
                     }
                     None => log::warn!("No UI handle; the saved clip cannot be confirmed on screen"),
                 }
+                crate::integrations::salami_app::clip_saved();
             }
             CaptureToLauncher::AudioPreviewReady(preview) => {
                 log::debug!(
@@ -583,6 +584,7 @@ impl CaptureSupervisor {
                         log::warn!("Could not tell the UI about the export: {e}");
                     }
                 }
+                crate::integrations::salami_app::clip_saved();
             }
             CaptureToLauncher::ClipTrimmed(trimmed) => {
                 log::info!(
@@ -614,6 +616,7 @@ impl CaptureSupervisor {
                         log::warn!("Could not tell the UI about the trimmed clip: {e}");
                     }
                 }
+                crate::integrations::salami_app::clip_saved();
             }
             CaptureToLauncher::Error(error) => {
                 log::error!(

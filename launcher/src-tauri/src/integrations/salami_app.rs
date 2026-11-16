@@ -14,6 +14,10 @@
 //!   Launchers einmal alle (also auch alte), danach neue während und nach dem Spiel. Erledigte
 //!   Hashes merkt sich `salami_app_screenshots.json`; in der App gelöschte Bilder meldet der
 //!   Server nicht als fehlend, sie kommen also nicht wieder.
+//! - **Clips** aus dem Clip-Ordner (`clip_library::list`), auch die schon vorhandenen: wie bei den
+//!   Screenshots SHA-256 → `check` → fehlende per PUT, aber einzeln nacheinander und als Stream
+//!   aus der Datei. Nur fertige Dateien (seit 30 s unverändert). Eigener Schalter
+//!   `salami_app_clips`, erledigte Hashes in `salami_app_clips.json`.
 //! - **Kopplung**: Code + QR-Code für die App, Geräteliste, „Daten löschen“ (siehe
 //!   `commands::salami_app_command`). Abschalten per Einstellung `salami_app_sync`.
 
@@ -32,12 +36,13 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::future::Future;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use uuid::Uuid;
 
 const STORE_FILE: &str = "salami_app.json";
 const SCREENSHOTS_FILE: &str = "salami_app_screenshots.json";
+const CLIPS_FILE: &str = "salami_app_clips.json";
 const MOJANG_JOIN_URL: &str = "https://sessionserver.mojang.com/session/minecraft/join";
 /// Takt der Hintergrundaufgabe; Sitzungen gehen jeden [`SEND_EVERY`]-ten Takt an den Server.
 const TICK: Duration = Duration::from_secs(60);
@@ -52,6 +57,11 @@ const MAX_SESSION_HOURS: i64 = 24;
 /// Nach „Speicher voll“ (507) so lange keine Uploads versuchen.
 const STORAGE_FULL_PAUSE: Duration = Duration::from_secs(60 * 60);
 const RATE_LIMIT_WAIT: Duration = Duration::from_secs(15);
+/// Ein Clip gilt als fertig, wenn seine Datei so lange nicht mehr geändert wurde. Hält Clips
+/// zurück, die gerade gespeichert, geschnitten oder exportiert werden.
+const CLIP_SETTLE_SECS: i64 = 30;
+/// Ein Clip darf bis 600 MiB groß sein; auch über eine langsame Leitung soll das durchgehen.
+const CLIP_UPLOAD_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 
 /// Inhalt von `salami_app.json` (verschlüsselt abgelegt).
 #[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq)]
@@ -146,6 +156,10 @@ fn screenshots_path() -> PathBuf {
     LAUNCHER_DIRECTORY.root_dir().join(SCREENSHOTS_FILE)
 }
 
+fn clips_path() -> PathBuf {
+    LAUNCHER_DIRECTORY.root_dir().join(CLIPS_FILE)
+}
+
 /// `salami_app.json` im Speicher; geladen beim ersten Zugriff.
 static STORE: Lazy<std::sync::Mutex<Option<AppStore>>> = Lazy::new(Default::default);
 /// Nur eine Sitzungsmeldung zur Zeit.
@@ -157,6 +171,15 @@ static ENDED: Lazy<std::sync::Mutex<HashSet<Uuid>>> = Lazy::new(Default::default
 /// Zeitpunkt der letzten 507-Antwort („Speicher voll“).
 static STORAGE_FULL: Lazy<std::sync::Mutex<Option<Instant>>> = Lazy::new(Default::default);
 static STARTED: AtomicBool = AtomicBool::new(false);
+/// Nur ein Clip-Abgleich zur Zeit. Wer währenddessen einen will, setzt [`CLIPS_AGAIN`].
+static CLIPS_LOCK: Lazy<tokio::sync::Mutex<()>> = Lazy::new(Default::default);
+static CLIPS_AGAIN: AtomicBool = AtomicBool::new(false);
+/// Der Server hat einen Clip mit 507 abgelehnt: bis zum nächsten Launcher-Start keine Clips mehr.
+static CLIPS_FULL: AtomicBool = AtomicBool::new(false);
+/// Steigt bei „Daten löschen“; ein laufender Clip-Abgleich bricht dann ab.
+static CLIPS_EPOCH: AtomicU64 = AtomicU64::new(0);
+/// Zuletzt vom Server genannte Höchstgröße eines Clips (0 = noch unbekannt).
+static CLIP_MAX_BYTES: AtomicU64 = AtomicU64::new(0);
 
 fn read_store<T>(f: impl FnOnce(&AppStore) -> T) -> T {
     let mut guard = STORE.lock().unwrap_or_else(|e| e.into_inner());
@@ -217,6 +240,8 @@ pub enum Failure {
     NoAccount,
     Server(StatusCode, String),
     Offline(String),
+    /// Die Datei auf der Platte ließ sich nicht lesen oder hat sich gerade geändert.
+    Unreadable(String),
 }
 
 impl Failure {
@@ -228,13 +253,18 @@ impl Failure {
             Failure::NoAccount => "Bitte im Launcher mit einem Minecraft-Konto anmelden".into(),
             Failure::Server(_, message) => format!("Salami-App: {message}"),
             Failure::Offline(e) => format!("Salami-App-Server nicht erreichbar: {e}"),
+            Failure::Unreadable(e) => format!("Datei nicht lesbar: {e}"),
         }
     }
 
     /// Später nochmal versuchen (statt die Daten zu verwerfen)?
     fn is_temporary(&self) -> bool {
         match self {
-            Failure::Offline(_) | Failure::RateLimited | Failure::StorageFull | Failure::Unauthorized => true,
+            Failure::Offline(_)
+            | Failure::RateLimited
+            | Failure::StorageFull
+            | Failure::Unauthorized
+            | Failure::Unreadable(_) => true,
             Failure::Server(status, _) => status.is_server_error(),
             Failure::NoAccount => false,
         }
@@ -587,6 +617,7 @@ pub fn game_exited(meta: &ProcessMetadata) {
         }
         flush_sessions().await;
         sync_profile_screenshots(game.account, profile_id, &game.profile, game.start).await;
+        request_clip_sync();
     });
 }
 
@@ -625,8 +656,20 @@ impl ScreenshotIndex {
             .and_then(|bytes| std::fs::write(&tmp, bytes).map_err(AppError::from))
             .and_then(|_| std::fs::rename(&tmp, path).map_err(AppError::from));
         if let Err(e) = written {
-            log::warn!("[Salami-App] could not save {}: {}", SCREENSHOTS_FILE, e);
+            log::warn!("[Salami-App] could not save {}: {}", path.display(), e);
         }
+    }
+
+    /// Hash dieser Datei, falls er schon berechnet wurde und Größe und Änderungszeit noch stimmen.
+    fn known_hash(&self, key: &str, size: u64, modified: i64) -> Option<String> {
+        self.files
+            .get(key)
+            .filter(|f| f.size == size && f.modified == modified)
+            .map(|f| f.sha256.clone())
+    }
+
+    fn remember_hash(&mut self, key: String, size: u64, modified: i64, sha256: String) {
+        self.files.insert(key, IndexedFile { size, modified, sha256 });
     }
 }
 
@@ -775,21 +818,14 @@ async fn sync_shots(account: Uuid, shots: Vec<Shot>, prune: bool) -> std::result
     let mut seen_hashes = HashSet::new();
     for shot in shots {
         let key = shot.path.display().to_string();
-        let known = index
-            .files
-            .get(&key)
-            .filter(|f| f.size == shot.size && f.modified == shot.modified)
-            .map(|f| f.sha256.clone());
+        let known = index.known_hash(&key, shot.size, shot.modified);
         let hash = match known {
             Some(hash) => hash,
             None => {
                 let path = shot.path.clone();
                 match tokio::task::spawn_blocking(move || sha256_file(&path)).await {
                     Ok(Ok(hash)) => {
-                        index.files.insert(
-                            key,
-                            IndexedFile { size: shot.size, modified: shot.modified, sha256: hash.clone() },
-                        );
+                        index.remember_hash(key, shot.size, shot.modified, hash.clone());
                         hash
                     }
                     _ => continue,
@@ -922,6 +958,400 @@ async fn sync_profile_screenshots(account: Uuid, profile_id: Uuid, profile_name:
     }
 }
 
+// ------------------------------------------------------------------ Clips
+
+/// Ein fertiger Clip auf der Platte.
+#[derive(Debug, Clone, PartialEq)]
+struct Clip {
+    path: PathBuf,
+    /// Nur gesetzt, wenn der Nutzer den Clip umbenannt hat.
+    name: Option<String>,
+    game: Option<String>,
+    recorded: DateTime<Utc>,
+    size: u64,
+    /// Änderungszeit in Sekunden (wie `ClipEntry::created_at`).
+    modified: i64,
+}
+
+/// Name, wie ihn der Launcher selbst vergibt: `<Unix-Zeit>_<Anlass>`, dazu Zähler und die
+/// Anhänge fürs Schneiden und Hochkant-Exportieren (`1788803479_clip-2_trimmed`).
+fn is_default_clip_name(stem: &str) -> bool {
+    let Some((stamp, rest)) = stem.split_once('_') else {
+        return false;
+    };
+    stamp.len() >= 9
+        && stamp.bytes().all(|b| b.is_ascii_digit())
+        && !rest.is_empty()
+        && rest.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+}
+
+/// Wählt aus der Clip-Bibliothek (neueste zuerst) die Clips, die jetzt hochgeladen werden können:
+/// seit [`CLIP_SETTLE_SECS`] unverändert, nicht leer und höchstens `max_bytes` groß (0 = Grenze
+/// noch unbekannt). Fremde Videos im Clip-Ordner, die der Launcher nie angefasst hat, bleiben
+/// auf dem PC.
+fn ready_clips(entries: Vec<crate::utils::clip_library::ClipEntry>, now: i64, max_bytes: u64) -> Vec<Clip> {
+    entries
+        .into_iter()
+        .filter(|entry| entry.managed || is_default_clip_name(&entry.name))
+        .filter(|entry| entry.size_bytes > 0 && (max_bytes == 0 || entry.size_bytes <= max_bytes))
+        .filter(|entry| entry.created_at > 0 && entry.created_at <= now - CLIP_SETTLE_SECS)
+        .filter_map(|entry| {
+            Some(Clip {
+                recorded: DateTime::from_timestamp(entry.created_at, 0)?,
+                name: Some(entry.name).filter(|name| !is_default_clip_name(name)),
+                game: entry.game.filter(|game| !game.trim().is_empty()),
+                size: entry.size_bytes,
+                modified: entry.created_at,
+                path: entry.path,
+            })
+        })
+        .collect()
+}
+
+/// Antwort auf `POST /v1/sync/clips/check`.
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct ClipCheck {
+    missing: Vec<String>,
+    #[serde(default)]
+    used_bytes: u64,
+    #[serde(default)]
+    quota_bytes: u64,
+    #[serde(default)]
+    max_bytes: u64,
+}
+
+fn quota_reached(used_bytes: u64, quota_bytes: u64) -> bool {
+    quota_bytes > 0 && used_bytes >= quota_bytes
+}
+
+/// Was mit einem Clip nach dem `check` geschieht.
+#[derive(Debug, PartialEq)]
+enum ClipStep {
+    /// Schon auf dem Server oder in der App gelöscht: erledigt.
+    AlreadyThere,
+    /// Größer als der Server annimmt: überspringen, aber nicht als erledigt merken.
+    TooBig,
+    /// Speicher voll: liegen lassen.
+    NoRoom,
+    Upload,
+}
+
+fn clip_step(size: u64, missing: bool, max_bytes: u64, full: bool) -> ClipStep {
+    if !missing {
+        ClipStep::AlreadyThere
+    } else if max_bytes > 0 && size > max_bytes {
+        ClipStep::TooBig
+    } else if full {
+        ClipStep::NoRoom
+    } else {
+        ClipStep::Upload
+    }
+}
+
+/// Wie es nach einem Upload-Versuch weitergeht.
+#[derive(Debug, PartialEq)]
+enum AfterUpload {
+    Uploaded,
+    /// 429: kurz warten, denselben Clip nochmal.
+    Retry,
+    /// 507: bis zum nächsten Launcher-Start keine Clips mehr.
+    Full,
+    /// Server nicht erreichbar o. Ä.: diese Runde beenden, später weiter.
+    Later,
+    /// Der Server nimmt diesen Clip nie an (400, 413, 415): als erledigt merken.
+    Rejected,
+    /// Datei gerade nicht lesbar oder verändert: diesen Clip auslassen, die anderen weiter.
+    Skip,
+}
+
+fn after_upload(result: &std::result::Result<(), Failure>, attempts: u32) -> AfterUpload {
+    match result {
+        Ok(()) => AfterUpload::Uploaded,
+        Err(Failure::RateLimited) if attempts < 4 => AfterUpload::Retry,
+        Err(Failure::StorageFull) => AfterUpload::Full,
+        Err(Failure::Unreadable(_)) => AfterUpload::Skip,
+        Err(failure) if failure.is_temporary() => AfterUpload::Later,
+        Err(_) => AfterUpload::Rejected,
+    }
+}
+
+/// Wert für die Kopfzeile `X-Game`: nur druckbares ASCII, sonst lieber weglassen.
+fn header_text(value: &str) -> Option<&str> {
+    let value = value.trim();
+    (!value.is_empty() && value.len() <= 100 && value.bytes().all(|b| (0x20..0x7f).contains(&b))).then_some(value)
+}
+
+/// Lädt die Datei als Stream hoch (nie ganz im Speicher). Hat sie sich seit dem Hashen geändert,
+/// wird nichts gesendet.
+async fn put_clip(url: &str, token: &str, clip: &Clip) -> std::result::Result<(), Failure> {
+    let unreadable = |e: std::io::Error| Failure::Unreadable(format!("{}: {e}", clip.path.display()));
+    let file = tokio::fs::File::open(&clip.path).await.map_err(unreadable)?;
+    let meta = file.metadata().await.map_err(unreadable)?;
+    let modified = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs() as i64);
+    if meta.len() != clip.size || modified != Some(clip.modified) {
+        return Err(Failure::Unreadable(format!("{} hat sich geändert", clip.path.display())));
+    }
+    let mut request = HTTP_CLIENT
+        .put(url)
+        .timeout(CLIP_UPLOAD_TIMEOUT)
+        .bearer_auth(token)
+        .header(reqwest::header::CONTENT_TYPE, "video/mp4")
+        // der Body ist ein Stream, die Länge steht trotzdem fest
+        .header(reqwest::header::CONTENT_LENGTH, clip.size)
+        .header("X-Recorded-At", clip.recorded.to_rfc3339_opts(chrono::SecondsFormat::Secs, true));
+    if let Some(name) = &clip.name {
+        request = request.header("X-Clip-Name", encode_uri_component(name));
+    }
+    if let Some(game) = clip.game.as_deref().and_then(header_text) {
+        request = request.header("X-Game", game);
+    }
+    read_json::<serde_json::Value>(request.body(reqwest::Body::from(file)).send().await)
+        .await
+        .map(|_| ())
+}
+
+/// Clip-Ordner, wenn Clips hochgeladen werden sollen: Sync an und Schalter „Clips hochladen“ an.
+async fn clip_dir_if_enabled() -> Option<PathBuf> {
+    server_url()?;
+    let state = State::get().await.ok()?;
+    let config = state.config_manager.get_config().await;
+    (config.salami_app_sync && config.salami_app_clips).then(|| config.clips.resolved_output_dir())
+}
+
+/// Wird fertig, sobald der laufende Abgleich aufhören soll: „Daten löschen“ oder Schalter aus.
+async fn clip_sync_stopped(epoch: u64) {
+    loop {
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        if CLIPS_EPOCH.load(Ordering::SeqCst) != epoch || clip_dir_if_enabled().await.is_none() {
+            return;
+        }
+    }
+}
+
+/// Ergebnis eines Clip-Abgleichs.
+#[derive(Debug, Default, Clone, PartialEq)]
+struct ClipReport {
+    uploaded: u32,
+    already_there: u32,
+    too_big: u32,
+    storage_full: bool,
+}
+
+/// Ein Abgleich: fertige Clips hashen, beim Server nachfragen, fehlende einzeln hochladen.
+async fn run_clip_sync() -> std::result::Result<ClipReport, Failure> {
+    let mut report = ClipReport::default();
+    let Some(dir) = clip_dir_if_enabled().await else {
+        return Ok(report);
+    };
+    if CLIPS_FULL.load(Ordering::SeqCst) {
+        report.storage_full = true;
+        return Ok(report);
+    }
+    let Some(account) = active_account_id().await else {
+        return Ok(report);
+    };
+    let base = base()?;
+    let epoch = CLIPS_EPOCH.load(Ordering::SeqCst);
+    let index_path = clips_path();
+    let known_max = CLIP_MAX_BYTES.load(Ordering::SeqCst);
+
+    let listed = tokio::task::spawn_blocking({
+        let index_path = index_path.clone();
+        move || {
+            let entries = crate::utils::clip_library::list(&dir)?;
+            let present: HashSet<String> = entries.iter().map(|e| e.path.display().to_string()).collect();
+            let mut index = ScreenshotIndex::load(&index_path);
+            index.files.retain(|path, _| present.contains(path));
+            Ok::<_, AppError>((index, ready_clips(entries, Utc::now().timestamp(), known_max)))
+        }
+    })
+    .await;
+    let (mut index, clips) = match listed {
+        Ok(Ok(listed)) => listed,
+        Ok(Err(e)) => return Err(Failure::Unreadable(e.to_string())),
+        Err(e) => return Err(Failure::Unreadable(e.to_string())),
+    };
+
+    // Hashes: aus dem Index, sonst die Datei einmal durchlesen
+    let mut pending: Vec<(Clip, String)> = Vec::new();
+    let mut seen_hashes = HashSet::new();
+    let mut hashed = false;
+    for clip in clips {
+        let key = clip.path.display().to_string();
+        let hash = match index.known_hash(&key, clip.size, clip.modified) {
+            Some(hash) => hash,
+            None => {
+                if CLIPS_EPOCH.load(Ordering::SeqCst) != epoch {
+                    return Ok(report);
+                }
+                let path = clip.path.clone();
+                match tokio::task::spawn_blocking(move || sha256_file(&path)).await {
+                    Ok(Ok(hash)) => {
+                        index.remember_hash(key, clip.size, clip.modified, hash.clone());
+                        hashed = true;
+                        hash
+                    }
+                    _ => continue,
+                }
+            }
+        };
+        if index.done.contains(&hash) || !seen_hashes.insert(hash.clone()) {
+            continue;
+        }
+        pending.push((clip, hash));
+    }
+    let save = |index: &ScreenshotIndex| {
+        if CLIPS_EPOCH.load(Ordering::SeqCst) == epoch {
+            index.save(&index_path);
+        }
+    };
+    if hashed {
+        save(&index);
+    }
+
+    let mut outcome = Ok(());
+    'chunks: for chunk in pending.chunks(MAX_HASHES_PER_CHECK) {
+        let hashes: Vec<&String> = chunk.iter().map(|(_, hash)| hash).collect();
+        let body = serde_json::json!({ "hashes": hashes });
+        let checked: std::result::Result<ClipCheck, Failure> = with_token(account, |token| {
+            let request = HTTP_CLIENT
+                .post(format!("{base}/v1/sync/clips/check"))
+                .timeout(Duration::from_secs(20))
+                .bearer_auth(token)
+                .json(&body);
+            async move { read_json(request.send().await).await }
+        })
+        .await;
+        let check = match checked {
+            Ok(check) => check,
+            Err(failure) => {
+                outcome = Err(failure);
+                break;
+            }
+        };
+        CLIP_MAX_BYTES.store(check.max_bytes, Ordering::SeqCst);
+        let missing: HashSet<&String> = check.missing.iter().collect();
+        let full = quota_reached(check.used_bytes, check.quota_bytes);
+        report.storage_full |= full;
+
+        for (clip, hash) in chunk {
+            match clip_step(clip.size, missing.contains(hash), check.max_bytes, full) {
+                ClipStep::AlreadyThere => {
+                    index.done.insert(hash.clone());
+                    report.already_there += 1;
+                    continue;
+                }
+                ClipStep::TooBig => {
+                    report.too_big += 1;
+                    continue;
+                }
+                ClipStep::NoRoom => continue,
+                ClipStep::Upload => {}
+            }
+            let url = format!("{base}/v1/sync/clips/{hash}");
+            let mut attempts = 0;
+            loop {
+                attempts += 1;
+                let upload = with_token(account, |token| {
+                    let url = &url;
+                    async move { put_clip(url, &token, clip).await }
+                });
+                let result = tokio::select! {
+                    result = upload => result,
+                    _ = clip_sync_stopped(epoch) => {
+                        log::info!("[Salami-App] clip upload stopped");
+                        break 'chunks;
+                    }
+                };
+                match after_upload(&result, attempts) {
+                    AfterUpload::Uploaded => {
+                        index.done.insert(hash.clone());
+                        report.uploaded += 1;
+                        save(&index);
+                        break;
+                    }
+                    AfterUpload::Retry => tokio::time::sleep(RATE_LIMIT_WAIT).await,
+                    AfterUpload::Full => {
+                        CLIPS_FULL.store(true, Ordering::SeqCst);
+                        report.storage_full = true;
+                        break 'chunks;
+                    }
+                    AfterUpload::Later => {
+                        outcome = result;
+                        break 'chunks;
+                    }
+                    AfterUpload::Rejected => {
+                        if let Err(failure) = &result {
+                            log::warn!(
+                                "[Salami-App] clip {} skipped for good: {}",
+                                clip.path.display(),
+                                failure.message()
+                            );
+                        }
+                        index.done.insert(hash.clone());
+                        break;
+                    }
+                    AfterUpload::Skip => {
+                        if let Err(failure) = &result {
+                            log::info!("[Salami-App] clip left for later: {}", failure.message());
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    save(&index);
+    outcome.map(|_| report)
+}
+
+/// Gleicht die Clips mit dem Server ab. Läuft schon ein Abgleich, hängt der eine weitere Runde an
+/// (damit ein eben gespeicherter Clip nicht bis zum nächsten Takt wartet).
+pub async fn sync_clips() {
+    let Ok(_guard) = CLIPS_LOCK.try_lock() else {
+        CLIPS_AGAIN.store(true, Ordering::SeqCst);
+        return;
+    };
+    loop {
+        CLIPS_AGAIN.store(false, Ordering::SeqCst);
+        match run_clip_sync().await {
+            Ok(report) if report != ClipReport::default() => log::info!(
+                "[Salami-App] clips: {} uploaded, {} already there, {} too big{}",
+                report.uploaded,
+                report.already_there,
+                report.too_big,
+                if report.storage_full { ", storage full" } else { "" }
+            ),
+            Ok(_) => {}
+            Err(failure) => log::info!("[Salami-App] clip sync postponed: {}", failure.message()),
+        }
+        if !CLIPS_AGAIN.swap(false, Ordering::SeqCst) {
+            break;
+        }
+    }
+}
+
+/// Stößt den Clip-Abgleich im Hintergrund an. Ein Upload kann lange dauern, darum wartet
+/// niemand darauf.
+pub fn request_clip_sync() {
+    tokio::spawn(sync_clips());
+}
+
+/// Ein Clip wurde gespeichert, geschnitten oder exportiert: hochladen, sobald die Datei als
+/// fertig gilt.
+pub fn clip_saved() {
+    tokio::spawn(async {
+        tokio::time::sleep(Duration::from_secs(CLIP_SETTLE_SECS as u64 + 5)).await;
+        sync_clips().await;
+    });
+}
+
 // ------------------------------------------------------------------ Hintergrund
 
 async fn active_account_id() -> Option<Uuid> {
@@ -946,6 +1376,7 @@ pub async fn sync_everything() {
             log::info!("[Salami-App] screenshot sync postponed: {}", failure.message());
         }
     }
+    request_clip_sync();
 }
 
 async fn tick(round: u64, was_enabled: &mut bool) {
@@ -995,6 +1426,7 @@ async fn tick(round: u64, was_enabled: &mut bool) {
                 sync_profile_screenshots(game.account, meta.profile_id, &game.profile, game.start).await;
             }
         }
+        request_clip_sync();
     }
 }
 
@@ -1118,7 +1550,7 @@ pub async fn remove_device(account: Uuid, id: &str) -> Result<()> {
     Ok(())
 }
 
-/// Löscht alle Daten dieses Kontos auf dem Sync-Server (Spielzeit, Screenshots, Geräte).
+/// Löscht alle Daten dieses Kontos auf dem Sync-Server (Spielzeit, Screenshots, Clips, Geräte).
 async fn delete_account(account: Uuid) -> std::result::Result<(), Failure> {
     let base = base()?;
     with_token(account, |token| {
@@ -1133,7 +1565,7 @@ async fn delete_account(account: Uuid) -> std::result::Result<(), Failure> {
 }
 
 /// „Daten löschen“: Für alle gekoppelten Konten (und das aktive) alles auf dem Server löschen,
-/// danach lokal Tokens, Puffer und Screenshot-Liste vergessen. Den Schalter stellt der Aufrufer ab.
+/// danach lokal Tokens, Puffer, Screenshot- und Clip-Liste vergessen. Den Schalter stellt der Aufrufer ab.
 /// → Anzahl der Konten
 pub async fn delete_all_data(active: Option<Uuid>) -> Result<usize> {
     let mut accounts: Vec<Uuid> = read_store(|s| s.tokens.keys().filter_map(|k| Uuid::parse_str(k).ok()).collect());
@@ -1161,11 +1593,15 @@ pub async fn delete_all_data(active: Option<Uuid>) -> Result<usize> {
         s.tokens.clear();
         s.sessions.clear();
     });
-    let index_path = screenshots_path();
-    if index_path.exists() {
-        std::fs::remove_file(&index_path)?;
+    // ein laufender Clip-Upload bricht ab und schreibt seine Liste nicht mehr zurück
+    CLIPS_EPOCH.fetch_add(1, Ordering::SeqCst);
+    for index_path in [screenshots_path(), clips_path()] {
+        if index_path.exists() {
+            std::fs::remove_file(&index_path)?;
+        }
     }
     *STORAGE_FULL.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    CLIPS_FULL.store(false, Ordering::SeqCst);
     log::info!("[Salami-App] data deleted for {} account(s)", deleted);
     Ok(deleted)
 }
@@ -1181,6 +1617,8 @@ pub struct AppStatus {
     pub account_name: Option<String>,
     pub pending_sessions: usize,
     pub storage_full: bool,
+    /// Der Clip-Speicher (5 GiB) ist voll; bis zum nächsten Start lädt der Launcher keine Clips.
+    pub clips_storage_full: bool,
     pub download_url: String,
     pub privacy_url: String,
 }
@@ -1203,6 +1641,7 @@ pub async fn status() -> AppStatus {
         account_name: account.map(|a| a.username),
         pending_sessions,
         storage_full: storage_full_recently(),
+        clips_storage_full: CLIPS_FULL.load(Ordering::SeqCst),
         download_url: crate::branding::APP_DOWNLOAD_PAGE.to_string(),
         privacy_url: crate::branding::APP_PRIVACY_PAGE.to_string(),
     }
@@ -1378,6 +1817,268 @@ mod tests {
         assert_eq!(names, ["a.png", "b.PNG"]);
         assert!(list_shots(&dirs, Some(Utc::now() + chrono::Duration::hours(1))).is_empty());
         assert_eq!(sha256_file(&dir.join("a.png")).unwrap().len(), 64);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    // ---------------------------------------------------------------- Clips
+
+    fn clip_entry(name: &str, size: u64, age_secs: i64, managed: bool) -> crate::utils::clip_library::ClipEntry {
+        crate::utils::clip_library::ClipEntry {
+            path: PathBuf::from(format!("{name}.mp4")),
+            name: name.into(),
+            size_bytes: size,
+            created_at: NOW - age_secs,
+            duration_seconds: Some(30.0),
+            game: Some("Minecraft".into()),
+            thumbnail: None,
+            favourite: false,
+            managed,
+        }
+    }
+
+    const NOW: i64 = 1_790_000_000;
+
+    #[test]
+    fn launcher_names_are_told_from_renamed_clips() {
+        for name in ["1788803479_clip", "1788803479_clip-2", "1787099385_clip_trimmed", "1787099385_clip_vertical2"] {
+            assert!(is_default_clip_name(name), "{name}");
+        }
+        for name in ["insane clutch", "keeper", "2024_urlaub", "1788803479", "1788803479_", "1788803479_bed rush"] {
+            assert!(!is_default_clip_name(name), "{name}");
+        }
+    }
+
+    #[test]
+    fn only_finished_clips_are_picked() {
+        let clips = ready_clips(
+            vec![
+                clip_entry("1789999990_clip", 10, 5, true),   // wird gerade geschrieben
+                clip_entry("1789999900_clip", 10, 29, true),  // noch nicht 30 s ruhig
+                clip_entry("1789999800_clip", 10, 30, true),  // fertig
+                clip_entry("insane clutch", 20, 3_600, true), // fertig, umbenannt
+                clip_entry("empty", 0, 3_600, true),
+            ],
+            NOW,
+            0,
+        );
+        let names: Vec<_> = clips.iter().map(|c| c.path.display().to_string()).collect();
+        assert_eq!(names, ["1789999800_clip.mp4", "insane clutch.mp4"], "newest first, order kept");
+        assert_eq!(clips[0].name, None, "the launcher's own name is not sent");
+        assert_eq!(clips[1].name.as_deref(), Some("insane clutch"));
+        assert_eq!(clips[0].game.as_deref(), Some("Minecraft"));
+        assert_eq!(clips[0].recorded.timestamp(), NOW - 30);
+        assert_eq!((clips[1].size, clips[1].modified), (20, NOW - 3_600));
+    }
+
+    #[test]
+    fn foreign_videos_in_the_clip_folder_stay_on_the_pc() {
+        let clips = ready_clips(
+            vec![
+                clip_entry("holiday-2019", 10, 3_600, false),
+                // ohne Infodatei, aber eindeutig vom Launcher geschrieben (z. B. Hochkant-Export)
+                clip_entry("1787099385_clip_vertical", 10, 3_600, false),
+            ],
+            NOW,
+            0,
+        );
+        assert_eq!(clips.len(), 1);
+        assert_eq!(clips[0].path, PathBuf::from("1787099385_clip_vertical.mp4"));
+    }
+
+    #[test]
+    fn clips_over_the_known_limit_are_left_out_before_hashing() {
+        let entries = || vec![clip_entry("1789990000_clip", 601, 100, true), clip_entry("1789980000_clip", 600, 100, true)];
+        assert_eq!(ready_clips(entries(), NOW, 0).len(), 2, "limit not known yet");
+        let clips = ready_clips(entries(), NOW, 600);
+        assert_eq!(clips.len(), 1);
+        assert_eq!(clips[0].size, 600);
+    }
+
+    #[test]
+    fn hash_cache_is_keyed_by_path_size_and_mtime() {
+        let dir = std::env::temp_dir().join(format!("salami-app-clips-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let clip = dir.join("a.mp4");
+        std::fs::write(&clip, b"abc").unwrap();
+        let hash = sha256_file(&clip).unwrap();
+        assert_eq!(hash, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+
+        let mut index = ScreenshotIndex::default();
+        index.remember_hash("a.mp4".into(), 3, 100, hash.clone());
+        assert_eq!(index.known_hash("a.mp4", 3, 100), Some(hash.clone()));
+        assert_eq!(index.known_hash("a.mp4", 4, 100), None, "size changed");
+        assert_eq!(index.known_hash("a.mp4", 3, 101), None, "mtime changed");
+        assert_eq!(index.known_hash("b.mp4", 3, 100), None, "other file");
+
+        // übersteht Speichern und Laden, zusammen mit den erledigten Hashes
+        index.done.insert(hash.clone());
+        let path = dir.join(CLIPS_FILE);
+        index.save(&path);
+        let loaded = ScreenshotIndex::load(&path);
+        assert_eq!(loaded.known_hash("a.mp4", 3, 100), Some(hash.clone()));
+        assert!(loaded.done.contains(&hash));
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn check_answer_matches_contract() {
+        let check: ClipCheck = serde_json::from_str(
+            r#"{"missing":["ab"],"usedBytes":1048576,"quotaBytes":5368709120,"maxBytes":629145600}"#,
+        )
+        .unwrap();
+        assert_eq!(check.missing, ["ab"]);
+        assert_eq!(check.quota_bytes, 5 * 1024 * 1024 * 1024);
+        assert_eq!(check.max_bytes, 600 * 1024 * 1024);
+        assert!(!quota_reached(check.used_bytes, check.quota_bytes));
+        // ältere Server ohne Speicherangaben: keine Grenze annehmen
+        let bare: ClipCheck = serde_json::from_str(r#"{"missing":[]}"#).unwrap();
+        assert!(!quota_reached(bare.used_bytes, bare.quota_bytes));
+    }
+
+    #[test]
+    fn quota_and_size_limit_decide_what_is_uploaded() {
+        assert_eq!(clip_step(10, false, 100, false), ClipStep::AlreadyThere);
+        assert_eq!(clip_step(500, false, 100, true), ClipStep::AlreadyThere, "known to the server wins");
+        assert_eq!(clip_step(100, true, 100, false), ClipStep::Upload, "exactly the limit is fine");
+        assert_eq!(clip_step(101, true, 100, false), ClipStep::TooBig);
+        assert_eq!(clip_step(101, true, 0, false), ClipStep::Upload, "no limit known");
+        assert_eq!(clip_step(10, true, 100, true), ClipStep::NoRoom);
+        assert!(quota_reached(5, 5));
+        assert!(quota_reached(6, 5));
+        assert!(!quota_reached(4, 5));
+        assert!(!quota_reached(4, 0));
+    }
+
+    #[test]
+    fn upload_failures_lead_to_the_right_next_step() {
+        let server = |code: u16| Err(Failure::Server(StatusCode::from_u16(code).unwrap(), "x".into()));
+        assert_eq!(after_upload(&Ok(()), 1), AfterUpload::Uploaded);
+        assert_eq!(after_upload(&Err(Failure::RateLimited), 1), AfterUpload::Retry);
+        assert_eq!(after_upload(&Err(Failure::RateLimited), 4), AfterUpload::Later, "not forever");
+        assert_eq!(after_upload(&Err(Failure::StorageFull), 1), AfterUpload::Full);
+        for code in [400, 413, 415] {
+            assert_eq!(after_upload(&server(code), 1), AfterUpload::Rejected, "{code}");
+        }
+        assert_eq!(after_upload(&server(502), 1), AfterUpload::Later);
+        assert_eq!(after_upload(&Err(Failure::Offline("x".into())), 1), AfterUpload::Later);
+        assert_eq!(after_upload(&Err(Failure::Unauthorized), 1), AfterUpload::Later);
+        assert_eq!(after_upload(&Err(Failure::Unreadable("x".into())), 1), AfterUpload::Skip);
+    }
+
+    #[test]
+    fn game_header_is_plain_ascii_or_absent() {
+        assert_eq!(header_text(" Minecraft 1.21 "), Some("Minecraft 1.21"));
+        assert_eq!(header_text("Räuber"), None);
+        assert_eq!(header_text("a\nb"), None);
+        assert_eq!(header_text("  "), None);
+    }
+
+    /// Winziger HTTP-Server: nimmt eine Anfrage an, antwortet mit `status` und gibt Kopf und
+    /// Body der Anfrage zurück.
+    async fn one_request(status: &'static str) -> (String, tokio::task::JoinHandle<(String, Vec<u8>)>) {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let handle = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut data = Vec::new();
+            let mut buffer = [0u8; 8192];
+            let (head, body_start) = loop {
+                let n = socket.read(&mut buffer).await.unwrap();
+                assert!(n > 0, "connection closed before the head was complete");
+                data.extend_from_slice(&buffer[..n]);
+                if let Some(end) = data.windows(4).position(|w| w == b"\r\n\r\n") {
+                    break (String::from_utf8_lossy(&data[..end]).to_lowercase(), end + 4);
+                }
+            };
+            let length: usize = head
+                .lines()
+                .find_map(|line| line.strip_prefix("content-length:"))
+                .map(|v| v.trim().parse().unwrap())
+                .unwrap_or(0);
+            while data.len() < body_start + length {
+                let n = socket.read(&mut buffer).await.unwrap();
+                if n == 0 {
+                    break;
+                }
+                data.extend_from_slice(&buffer[..n]);
+            }
+            let body = r#"{"ok":true}"#;
+            let answer = format!("HTTP/1.1 {status}\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}", body.len());
+            socket.write_all(answer.as_bytes()).await.unwrap();
+            let _ = socket.shutdown().await;
+            (head, data[body_start..].to_vec())
+        });
+        (url, handle)
+    }
+
+    fn clip_on_disk(tag: &str, bytes: &[u8], name: Option<&str>) -> (PathBuf, Clip) {
+        let dir = std::env::temp_dir().join(format!("salami-app-put-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("clip.mp4");
+        std::fs::write(&path, bytes).unwrap();
+        let modified = std::fs::metadata(&path)
+            .unwrap()
+            .modified()
+            .unwrap()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+        let clip = Clip {
+            path,
+            name: name.map(str::to_string),
+            game: Some("Minecraft".into()),
+            recorded: at(0),
+            size: bytes.len() as u64,
+            modified,
+        };
+        (dir, clip)
+    }
+
+    #[tokio::test]
+    async fn a_clip_is_streamed_with_its_length_and_headers() {
+        // größer als ein Lesepuffer, damit der Body in mehreren Stücken kommt
+        let bytes: Vec<u8> = (0..300_000u32).map(|i| (i % 251) as u8).collect();
+        let (dir, clip) = clip_on_disk("ok", &bytes, Some("Größe & Spaß"));
+        let (url, server) = one_request("200 OK").await;
+
+        put_clip(&format!("{url}/v1/sync/clips/abc"), "L.test", &clip).await.unwrap();
+
+        let (head, body) = server.await.unwrap();
+        assert!(head.starts_with("put /v1/sync/clips/abc "), "{head}");
+        assert!(head.contains("content-length: 300000"), "{head}");
+        assert!(!head.contains("transfer-encoding"), "{head}");
+        assert!(head.contains("content-type: video/mp4"), "{head}");
+        assert!(head.contains("authorization: bearer l.test"), "{head}");
+        assert!(head.contains("x-recorded-at: 2026-09-21t"), "{head}");
+        assert!(head.contains("x-clip-name: gr%c3%b6%c3%9fe%20%26%20spa%c3%9f"), "{head}");
+        assert!(head.contains("x-game: minecraft"), "{head}");
+        assert_eq!(body, bytes);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn a_full_server_is_reported_as_storage_full() {
+        let (dir, clip) = clip_on_disk("full", b"mp4", None);
+        let (url, server) = one_request("507 Insufficient Storage").await;
+
+        let result = put_clip(&format!("{url}/v1/sync/clips/abc"), "L.test", &clip).await;
+
+        assert!(matches!(result, Err(Failure::StorageFull)), "{result:?}");
+        let (head, _) = server.await.unwrap();
+        assert!(!head.contains("x-clip-name"), "an unrenamed clip sends no name: {head}");
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn a_clip_that_changed_since_hashing_is_not_sent() {
+        let (dir, mut clip) = clip_on_disk("changed", b"mp4", None);
+        clip.size += 1;
+        // kein Server: die Anfrage darf gar nicht erst rausgehen
+        let result = put_clip("http://127.0.0.1:9/v1/sync/clips/abc", "L.test", &clip).await;
+        assert!(matches!(result, Err(Failure::Unreadable(_))), "{result:?}");
         let _ = std::fs::remove_dir_all(dir);
     }
 }

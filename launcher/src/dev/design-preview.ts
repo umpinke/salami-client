@@ -77,6 +77,7 @@ const launcherConfig = {
   salami_theme: true,
   combat_modules: true,
   salami_app_sync: true,
+  salami_app_clips: true,
 };
 
 /** Beispiel-Log für die Log-Ansichten. */
@@ -167,6 +168,7 @@ mockIPC((cmd, args) => {
         accountName: sampleAccount.username,
         pendingSessions: 0,
         storageFull: new URLSearchParams(location.search).has("full"),
+        clipsStorageFull: new URLSearchParams(location.search).has("full"),
         downloadUrl: "https://salami-client.umpinke.de/#download",
         privacyUrl: "https://salami-client.umpinke.de/#info",
       };

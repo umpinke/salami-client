@@ -8,6 +8,8 @@ export interface SalamiAppStatus {
   accountName: string | null;
   pendingSessions: number;
   storageFull: boolean;
+  /** Clip-Speicher voll: bis zum nächsten Launcher-Start werden keine Clips hochgeladen. */
+  clipsStorageFull: boolean;
   downloadUrl: string;
   privacyUrl: string;
 }

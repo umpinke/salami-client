@@ -143,6 +143,8 @@ export interface LauncherConfig {
   combat_modules?: boolean;
   /** Spielzeit und Screenshots mit der Salami-App fürs Handy synchronisieren (Standard: an). */
   salami_app_sync?: boolean;
+  /** Clips zur Salami-App hochladen; wirkt nur zusammen mit salami_app_sync (Standard: an). */
+  salami_app_clips?: boolean;
 }
 
 export type LogLevel = "error" | "warn" | "info" | "debug" | "trace";

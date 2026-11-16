@@ -29,6 +29,7 @@ export function SalamiAppSettings() {
   const [deleting, setDeleting] = useState(false);
 
   const syncOn = tempConfig?.salami_app_sync ?? true;
+  const clipsOn = tempConfig?.salami_app_clips ?? true;
 
   const refresh = useCallback(async () => {
     try {
@@ -85,7 +86,7 @@ export function SalamiAppSettings() {
       id="settings-section-salami-app"
       title={t("salami.app.title")}
       icon="solar:smartphone-bold"
-      keywords={kw("salami.app.title", "app", "handy", "phone", "smartphone", "android", "koppeln", "pair", "sync", "screenshots", "spielzeit", "playtime", "streak")}
+      keywords={kw("salami.app.title", "app", "handy", "phone", "smartphone", "android", "koppeln", "pair", "sync", "screenshots", "clips", "spielzeit", "playtime", "streak")}
       description={t("salami.app.description")}
     >
       <SettingRow
@@ -117,6 +118,27 @@ export function SalamiAppSettings() {
         <div className="flex gap-2 my-2 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 font-minecraft text-xs text-amber-100">
           <Icon icon="solar:danger-triangle-bold" className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <span>{t("salami.app.storage_full")}</span>
+        </div>
+      )}
+
+      <SettingRow
+        label={t("salami.app.clips")}
+        description={t("salami.app.clips.description")}
+        searchKeywords={kw("salami.app.clips", "clips", "clip", "video", "videos", "hochladen", "upload", "sync")}
+        disabled={saving || !syncOn}
+      >
+        <ToggleSwitch
+          checked={syncOn && clipsOn}
+          onChange={(checked) => tempConfig && setTempConfig({ ...tempConfig, salami_app_clips: checked })}
+          disabled={saving || !syncOn}
+          size="md"
+        />
+      </SettingRow>
+
+      {syncOn && clipsOn && status.clipsStorageFull && (
+        <div className="flex gap-2 my-2 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 font-minecraft text-xs text-amber-100">
+          <Icon icon="solar:danger-triangle-bold" className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <span>{t("salami.app.clips.storage_full")}</span>
         </div>
       )}
 

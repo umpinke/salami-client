@@ -401,6 +401,9 @@ pub struct LauncherConfig {
     /// (`integrations::salami_app`). Standardmäßig an.
     #[serde(default = "default_true_bool")]
     pub salami_app_sync: bool,
+    /// Clips zur Salami-App hochladen; wirkt nur zusammen mit `salami_app_sync`. Standardmäßig an.
+    #[serde(default = "default_true_bool")]
+    pub salami_app_clips: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -495,6 +498,7 @@ impl Default for LauncherConfig {
             salami_theme: false,
             combat_modules: true,
             salami_app_sync: true,
+            salami_app_clips: true,
         }
     }
 }
@@ -837,6 +841,7 @@ impl ConfigManager {
                     salami_theme: new_config.salami_theme,
                     combat_modules: new_config.combat_modules,
                     salami_app_sync: new_config.salami_app_sync,
+                    salami_app_clips: new_config.salami_app_clips,
                 };
 
                 true
