@@ -270,7 +270,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
         sc.width = width; sc.height = height
         sc.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(config.fps))
         sc.pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
-        sc.queueDepth = 4; sc.showsCursor = false; sc.scalesToFit = true
+        sc.queueDepth = 4; sc.showsCursor = true; sc.scalesToFit = true
         sc.capturesAudio = config.capture_audio && config.audio_source != "system"
         sc.sampleRate = 48000; sc.channelCount = 2
         sc.captureMicrophone = config.capture_microphone
