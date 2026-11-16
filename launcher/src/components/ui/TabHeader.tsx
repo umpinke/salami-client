@@ -44,13 +44,13 @@ export function TabHeader({
   return (
     <div
       ref={headerRef}      className={cn(
-        "flex-shrink-0 flex flex-col gap-4 p-6 backdrop-blur-md border-b shadow-md",
+        "flex-shrink-0 flex flex-col gap-4 p-6 border-b",
         "rounded-none",
         className,
       )}
       style={{
-        backgroundColor: `${colors.main}30`,
-        borderColor: `${colors.main}60`,
+        backgroundColor: "transparent",
+        borderColor: "rgba(255, 255, 255, 0.09)",
         borderRadius: "0px",
       }}
       role={role}

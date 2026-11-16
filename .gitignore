@@ -32,3 +32,4 @@ branding/out/
 
 # lokale Claude-Code-Einstellungen (Vorschau-Server)
 /.claude/
+launcher/dist-website-demo*

@@ -6,6 +6,8 @@ import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 import { 
   getVariantColors,
+  hexAlpha,
+  SURFACE,
   getBorderRadiusClass,
   createRadiusStyle,
   getAccessibilityProps,
@@ -69,74 +71,24 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
     disabled: false
   });
 
-  const getBoxShadow = () => {
-    switch (variant) {
-      case "3d":
-        return `0 8px 28px rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.35), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`;
-      case "elevated":
-        return `0 10px 34px rgba(0,0,0,0.3), 0 15px 25px rgba(0,0,0,0.5), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`;
-      case "secondary":
-        return `0 6px 22px rgba(0,0,0,0.25), 0 8px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1), inset 0 0 0 1px rgba(255,255,255,0.05)`;
-      default:
-        return "none";
-    }
-  };
+  const tinted = ["warning", "destructive", "info", "success"].includes(variant);
+  const raised = variant === "3d" || variant === "elevated";
 
-  const getBorderStyle = () => {
-    switch (variant) {
-      case "3d":
-      case "elevated":
-      case "secondary":
-        return "border";
-      case "flat-secondary":
-      case "flat":
-        return "border";
-      default:
-        return "border";
-    }
-  };
-
+  const getBoxShadow = () => (raised ? "0 18px 40px -18px rgba(0,0,0,0.7)" : "none");
+  const getBorderStyle = () => "border";
   const getBackgroundColor = () => {
-    if (variant === "secondary") {
-      return "rgba(107, 114, 128, 0.2)";
-    }
-
-    if (variant === "flat-secondary") {
-      return "rgba(107, 114, 128, 0.3)";
-    }
-
-    return `${colors.main}30`;
+    if (tinted) return hexAlpha(colors.main, 0.14);
+    return isHovered && onClick ? SURFACE.hover : SURFACE.base;
   };
+  const getBorderColor = () => (tinted ? hexAlpha(colors.main, 0.35) : SURFACE.line);
 
-  const getBorderColor = () => {
-    if (variant === "secondary") {
-      return "rgba(107, 114, 128, 0.6)";
-    }
-
-    if (variant === "flat-secondary") {
-      return "rgba(107, 114, 128, 0.8)";
-    }
-
-    return `${colors.main}80`;
-  };
-
-  const getBorderBottomColor = () => {
-    if (variant === "secondary") {
-      return "rgba(75, 85, 99, 1)";
-    }
-
-    if (variant === "flat-secondary") {
-      return isHovered ? "rgba(156, 163, 175, 1)" : "rgba(75, 85, 99, 1)";
-    }
-
-    return isHovered ? colors.light : colors.main;
-  };  return (
+  return (
     <div
       ref={mergedRef}
       role={role || (onClick ? "button" : undefined)}
       tabIndex={onClick ? 0 : undefined}
       className={cn(
-        "relative backdrop-blur-md overflow-hidden",
+        "relative overflow-hidden transition-colors duration-150",
         getBorderRadiusClass(borderRadius),
         getBorderStyle(),
         onClick && "cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2",
@@ -145,9 +97,8 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
       style={{
         backgroundColor: getBackgroundColor(),
         borderColor: getBorderColor(),
-        borderBottomColor: getBorderBottomColor(),
         boxShadow: getBoxShadow(),
-        filter: isHovered ? "brightness(1.1)" : "brightness(1)",
+        
         ...createRadiusStyle(borderRadius, 1.2),
       }}
       onClick={onClick}
@@ -156,21 +107,6 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
       onContextMenu={onContextMenu}
       {...accessibilityProps}
     >
-      {variant === "3d" && (
-        <span
-          className="absolute inset-x-0 top-0 h-[2px]"
-          style={{
-            backgroundColor:
-              variant === "3d"
-                ? "rgba(156, 163, 175, 0.8)"
-                : variant === "flat-secondary"
-                  ? "rgba(156, 163, 175, 0.8)"
-                  : `${colors.main}80`,
-            borderTopLeftRadius: borderRadius === 0 ? "0" : `${Math.round(borderRadius * 1.2)}px`,
-            borderTopRightRadius: borderRadius === 0 ? "0" : `${Math.round(borderRadius * 1.2)}px`,
-          }}
-        />
-      )}
       {children}
     </div>
   );

@@ -94,17 +94,15 @@ export function CurrentAccountDisplay({
       <div
         ref={buttonRef}
         className={cn(
-          "font-smallcaps relative overflow-hidden backdrop-blur-md transition-all duration-200",
+          "font-smallcaps relative overflow-hidden transition-colors duration-150",
           "rounded-md text-white tracking-wider",
-          "flex items-center gap-3 px-4 py-1",
-          "text-shadow-sm",
+          "flex items-center gap-2.5 pl-1.5 pr-3 py-1",
           getBorderClasses(),
           variant !== "flat" &&
             "shadow-[0_8px_28px_rgba(0,0,0,0.3),0_10px_15px_rgba(0,0,0,0.35)]",
           "cursor-pointer",
           getHoverTransform(),
           variant !== "flat" && `hover:shadow-[${getHoverBoxShadow()}]`,
-          "hover:brightness-110",
           getActiveTransform(),
           variant !== "flat" && `active:shadow-[${getActiveBoxShadow()}]`,
           "active:brightness-90",
@@ -114,11 +112,10 @@ export function CurrentAccountDisplay({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         style={{
-          backgroundColor: `${accentColor.value}30`,
-          borderColor: `${accentColor.value}80`,
-          borderBottomColor: getBorderBottomColor(),
+          backgroundColor: isHovered ? "rgba(255, 255, 255, 0.1)" : "rgba(255, 255, 255, 0.06)",
+          borderColor: "rgba(255, 255, 255, 0.09)",
           boxShadow: getBoxShadow(),
-          filter: isHovered ? "brightness(1.1)" : "brightness(1)",
+          
         }}
       >
         {variant !== "flat" && (
@@ -135,10 +132,10 @@ export function CurrentAccountDisplay({
         <span className="absolute inset-0 opacity-0 hover:opacity-30 transition-opacity duration-300 bg-gradient-radial from-white/30 via-transparent to-transparent" />
 
         <div
-          className="relative w-7 h-7 overflow-hidden border-2 rounded-sm flex-shrink-0 flex items-center justify-center"
+          className="relative w-7 h-7 overflow-hidden rounded-sm flex-shrink-0 flex items-center justify-center"
           style={{
-            borderColor: `${accentColor.value}60`,
-            backgroundColor: `${accentColor.value}20`,
+            
+            backgroundColor: "rgba(255, 255, 255, 0.08)",
           }}
         >
           <span className="text-white font-smallcaps text-xs">+</span>
@@ -152,7 +149,7 @@ export function CurrentAccountDisplay({
 
         <Icon
           icon="solar:alt-arrow-down-bold"
-          className="w-4 h-4 text-white/90 ml-1 flex-shrink-0"
+          className="w-3.5 h-3.5 text-white/50 flex-shrink-0"
         />
       </div>
     );
@@ -165,9 +162,9 @@ export function CurrentAccountDisplay({
     <div
       ref={buttonRef}
       className={cn(
-        "font-smallcaps relative overflow-hidden backdrop-blur-md transition-all duration-200",
+        "font-smallcaps relative overflow-hidden transition-colors duration-150",
         "rounded-md text-white tracking-wider",
-        "flex items-center gap-3 px-4 py-1",
+        "flex items-center gap-2.5 pl-1.5 pr-3 py-1",
         "text-shadow-sm",
         getBorderClasses(),
         variant !== "flat" &&
@@ -185,11 +182,10 @@ export function CurrentAccountDisplay({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{
-        backgroundColor: `${accentColor.value}30`,
-        borderColor: `${accentColor.value}80`,
-        borderBottomColor: getBorderBottomColor(),
+        backgroundColor: isHovered ? "rgba(255, 255, 255, 0.1)" : "rgba(255, 255, 255, 0.06)",
+        borderColor: "rgba(255, 255, 255, 0.09)",
         boxShadow: getBoxShadow(),
-        filter: isHovered ? "brightness(1.1)" : "brightness(1)",
+        
       }}
     >
       {variant !== "flat" && (
@@ -206,10 +202,10 @@ export function CurrentAccountDisplay({
       <span className="absolute inset-0 opacity-0 hover:opacity-30 transition-opacity duration-300 bg-gradient-radial from-white/30 via-transparent to-transparent" />
 
       <div
-        className="relative w-7 h-7 overflow-hidden border-2 rounded-sm flex-shrink-0 flex items-center justify-center"
+        className="relative w-7 h-7 overflow-hidden rounded-sm flex-shrink-0 flex items-center justify-center"
         style={{
-          borderColor: `${accentColor.value}60`,
-          backgroundColor: `${accentColor.value}20`,
+          
+          backgroundColor: "rgba(255, 255, 255, 0.08)",
         }}
       >
         <PlayerHead
@@ -224,7 +220,7 @@ export function CurrentAccountDisplay({
       {!compact && (
         <div className="flex flex-col min-w-0">
           <span
-            className="text-base text-white font-smallcaps truncate"
+            className="max-w-[9rem] text-sm text-white font-smallcaps truncate"
             title={username}
           >
             {username}
@@ -234,7 +230,7 @@ export function CurrentAccountDisplay({
 
       <Icon
         icon="solar:alt-arrow-down-bold"
-        className="w-4 h-4 text-white/90 ml-1 flex-shrink-0"
+        className="w-3.5 h-3.5 text-white/50 flex-shrink-0"
       />
     </div>
   );

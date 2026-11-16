@@ -2992,7 +2992,7 @@ export function ModrinthSearchV2({
           {searchResults.length > 0 && (
             disableVirtualization ? (
               // Non-virtualized scrollable div
-              <div className="space-y-1">
+              <div>
                 {searchResults.map((hit, index) => {
                   const projectVersions = expandedVersions[hit.project_id];
                   const displayedCount = numDisplayedVersions[hit.project_id] || initialDisplayCount;

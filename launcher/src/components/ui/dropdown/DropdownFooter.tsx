@@ -20,8 +20,8 @@ export function DropdownFooter({ className, children }: DropdownFooterProps) {
         className,
       )}
       style={{
-        backgroundColor: `${accentColor.value}15`,
-        borderTopColor: `${accentColor.value}30`,
+        backgroundColor: "rgba(255, 255, 255, 0.03)",
+        borderTopColor: "rgba(255, 255, 255, 0.09)",
       }}
     >
       {children}

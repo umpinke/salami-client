@@ -13,7 +13,7 @@ export function DropdownDivider({ className }: DropdownDividerProps) {
   return (
     <div
       className={cn("h-px w-full my-1", className)}
-      style={{ backgroundColor: `${accentColor.value}30` }}
+      style={{ backgroundColor: "rgba(255, 255, 255, 0.09)" }}
     />
   );
 }

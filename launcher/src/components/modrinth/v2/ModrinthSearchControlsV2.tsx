@@ -8,7 +8,8 @@ import type {
 import { UnifiedSortType, ModPlatform } from "../../../types/unified";
 // Profile type will be defined locally
 import { SearchWithFilters } from "../../ui/SearchWithFilters";
-import { GroupTabs, type GroupTab } from "../../ui/GroupTabs";
+import type { GroupTab } from "../../ui/GroupTabs";
+import { hexAlpha, SURFACE } from "../../ui/design-system";
 import { IconButton } from "../../ui/buttons/IconButton";
 import { TagBadge } from "../../ui/TagBadge";
 import { Icon } from "@iconify/react";
@@ -118,21 +119,90 @@ export const ModrinthSearchControlsV2: React.FC<
     count: 0, // Could be populated with result counts if needed
   }));
 
+  const sources = [
+    {
+      id: ModPlatform.Modrinth,
+      name: "Modrinth",
+      icon: "https://cdn.modrinth.com/modrinth-new.png",
+      title: t('content.search_modrinth'),
+    },
+    {
+      id: ModPlatform.CurseForge,
+      name: "CurseForge",
+      icon: "/icons/curseforge.svg",
+      title: t('content.search_curseforge'),
+    },
+  ];
+
   return (
     <>
-      {/* Group Tabs for Project Types */}
-      <GroupTabs
-        groups={groups}
-        activeGroup={projectType}
-        onGroupChange={onProjectTypeChange}
-        showAddButton={false}
-      />
+      {/* Inhaltsarten als Textreiter mit Akzentstrich, rechts die Quelle */}
+      <div
+        className="mb-4 flex items-end justify-between gap-4 border-b"
+        style={{ borderColor: SURFACE.line }}
+      >
+        <div className="flex min-w-0 items-end gap-6 overflow-x-auto">
+          {groups.map((group) => {
+            const active = group.id === projectType;
+            return (
+              <button
+                key={group.id}
+                type="button"
+                onClick={() => onProjectTypeChange(group.id as ModrinthProjectType)}
+                className={cn(
+                  "relative flex-shrink-0 pb-2.5 font-minecraft text-2xl lowercase leading-none transition-colors duration-150",
+                  active ? "text-white" : "text-white/40 hover:text-white/75",
+                )}
+                style={{ borderRadius: 0 }}
+              >
+                {group.name}
+                {active && (
+                  <span
+                    className="absolute inset-x-0 -bottom-px h-[3px]"
+                    style={{ backgroundColor: accentColor.value }}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mb-2 flex flex-shrink-0 items-center gap-3 text-sm">
+          {sources.map((source) => {
+            const active = modSource === source.id;
+            return (
+              <button
+                key={source.id}
+                type="button"
+                onClick={() => onModSourceChange(source.id)}
+                title={source.title}
+                className={cn(
+                  "flex items-center gap-1.5 border px-2.5 py-1 font-minecraft lowercase transition-colors duration-150",
+                  active ? "text-white" : "text-white/45 hover:text-white/80",
+                )}
+                style={{
+                  backgroundColor: active ? hexAlpha(accentColor.value, 0.16) : "transparent",
+                  borderColor: active ? hexAlpha(accentColor.value, 0.45) : SURFACE.line,
+                }}
+              >
+                <img
+                  src={source.icon}
+                  alt=""
+                  className={cn("h-4 w-4 object-contain", !active && "opacity-60 grayscale")}
+                />
+                <span>{source.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Search & Filter Header */}
-      <div className="mb-4">
+      <div className="mb-3">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 flex-1">
             <SearchWithFilters
+              className="min-w-0 flex-1 [&>div]:max-w-none"
               placeholder={t('content.search_placeholder', { type: projectType })}
               searchValue={searchTerm}
               onSearchChange={onSearchTermChange}
@@ -143,53 +213,24 @@ export const ModrinthSearchControlsV2: React.FC<
 
             <button
               onClick={onToggleSidebar}
-              className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-smallcaps text-base transition-all duration-200 min-h-[2.5rem]"
+              className="flex min-h-[2.5rem] items-center gap-2 border px-3 font-minecraft text-sm lowercase transition-colors duration-150"
+              style={{
+                backgroundColor: isSidebarVisible ? hexAlpha(accentColor.value, 0.16) : SURFACE.base,
+                borderColor: isSidebarVisible ? hexAlpha(accentColor.value, 0.45) : SURFACE.line,
+                color: isSidebarVisible ? "#fff" : "rgba(255,255,255,0.6)",
+              }}
               title={isSidebarVisible ? t('content.filters.hide') : t('content.filters.show')}
             >
-              <div className="w-4 h-8 flex items-center justify-center">
-                <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
-                </svg>
-              </div>
-            </button>
-          </div>
-
-          {/* Platform Selection Buttons - ganz rechts */}
-          <div className="flex items-center gap-1 border border-white/10 rounded-lg p-0.5">
-            <button
-              onClick={() => onModSourceChange(ModPlatform.Modrinth)}
-              className={cn(
-                "flex items-center gap-1.5 px-2 py-1 rounded-md font-smallcaps text-base transition-all duration-200 min-h-[2.5rem]",
-                modSource === ModPlatform.Modrinth
-                  ? "bg-green-400/40 text-white border border-green-300/30"
-                  : "bg-black/30 text-white/70 hover:text-white hover:bg-black/40 border border-transparent"
+              <Icon icon="solar:tuning-2-bold" className="h-4 w-4" />
+              <span>{t('content.filters.title', 'Filter')}</span>
+              {totalFilters > 0 && (
+                <span
+                  className="flex h-4 min-w-4 items-center justify-center px-1 text-[10px] leading-none text-white"
+                  style={{ backgroundColor: accentColor.value, borderRadius: 999 }}
+                >
+                  {totalFilters}
+                </span>
               )}
-              title={t('content.search_modrinth')}
-            >
-              <img
-                src="https://cdn.modrinth.com/modrinth-new.png"
-                alt="Modrinth"
-                className="w-5 h-5 object-contain"
-              />
-              <span className="hidden sm:inline">Modrinth</span>
-            </button>
-
-            <button
-              onClick={() => onModSourceChange(ModPlatform.CurseForge)}
-              className={cn(
-                "flex items-center gap-1.5 px-2 py-1 rounded-md font-smallcaps text-base transition-all duration-200 min-h-[2.5rem]",
-                modSource === ModPlatform.CurseForge
-                  ? "bg-orange-400/40 text-white border border-orange-300/30"
-                  : "bg-black/30 text-white/70 hover:text-white hover:bg-black/40 border border-transparent"
-              )}
-              title={t('content.search_curseforge')}
-            >
-              <img
-                src="/icons/curseforge.svg"
-                alt="CurseForge"
-                className="w-5 h-5 object-contain"
-              />
-              <span className="hidden sm:inline">CurseForge</span>
             </button>
           </div>
         </div>

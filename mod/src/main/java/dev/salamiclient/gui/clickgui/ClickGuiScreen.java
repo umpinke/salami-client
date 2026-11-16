@@ -51,11 +51,11 @@ import java.util.Set;
  * Zeichnen und Klicken nutzen dieselbe Berechnung, damit beides nie auseinanderläuft.
  */
 public final class ClickGuiScreen extends Screen {
-	private static final int PANEL_WIDTH = 124;
-	private static final int HEADER_HEIGHT = 15;
-	private static final int MODULE_HEIGHT = 14;
-	private static final int SETTING_HEIGHT = 12;
-	private static final int PADDING = 4;
+	private static final int PANEL_WIDTH = 132;
+	private static final int HEADER_HEIGHT = 18;
+	private static final int MODULE_HEIGHT = 15;
+	private static final int SETTING_HEIGHT = 13;
+	private static final int PADDING = 6;
 	private static final int INDENT = 4;
 
 	/** Aufgeklappte Module bleiben während der Sitzung aufgeklappt. */
@@ -124,7 +124,7 @@ public final class ClickGuiScreen extends Screen {
 	/*public void extractBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
 	*///?} else
 	public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-		graphics.fill(0, 0, width, height, 0x88000000);
+		graphics.fill(0, 0, width, height, 0xA60A0809);
 	}
 
 	@Override
@@ -145,7 +145,10 @@ public final class ClickGuiScreen extends Screen {
 		for (Panel panel : panels) {
 			renderPanel(graphics, panel, theme, hover);
 		}
-		GuiDraw.centeredText(graphics, font, I18n.get("salami.clickgui.hint"), uiWidth() / 2, uiHeight() - 12, theme.textDim());
+		String hint = I18n.get("salami.clickgui.hint");
+		int hintWidth = font.width(hint) + 16;
+		GuiDraw.roundRect(graphics, (uiWidth() - hintWidth) / 2, uiHeight() - 18, hintWidth, 14, 0xB0000000);
+		GuiDraw.centeredText(graphics, font, hint, uiWidth() / 2, uiHeight() - 15, theme.textDim());
 		renderHudButton(graphics, theme, mx, my);
 		renderModsButton(graphics, theme, mx, my);
 		renderConfigsButton(graphics, theme, mx, my);
@@ -171,20 +174,45 @@ public final class ClickGuiScreen extends Screen {
 		List<Row> rows = rows(panel);
 		int right = panel.x + PANEL_WIDTH;
 		int bottom = bottom(panel, rows);
+		int height = bottom - panel.y;
 
-		g.fill(panel.x, panel.y, right, bottom, theme.panel());
-		g.fill(panel.x, panel.y, right, panel.y + HEADER_HEIGHT, theme.header());
+		// Schatten, Rahmen, Fläche – jeweils mit abgeschrägten Ecken
+		GuiDraw.roundRect(g, panel.x + 2, panel.y + 3, PANEL_WIDTH, height, 0x50000000);
+		GuiDraw.roundRect(g, panel.x, panel.y, PANEL_WIDTH, height, theme.outline());
+		GuiDraw.roundRect(g, panel.x + 1, panel.y + 1, PANEL_WIDTH - 2, height - 2, theme.panel() | 0xFF000000);
+		if (panel.open) {
+			g.fill(panel.x + 2, panel.y + 1, right - 2, panel.y + 2, theme.header());
+			g.fill(panel.x + 1, panel.y + 2, right - 1, panel.y + HEADER_HEIGHT, theme.header());
+			g.fill(panel.x + 1, panel.y + HEADER_HEIGHT - 1, right - 1, panel.y + HEADER_HEIGHT, theme.accent());
+		} else {
+			GuiDraw.roundRect(g, panel.x + 1, panel.y + 1, PANEL_WIDTH - 2, HEADER_HEIGHT - 2, theme.header());
+		}
 
-		GuiDraw.text(g, font, I18n.get(panel.category.translationKey()), panel.x + PADDING, panel.y + 4, theme.headerText(), false);
-		String marker = panel.open ? "-" : "+";
-		int markerX = right - PADDING - font.width(marker);
-		GuiDraw.text(g, font, marker, markerX, panel.y + 4, theme.headerText(), false);
+		int textY = panel.y + 5;
+		GuiDraw.text(g, font, I18n.get(panel.category.translationKey()), panel.x + PADDING, textY, theme.headerText(), false);
+		int markerX = right - PADDING - 5;
+		drawChevron(g, markerX, panel.y + (panel.open ? 8 : 7), panel.open, theme.headerText());
+
+		// „3/12“: eingeschaltete von allen Modulen der Kategorie
+		int total = 0;
+		int enabled = 0;
+		for (Module module : modules.byCategory(panel.category)) {
+			if (modules.isAvailable(module)) {
+				total++;
+				if (module.isEnabled()) {
+					enabled++;
+				}
+			}
+		}
+		String count = enabled + "/" + total;
+		int countX = markerX - 5 - font.width(count);
+		GuiDraw.text(g, font, count, countX, textY, (theme.headerText() & 0x00FFFFFF) | 0x99000000, false);
 		if (panel.category.isRestricted()) {
-			GuiDraw.text(g, font, "!", markerX - 8, panel.y + 4, theme.warning(), false);
+			GuiDraw.text(g, font, "!", countX - 7, textY, theme.warning(), false);
 		}
 
 		if (panel.open && rows.isEmpty()) {
-			GuiDraw.text(g, font, I18n.get("salami.clickgui.empty"), panel.x + PADDING, panel.y + HEADER_HEIGHT + 3, theme.textDim(), false);
+			GuiDraw.text(g, font, I18n.get("salami.clickgui.empty"), panel.x + PADDING, panel.y + HEADER_HEIGHT + 4, theme.textDim(), false);
 		}
 
 		for (Row row : rows) {
@@ -195,8 +223,32 @@ public final class ClickGuiScreen extends Screen {
 				renderSettingRow(g, panel, row, theme, hovered);
 			}
 		}
+	}
 
-		GuiDraw.outline(g, panel.x, panel.y, PANEL_WIDTH, bottom - panel.y, theme.outline());
+	/** Kleiner Pfeil aus Pixeln: nach unten (aufgeklappt) oder nach rechts (zugeklappt). */
+	private static void drawChevron(GuiGraphics g, int x, int y, boolean down, int color) {
+		if (down) {
+			g.fill(x, y, x + 5, y + 1, color);
+			g.fill(x + 1, y + 1, x + 4, y + 2, color);
+			g.fill(x + 2, y + 2, x + 3, y + 3, color);
+		} else {
+			g.fill(x + 1, y, x + 2, y + 5, color);
+			g.fill(x + 2, y + 1, x + 3, y + 4, color);
+			g.fill(x + 3, y + 2, x + 4, y + 3, color);
+		}
+	}
+
+	/** Knopf der oberen Leiste; {@code primary} ist vollflächig in der Akzentfarbe. */
+	private void renderTopButton(GuiGraphics g, Theme theme, int[] b, String label, int textInset, boolean hovered, boolean primary) {
+		int width = b[2] - b[0];
+		int height = b[3] - b[1];
+		int fill = primary ? theme.accent() : hovered ? theme.header() : theme.panel() | 0xFF000000;
+		GuiDraw.roundRect(g, b[0], b[1], width, height, primary || hovered ? theme.accent() : theme.outline());
+		GuiDraw.roundRect(g, b[0] + 1, b[1] + 1, width - 2, height - 2, fill);
+		if (primary && hovered) {
+			GuiDraw.roundRect(g, b[0] + 1, b[1] + 1, width - 2, height - 2, 0x30FFFFFF);
+		}
+		GuiDraw.text(g, font, label, b[0] + textInset, b[1] + 3, primary ? GuiDraw.textOn(theme.accent()) : theme.headerText(), false);
 	}
 
 	// ------------------------------------------------------------------ HUD-Editor-Knopf
@@ -209,9 +261,7 @@ public final class ClickGuiScreen extends Screen {
 	private void renderHudButton(GuiGraphics g, Theme theme, int mouseX, int mouseY) {
 		int[] b = hudButton();
 		boolean hovered = mouseX >= b[0] && mouseX < b[2] && mouseY >= b[1] && mouseY < b[3];
-		g.fill(b[0], b[1], b[2], b[3], hovered ? theme.header() : theme.panel());
-		GuiDraw.outline(g, b[0], b[1], b[2] - b[0], b[3] - b[1], theme.outline());
-		GuiDraw.text(g, font, I18n.get("salami.clickgui.hud_editor"), b[0] + 6, b[1] + 3, theme.headerText(), false);
+		renderTopButton(g, theme, b, I18n.get("salami.clickgui.hud_editor"), 6, hovered, false);
 	}
 
 	// ------------------------------------------------------------------ Mods-Knopf (oben links)
@@ -224,9 +274,7 @@ public final class ClickGuiScreen extends Screen {
 	private void renderModsButton(GuiGraphics g, Theme theme, int mouseX, int mouseY) {
 		int[] b = modsButton();
 		boolean hovered = mouseX >= b[0] && mouseX < b[2] && mouseY >= b[1] && mouseY < b[3];
-		g.fill(b[0], b[1], b[2], b[3], hovered ? theme.accent() : theme.header());
-		GuiDraw.outline(g, b[0], b[1], b[2] - b[0], b[3] - b[1], theme.accent());
-		GuiDraw.text(g, font, I18n.get("salami.clickgui.mods"), b[0] + 8, b[1] + 3, hovered ? theme.panel() | 0xFF000000 : theme.headerText(), false);
+		renderTopButton(g, theme, b, I18n.get("salami.clickgui.mods"), 8, hovered, true);
 	}
 
 	// ------------------------------------------------------------------ Configs-Knopf (neben Mods)
@@ -240,9 +288,7 @@ public final class ClickGuiScreen extends Screen {
 	private void renderConfigsButton(GuiGraphics g, Theme theme, int mouseX, int mouseY) {
 		int[] b = configsButton();
 		boolean hovered = mouseX >= b[0] && mouseX < b[2] && mouseY >= b[1] && mouseY < b[3];
-		g.fill(b[0], b[1], b[2], b[3], hovered ? theme.header() : theme.panel());
-		GuiDraw.outline(g, b[0], b[1], b[2] - b[0], b[3] - b[1], theme.outline());
-		GuiDraw.text(g, font, I18n.get("salami.clickgui.configs"), b[0] + 6, b[1] + 3, theme.headerText(), false);
+		renderTopButton(g, theme, b, I18n.get("salami.clickgui.configs"), 6, hovered, false);
 	}
 
 	// ------------------------------------------------------------------ Größe (− 100 % +)
@@ -280,8 +326,8 @@ public final class ClickGuiScreen extends Screen {
 		for (int i = 0; i < controls.length; i++) {
 			int x0 = controls[i][0];
 			int x1 = controls[i][1];
-			g.fill(x0, CONTROL_TOP, x1, CONTROL_BOTTOM, hovered == i ? theme.header() : theme.panel());
-			GuiDraw.outline(g, x0, CONTROL_TOP, x1 - x0, CONTROL_BOTTOM - CONTROL_TOP, theme.outline());
+			g.fill(x0, CONTROL_TOP, x1, CONTROL_BOTTOM, theme.outline());
+			g.fill(x0 + (i == 0 ? 1 : 0), CONTROL_TOP + 1, x1 - (i == 2 ? 1 : 0), CONTROL_BOTTOM - 1, hovered == i ? theme.header() : theme.panel() | 0xFF000000);
 			if (i == 1) {
 				String percent = Math.round(uiScale * 100) + "%";
 				GuiDraw.text(g, font, percent, (x0 + x1 - font.width(percent)) / 2, CONTROL_TOP + 3, theme.headerText(), false);
@@ -323,54 +369,76 @@ public final class ClickGuiScreen extends Screen {
 
 	private void renderModuleRow(GuiGraphics g, Panel panel, Row row, Theme theme, boolean hovered) {
 		Module module = row.module();
-		int right = panel.x + PANEL_WIDTH;
-		if (module.isEnabled()) {
-			g.fill(panel.x, row.y(), right, row.y() + row.height(), theme.enabledRow());
+		int left = panel.x + 1;
+		int right = panel.x + PANEL_WIDTH - 1;
+		boolean on = module.isEnabled();
+		if (on) {
+			g.fill(left, row.y(), right, row.y() + row.height(), theme.enabledRow());
+			g.fill(left, row.y(), left + 2, row.y() + row.height(), theme.accent());
 		}
 		if (hovered) {
-			g.fill(panel.x, row.y(), right, row.y() + row.height(), theme.hover());
+			g.fill(left, row.y(), right, row.y() + row.height(), theme.hover());
 		}
-		String expander = EXPANDED.contains(module.id()) ? "v" : ">";
-		int expanderX = right - PADDING - font.width(expander);
-		String name = font.plainSubstrByWidth(I18n.get(module.translationKey()), expanderX - panel.x - PADDING - 2);
-		GuiDraw.text(g, font, name, panel.x + PADDING, row.y() + 3, module.isEnabled() ? theme.accent() : theme.text(), false);
-		GuiDraw.text(g, font, expander, expanderX, row.y() + 3, theme.textDim(), false);
+		boolean hasSettings = false;
+		for (Setting<?> setting : module.settings()) {
+			if (!setting.isHidden()) {
+				hasSettings = true;
+				break;
+			}
+		}
+		boolean expanded = EXPANDED.contains(module.id());
+		int expanderX = right - PADDING - 4;
+		String name = font.plainSubstrByWidth(I18n.get(module.translationKey()), expanderX - panel.x - PADDING - 4);
+		GuiDraw.text(g, font, name, panel.x + PADDING + (on ? 2 : 0), row.y() + 4, on ? theme.headerText() : theme.text(), false);
+		if (hasSettings) {
+			drawChevron(g, expanderX, row.y() + (expanded ? 6 : 5), expanded, expanded ? theme.accent() : theme.textDim());
+		}
 	}
 
 	private void renderSettingRow(GuiGraphics g, Panel panel, Row row, Theme theme, boolean hovered) {
 		Setting<?> setting = row.setting();
 		int left = panel.x + PADDING + INDENT;
 		int right = panel.x + PANEL_WIDTH - PADDING;
-		int textY = row.y() + 2;
+		int textY = row.y() + 3;
+		// Einstellungen liegen auf einer dunkleren Fläche unter ihrem Modul
+		g.fill(panel.x + 1, row.y(), panel.x + PANEL_WIDTH - 1, row.y() + row.height(), 0x38000000);
 		if (hovered) {
-			g.fill(panel.x, row.y(), panel.x + PANEL_WIDTH, row.y() + row.height(), theme.hover());
+			g.fill(panel.x + 1, row.y(), panel.x + PANEL_WIDTH - 1, row.y() + row.height(), theme.hover());
 		}
-		// dezente Einrückungslinie
 		g.fill(panel.x + PADDING, row.y(), panel.x + PADDING + 1, row.y() + row.height(), theme.outline());
+		boolean chip = false;
 
 		String value;
 		int valueColor = theme.text();
 		int valueRight = right;
 
 		if (setting instanceof BoolSetting bool) {
-			value = I18n.get(bool.isOn() ? "salami.on" : "salami.off");
-			valueColor = bool.isOn() ? theme.accent() : theme.textDim();
+			// Schalter statt „An/Aus“
+			value = "";
+			int trackY = row.y() + 4;
+			GuiDraw.roundRect(g, right - 12, trackY, 12, 6, bool.isOn() ? theme.accent() : theme.outline());
+			int knobX = bool.isOn() ? right - 5 : right - 11;
+			g.fill(knobX, trackY + 1, knobX + 4, trackY + 5, bool.isOn() ? GuiDraw.textOn(theme.accent()) : theme.textDim());
+			valueRight = right - 15;
 		} else if (setting instanceof NumberSetting number) {
 			value = number.display();
 			int trackY = row.y() + row.height() - 2;
+			int knob = left + (int) Math.round((right - left) * number.fraction());
 			g.fill(left, trackY, right, trackY + 1, theme.outline());
-			g.fill(left, trackY, left + (int) Math.round((right - left) * number.fraction()), trackY + 1, theme.accent());
+			g.fill(left, trackY, knob, trackY + 1, theme.accent());
+			g.fill(Math.max(left, knob - 1), trackY - 1, Math.min(right, knob + 1), trackY + 2, theme.headerText());
 		} else if (setting instanceof ModeSetting<?> mode) {
 			value = modeLabel(mode);
 		} else if (setting instanceof KeybindSetting keybind) {
 			value = listeningKeybind == keybind ? "..." : keybind.keyName();
+			chip = true;
 			if (listeningKeybind == keybind) {
 				valueColor = theme.accent();
 			}
 		} else if (setting instanceof ColorSetting color) {
 			value = "";
-			g.fill(right - 9, row.y() + 2, right, row.y() + 10, color.argb());
-			GuiDraw.outline(g, right - 9, row.y() + 2, 9, 8, picker != null && picker.setting() == color ? theme.accent() : theme.outline());
+			GuiDraw.roundRect(g, right - 10, row.y() + 2, 10, 9, picker != null && picker.setting() == color ? theme.accent() : theme.outline());
+			g.fill(right - 9, row.y() + 3, right - 1, row.y() + 10, color.argb());
 			valueRight = right - 12;
 		} else if (setting instanceof StringListSetting list) {
 			value = I18n.get("salami.clickgui.entries", list.get().size());
@@ -382,6 +450,11 @@ public final class ClickGuiScreen extends Screen {
 		}
 
 		int valueWidth = font.width(value);
+		if (chip) {
+			// Taste als kleines Feld
+			GuiDraw.roundRect(g, right - valueWidth - 6, row.y() + 1, valueWidth + 6, row.height() - 2, theme.hover());
+			valueRight = right - 3;
+		}
 		String label = font.plainSubstrByWidth(label(setting), valueRight - valueWidth - left - 4);
 		GuiDraw.text(g, font, label, left, textY, theme.textDim(), false);
 		if (!value.isEmpty()) {
@@ -454,7 +527,7 @@ public final class ClickGuiScreen extends Screen {
 			return panel.y + HEADER_HEIGHT + MODULE_HEIGHT;
 		}
 		Row last = rows.get(rows.size() - 1);
-		return last.y() + last.height() + 2;
+		return last.y() + last.height() + 3;
 	}
 
 	/** Oberstes Panel zuerst (zuletzt gezeichnet = liegt oben). */
@@ -744,7 +817,7 @@ public final class ClickGuiScreen extends Screen {
 		// Standard-Layout: nebeneinander, bei schmalem Fenster in die nächste Reihe umbrechen
 		int gap = 8;
 		int x = 10;
-		int y = 24;
+		int y = 26;
 		int rowHeight = 0;
 		for (Category category : Category.values()) {
 			// Kampf-Module im Launcher aus: kein leeres Utility-Panel

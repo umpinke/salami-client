@@ -8,6 +8,7 @@ import { useThemeStore } from "../../../store/useThemeStore";
 import { ThemedSurface } from "../ThemedSurface";
 import { 
   getVariantColors,
+  getButtonSkin,
   getSizeClasses,
   getBorderRadiusClass,
   getAccessibilityProps,
@@ -131,6 +132,8 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         shadowDepth !== "none"
       );
     };    const colors = getVariantColors(variant, accentColor);
+    const bare = displayVariant === "ghost" || displayVariant === "themed-surface";
+    const skin = getButtonSkin(bare ? "ghost" : variant, accentColor, isHovered && !disabled && !bare);
     const radiusClass = getBorderRadiusClass();
     const accessibilityProps = getAccessibilityProps({
       label,
@@ -160,69 +163,6 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
       }
     };
 
-    const getBackgroundColor = () => {
-      if (displayVariant === "ghost" || displayVariant === "themed-surface")
-        return "transparent";
-
-      if (variant === "ghost") {
-        return isHovered ? `rgba(255, 255, 255, 0.1)` : "transparent";
-      }
-
-      if (variant === "flat" || variant === "flat-secondary") {
-        return `${colors.main}30`;
-      }
-
-      const baseOpacity = isHovered ? "50" : "30";
-      return `${colors.main}${baseOpacity}`;
-    };
-
-    const getBorderColor = () => {
-      if (displayVariant === "ghost" || displayVariant === "themed-surface")
-        return "transparent";
-
-      if (variant === "ghost") {
-        return "transparent";
-      }
-
-      if (variant === "flat" || variant === "flat-secondary") {
-        return `${colors.main}80`;
-      }
-
-      return isHovered ? `${colors.light}` : `${colors.main}80`;
-    };
-
-    const getBorderBottomColor = () => {
-      if (displayVariant === "ghost" || displayVariant === "themed-surface")
-        return "transparent";
-
-      if (variant === "ghost") {
-        return "transparent";
-      }
-
-      if (variant === "flat" || variant === "flat-secondary") {
-        return isHovered ? colors.light : colors.dark;
-      }
-
-      return isHovered ? colors.light : colors.dark;
-    };
-
-    const getBoxShadow = () => {
-      if (
-        displayVariant === "ghost" ||
-        displayVariant === "themed-surface" ||
-        variant !== "3d" ||
-        shadowDepth === "none"
-      ) {
-        return "none";
-      }
-
-      const part1Y = shadowDepth === "short" ? "4px" : "8px";
-      const part2Y = shadowDepth === "short" ? "6px" : "10px";
-      const part2Blur = shadowDepth === "short" ? "10px" : "15px";
-
-      return `0 ${part1Y} 14px rgba(0,0,0,0.3), 0 ${part2Y} ${part2Blur} rgba(0,0,0,0.35), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`;
-    };
-
     const getBorderClasses = () => {
       if (displayVariant === "ghost" || displayVariant === "themed-surface") {
         return "";
@@ -239,21 +179,6 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
       return "border";
     };
 
-    const getShadowClasses = () => {
-      if (
-        displayVariant === "ghost" ||
-        displayVariant === "themed-surface" ||
-        variant !== "3d" ||
-        shadowDepth === "none"
-      ) {
-        return "";
-      }
-
-      return shadowDepth === "default"
-        ? "shadow-[0_8px_28px_rgba(0,0,0,0.3),0_10px_15px_rgba(0,0,0,0.35)]"
-        : "shadow-[0_4px_16px_rgba(0,0,0,0.3),0_6px_10px_rgba(0,0,0,0.35)]";
-    };
-
     const buttonElement = (
       <button
         ref={mergedRef}
@@ -264,47 +189,31 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         className={cn(
-          "font-smallcaps relative overflow-hidden backdrop-blur-md",
+          "font-smallcaps relative overflow-hidden transition-colors duration-150",
           "rounded-md text-white tracking-wider",
           "flex items-center justify-center",
-          "text-shadow-sm",
           getBorderClasses(),
-          getShadowClasses(),
           "focus:outline-none focus:ring-2 focus:ring-white/30 focus:ring-offset-1 focus:ring-offset-black/20",
           "disabled:opacity-50 disabled:cursor-not-allowed",
           displayVariant !== "themed-surface" && sizeClasses,
           className,
         )}
         style={{
-          backgroundColor: getBackgroundColor(),
-          borderColor: getBorderColor(),
-          borderBottomColor: getBorderBottomColor(),
-          boxShadow: getBoxShadow(),
-          color: colors.text,
-          filter: isHovered && !disabled ? "brightness(1.1)" : "brightness(1)",
+          backgroundColor: skin.background,
+          borderColor: skin.border,
+          boxShadow: bare || shadowDepth === "none" ? "none" : skin.shadow,
+          color: bare ? colors.text : skin.color,
+          
         }}
         {...props}
       >
-        {variant !== "ghost" &&
-          variant === "3d" &&
-          displayVariant !== "ghost" &&
-          displayVariant !== "themed-surface" && (
-            <span
-              className="absolute inset-x-0 top-0 h-[2px] rounded-t-sm transition-colors duration-200"
-              style={{
-                backgroundColor: isHovered
-                  ? `${colors.light}`
-                  : `${colors.light}80`,
-                opacity: isHovered ? 1 : 0.8,
-              }}
-            />
-          )}        <span
+        <span
           className={cn(
             "relative z-10 flex items-center justify-center transition-transform duration-200",
             getIconSize(),
           )}
           style={{
-            transform: isHovered && !disabled ? "scale(1.05)" : "scale(1)",
+            
           }}
           aria-hidden="true"
         >

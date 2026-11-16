@@ -181,12 +181,11 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
         return "transparent";
       }
 
-      const baseOpacity = isHovered || isFocused ? "50" : "30";
-      return `${colors.main}${baseOpacity}`;
+      return isHovered || isFocused ? "rgba(255, 255, 255, 0.08)" : "rgba(255, 255, 255, 0.045)";
     };    const getBorderColor = () => {
       if (variant === "minimal") return "transparent";
 
-      return isHovered || isFocused ? `${colors.light}` : `${colors.main}80`;
+      return isFocused ? colors.main : isHovered ? "rgba(255, 255, 255, 0.2)" : "rgba(255, 255, 255, 0.09)";
     };
 
     const getBorderClasses = () => {
@@ -194,17 +193,15 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
         return "border-b-2 border-white/30 rounded-none";
       if (variant === "filled") return "border-none rounded-[var(--border-radius)]";
       if (variant === "3d") return "border rounded-[var(--border-radius)]";
-      return "border border-b-2 rounded-[var(--border-radius)]";
+      return "border rounded-[var(--border-radius)]";
     };    const getBoxShadow = () => {
       if (variant === "minimal" || variant === "filled" || variant !== "3d")
         return "none";
 
-      return isHovered || isFocused
-        ? `0 6px 22px rgba(0,0,0,0.25), 0 8px 12px rgba(0,0,0,0.4), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`
-        : `0 4px 16px rgba(0,0,0,0.3), 0 6px 10px rgba(0,0,0,0.35), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`;
+      return "none";
     };    const standardInputContent = (
       <>
-        {variant === "3d" && (
+        {false && (
           <span
             className="absolute inset-x-0 top-0 h-[2px] rounded-t-sm transition-colors duration-200"
             style={{
@@ -367,12 +364,6 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
         style={{
           backgroundColor: getBackgroundColor(),
           borderColor: getBorderColor(),
-          borderBottomColor:
-            variant === "minimal"
-              ? "transparent"
-              : isHovered || isFocused
-                ? colors.light
-                : colors.dark,
           boxShadow: getBoxShadow(),
           filter:
             (isHovered || isFocused) && !disabled

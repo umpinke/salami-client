@@ -5,6 +5,7 @@ import { cn } from '../../lib/utils';
 import { useThemeStore } from '../../store/useThemeStore';
 import { 
   getVariantColors,
+  SURFACE,
   getBorderRadiusClass,
   createRadiusStyle,
   getAccessibilityProps
@@ -71,18 +72,14 @@ export function ThemedSurface({
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   };
 
-  const opacityDefault = 0.2;
-  const opacityHover = 0.48;
-  const opacityActive = 0.6;
+  const custom = isValidHex(baseColorHex);
+  const lineColor = alwaysActive
+    ? parseHexToRgba(effectiveBaseColor, 0.55)
+    : custom
+      ? parseHexToRgba(effectiveBaseColor, isSurfaceHovered ? 0.45 : 0.25)
+      : isSurfaceHovered ? SURFACE.lineStrong : SURFACE.line;
 
-  let currentBorderOpacity = opacityDefault;
-  if (alwaysActive) {
-    currentBorderOpacity = opacityActive;
-  } else if (isSurfaceHovered) {
-    currentBorderOpacity = opacityHover;
-  }
-
-  const { 
+  const {
     top: showTopBorder = true, 
     bottom: showBottomBorder = true, 
     left: showLeftBorder = true, 
@@ -90,12 +87,12 @@ export function ThemedSurface({
   } = borderVisibility || {};
 
   const internalStyles = {
-    '--surface-bg-default': parseHexToRgba(effectiveBaseColor, 0.03),
-    '--surface-bg-hover': parseHexToRgba(effectiveBaseColor, 0.1),
-    borderTopColor: ((isSurfaceHovered && !alwaysActive) || showTopBorder) ? parseHexToRgba(effectiveBaseColor, currentBorderOpacity) : 'transparent',
-    borderRightColor: ((isSurfaceHovered && !alwaysActive) || showRightBorder) ? parseHexToRgba(effectiveBaseColor, currentBorderOpacity) : 'transparent',
-    borderBottomColor: ((isSurfaceHovered && !alwaysActive) || showBottomBorder) ? parseHexToRgba(effectiveBaseColor, currentBorderOpacity) : 'transparent',
-    borderLeftColor: ((isSurfaceHovered && !alwaysActive) || showLeftBorder) ? parseHexToRgba(effectiveBaseColor, currentBorderOpacity) : 'transparent',
+    '--surface-bg-default': custom ? parseHexToRgba(effectiveBaseColor, 0.08) : SURFACE.base,
+    '--surface-bg-hover': alwaysActive || custom ? parseHexToRgba(effectiveBaseColor, 0.16) : SURFACE.hover,
+    borderTopColor: showTopBorder ? lineColor : 'transparent',
+    borderRightColor: showRightBorder ? lineColor : 'transparent',
+    borderBottomColor: showBottomBorder ? lineColor : 'transparent',
+    borderLeftColor: showLeftBorder ? lineColor : 'transparent',
   } as React.CSSProperties;
 
   const combinedStyles = { ...internalStyles, ...incomingStyle };
@@ -107,7 +104,7 @@ export function ThemedSurface({
       className={cn(
         "relative p-3 transition-colors duration-200 w-full select-none",
         radiusClass,
-        "border-2",
+        "border",
         alwaysActive
           ? "bg-[var(--surface-bg-hover)]"
           : "bg-[var(--surface-bg-default)] hover:bg-[var(--surface-bg-hover)]",

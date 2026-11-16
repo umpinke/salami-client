@@ -7,6 +7,8 @@ import { cn } from "../../../lib/utils";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { 
   getVariantColors,
+  mixHex,
+  SURFACE,
   getBorderRadiusClass,
   createRadiusStyle,
   getAccessibilityProps
@@ -262,7 +264,7 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
         }}
         role={role}
         className={cn(
-          "fixed font-smallcaps backdrop-blur-md z-[1001] overflow-hidden",
+          "fixed font-smallcaps z-[1001] overflow-hidden",
           radiusClass,
           "text-white transition-all duration-200",
           "border shadow-[0_12px_32px_rgba(0,0,0,0.45)]",
@@ -275,15 +277,13 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
           top: `${dropdownTop}px`,
           left: `${dropdownLeft}px`,
           width: `${width}px`,
-          backgroundColor: `${colors.main}15`,
-          borderColor: `${colors.main}40`,
-          borderBottomColor: colors.dark,
-          boxShadow: `0 8px 28px rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.35), inset 0 1px 0 ${colors.light}20, inset 0 0 0 1px ${colors.main}10`,
+          backgroundColor: mixHex(SURFACE.solid, colors.main, 0.05),
+          borderColor: SURFACE.line,
+          boxShadow: "0 24px 60px -16px rgba(0,0,0,0.75)",
           ...createRadiusStyle(borderRadius),
         }}
         {...accessibilityProps}
       >
-        <div className="absolute inset-0 opacity-20 bg-gradient-radial from-white/20 via-transparent to-transparent pointer-events-none" />
         <div className="relative z-10">{children}</div>
       </div>,
       document.body,

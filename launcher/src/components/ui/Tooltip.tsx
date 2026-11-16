@@ -126,7 +126,7 @@ export function Tooltip({
 
   const getTooltipClasses = () => {
     // z above modals/overlays (Modal + global modal portal use z-[1000]) so tooltips render on top
-    const baseClasses = "fixed z-[1100] px-3 py-2 text-xs font-minecraft text-white border-2 pointer-events-none transition-opacity duration-200 rounded-lg backdrop-blur-md";
+    const baseClasses = "fixed z-[1100] px-3 py-2 text-xs font-minecraft text-white border pointer-events-none transition-opacity duration-200 rounded-lg shadow-[0_12px_30px_-10px_rgba(0,0,0,0.8)]";
 
     return `${baseClasses} ${className}`;
   };
@@ -159,8 +159,8 @@ export function Tooltip({
             // static mode: center horizontally on the anchor point and sit above/below it
             transform: isStatic ? (isBottom ? 'translate(-50%, 0)' : 'translate(-50%, -100%)') : undefined,
             textAlign: isStatic ? 'center' : undefined,
-            backgroundColor: `${accentColor.value}20`, // Wie ProfileIconV2
-            borderColor: `${accentColor.value}60`, // Wie ProfileIconV2
+            backgroundColor: "#221e1f",
+            borderColor: "rgba(255, 255, 255, 0.12)",
             maxWidth: '300px', // Kompakt für kürzere Texte
             wordWrap: 'break-word', // Automatischer Wortumbruch
           }}

@@ -246,24 +246,22 @@ export function ProfileCardV2({
 
     const shadowDepth = "short";
 
-    const backgroundColor = isHovered ? `${colors.main}50` : `${colors.main}30`;
-    const borderColor = isHovered ? colors.light : `${colors.main}80`;
-    const borderBottomColor = isHovered ? colors.light : colors.dark;
+    const backgroundColor = isHovered ? `${colors.main}47` : `${colors.main}29`;
+    const borderColor = isHovered ? `${colors.main}80` : `${colors.main}47`;
+    const borderBottomColor = borderColor;
 
     const part1Y = shadowDepth === "short" ? "4px" : "8px";
     const part2Y = shadowDepth === "short" ? "6px" : "10px";
     const part2Blur = shadowDepth === "short" ? "10px" : "15px";
-    const boxShadow = `0 ${part1Y} 14px rgba(0,0,0,0.3), 0 ${part2Y} ${part2Blur} rgba(0,0,0,0.35), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`;
+    const boxShadow = "none";
 
     return {
       backgroundColor,
-      border: "2px solid",
-      borderBottom: "4px solid",
+      border: "1px solid",
+      borderBottom: "1px solid",
       borderColor,
       borderBottomColor,
       boxShadow,
-      transform: isHovered ? "scale(1.02)" : "scale(1)",
-      filter: isHovered ? "brightness(1.1)" : "brightness(1)",
       transition: "all 0.2s ease",
     };
   };
@@ -278,18 +276,16 @@ export function ProfileCardV2({
       dark: accentColor.value,
     };
 
-    const backgroundColor = isHovered ? `${colors.main}40` : `${colors.main}25`;
-    const borderColor = isHovered ? colors.light : `${colors.main}70`;
-    const borderBottomColor = isHovered ? colors.light : colors.dark;
+    const backgroundColor = isHovered ? "rgba(255, 255, 255, 0.11)" : "rgba(255, 255, 255, 0.08)";
+    const borderColor = "rgba(255, 255, 255, 0.09)";
+    const borderBottomColor = borderColor;
 
-    const boxShadow = isHovered
-      ? `0 2px 10px rgba(0,0,0,0.4), 0 4px 8px rgba(0,0,0,0.3), inset 0 1px 0 ${colors.light}50, inset 0 0 0 1px ${colors.main}30`
-      : `0 2px 10px rgba(0,0,0,0.3), 0 3px 6px rgba(0,0,0,0.25), inset 0 1px 0 ${colors.light}30, inset 0 0 0 1px ${colors.main}20`;
+    const boxShadow = "none";
 
     return {
       backgroundColor,
       border: "1px solid",
-      borderBottom: "2px solid",
+      borderBottom: "1px solid",
       borderColor,
       borderBottomColor,
       boxShadow,

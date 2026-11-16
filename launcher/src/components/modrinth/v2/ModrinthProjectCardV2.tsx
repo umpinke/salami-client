@@ -11,18 +11,36 @@ type CompatibleProject = UnifiedModSearchResult;
 import type { AccentColor } from "../../../store/useThemeStore";
 import type { ContentInstallStatus } from "../../../types/profile";
 import { ActionButton } from "../../ui/ActionButton";
-import { TagBadge } from "../../ui/TagBadge";
+import { Icon } from "@iconify/react";
 import { cn } from "../../../lib/utils";
 import { ModrinthVersionListV2 } from "./ModrinthVersionListV2";
 import { openExternalUrl } from "../../../services/tauri-service";
 import { toast } from "react-hot-toast";
 import { preloadIcons } from "../../../lib/icon-utils";
 import { useTranslation } from "react-i18next";
-import { ThemedSurface } from "../../ui/ThemedSurface";
+import { readableOn, SURFACE } from "../../ui/design-system";
 import { useNavigate } from "react-router-dom";
 import { CartToggleButton } from "../../../features/mod-downloader/CartToggleButton";
 
 type Profile = any;
+
+const INSTALLED_COLOR = "#4ade80";
+const PACK_COLOR = "#60a5fa";
+
+const compactFormatters = new Map<string, Intl.NumberFormat>();
+/** 286345789 → „286,3 Mio.“ – kurz genug für die Kennzahlenzeile. */
+function compactNumber(value: number, language: string): string {
+  let formatter = compactFormatters.get(language);
+  if (!formatter) {
+    try {
+      formatter = new Intl.NumberFormat(language, { notation: "compact", maximumFractionDigits: 1 });
+    } catch {
+      formatter = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
+    }
+    compactFormatters.set(language, formatter);
+  }
+  return formatter.format(value);
+}
 
 interface VersionListPassthroughProps {
   projectVersions: UnifiedVersion[] | null | "loading";
@@ -205,7 +223,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
     itemIndex,
     onProjectClick,
   }) => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -230,212 +248,194 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
       navigate(`/mods/${source}/${hit.project_id}`);
     };
 
+    const authorUrl =
+      hit.source === "Modrinth"
+        ? `https://modrinth.com/user/${hit.author}`
+        : `https://www.curseforge.com/members/${hit.author}/projects`;
+    const statusColor = installStatus?.is_included_in_norisk_pack
+      ? PACK_COLOR
+      : installStatus?.is_installed
+        ? INSTALLED_COLOR
+        : null;
+    const installBusy =
+      hit.project_type === "modpack" ? !!isInstallingModpackAsProfile : !!isQuickInstalling;
+    const alreadyInstalled = !!installStatus?.is_installed && !!selectedProfile;
+    const installDisabled = !!isInstallingModpackAsProfile || !!isQuickInstalling || alreadyInstalled;
+
     return (
       <div>
-        {/* Main Card */}
+        {/* Zeile der Zutatenliste: Platznummer, Bild, Text, Aktionen – Haarlinie statt Kasten */}
         <div
           onClick={handleTitleClick}
-          className={cn(
-            "relative flex items-center gap-4 p-3 rounded-lg bg-black/20 border border-white/10 hover:border-white/20 transition-all duration-200 cursor-pointer",
-          installStatus?.is_installed &&
-            !installStatus?.is_included_in_norisk_pack &&
-            "border-l-green-500",
-          !installStatus?.is_installed &&
-            installStatus?.is_included_in_norisk_pack &&
-            "border-l-blue-500",
-          installStatus?.is_installed &&
-            installStatus?.is_included_in_norisk_pack &&
-            "border-l-blue-500",
-        )}
-      >
-        {/* Stats - absolute oben rechts */}
-        <div className="absolute top-3 right-3 flex items-center space-x-2 text-xs text-gray-400 font-minecraft">
-          {/* Downloads */}
-          <div className="text-white/50 flex items-center gap-0.5">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-3 w-3"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" />
-            </svg>
-            <span>{hit.downloads.toLocaleString()}</span>
-          </div>
-        </div>
-
-        {/* Project Icon */}
-        <div
-          className="relative w-20 h-20 flex-shrink-0 rounded-md overflow-hidden border"
-          style={{
-            borderColor: `${accentColor.value}30`,
-            backgroundColor: `${accentColor.value}10`,
-          }}
+          className="group relative flex cursor-pointer items-center gap-4 border-b py-3 pl-2 pr-3 transition-colors duration-150 hover:bg-white/[0.04]"
+          style={{ borderColor: SURFACE.line }}
         >
-          {hit.icon_url ? (
-            <img
-              src={hit.icon_url || "/placeholder.svg"}
-              alt={`${hit.title} icon`}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full bg-gray-700/50 flex items-center justify-center">
-              <span className="text-gray-500 text-xl">?</span>
-            </div>
-          )}
-        </div>
-
-        {/* Project Info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-row items-baseline space-x-1.5 mb-1">
+          {statusColor && (
             <span
-              className="text-white font-minecraft text-lg whitespace-nowrap overflow-hidden text-ellipsis normal-case hover:underline hover:text-accent cursor-pointer text-left transition-colors"
-              title={`View ${hit.title} details`}
+              className="absolute bottom-2.5 left-0 top-2.5 w-[3px]"
+              style={{ backgroundColor: statusColor }}
+              aria-hidden="true"
+            />
+          )}
+
+          {typeof itemIndex === "number" && (
+            <span
+              className="w-9 flex-shrink-0 text-right font-minecraft text-2xl leading-none tabular-nums text-white/[0.16] transition-colors duration-150 group-hover:text-white/45"
+              aria-hidden="true"
             >
-              {hit.title}
+              {String(itemIndex + 1).padStart(2, "0")}
             </span>
-            {hit.author && (
-              <a
-                href={
-                  hit.source === 'Modrinth'
-                    ? `https://modrinth.com/user/${hit.author}`
-                    : `https://www.curseforge.com/members/${hit.author}/projects`
-                }
-                onClick={async (e) => {
-                  e.preventDefault();
-                  try {
-                    await openExternalUrl(
-                      hit.source === 'Modrinth'
-                        ? `https://modrinth.com/user/${hit.author}`
-                        : `https://www.curseforge.com/members/${hit.author}/projects`
-                    );
-                  } catch (error) {
-                    console.error("Failed to open external URL:", error);
-                    toast.error(t('common.open_link_failed'));
-                  }
-                }}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-gray-400 truncate font-minecraft flex-shrink min-w-0 hover:text-gray-200 hover:underline cursor-pointer"
-                title={`Open ${hit.author}'s profile on ${hit.source === 'Modrinth' ? 'Modrinth' : 'CurseForge'}`}
+          )}
+
+          {/* Project Icon */}
+          <div
+            className="relative h-14 w-14 flex-shrink-0 overflow-hidden border"
+            style={{
+              borderColor: SURFACE.line,
+              backgroundColor: SURFACE.base,
+              borderRadius: "calc(var(--border-radius) * 0.8)",
+            }}
+          >
+            {hit.icon_url ? (
+              <img
+                src={hit.icon_url || "/placeholder.svg"}
+                alt={`${hit.title} icon`}
+                className="h-full w-full object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center font-minecraft text-xl uppercase text-white/30">
+                {String(hit.title ?? "?").trim().charAt(0) || "?"}
+              </div>
+            )}
+          </div>
+
+          {/* Project Info */}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline gap-2">
+              <span
+                className="overflow-hidden text-ellipsis whitespace-nowrap text-left font-minecraft text-lg normal-case leading-tight text-white"
+                title={`View ${hit.title} details`}
               >
-                by {hit.author}
-              </a>
-            )}
-          </div>
-
-          {/* Description */}
-          <p className="text-xs text-gray-300 line-clamp-2 font-minecraft leading-tight mb-2 min-h-[2rem]">
-            {hit.description}
-          </p>
-
-          <div className="flex items-center gap-1 text-sm font-minecraft">
-            {/* Status badges */}
-            {installStatus && (
-              <>
-                {installStatus.is_installed && (
-                  <TagBadge variant="success" size="sm">
-                    Installed
-                  </TagBadge>
-                )}
-                {installStatus.is_included_in_norisk_pack && (
-                  <TagBadge
-                    variant={
-                      installStatus.norisk_pack_item_details?.is_enabled === false
-                        ? "inactive"
-                        : "info"
+                {hit.title}
+              </span>
+              {hit.author && (
+                <a
+                  href={authorUrl}
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    try {
+                      await openExternalUrl(authorUrl);
+                    } catch (error) {
+                      console.error("Failed to open external URL:", error);
+                      toast.error(t('common.open_link_failed'));
                     }
-                    size="sm"
-                  >
-                    Salami Pack
-                  </TagBadge>
-                )}
-              </>
-            )}
+                  }}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="min-w-0 flex-shrink truncate font-minecraft text-xs text-white/40 hover:text-white/80 hover:underline"
+                  title={`Open ${hit.author}'s profile on ${hit.source === 'Modrinth' ? 'Modrinth' : 'CurseForge'}`}
+                >
+                  {hit.author}
+                </a>
+              )}
+            </div>
 
-            {/* Categories */}
-            {hit.categories &&
-              hit.categories.length > 0 &&
-              hit.categories
-                .slice(0, 3)
-                .map((category) => (
-                  <TagBadge key={category} size="sm">
-                    {category.replace(/-/g, " ")}
-                  </TagBadge>
-                ))}
+            <p className="mt-0.5 line-clamp-1 font-minecraft text-xs leading-snug text-white/55">
+              {hit.description}
+            </p>
+
+            {/* Kennzahlen und Kategorien als ruhige Textzeile */}
+            <div className="mt-1.5 flex items-center gap-2 overflow-hidden whitespace-nowrap font-minecraft text-[11px] text-white/40">
+              <span className="flex flex-shrink-0 items-center gap-1 text-white/65" title={hit.downloads.toLocaleString()}>
+                <Icon icon="solar:download-minimalistic-bold" className="h-3 w-3" />
+                {compactNumber(hit.downloads, i18n.language)}
+              </span>
+              {installStatus?.is_installed && (
+                <span className="flex-shrink-0" style={{ color: INSTALLED_COLOR }}>
+                  ● Installed
+                </span>
+              )}
+              {installStatus?.is_included_in_norisk_pack && (
+                <span
+                  className="flex-shrink-0"
+                  style={{
+                    color: PACK_COLOR,
+                    opacity: installStatus.norisk_pack_item_details?.is_enabled === false ? 0.5 : 1,
+                  }}
+                >
+                  ● Salami Pack
+                </span>
+              )}
+              {(hit.categories ?? []).slice(0, 3).map((category: string) => (
+                <React.Fragment key={category}>
+                  <span className="text-white/20" aria-hidden="true">/</span>
+                  <span className="truncate lowercase">{category.replace(/-/g, " ")}</span>
+                </React.Fragment>
+              ))}
+            </div>
           </div>
-        </div>
 
-
-
-        {/* Action Buttons */}
-        <div className="flex items-center space-x-1">
-          {hit.project_type === "modpack" ? (
-            <ActionButton
-              label={isInstallingModpackAsProfile ? "Installing..." : "Install"}
-              icon={isInstallingModpackAsProfile ? "solar:refresh-bold" : "solar:download-minimalistic-bold"}
-              iconClassName={isInstallingModpackAsProfile ? "animate-spin-slow" : ""}
-              variant={isInstallingModpackAsProfile ? "secondary" : "primary"}
-              disabled={isInstallingModpackAsProfile || isQuickInstalling || (!!installStatus?.is_installed && !!selectedProfile)}
+          {/* Action Buttons */}
+          <div className="flex flex-shrink-0 items-center gap-1">
+            <button
+              type="button"
+              disabled={installDisabled}
               onClick={(e) => {
                 e.stopPropagation();
-                if (onInstallModpackAsProfileClick) {
+                if (hit.project_type === "modpack" && onInstallModpackAsProfileClick) {
                   onInstallModpackAsProfileClick(hit);
                 } else {
-                  console.warn(
-                    "onInstallModpackAsProfileClick is not defined for modpack",
-                  );
                   onQuickInstallClick(hit);
                 }
               }}
-              size="sm"
-            />
-          ) : (
+              className={cn(
+                "flex h-9 items-center gap-2 px-3.5 font-minecraft text-sm lowercase text-white transition-[filter,background-color] duration-150",
+                installDisabled ? "cursor-not-allowed opacity-50" : "hover:brightness-110",
+              )}
+              style={{
+                backgroundColor: installBusy || alreadyInstalled ? SURFACE.raised : accentColor.value,
+                color: installBusy || alreadyInstalled ? "#fff" : readableOn(accentColor.value),
+              }}
+            >
+              <Icon
+                icon={
+                  installBusy
+                    ? "solar:refresh-bold"
+                    : "solar:download-minimalistic-bold"
+                }
+                className={cn("h-4 w-4", installBusy && "animate-spin-slow")}
+              />
+              <span>{installBusy ? "Installing..." : alreadyInstalled ? "Installed" : "Install"}</span>
+            </button>
+            <CartToggleButton project={hit} />
             <ActionButton
-              label={isQuickInstalling ? "Installing..." : "Install"}
               icon={
-                isQuickInstalling
+                isLoadingVersions
                   ? "solar:refresh-bold"
-                  : "solar:download-minimalistic-bold"
+                  : isExpanded
+                    ? "solar:alt-arrow-up-bold"
+                    : "solar:alt-arrow-down-bold"
               }
-              iconClassName={isQuickInstalling ? "animate-spin-slow" : ""}
-              variant={isQuickInstalling ? "secondary" : "primary"}
-              disabled={isQuickInstalling || (!!installStatus?.is_installed && !!selectedProfile)}
+              iconClassName={isLoadingVersions ? "animate-spin-fast" : ""}
+              variant="icon-only"
+              disabled={isLoadingVersions}
+              tooltip={isExpanded ? "Hide Versions" : "Show Versions"}
               onClick={(e) => {
                 e.stopPropagation();
-                onQuickInstallClick(hit);
+                onToggleVersionsClick(hit.project_id);
               }}
               size="sm"
             />
-          )}
-          <CartToggleButton project={hit} />
-          <ActionButton
-            icon={
-              isLoadingVersions
-                ? "solar:refresh-bold"
-                : isExpanded
-                  ? "solar:alt-arrow-up-bold"
-                  : "solar:alt-arrow-down-bold"
-            }
-            iconClassName={isLoadingVersions ? "animate-spin-fast" : ""}
-            variant="icon-only"
-            disabled={isLoadingVersions}
-            tooltip={isExpanded ? "Hide Versions" : "Show Versions"}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleVersionsClick(hit.project_id);
-            }}
-            size="sm"
-          />
-        </div>
-
+          </div>
         </div>
 
         {/* Version List - Below Card */}
         {isExpanded &&
           Array.isArray(projectVersions) &&
           projectVersions.length > 0 && (
-            <div className="mt-4">
+            <div className="mb-3 mt-3 pl-11">
               <ModrinthVersionListV2
               projectId={hit.project_id}
               project={hit}

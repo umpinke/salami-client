@@ -7,6 +7,7 @@ import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 import { IconButton } from "./buttons/IconButton";
+import { mixHex, SURFACE } from "./design-system";
 
 interface ModalProps {
   title: string;
@@ -110,12 +111,7 @@ export function Modal({
     return "border";
   };
 
-  const getBoxShadow = () => {
-    if (variant === "3d") {
-      return `0 10px 34px rgba(0,0,0,0.3), 0 15px 25px rgba(0,0,0,0.5), inset 0 1px 0 ${accentColor.value}40, inset 0 0 0 1px ${accentColor.value}20`;
-    }
-    return "none";
-  };
+  const getBoxShadow = () => "0 30px 80px -20px rgba(0,0,0,0.8)";
   return (
     <div
       ref={modalRef}
@@ -131,25 +127,17 @@ export function Modal({
           className,
         )}
         style={{
-          backgroundColor: `${accentColor.value}20`,
-          borderColor: `${accentColor.value}80`,
-          borderBottomColor: accentColor.value,
+          backgroundColor: mixHex(SURFACE.solid, accentColor.value, 0.05),
+          borderColor: SURFACE.line,
           boxShadow: getBoxShadow(),
         }}
       >
-        {variant === "3d" && (
-          <span
-            className="absolute inset-x-0 top-0 h-[2px] rounded-t-sm"
-            style={{ backgroundColor: `${accentColor.value}80` }}
-          />
-        )}
-
         <div
           ref={headerRef}
-          className="flex items-center justify-between px-6 py-4 border-b-2 flex-shrink-0"
+          className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0"
           style={{
-            borderColor: `${accentColor.value}60`,
-            backgroundColor: `${accentColor.value}30`,
+            borderColor: SURFACE.line,
+            backgroundColor: "transparent",
           }}
         >
           <div className="flex items-center space-x-3">

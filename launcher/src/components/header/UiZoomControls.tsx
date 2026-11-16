@@ -9,10 +9,10 @@ export function UiZoomControls() {
   const zoomIn = useUiScaleStore((s) => s.zoomIn);
   const zoomOut = useUiScaleStore((s) => s.zoomOut);
   const reset = useUiScaleStore((s) => s.reset);
-  const button = "flex h-10 w-9 items-center justify-center text-white/70 transition-colors hover:text-white disabled:opacity-30 disabled:hover:text-white/70";
+  const button = "flex h-9 w-7 items-center justify-center text-white/70 transition-colors hover:text-white disabled:opacity-30 disabled:hover:text-white/70";
 
   return (
-    <div className="flex items-center rounded-lg bg-white/5">
+    <div className="hidden items-center rounded-lg border border-white/[0.09] bg-white/[0.045] min-[1140px]:flex">
       <button
         type="button"
         onClick={zoomOut}
@@ -21,14 +21,14 @@ export function UiZoomControls() {
         aria-label={t("header.zoom_out")}
         className={button}
       >
-        <Icon icon="solar:magnifer-zoom-out-linear" className="h-5 w-5" />
+        <Icon icon="solar:magnifer-zoom-out-linear" className="h-4 w-4" />
       </button>
       <button
         type="button"
         onClick={reset}
         title={t("header.zoom_reset")}
         aria-label={t("header.zoom_reset")}
-        className="h-10 min-w-[2.75rem] px-1 text-xs tabular-nums text-white/70 transition-colors hover:text-white"
+        className="h-9 min-w-[2.4rem] px-0.5 text-xs tabular-nums text-white/70 transition-colors hover:text-white"
       >
         {Math.round(scale * 100)}%
       </button>
@@ -40,7 +40,7 @@ export function UiZoomControls() {
         aria-label={t("header.zoom_in")}
         className={button}
       >
-        <Icon icon="solar:magnifer-zoom-in-linear" className="h-5 w-5" />
+        <Icon icon="solar:magnifer-zoom-in-linear" className="h-4 w-4" />
       </button>
     </div>
   );

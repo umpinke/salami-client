@@ -196,29 +196,20 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             className,
           )}
           style={{
-            backgroundColor: `${accentColor.value}${isHovered || isFocused ? "50" : "30"}`,
+            backgroundColor: isHovered || isFocused ? "rgba(255, 255, 255, 0.08)" : "rgba(255, 255, 255, 0.045)",
             borderColor: error
               ? "rgba(239, 68, 68, 0.6)"
-              : `${accentColor.value}${isHovered || isFocused ? "90" : "80"}`,
-            borderBottomColor: error
-              ? "rgb(185, 28, 28)"
-              : isHovered || isFocused
-                ? accentColor.hoverValue
-                : accentColor.value,
+              : isFocused ? accentColor.value : isHovered ? "rgba(255, 255, 255, 0.2)" : "rgba(255, 255, 255, 0.09)",
             boxShadow:
               variant === "3d"
                 ? `0 4px 16px rgba(0,0,0,0.3), 0 6px 10px rgba(0,0,0,0.35)`
                 : "none",
-            filter:
-              (isFocused || isHovered) && !props.disabled
-                ? "brightness(1.1)"
-                : "brightness(1)",
             ...createRadiusStyle(borderRadius),
           }}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
-          {variant === "3d" && (
+          {false && (
             <span
               className="absolute inset-x-0 top-0 h-[2px] transition-colors duration-200"
               style={{

@@ -129,25 +129,16 @@ export function Select({
 
   const colors = getVariantColors();
 
-  const getBackgroundColor = () => {
-    const baseOpacity = isHovered || isOpen ? "50" : "30";
-    return `${colors.main}${baseOpacity}`;
-  };
+  const getBackgroundColor = () => (isHovered || isOpen ? "rgba(255, 255, 255, 0.08)" : "rgba(255, 255, 255, 0.045)");
 
-  const getBorderColor = () => {
-    return isHovered || isOpen ? `${colors.light}` : `${colors.main}80`;
-  };
+  const getBorderColor = () => (isOpen ? colors.main : isHovered ? "rgba(255, 255, 255, 0.2)" : "rgba(255, 255, 255, 0.09)");
   const getBorderClasses = () => {
     if (variant === "3d") return "border";
     return "border";
   };
 
   const getBoxShadow = () => {
-    if (variant !== "3d") return "none";
-
-    return isHovered || isOpen
-      ? `0 6px 22px rgba(0,0,0,0.25), 0 8px 12px rgba(0,0,0,0.4), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`
-      : `0 4px 16px rgba(0,0,0,0.3), 0 6px 10px rgba(0,0,0,0.35), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`;
+    return "none";
   };
 
   const buttonContent = (
@@ -250,16 +241,11 @@ export function Select({
         )}        style={{
           backgroundColor: getBackgroundColor(),
           borderColor: getBorderColor(),
-          borderBottomColor: isHovered || isOpen ? colors.light : colors.dark,
           boxShadow: getBoxShadow(),
-          filter:
-            (isHovered || isOpen) && !disabled
-              ? "brightness(1.1)"
-              : "brightness(1)",
           ...createRadiusStyle(borderRadius),
         }}
         disabled={disabled}
-      >        {variant === "3d" && (
+      >        {false && (
           <span
             className="absolute inset-x-0 top-0 h-[2px] transition-colors duration-200"
             style={{

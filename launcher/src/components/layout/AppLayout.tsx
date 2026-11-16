@@ -5,7 +5,11 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { Icon } from "@iconify/react";
 
-import { VerticalNavbar } from ".././navigation/VerticalNavbar";
+import { TopNav, type TopNavItem } from ".././navigation/TopNav";
+import { SalamiBackdrop } from "../effects/SalamiBackdrop";
+import { mixHex, SURFACE } from "../ui/design-system";
+import { Logo } from "../ui/Logo";
+import { CreditsModal } from "../modals/CreditsModal";
 import { UserProfileBar } from ".././header/UserProfileBar";
 import { NavigationHistory } from "../ui/NavigationHistory";
 import { useThemeStore } from "../../store/useThemeStore";
@@ -40,7 +44,6 @@ import { SettingsModal } from "../modals/SettingsModal";
 import { ProfileDuplicateModal } from "../modals/ProfileDuplicateModal";
 import { exit } from '@tauri-apps/plugin-process';
 import { Tooltip } from "../ui/Tooltip";
-import { HeaderInfoCarousel } from "../header/HeaderInfoCarousel";
 import { toast } from 'react-hot-toast';
 import { useTranslation } from "react-i18next";
 import { parseErrorMessage } from "../../utils/error-utils";
@@ -77,7 +80,7 @@ export function AppLayout({
     void refreshClips();
   }, [refreshClips]);
 
-  const navItems = [
+  const navItems: TopNavItem[] = [
     { id: "play", icon: "solar:play-bold", label: t("nav.play") },
     { id: "profiles", icon: "solar:user-id-bold", label: t("nav.profiles") },
     { id: "mods", icon: "solar:widget-bold", label: t("nav.mods") },
@@ -92,35 +95,10 @@ export function AppLayout({
   const { isBackgroundAnimationEnabled, accentColor: themeAccentColor, accentColor } = useThemeStore();
   const { isEnabled: isSnowEnabled } = useSnowEffectStore();
   const { selectedTheme, isThemeActive } = useLauncherTheme();
-  const getComplementaryBackground = () => {
-    const hexToRgb = (hex: string) => {
-      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-      return result
-        ? {
-            r: Number.parseInt(result[1], 16),
-            g: Number.parseInt(result[2], 16),
-            b: Number.parseInt(result[3], 16),
-          }
-        : { r: 34, g: 34, b: 34 };
-    };
+  const getComplementaryBackground = () => mixHex("#0f0d0e", themeAccentColor.value, 0.04);
 
-    const rgb = hexToRgb(themeAccentColor.value);
-
-    const darkR = Math.floor(rgb.r * 0.1);
-    const darkG = Math.floor(rgb.g * 0.1);
-    const darkB = Math.floor(rgb.b * 0.1);
-
-    const finalR = Math.min(darkR, 30);
-    const finalG = Math.min(darkG, 30);
-    const finalB = Math.min(darkB, 30);
-
-    return `rgb(${finalR}, ${finalG}, ${finalB})`;
-  };
-
-  const getComplementaryBackgroundWithAlpha = (alpha: number) => {
-    const rgb = getComplementaryBackground();
-    return rgb.replace("rgb(", "rgba(").replace(")", `, ${alpha})`);
-  };
+  const getComplementaryBackgroundWithAlpha = (alpha: number) =>
+    getComplementaryBackground().replace("rgb(", "rgba(").replace(")", `, ${alpha})`);
 
   const backgroundColor = getComplementaryBackground();
 
@@ -293,6 +271,14 @@ export function AppLayout({
             style={{ backgroundColor: hexToRgbaWithLowOpacity(themeAccentColor.value) }}
           ></div>
         );
+      case BACKGROUND_EFFECTS.SALAMI_RINGS:
+        return (
+          <SalamiBackdrop
+            accentColorValue={themeAccentColor.value}
+            focus={activeTab === "play" ? { x: 72, y: 54 } : { x: 92, y: 4 }}
+            animated={isBackgroundAnimationEnabled}
+          />
+        );
       case BACKGROUND_EFFECTS.PLAIN_BACKGROUND:
         return <PlainBackground accentColorValue={themeAccentColor.value} />;
       default:
@@ -307,46 +293,34 @@ export function AppLayout({
   return (
     <div
       ref={launcherRef}
-      className="h-screen w-full bg-black/50 backdrop-blur-lg border overflow-hidden relative flex"
+      className="h-screen w-full border overflow-hidden relative flex flex-col"
       style={{
-        backgroundColor: backgroundColor,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundImage: isCustomMediaVisible 
-          ? `linear-gradient(to bottom right, ${getComplementaryBackgroundWithAlpha(0.3)}, rgba(0,0,0,0.5))`
-          : `linear-gradient(to bottom right, ${backgroundColor}, rgba(0,0,0,0.9))`,
-        borderColor: `${themeAccentColor.value}30`,
+        backgroundColor: isCustomMediaVisible ? getComplementaryBackgroundWithAlpha(0.55) : backgroundColor,
+        borderColor: SURFACE.line,
       }}
     >
+      {/* Hintergrund liegt unter Leiste und Inhalt – die Leiste ist kein eigener Kasten mehr */}
+      <div className="absolute inset-0">
+        <CustomMediaBackground activeTab={activeTab} />
+        {shouldShowEffects && renderBackgroundEffect()}
+        {/* Snow overlay - independent of theme/background */}
+        {shouldShowEffects && isSnowEnabled && <Snowfall />}
+        {shouldShowEffects && selectedTheme?.id === SALAMI_THEME_ID && <SalamiFall />}
+      </div>
 
-      <VerticalNavbar
+      <TopBar
         items={navItems}
-        activeItem={activeTab}
-        onItemClick={onNavChange}
-        className="h-full border-r-2 z-10"
-        version={appConfig.version}
+        activeTab={activeTab}
+        onNavChange={onNavChange}
+        minimizeRef={minimizeRef}
+        maximizeRef={maximizeRef}
+        closeRef={closeRef}
       />
 
-      <div className="flex-1 flex flex-col h-full overflow-hidden">
-        <HeaderBar
-          title={navItems.find((item) => item.id === activeTab)?.label ?? BRAND.name}
-          minimizeRef={minimizeRef}
-          maximizeRef={maximizeRef}
-          closeRef={closeRef}
-        />
-
-        <div className="flex-1 relative overflow-hidden">
-          <CustomMediaBackground activeTab={activeTab} />
-          {shouldShowEffects && renderBackgroundEffect()}
-          {/* Snow overlay - independent of theme/background */}
-          {shouldShowEffects && isSnowEnabled && <Snowfall />}
-          {shouldShowEffects && selectedTheme?.id === SALAMI_THEME_ID && <SalamiFall />}
-
-          <div className="relative z-10 h-full overflow-hidden custom-scrollbar">
-            {children}
-          </div>
-        </div>
+      <div className="relative z-10 flex-1 overflow-hidden custom-scrollbar">
+        {children}
       </div>
+
       {/* Global Modals Portal */}
       <ProfileWizardV2Modal />
       <ProfileSettingsModal />
@@ -356,20 +330,26 @@ export function AppLayout({
   );
 }
 
-interface HeaderBarProps {
-  /** Name der aktuellen Seite – das Branding steht in der Seitenleiste. */
-  title: string;
+interface TopBarProps {
+  items: TopNavItem[];
+  activeTab: string;
+  onNavChange: (tabId: string) => void;
   minimizeRef: React.RefObject<HTMLDivElement>;
   maximizeRef: React.RefObject<HTMLDivElement>;
   closeRef: React.RefObject<HTMLDivElement>;
 }
 
-function HeaderBar({ title, minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
+/**
+ * Leiste oben: Marke, Navigation als Reiter, Konto und Fenster-Knöpfe in einer Zeile –
+ * statt NoRisks Seitenleiste mit eigener Kopfzeile.
+ */
+function TopBar({ items, activeTab, onNavChange, minimizeRef, maximizeRef, closeRef }: TopBarProps) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const [appVersion, setAppVersion] = useState<string | null>(null);
   const [availableUpdate, setAvailableUpdate] = useState<UpdateInfo | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showCredits, setShowCredits] = useState(false);
 
   const handleUpdateClick = async () => {
     if (isUpdating) return; // Prevent multiple simultaneous downloads
@@ -392,119 +372,93 @@ function HeaderBar({ title, minimizeRef, maximizeRef, closeRef }: HeaderBarProps
     }
   };
 
-  // Calculate complementary/update highlight color based on current accent
-  const getUpdateHighlightColor = () => {
-    const hexToRgb = (hex: string) => {
-      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-      return result
-        ? {
-            r: Number.parseInt(result[1], 16),
-            g: Number.parseInt(result[2], 16),
-            b: Number.parseInt(result[3], 16),
-          }
-        : { r: 245, g: 158, b: 11 }; // fallback to amber
-    };
-
-    const rgb = hexToRgb(accentColor.value);
-
-    // Calculate a complementary warning color
-    // Mix current accent with amber/yellow for good visibility
-    const accentWeight = 0.4; // How much of the accent color to include
-    const warningWeight = 0.9; // How much of the warning color (amber)
-
-    const warningRgb = { r: 245, g: 158, b: 100 }; // Amber base
-
-    const mixedR = Math.round(rgb.r * accentWeight + warningRgb.r * warningWeight);
-    const mixedG = Math.round(rgb.g * accentWeight + warningRgb.g * warningWeight);
-    const mixedB = Math.round(rgb.b * accentWeight + warningRgb.b * warningWeight);
-
-    return `rgb(${mixedR}, ${mixedG}, ${mixedB})`;
-  };
-
   useEffect(() => {
     const fetchVersion = async () => {
       try {
-        const fetchedVersion = await ConfigService.getAppVersion();
-        setAppVersion(fetchedVersion);
+        setAppVersion(await ConfigService.getAppVersion());
       } catch (error) {
         console.error("Failed to fetch app version:", error);
         setAppVersion("?.?.?");
       }
     };
 
-  const checkForUpdates = async () => {
-    try {
-      const updateInfo = await checkUpdateAvailable();
-      if (updateInfo) {
-        console.log("Update available:", updateInfo);
-        setAvailableUpdate(updateInfo);
+    const checkForUpdates = async () => {
+      try {
+        const updateInfo = await checkUpdateAvailable();
+        if (updateInfo) {
+          console.log("Update available:", updateInfo);
+          setAvailableUpdate(updateInfo);
+        }
+      } catch (error) {
+        console.error("Failed to check for updates:", error);
+        // Don't show error to user, just silently fail
       }
-    } catch (error) {
-      console.error("Failed to check for updates:", error);
-      // Don't show error to user, just silently fail
-    }
-  };
+    };
 
     fetchVersion();
     checkForUpdates();
 
-    // Check for updates every 4 hours (4 * 60 * 60 * 1000 = 14,400,000 ms)
-    const updateCheckInterval = setInterval(() => {
-      console.log("Performing scheduled update check...");
-      checkForUpdates();
-    }, 4 * 60 * 60 * 1000);
-
-    return () => {
-      clearInterval(updateCheckInterval);
-    };
+    // Check for updates every 4 hours
+    const updateCheckInterval = setInterval(checkForUpdates, 4 * 60 * 60 * 1000);
+    return () => clearInterval(updateCheckInterval);
   }, []);
 
+  const settingsItem = items.find((item) => item.isAction);
+
   return (
-    <div
-      className="h-20 flex-shrink-0 border-b-2 backdrop-blur-lg flex items-center justify-between px-8 z-10"
-      style={{
-        borderColor: `${accentColor.value}40`,
-        backgroundColor: `rgba(${Number.parseInt(accentColor.value.slice(1, 3), 16)}, ${Number.parseInt(
-          accentColor.value.slice(3, 5),
-          16,
-        )}, ${Number.parseInt(accentColor.value.slice(5, 7), 16)}, 0.01)`,
-      }}
+    <header
+      className="relative z-20 grid h-[60px] flex-shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(max-content,1fr)] items-center gap-3 pl-4 pr-2"
       data-tauri-drag-region
     >
-      <div className="flex items-center gap-4" data-tauri-drag-region>
-        <NavigationHistory />
+      <div className="flex min-w-0 items-center gap-2" data-tauri-drag-region>
+        <button
+          type="button"
+          onClick={() => setShowCredits(true)}
+          aria-label={BRAND.name}
+          title={`${BRAND.name} v${appVersion ?? "?.?.?"}`}
+          className="flex flex-shrink-0 items-center gap-2.5 py-1 pl-1 pr-2 transition-colors hover:bg-white/5"
+        >
+          <Logo size="sm" className="!h-8 !w-8" />
+          <span className="hidden flex-col leading-none min-[1180px]:flex">
+            <span className="font-minecraft text-[17px] text-white">{BRAND.shortName}</span>
+            <span className="mt-0.5 text-[10px] text-white/40">v{appVersion ?? "?.?.?"}</span>
+          </span>
+        </button>
 
-        <div className="flex flex-col items-start">
-          <div className="flex items-center gap-3">
-            <h1
-              className="font-smallcaps text-2xl tracking-wider font-bold text-shadow"
-              data-tauri-drag-region
+        <NavigationHistory className="text-white/60" />
+
+        {availableUpdate && (
+          <Tooltip content={isUpdating ? t('header.update.tooltip_updating') : t('header.update.tooltip_available', { version: availableUpdate.version })}>
+            <button
+              type="button"
+              onClick={handleUpdateClick}
+              disabled={isUpdating}
+              className="flex h-8 items-center gap-1.5 px-2.5 text-xs disabled:cursor-not-allowed disabled:opacity-60"
+              style={{ backgroundColor: accentColor.value, color: "#fff" }}
             >
-              {title}
-            </h1>
-            {availableUpdate && (
-              <Tooltip content={isUpdating ? t('header.update.tooltip_updating') : t('header.update.tooltip_available', { version: availableUpdate.version })}>
-                <div
-                  className={isUpdating ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}
-                  onClick={handleUpdateClick}
-                >
-                  <Icon
-                    icon={isUpdating ? "solar:download-minimalistic-bold" : "solar:download-minimalistic-bold"}
-                    className={`w-6 h-6 transition-colors ${isUpdating ? 'animate-pulse' : ''}`}
-                    style={{
-                      color: accentColor.value,
-                    }}
-                  />
-                </div>
-              </Tooltip>
-            )}
-          </div>
-          <HeaderInfoCarousel version={appVersion} />
-        </div>
+              <Icon icon="solar:download-minimalistic-bold" className={`h-4 w-4 ${isUpdating ? "animate-pulse" : ""}`} />
+              <span>{availableUpdate.version}</span>
+            </button>
+          </Tooltip>
+        )}
       </div>
 
-      <div className="flex items-center gap-4">
+      <TopNav items={items} activeItem={activeTab} onItemClick={onNavChange} />
+
+      <div className="flex min-w-0 items-center justify-end gap-2" data-tauri-drag-region>
         <UserProfileBar />
+
+        {settingsItem && (
+          <button
+            type="button"
+            onClick={() => onNavChange(settingsItem.id)}
+            title={settingsItem.label}
+            aria-label={settingsItem.label}
+            className="flex h-9 w-9 flex-shrink-0 items-center justify-center text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <Icon icon={settingsItem.icon} className="h-5 w-5" />
+          </button>
+        )}
 
         <WindowControls
           minimizeRef={minimizeRef}
@@ -512,7 +466,9 @@ function HeaderBar({ title, minimizeRef, maximizeRef, closeRef }: HeaderBarProps
           closeRef={closeRef}
         />
       </div>
-    </div>
+
+      <CreditsModal isOpen={showCredits} onClose={() => setShowCredits(false)} />
+    </header>
   );
 }
 
@@ -528,28 +484,18 @@ function WindowControls({
   closeRef,
 }: WindowControlsProps) {
   const { t } = useTranslation();
+  const glyph = "h-[11px] w-[11px]";
+  const base = "titlebar-button-borderless flex h-9 w-10 items-center justify-center text-white/55 transition-colors cursor-pointer";
   return (
-    <div className="flex items-center gap-3 ml-4">
-      <div
-        ref={minimizeRef}
-        className="titlebar-button-borderless w-5 h-5 flex items-center justify-center text-white/60 hover:text-white transition-colors cursor-pointer"
-        title={t('window.minimize')}
-      >
-        <Icon icon="pixel:minus-solid" className="w-4 h-4" />
+    <div className="ml-1 flex flex-shrink-0 items-center">
+      <div ref={minimizeRef} className={`${base} hover:bg-white/10 hover:text-white`} title={t('window.minimize')}>
+        <svg viewBox="0 0 11 11" className={glyph} fill="none" stroke="currentColor" strokeWidth="1.2"><path d="M1 5.5h9" /></svg>
       </div>
-      <div
-        ref={maximizeRef}
-        className="titlebar-button-borderless w-5 h-5 flex items-center justify-center text-white/60 hover:text-white transition-colors cursor-pointer"
-        title={t('window.maximize')}
-      >
-        <Icon icon="pixel:expand-solid" className="w-4 h-4" />
+      <div ref={maximizeRef} className={`${base} hover:bg-white/10 hover:text-white`} title={t('window.maximize')}>
+        <svg viewBox="0 0 11 11" className={glyph} fill="none" stroke="currentColor" strokeWidth="1.2"><rect x="1.5" y="1.5" width="8" height="8" rx="1.5" /></svg>
       </div>
-      <div
-        ref={closeRef}
-        className="titlebar-button-borderless w-5 h-5 flex items-center justify-center text-white/60 hover:text-red-500 transition-colors cursor-pointer"
-        title={t('window.close')}
-      >
-        <Icon icon="pixel:window-close-solid" className="w-4 h-4" />
+      <div ref={closeRef} className={`${base} hover:bg-red-500 hover:text-white`} title={t('window.close')}>
+        <svg viewBox="0 0 11 11" className={glyph} fill="none" stroke="currentColor" strokeWidth="1.2"><path d="M1.5 1.5l8 8M9.5 1.5l-8 8" /></svg>
       </div>
     </div>
   );

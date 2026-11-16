@@ -601,3 +601,23 @@ nav button:not(.no-radius),
 .salami-inactive *::after {
   animation-play-state: paused !important;
 }
+
+/* Salami-Hintergrund: langsames Wandern des Lichts (nur mit Hintergrund-Animation) */
+@keyframes salami-backdrop-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(-2%, 1.5%, 0) scale(1.06); }
+}
+.salami-backdrop-drift {
+  animation: salami-backdrop-drift 26s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .salami-backdrop-drift { animation: none; }
+}
+
+/* Salami-Startseite: Schattenriss-Schrift hinter der Spielfigur */
+.salami-ghost-text {
+  color: transparent;
+  -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.07);
+  letter-spacing: -0.02em;
+  user-select: none;
+}

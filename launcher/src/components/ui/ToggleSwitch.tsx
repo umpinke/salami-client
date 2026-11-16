@@ -33,21 +33,21 @@ export function ToggleSwitch({
     switch (size) {
       case "sm":
         return {
-          track: "w-8 h-4",
+          track: "w-8 h-[18px]",
           knob: "w-3 h-3",
           knobTranslate: "translate-x-4",
           label: "text-xs",
         };
       case "lg":
         return {
-          track: "w-14 h-7",
+          track: "w-14 h-[30px]",
           knob: "w-5 h-5",
           knobTranslate: "translate-x-7",
           label: "text-base",
         };
       default:
         return {
-          track: "w-10 h-5",
+          track: "w-10 h-[22px]",
           knob: "w-4 h-4",
           knobTranslate: "translate-x-5",
           label: "text-sm",
@@ -66,10 +66,10 @@ export function ToggleSwitch({
   useEffect(() => {
     if (knobRef.current) {
       gsap.to(knobRef.current, {
-        x: checked ? (size === "sm" ? 16 : size === "lg" ? 28 : 20) : 0,
+        x: checked ? (size === "sm" ? 14 : size === "lg" ? 30 : 18) : 0,
         backgroundColor: checked ? "#ffffff" : "#f0f0f0",
         boxShadow: checked
-          ? `0 1px 3px rgba(0,0,0,0.3), 0 0 0 2px ${accentColor.value}40`
+          ? "0 1px 3px rgba(0,0,0,0.35)"
           : "0 1px 3px rgba(0,0,0,0.3)",
         duration: 0.3,
         ease: "power2.inOut",
@@ -79,11 +79,8 @@ export function ToggleSwitch({
     if (trackRef.current) {
       gsap.to(trackRef.current, {
         backgroundColor: checked
-          ? `${accentColor.value}80`
-          : `${accentColor.value}30`,
-        borderColor: checked
-          ? `${accentColor.value}CC`
-          : `${accentColor.value}50`,
+          ? accentColor.value
+          : "rgba(255, 255, 255, 0.14)",
         duration: 0.3,
         ease: "power2.inOut",
       });
@@ -155,31 +152,21 @@ export function ToggleSwitch({
           )}
           style={{
             backgroundColor: checked
-              ? `${accentColor.value}80`
-              : `${accentColor.value}30`,
-            borderWidth: "2px",
-            borderStyle: "solid",
-            borderColor: checked
-              ? `${accentColor.value}CC`
-              : `${accentColor.value}50`,
-            borderBottomWidth: "3px",
-            borderBottomColor: checked
-              ? accentColor.dark
-              : `${accentColor.value}70`,
-            boxShadow: `inset 0 1px 0 ${accentColor.value}20`,
+              ? accentColor.value
+              : "rgba(255, 255, 255, 0.14)",
           }}
         >
           <div
             ref={knobRef}
             className={cn(
-              "absolute top-1/2 left-0.5 -translate-y-1/2 bg-white rounded-full shadow-md",
+              "absolute top-1/2 left-[3px] -translate-y-1/2 bg-white rounded-full shadow-md",
               sizeConfig.knob,
             )}
             style={{
               boxShadow: checked
-                ? `0 1px 3px rgba(0,0,0,0.3), 0 0 0 2px ${accentColor.value}40`
+                ? "0 1px 3px rgba(0,0,0,0.35)"
                 : "0 1px 3px rgba(0,0,0,0.3)",
-              transform: `translate(${checked ? (size === "sm" ? 16 : size === "lg" ? 28 : 20) : 0}px, -50%) scale(${isHovered ? 1.15 : 1})`,
+              transform: `translate(${checked ? (size === "sm" ? 14 : size === "lg" ? 30 : 18) : 0}px, -50%) scale(${isHovered ? 1.15 : 1})`,
             }}
           />
         </div>

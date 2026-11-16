@@ -80,6 +80,25 @@ public final class GuiDraw {
 		/*g.submitOutline(x, y, width, height, color);*/
 	}
 
+	/** Rechteck mit um 1 Pixel abgeschrägten Ecken – wirkt bei GUI-Skalierung wie abgerundet. */
+	public static void roundRect(GuiGraphics g, int x, int y, int width, int height, int color) {
+		if (width < 3 || height < 3) {
+			g.fill(x, y, x + width, y + height, color);
+			return;
+		}
+		g.fill(x + 1, y, x + width - 1, y + 1, color);
+		g.fill(x, y + 1, x + width, y + height - 1, color);
+		g.fill(x + 1, y + height - 1, x + width - 1, y + height, color);
+	}
+
+	/** Gut lesbare Textfarbe (dunkel oder hell) auf einer deckenden Fläche. */
+	public static int textOn(int argb) {
+		int r = (argb >> 16) & 0xFF;
+		int gr = (argb >> 8) & 0xFF;
+		int b = argb & 0xFF;
+		return (r * 299 + gr * 587 + b * 114) / 1000 > 150 ? 0xFF1B1415 : 0xFFFFFFFF;
+	}
+
 	public static void item(GuiGraphics g, ItemStack stack, int x, int y) {
 		//? if >=26.1 {
 		/*g.item(stack, x, y);

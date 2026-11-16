@@ -33,10 +33,10 @@ export function ProfileIconV2({
 
   return (
     <div
-      className={`${sizeClasses[size]} rounded-lg border-2 flex items-center justify-center overflow-hidden ${className}`}
+      className={`${sizeClasses[size]} rounded-lg border flex items-center justify-center overflow-hidden ${className}`}
       style={{
-        backgroundColor: `${accentColor.value}20`,
-        borderColor: `${accentColor.value}60`,
+        backgroundColor: `${accentColor.value}1f`,
+        borderColor: `${accentColor.value}33`,
       }}
     >
       <ProfileIcon

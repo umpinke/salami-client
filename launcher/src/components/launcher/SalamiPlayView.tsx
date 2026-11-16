@@ -1,9 +1,9 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 import type { Profile } from "../../types/profile";
+import { hexAlpha, SURFACE } from "../ui/design-system";
 import { MainLaunchButton } from "./MainLaunchButton";
 import { PlayerRig } from "./PlayerRig";
 
@@ -33,8 +33,9 @@ const LOADER_NAMES: Record<string, string> = {
 };
 
 /**
- * Startseite im Salami-Layout: links Profil, Start-Knopf und zuletzt gespielte Profile,
- * rechts die Spielfigur – statt NoRisks zentrierter Figur mit Knopf darüber.
+ * Startseite des Salami Client: links offen gesetzter Text (Begrüßung, Profil, Start-Knopf,
+ * zuletzt gespielt), rechts die Spielfigur auf einer Bühne mit der Spielversion als
+ * Schattenriss dahinter – ohne Kasten und ohne NoRisks mittige Figur mit Knopf darunter.
  */
 export function SalamiPlayView({ profiles, selectedProfile, versions, onVersionChange, playerName }: SalamiPlayViewProps) {
   const { t } = useTranslation();
@@ -51,21 +52,29 @@ export function SalamiPlayView({ profiles, selectedProfile, versions, onVersionC
   const loaderName = selectedProfile ? LOADER_NAMES[selectedProfile.loader] ?? selectedProfile.loader : "";
 
   return (
-    <div className="relative z-10 grid h-full w-full grid-cols-[minmax(360px,44%)_1fr] items-center gap-6 px-10">
-      {/* z-20: die Dreh-Ebene der Spielfigur ist größer als ihre Spalte und läge sonst über dem Panel */}
-      <section className="relative z-20 flex flex-col gap-6 rounded-3xl border border-white/10 bg-black/50 p-8 shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-md">
+    <div className="relative z-10 grid h-full w-full grid-cols-[minmax(400px,46%)_1fr] items-center">
+      {/* z-20: die Dreh-Ebene der Spielfigur ist größer als ihre Spalte und läge sonst über dem Text */}
+      <section className="relative z-20 flex flex-col gap-7 pl-14 pr-6">
         <div>
-          <p className="text-sm uppercase tracking-[0.3em] text-white/70">
+          <p className="flex items-center gap-2.5 text-base text-white/60">
+            <span className="h-[3px] w-7" style={{ backgroundColor: accent.value }} />
             {playerName ? t("salami.play.greeting", { name: playerName }) : t("salami.play.greeting_anon")}
           </p>
-          <h1 className="mt-2 break-words font-minecraft text-5xl leading-tight text-white text-shadow">
+          <h1 className="mt-3 break-words font-minecraft text-[4.25rem] leading-[1.02] text-white">
             {selectedProfile?.name ?? t("salami.play.no_profile")}
           </h1>
           {selectedProfile && (
-            <p className="mt-2 flex items-center gap-2 text-base text-white/70">
-              <Icon icon="solar:box-bold" className="h-5 w-5" style={{ color: accent.value }} />
-              {t("salami.play.version", { version: selectedProfile.game_version, loader: loaderName })}
-            </p>
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+              <span className="border px-3 py-1 text-white/80" style={{ backgroundColor: SURFACE.base, borderColor: SURFACE.line }}>
+                Minecraft {selectedProfile.game_version}
+              </span>
+              <span
+                className="border px-3 py-1"
+                style={{ backgroundColor: hexAlpha(accent.value, 0.14), borderColor: hexAlpha(accent.value, 0.35), color: accent.light || "#fff" }}
+              >
+                {loaderName}
+              </span>
+            </div>
           )}
         </div>
 
@@ -76,15 +85,15 @@ export function SalamiPlayView({ profiles, selectedProfile, versions, onVersionC
             versions={versions}
             selectedVersionLabel={selectedProfile?.name}
             mainButtonWidth="w-full"
-            maxWidth="440px"
-            mainButtonHeight="h-16"
+            maxWidth="400px"
+            mainButtonHeight="h-[68px]"
           />
         )}
 
         {recent.length > 1 && (
           <div>
-            <div className="mb-2 text-xs uppercase tracking-[0.2em] text-white/45">{t("salami.play.recent")}</div>
-            <div className="flex max-w-[440px] flex-wrap gap-2">
+            <div className="mb-2.5 text-sm text-white/40">{t("salami.play.recent")}</div>
+            <div className="flex max-w-[520px] flex-wrap gap-2">
               {recent.map((profile) => {
                 const active = profile.id === selectedProfile?.id;
                 return (
@@ -93,13 +102,28 @@ export function SalamiPlayView({ profiles, selectedProfile, versions, onVersionC
                     type="button"
                     onClick={() => onVersionChange(profile.id)}
                     className={cn(
-                      "flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm transition-colors",
-                      active ? "text-white" : "border-white/10 bg-black/30 text-white/75 hover:bg-white/10 hover:text-white",
+                      "flex items-center gap-2.5 border py-2 pl-2 pr-3.5 text-sm transition-colors",
+                      active ? "text-white" : "text-white/70 hover:text-white",
                     )}
-                    style={active ? { borderColor: accent.value, backgroundColor: `${accent.value}44` } : undefined}
+                    style={{
+                      backgroundColor: active ? SURFACE.raised : SURFACE.base,
+                      borderColor: active ? SURFACE.lineStrong : SURFACE.line,
+                    }}
                   >
-                    <span className="max-w-[160px] truncate">{profile.name}</span>
-                    <span className="text-xs text-white/45">{profile.game_version}</span>
+                    <span
+                      className="flex h-7 w-7 flex-shrink-0 items-center justify-center text-xs uppercase"
+                      style={{
+                        borderRadius: "calc(var(--border-radius) * 0.6)",
+                        backgroundColor: active ? accent.value : SURFACE.raised,
+                        color: "#fff",
+                      }}
+                    >
+                      {profile.name.trim().charAt(0) || "?"}
+                    </span>
+                    <span className="flex flex-col items-start leading-tight">
+                      <span className="max-w-[150px] truncate">{profile.name}</span>
+                      <span className="text-[11px] text-white/40">{profile.game_version}</span>
+                    </span>
                   </button>
                 );
               })}
@@ -108,8 +132,27 @@ export function SalamiPlayView({ profiles, selectedProfile, versions, onVersionC
         )}
       </section>
 
-      <section className="relative flex h-full items-center justify-center">
-        <div className="w-full max-w-[460px]">
+      <section className="relative flex h-full items-center justify-center overflow-hidden">
+        {selectedProfile && (
+          <span
+            className="salami-ghost-text pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-[62%] whitespace-nowrap font-minecraft text-[13rem] leading-none"
+            aria-hidden="true"
+          >
+            {selectedProfile.game_version}
+          </span>
+        )}
+        {/* Bühne: flache Scheibe unter den Füßen */}
+        <div
+          className="pointer-events-none absolute left-1/2 top-1/2 h-[90px] w-[440px] -translate-x-1/2 translate-y-[168px]"
+          style={{
+            borderRadius: "50%",
+            border: `1px solid ${hexAlpha(accent.value, 0.35)}`,
+            backgroundImage: `radial-gradient(closest-side, ${hexAlpha(accent.value, 0.3)}, ${hexAlpha(accent.value, 0.06)} 70%, transparent)`,
+            boxShadow: `0 0 60px -10px ${hexAlpha(accent.value, 0.5)}`,
+          }}
+          aria-hidden="true"
+        />
+        <div className="relative">
           <PlayerRig playerName={playerName} showNametag={false} />
         </div>
       </section>

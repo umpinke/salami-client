@@ -13,6 +13,8 @@ export enum BACKGROUND_EFFECTS {
   NEBULA_LIQUID_CHROME = "nebula-liquid-chrome",
   RETRO_GRID = "retro-grid",
   PLAIN_BACKGROUND = "plain-background",
+  /** Salami-Standard: Licht und Ringe (components/effects/SalamiBackdrop). */
+  SALAMI_RINGS = "salami-rings",
 }
 
 interface BackgroundEffectState {
@@ -36,7 +38,7 @@ interface BackgroundEffectState {
 export const useBackgroundEffectStore = create<BackgroundEffectState>()(
   persist(
     (set) => ({
-      currentEffect: BACKGROUND_EFFECTS.RETRO_GRID,
+      currentEffect: BACKGROUND_EFFECTS.SALAMI_RINGS,
       customMediaUrl: null,
       customMediaType: null,
       customMediaOpacity: 0.25,
@@ -54,6 +56,15 @@ export const useBackgroundEffectStore = create<BackgroundEffectState>()(
     }),
     {
       name: "norisk-background-effect-storage",
+      version: 1,
+      // Salami Client: einmalig vom NoRisk-Standard (Retro-Gitter) auf den eigenen Hintergrund wechseln
+      migrate: (persisted, version) => {
+        const state = persisted as Partial<BackgroundEffectState>;
+        if (version < 1 && state.currentEffect === BACKGROUND_EFFECTS.RETRO_GRID) {
+          return { ...state, currentEffect: BACKGROUND_EFFECTS.SALAMI_RINGS } as BackgroundEffectState;
+        }
+        return state as BackgroundEffectState;
+      },
     },
   ),
 );

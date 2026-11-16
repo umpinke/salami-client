@@ -69,7 +69,7 @@ export function UserProfileBar({ className }: UserProfileBarProps) {
         <div ref={profileButtonRef}>
           <CurrentAccountDisplay
             onClick={toggleAccountDropdown}
-            className="h-10"
+            className="h-9"
           />
         </div>
 

@@ -85,10 +85,10 @@ export function PlayTab() {
         )}
 
         {/* Online-Zähler + 3D Render Toggle - Top Right */}
-        <div className="absolute top-6 right-6 z-20 flex flex-col items-end gap-3">
+        <div className="absolute bottom-6 right-8 z-20 flex items-center gap-5">
           <OnlineCountBadge />
           <div className="flex items-center gap-2">
-            <span className="text-sm text-white/70 font-minecraft">{t("settings.background.skin_animation")}</span>
+            <span className="text-sm text-white/50 font-minecraft">{t("settings.background.skin_animation")}</span>
             <ToggleSwitch
               checked={cosmeticRenderer3d && webglOk}
               onChange={() => setCosmeticRenderer3d(!cosmeticRenderer3d)}

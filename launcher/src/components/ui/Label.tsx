@@ -141,31 +141,30 @@ export const Label = forwardRef<HTMLDivElement, LabelProps>(
       if (variant === "ghost") {
         return "transparent";
       }
-      return `${colors.main}30`;
+      return `${colors.main}26`;
     };
 
     const getBorderColor = () => {
       if (variant === "ghost") {
         return "transparent";
       }
-      return `${colors.main}80`;
+      return `${colors.main}4d`;
     };
 
     const getBorderBottomColor = () => {
       if (variant === "ghost") {
         return "transparent";
       }
-      return colors.dark;
+      return `${colors.main}4d`;
     };
 
     return (
       <div
         ref={mergedRef}
         className={cn(
-          "font-smallcaps relative overflow-hidden backdrop-blur-md",
+          "font-smallcaps relative overflow-hidden",
           "rounded-md text-white tracking-wider",
           "inline-flex items-center justify-center",
-          "text-shadow-sm",
           getBorderClasses(),
           sizeStyles[size],
           className,
@@ -179,7 +178,7 @@ export const Label = forwardRef<HTMLDivElement, LabelProps>(
         }}
         {...props}
       >
-        {variant === "3d" && (
+        {false && (
           <span
             className="absolute inset-x-0 top-0 h-[2px] rounded-t-sm"
             style={{
@@ -189,7 +188,7 @@ export const Label = forwardRef<HTMLDivElement, LabelProps>(
           />
         )}
 
-        {variant === "3d" && (
+        {false && (
           <>
             <span
               className="absolute inset-y-0 left-0 w-[1px]"

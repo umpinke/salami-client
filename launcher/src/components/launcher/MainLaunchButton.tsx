@@ -127,9 +127,9 @@ export function MainLaunchButton({
 
   const getMainButtonIcon = () => {
     if (isButtonLaunching) {
-      return <Icon icon="solar:stop-bold" width="24" height="24" />;
+      return <Icon icon="solar:stop-bold" width="18" height="18" />;
     }
-    return <Icon icon="solar:play-bold" width="24" height="24" />;
+    return <Icon icon="solar:play-bold" width="18" height="18" />;
   };
 
   const renderLaunchButtonContent = () => {
@@ -157,12 +157,14 @@ export function MainLaunchButton({
 
     const displaySubText = statusSubText || selectedVersionLabel;
     return (
-      <div className="w-full flex flex-col items-center justify-center leading-none -translate-y-[5px]">
-        <span className="text-3xl text-center">{actionText}</span>
+      <div className="flex w-full items-center justify-center gap-3 leading-none">
+        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-black/20">{getMainButtonIcon()}</span>
+        <div className="flex min-w-0 flex-col items-start gap-1">
+        <span className="text-2xl">{actionText}</span>
         {displaySubText && (
           <span
             className={cn(
-              "text-xs font-minecraft tracking-normal text-center normal-case whitespace-nowrap overflow-hidden text-ellipsis",
+              "text-xs font-minecraft tracking-normal normal-case whitespace-nowrap overflow-hidden text-ellipsis opacity-80",
               isButtonLaunching ? "max-w-64" : "",
               statusColorClass
             )}
@@ -174,6 +176,7 @@ export function MainLaunchButton({
             {displaySubText}
           </span>
         )}
+        </div>
       </div>
     );
   };
@@ -211,7 +214,7 @@ export function MainLaunchButton({
             onClick={handleOpenModal}
             disabled={isButtonLaunching || !versions || versions.length === 0}
             size="xl"
-            className={cn("rounded-l-none border-l-0", mainButtonHeight)}
+            className={cn("ml-[3px] rounded-l-none", mainButtonHeight)}
             icon={
               <Icon icon="solar:alt-arrow-down-bold" width="24" height="24" />
             }

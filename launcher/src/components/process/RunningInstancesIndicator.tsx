@@ -142,17 +142,20 @@ export function RunningInstancesIndicator({
     <div className={cn("relative", className)}>
       <div ref={buttonRef} className="relative">
         <Button
-          variant={hasInstances ? "success" : "flat"}
+          variant={hasInstances ? "success" : "secondary"}
           size="sm"
           onClick={handleOpenLogWindow}
           icon={<Icon icon="solar:monitor-bold" className="w-4 h-4" />}
-          className="h-10"
+          className="!h-9 !px-3"
+          title={instanceCount === 0 ? t('instances.no_instances') : undefined}
         >
+          <span className={hasInstances ? undefined : "hidden min-[1400px]:inline"}>
           {isLoading && instanceCount === 0
             ? t('instances.loading')
             : instanceCount === 0
               ? t('instances.no_instances')
               : `${instanceCount} ${t('common.instance', { count: instanceCount })}`}
+          </span>
         </Button>
       </div>
 

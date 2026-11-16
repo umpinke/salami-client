@@ -6,7 +6,7 @@ import { cn } from "../../../lib/utils";
 import { gsap } from "gsap";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { 
-  getVariantColors,
+  getButtonSkin,
   getSizeClasses,
   getBorderRadiusClass,
   getAccessibilityProps,
@@ -130,7 +130,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 
     const shouldShowShadow = () => {
       return variant === "3d" && shadowDepth !== "none";
-    };    const colors = getVariantColors(variant, accentColor);
+    };    const skin = getButtonSkin(variant, accentColor, isHovered && !disabled);
     
     const getButtonSizeClasses = () => {
       switch (size) {
@@ -149,54 +149,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       label,
       description,
       disabled
-    });    const getBackgroundColor = () => {
-      if (variant === "ghost") {
-        return isHovered ? `rgba(255, 255, 255, 0.1)` : "transparent";
-      }
-
-      if (variant === "flat" || variant === "flat-secondary") {
-        return `${colors.main}30`;
-      }
-
-      const baseOpacity = isHovered ? "50" : "30";
-      return `${colors.main}${baseOpacity}`;
-    };    const getBorderColor = () => {
-      if (variant === "ghost") {
-        return "transparent";
-      }
-
-      if (variant === "flat" || variant === "flat-secondary") {
-        return `${colors.main}80`;
-      }
-
-      return isHovered ? colors.light : `${colors.main}80`;
-    };
-
-    const getBorderBottomColor = () => {
-      if (variant === "ghost") {
-        return "transparent";
-      }
-
-      if (variant === "flat" || variant === "flat-secondary") {
-        return isHovered ? colors.light : colors.dark;
-      }
-
-      return isHovered ? colors.light : colors.dark;
-    };
-
-    const getBoxShadow = () => {
-      if (variant !== "3d" || shadowDepth === "none") {
-        return "none";
-      }
-
-      const part1Y = shadowDepth === "short" ? "4px" : "8px";
-      const part2Y = shadowDepth === "short" ? "6px" : "10px";
-      const part2Blur = shadowDepth === "short" ? "10px" : "15px";
-
-      return `0 ${part1Y} 14px rgba(0,0,0,0.3), 0 ${part2Y} ${part2Blur} rgba(0,0,0,0.35), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`;
-    };
-
-    const getBorderClasses = () => {
+    });    const getBorderClasses = () => {
       if (variant === "ghost") {
         return "";
       }
@@ -208,21 +161,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       return "border";
     };
 
-    const getTextColor = () => {
-      if (variant === "ghost") {
-        return "#ffffff";
-      }
-
-      return colors.text;
-    };
-
     return (
       <button
         ref={mergedRef}
         type="button"
         disabled={disabled}        className={cn(
           "relative overflow-hidden font-smallcaps transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2",
-          "flex items-center justify-center gap-2 backdrop-blur-md whitespace-nowrap",
+          "flex items-center justify-center gap-2 whitespace-nowrap",
           radiusClass,
           sizeClasses,
           getBorderClasses(),
@@ -232,13 +177,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           className,
         )}
         style={{
-          backgroundColor: getBackgroundColor(),
-          borderColor: getBorderColor(),
-          borderBottomColor: getBorderBottomColor(),
-          boxShadow: getBoxShadow(),
-          color: getTextColor(),
+          backgroundColor: skin.background,
+          borderColor: skin.border,
+          boxShadow: shadowDepth === "none" ? "none" : skin.shadow,
+          color: skin.color,
           transform: isPressed ? "translateY(1px)" : "translateY(0)",
-          filter: isHovered && !disabled ? "brightness(1.1)" : "brightness(1)",
+          
           ...createRadiusStyle(borderRadius),
         }}
         onClick={handleRipple}
@@ -249,17 +193,17 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         {...accessibilityProps}
         {...props}      >        {icon && iconPosition === "left" && (
           <span className="flex items-center transition-transform duration-200" style={{
-            transform: isHovered && !disabled ? "scale(1.05)" : "scale(1)",
+            
           }}>{icon}</span>
         )}
         <span className="transition-transform duration-200" style={{
-          transform: isHovered && !disabled ? "scale(1.05)" : "scale(1)",
+          
         }}>
           {children}
         </span>
         {icon && iconPosition === "right" && (
           <span className="flex items-center transition-transform duration-200" style={{
-            transform: isHovered && !disabled ? "scale(1.05)" : "scale(1)",
+            
           }}>{icon}</span>
         )}
       </button>

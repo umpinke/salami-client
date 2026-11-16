@@ -45,7 +45,83 @@ export const designTokens = {
   }
 };
 
-export const getVariantColors = (variant: ComponentVariant, accentColor: AccentColor): ColorTokens => {
+/**
+ * Salami-Designsprache: neutrale, warme Flächen mit Haarlinien statt akzentgetöntem Glas.
+ * Der Akzent bleibt Hauptaktionen und aktiven Zuständen vorbehalten.
+ */
+export const SURFACE = {
+  base: "rgba(255, 255, 255, 0.045)",
+  hover: "rgba(255, 255, 255, 0.08)",
+  raised: "rgba(255, 255, 255, 0.11)",
+  line: "rgba(255, 255, 255, 0.09)",
+  lineStrong: "rgba(255, 255, 255, 0.18)",
+  /** deckend – für Dialoge, Menüs und Tooltips */
+  solid: "#181516",
+  solidRaised: "#221e1f",
+} as const;
+
+const parseHex = (hex: string): [number, number, number] | null => {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})/i.exec(hex ?? "");
+  return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : null;
+};
+
+/** `#rrggbb` + Deckkraft → `rgba(...)`; alles andere bleibt unverändert. */
+export const hexAlpha = (hex: string, alpha: number): string => {
+  const rgb = parseHex(hex);
+  return rgb ? `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})` : hex;
+};
+
+/** Mischt zwei Hex-Farben (t = Anteil von `b`). */
+export const mixHex = (a: string, b: string, t: number): string => {
+  const x = parseHex(a);
+  const y = parseHex(b);
+  if (!x || !y) return a;
+  const c = x.map((v, i) => Math.round(v + (y[i] - v) * t));
+  return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+};
+
+/** Lesbare Schriftfarbe auf einer vollflächigen Farbe. */
+export const readableOn = (hex: string): string => {
+  const rgb = parseHex(hex);
+  if (!rgb) return "#ffffff";
+  const luminance = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
+  return luminance > 0.62 ? "#1b1415" : "#ffffff";
+};
+
+export interface ButtonSkin {
+  background: string;
+  border: string;
+  color: string;
+  shadow: string;
+}
+
+/** Aussehen aller Knöpfe: gefüllt (3d), getönt (Standard/Status), neutral oder unsichtbar. */
+export const getButtonSkin = (variant: ComponentVariant, accentColor: AccentColor, hovered: boolean): ButtonSkin => {
+  if (variant === "ghost") {
+    return { background: hovered ? SURFACE.hover : "transparent", border: "transparent", color: "#ffffff", shadow: "none" };
+  }
+  if (variant === "secondary" || variant === "flat-secondary") {
+    return { background: hovered ? SURFACE.raised : SURFACE.hover, border: SURFACE.line, color: "#f3f1f1", shadow: "none" };
+  }
+  if (variant === "3d" || variant === "elevated") {
+    const fill = hovered ? accentColor.light || accentColor.value : accentColor.value;
+    return {
+      background: fill,
+      border: "transparent",
+      color: readableOn(accentColor.value),
+      shadow: `0 10px 24px -12px ${hexAlpha(accentColor.value, 0.9)}`,
+    };
+  }
+  const colors = getVariantColors(variant, accentColor);
+  return {
+    background: hexAlpha(colors.main, hovered ? 0.28 : 0.16),
+    border: hexAlpha(colors.main, hovered ? 0.5 : 0.28),
+    color: colors.text,
+    shadow: "none",
+  };
+};
+
+export const getVariantColors =(variant: ComponentVariant, accentColor: AccentColor): ColorTokens => {
   switch (variant) {
     case "warning":
       return {
