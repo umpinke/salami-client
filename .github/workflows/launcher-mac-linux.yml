@@ -78,7 +78,11 @@ jobs:
             mod/*.gradle*
             mod/gradle/wrapper/gradle-wrapper.properties
 
-      - uses: dtolnay/rust-toolchain@stable
+      # Fest auf 1.99.1: Ab Rust 1.100 legt Cargo die Build-Ordner anders an
+      # (target/<ziel>/release/build/<paket>/<hash>/out). tauri-build 2.5.5 leitet daraus den falschen
+      # Zielordner ab und scheitert unter macOS beim Kopieren von salami-capture
+      # ("Operation not permitted"). Erst mit einem passenden tauri-build wieder auf stable stellen.
+      - uses: dtolnay/rust-toolchain@1.99.1
         with:
           targets: ${{ matrix.target }}
 
