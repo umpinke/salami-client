@@ -10,6 +10,7 @@ import dev.salamiclient.gui.CosmeticsScreen;
 import dev.salamiclient.gui.FriendsScreen;
 import dev.salamiclient.gui.SalamiMenuScreen;
 import dev.salamiclient.gui.clickgui.ClickGuiScreen;
+import dev.salamiclient.gui.MinigamesScreen;
 import dev.salamiclient.gui.ModSettingsScreen;
 import dev.salamiclient.gui.ModsScreen;
 import dev.salamiclient.modules.hud.CpsModule;
@@ -347,7 +348,9 @@ public final class SalamiClient implements ClientModInitializer {
 			|| (screen instanceof ModSettingsScreen settings && settings.wasCapturingKey())
 			|| (screen instanceof WaypointsScreen waypoints && waypoints.isEditing())
 			|| (screen instanceof FriendsScreen friends && friends.isTyping())
-			|| (screen instanceof CosmeticsScreen cosmetics && cosmetics.isTyping());
+			|| (screen instanceof CosmeticsScreen cosmetics && cosmetics.isTyping())
+			// Minispiele: während eines Spiels gehören alle Tasten dem Spiel
+			|| (screen instanceof MinigamesScreen games && games.isPlaying());
 	}
 
 	/** Sucht ein fokussiertes Textfeld im Screen – auch Creative-Suche, Buch und Rezeptbuch-Suche. */

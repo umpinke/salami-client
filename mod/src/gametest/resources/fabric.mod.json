@@ -13,7 +13,8 @@
 			"dev.salamiclient.gametest.SalamiModsBatchCGameTest",
 			"dev.salamiclient.gametest.SalamiCustomizeGameTest",
 			"dev.salamiclient.gametest.SalamiBenchmarkGameTest",
-			"dev.salamiclient.gametest.SalamiCapesGameTest"
+			"dev.salamiclient.gametest.SalamiCapesGameTest",
+			"dev.salamiclient.gametest.SalamiMinigamesGameTest"
 		]
 	},
 	"depends": {

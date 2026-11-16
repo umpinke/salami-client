@@ -26,7 +26,7 @@ import java.util.List;
 /**
  * Salami-Menü (Rechte Umschalttaste): Einstieg ins Spielmenü. Links ein Akzentstrich, daneben
  * Logo und Schriftzug, darunter der große Knopf zu den Mods, eine Reihe Kacheln für HUD,
- * Configs, Wegpunkte und die Panel-Ansicht und eine zweite für Freunde und Cosmetics.
+ * Configs, Wegpunkte und die Panel-Ansicht und eine zweite für Freunde, Cosmetics und Minispiele.
  *
  * <p>Rechnet wie die übrigen Salami-Menüs in skalierten Koordinaten (Modul „Oberfläche“);
  * Zeichnen und Klicken nutzen dieselben Rechtecke.
@@ -43,14 +43,15 @@ public final class SalamiMenuScreen extends Screen {
 	/** Abstand des Inhalts vom Akzentstrich links. */
 	private static final int INSET = 10;
 
-	/** Kacheln unter dem Mods-Knopf: erste Reihe Werkzeuge, zweite Reihe ({@link #social}) Freunde und Cosmetics. */
+	/** Kacheln unter dem Mods-Knopf: erste Reihe Werkzeuge, zweite Reihe ({@link #social}) Freunde, Cosmetics und Minispiele. */
 	private enum Tile {
 		HUD("salami.menu.hud", false),
 		CONFIGS("salami.clickgui.configs", false),
 		WAYPOINTS("salami.menu.waypoints", false),
 		PANELS("salami.menu.panels", false),
 		FRIENDS("salami.menu.friends", true),
-		COSMETICS("salami.menu.cosmetics", true);
+		COSMETICS("salami.menu.cosmetics", true),
+		MINIGAMES("salami.clickgui.minigames", true);
 
 		final String key;
 		final boolean social;
@@ -110,7 +111,7 @@ public final class SalamiMenuScreen extends Screen {
 		return new int[] {x, y, left() + BLOCK_W, y + MAIN_H};
 	}
 
-	/** Kacheln einer Reihe ({@code social} = zweite Reihe mit Freunden und Cosmetics). */
+	/** Kacheln einer Reihe ({@code social} = zweite Reihe mit Freunden, Cosmetics und Minispielen). */
 	private List<Tile> tiles(boolean social) {
 		List<Tile> list = new ArrayList<>();
 		for (Tile tile : Tile.values()) {
@@ -298,6 +299,17 @@ public final class SalamiMenuScreen extends Screen {
 				g.fill(x + 3, y + 9, x + 9, y + 12, color);
 				g.fill(x + 5, y + 3, x + 7, y + 8, 0xFF120F10);
 			}
+			case MINIGAMES -> {
+				// Gamepad: Gehäuse mit Griffen, Steuerkreuz und zwei Knöpfen
+				g.fill(x + 1, y + 3, x + 11, y + 9, color);
+				g.fill(x, y + 5, x + 12, y + 10, color);
+				g.fill(x, y + 10, x + 3, y + 11, color);
+				g.fill(x + 9, y + 10, x + 12, y + 11, color);
+				g.fill(x + 2, y + 6, x + 5, y + 7, 0xFF120F10);
+				g.fill(x + 3, y + 5, x + 4, y + 8, 0xFF120F10);
+				g.fill(x + 8, y + 5, x + 9, y + 6, 0xFF120F10);
+				g.fill(x + 9, y + 7, x + 10, y + 8, 0xFF120F10);
+			}
 		}
 	}
 
@@ -320,6 +332,7 @@ public final class SalamiMenuScreen extends Screen {
 			case PANELS -> minecraft.setScreen(new ClickGuiScreen(modules, config));
 			case FRIENDS -> minecraft.setScreen(new FriendsScreen(this));
 			case COSMETICS -> minecraft.setScreen(new CosmeticsScreen(this));
+			case MINIGAMES -> MinigamesScreen.open(this);
 		}
 	}
 

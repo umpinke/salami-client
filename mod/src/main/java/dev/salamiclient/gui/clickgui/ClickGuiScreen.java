@@ -9,6 +9,7 @@ import dev.salamiclient.gui.ColorPicker;
 import dev.salamiclient.gui.ConfigsScreen;
 import dev.salamiclient.gui.CosmeticsScreen;
 import dev.salamiclient.gui.HudEditorScreen;
+import dev.salamiclient.gui.MinigamesScreen;
 import dev.salamiclient.gui.ModsScreen;
 import dev.salamiclient.gui.SettingText;
 import dev.salamiclient.module.Category;
@@ -160,6 +161,7 @@ public final class ClickGuiScreen extends Screen {
 		renderModsButton(graphics, theme, mx, my);
 		renderConfigsButton(graphics, theme, mx, my);
 		renderCosmeticsButton(graphics, theme, mx, my);
+		renderMinigamesButton(graphics, theme, mx, my);
 		renderScaleControls(graphics, theme, mx, my);
 		if (picker != null) {
 			picker.render(graphics, font, theme, mx, my);
@@ -306,6 +308,20 @@ public final class ClickGuiScreen extends Screen {
 		int[] b = cosmeticsButton();
 		boolean hovered = mouseX >= b[0] && mouseX < b[2] && mouseY >= b[1] && mouseY < b[3];
 		renderTopButton(g, theme, b, I18n.get("salami.clickgui.cosmetics"), 6, hovered, false);
+	}
+
+	// ------------------------------------------------------------------ Minispiele-Knopf (neben Cosmetics)
+
+	private int[] minigamesButton() {
+		int left = cosmeticsButton()[2] + 4;
+		int w = font.width(I18n.get("salami.clickgui.minigames")) + 12;
+		return new int[] {left, 4, left + w, 18};
+	}
+
+	private void renderMinigamesButton(GuiGraphics g, Theme theme, int mouseX, int mouseY) {
+		int[] b = minigamesButton();
+		boolean hovered = mouseX >= b[0] && mouseX < b[2] && mouseY >= b[1] && mouseY < b[3];
+		renderTopButton(g, theme, b, I18n.get("salami.clickgui.minigames"), 6, hovered, false);
 	}
 
 	// ------------------------------------------------------------------ Größe (− 100 % +)
@@ -616,6 +632,11 @@ public final class ClickGuiScreen extends Screen {
 		int[] cos = cosmeticsButton();
 		if (event.x() >= cos[0] && event.x() < cos[2] && event.y() >= cos[1] && event.y() < cos[3]) {
 			minecraft.setScreen(new CosmeticsScreen(this));
+			return true;
+		}
+		int[] games = minigamesButton();
+		if (event.x() >= games[0] && event.x() < games[2] && event.y() >= games[1] && event.y() < games[3]) {
+			MinigamesScreen.open(this);
 			return true;
 		}
 		Hit hit = hitTest(event.x(), event.y());
