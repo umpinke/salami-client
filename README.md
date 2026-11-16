@@ -42,10 +42,7 @@ Neue Minecraft-Version: Eintrag in `settings.gradle.kts` und `stonecutter.proper
 
 Im Spiel:
 
-- **Rechte Umschalttaste** öffnet die ClickGUI.
-- **Ende** ist **Easy Leave**: Alle Kampfmodule gehen sofort aus und bleiben per Safe Mode gesperrt.
-
-Beide Tasten lassen sich unter *Optionen → Steuerung → Salami Client* ändern.
+- **Rechte Umschalttaste** öffnet das Salami-Menü (änderbar unter *Optionen → Steuerung → Salami Client*): Mods, Kacheln für HUD, Configs, Wegpunkte und Panels, darunter **Freunde** (Chat) und **Cosmetics** (Capes anlegen und hochladen).
 
 ### Launcher bauen
 
@@ -173,7 +170,7 @@ node --test "src/features/mod-downloader/*.test.ts"
 **Launcher**
 
 - Alles Markenspezifische steht zentral an zwei Stellen: `src-tauri/src/branding.rs` und `src/config/salami.ts`.
-- **Keine NoRisk-Dienste**: Cape-Shop, Cosmetics, Freunde/Chat, News, Werbung, Analytics, Feature-Flags und der NoRisk-Login sind aus dem Code entfernt. Als Sicherheitsnetz lehnt `utils/http_client.rs` Anfragen an `*.norisk.gg` ab (etwa aus importierten Packs), im Frontend blockiert sie die CSP.
+- **Keine NoRisk-Dienste**: NoRisks Cape-Shop, Cosmetics und Freunde/Chat (Salami hat dafür eigene, siehe `server/capes/`), News, Werbung, Analytics, Feature-Flags und der NoRisk-Login sind aus dem Code entfernt. Als Sicherheitsnetz lehnt `utils/http_client.rs` Anfragen an `*.norisk.gg` ab (etwa aus importierten Packs), im Frontend blockiert sie die CSP.
 - Die 3D-Skin-Ansicht und die Skin-Vorschaubilder nutzen [skinview3d](https://github.com/bs-community/skinview3d) (MIT, `src/lib/skin3d/`).
 - Packs und Standardprofile kommen aus `packs/*.json`. Optional lassen sie sich remote laden (`PACKS_URL`). Die Pack-Logik heißt intern noch `norisk_packs`, und `.noriskpack`-Dateien lassen sich weiter importieren.
 - Updates kommen über `latest.json` im neuesten GitHub-Release (`UPDATE_BASE_URL` in `branding.rs`), signiert mit dem eigenen Schlüssel.
@@ -182,11 +179,9 @@ node --test "src/features/mod-downloader/*.test.ts"
 
 - Module (`module/Module`) haben typisierte Settings (`setting/*`) und werden als JSON gespeichert (`config/salami/config.json`, verzögert und atomar).
 - Nur **aktive** Module bekommen Tick- und HUD-Aufrufe. Ein fehlerhaftes Modul wird abgeschaltet statt das Spiel abstürzen zu lassen.
-- **Safe Mode / Easy Leave**: Die Kategorie *Utility* (Kampf-Automatisierung) wird hart deaktiviert:
-  - per Taste,
-  - manuell,
-  - oder automatisch auf Servern einer editierbaren Liste.
-- **Kampf-Module erlauben** (*Launcher → Einstellungen → Allgemein → Im Spiel*, Standard: an): Ist der Schalter aus, gibt der Launcher `-Dsalami.combat=off` mit. Dann fehlen alle Utility-Module und Safe Mode im Spiel komplett: Sie erscheinen weder in der ClickGUI noch in der Mod-Liste und lassen sich weder per Taste noch über die Config einschalten.
+- Module mit eigenem Menü (`Module#hasScreen`, z. B. Freunde, Capes, Waypoints) bekommen in der Panel-Ansicht einen „Öffnen“-Knopf.
+- **Freunde** (`friends/Friends`, `FriendsApi`, `FriendsCommand`): Anmeldung wie bei den Capes über Mojang (`hasJoined`), danach ein eigenes Sitzungs-Token; Live-Verbindung per Server-Sent Events für Nachrichten, Anfragen und Online-Status. Server: `server/capes/friends.mjs`.
+- **Cosmetics** (`gui/CosmeticsScreen`, `capes/CapeLibrary`): liest und schreibt die Cape-Auswahl des Launchers (`capes.json` im Ordner aus `-Dsalami.capes.dir`), ohne Launcher `config/salami/cape.png`.
 - **Salami-Modus**:
   - Theme-Schalter im Mod (`SalamiThemeModule`).
   - Der Launcher kann ihn per `-Dsalami.theme=salami|default` vorgeben.
@@ -220,11 +215,10 @@ Der Benchmark schreibt die Zeit aller Module und die zehn teuersten einzeln ins 
 
 Der Test startet Minecraft mit einer Testwelt und prüft:
 
-- ClickGUI per Taste,
+- Salami-Menü per Taste, Panel-Ansicht (ohne Kampf-Module, mit Social), Freunde- und Cosmetics-Menü,
 - Klicks auf Module und Einstellungen,
-- Easy Leave und die Safe-Mode-Sperre,
 - den Salami-Look,
-- Auto Totem, Double Hand Totem, Crystal Macro (inkl. Obsidian setzen), Anchor Macro (inkl. Safe Anchor), Ghost Spear, Live Tracker, Breach Swap, Auto Mace (inkl. „Maximaler Schaden“), Auto Elytra, Speed Lunge, Key Pearl, Cobweb Placer, Fast XP, Speed Bridge, Lunge Macro, Auto Pot, Hitbox Expand, Configs und Kits in echten Testszenen,
+- Live Tracker, Capes (auch Anlegen und Hochladen aus dem Spiel), Configs und Kits in echten Testszenen,
 - Screenshots aller Visuals und des HUD-Editors.
 
 Screenshots: `mod/build/run/clientGameTest/screenshots/`.
@@ -234,37 +228,21 @@ Screenshots: `mod/build/run/clientGameTest/screenshots/`.
 | Kategorie | Modul | Kurz |
 |---|---|---|
 | Client | Salami-Modus | kompletter Salami-Look (Launcher-Schalter wird übernommen) |
-| Client | Safe Mode | sperrt alle Utility-Module; automatisch auf Servern der Liste |
 | Visuals | Watermark · Info HUD · Armor HUD · Item Counter · Combo Counter · PvP-Logo | **Overlay-System**: alle frei verschiebbar im HUD-Editor (ClickGUI → „HUD bearbeiten“) |
 | Visuals | Crosshair | eigenes Fadenkreuz: Kreuz, Punkt, Kreis, Salamischeibe; Farbe, Größe, Abstand, Dicke |
 | Visuals | Block Outline | farbiger Umriss für den anvisierten Block |
 | Visuals | Live Tracker | Rüstung (mit Haltbarkeit) und Hand-Items über dem Namen von Gegnern |
 | Sonstiges | Kits | Inventar-Layouts für Crystal, Anchor, Mace, Spear, Sword, Axe, SMP, NethPot, UHC und 3 eigene; Taste K sortiert das Inventar |
 | Sonstiges | Panic Disconnect | eigene Taste trennt sofort die Verbindung, ohne Menü und Rückfrage |
-| Utility | Auto Totem · Hover Totem · Double Hand Totem | Totems in Offhand/Hotbar |
-| Utility | Crystal Macro | bei gehaltenem Rechtsklick Kristall setzen/zerstören am Fadenkreuz; Min/Max-CPS, Loot-Schutz, Stopp nach Kill, optional erst Obsidian setzen |
-| Utility | Crystal Tweaks | wechselt automatisch auf Kristalle (optional nur beim Zielen auf Obsidian/Kristalle) |
-| Utility | Anchor Macro | Seelenanker laden/zünden; **Safe Anchor** setzt vorher Glowstone als Schutz |
-| Utility | Breach Swap · Attribute Swap | im Schlag-Tick auf Bresche-Streitkolben bzw. andere Waffe wechseln, danach zurück |
-| Utility | Auto Mace · Auto Elytra | Smash-Treffer im Fall (Reichweite, Zielfilter, Timing „Sofort“ oder „Maximaler Schaden“, lässt Schild-Blocker aus); Elytra beim Fallen an, vor dem Boden/Treffer zurück zum Brustpanzer |
-| Utility | Auto D-Tap | nach jedem zerstörten Kristall neu setzen und zerstören (1–3×); Reichweiten-Check, optional Obsidian nachsetzen |
-| Utility | Auto Pot | Heil-, Stärke- und Schnelligkeitstränke automatisch (Wurftränke vor die Füße, optional Trinktränke, holt Tränke aus dem Inventar, nie Tränke mit schädlichen Effekten) |
-| Utility | Hitbox Expand | vergrößerte Gegner-Hitboxen anzeigen (lokal) und – nur in der eigenen Einzelspieler-Welt – für das Fadenkreuz nutzen |
-| Utility | Speed Lunge · Ghost Spear | automatische Ausfall-Stöße mit dem Speer; Drop → Offhand → Slot-Makro |
-| Utility | Block ESP | Blöcke (CPvP, Kisten, Erze, Spawner) hervorheben, optional durch Wände |
-| Utility | Key Pearl · Pearl Catch | Enderperle per Taste werfen; Perle + Windkugel als Kombo |
-| Utility | Stun Slam · Lunge Macro | in der Luft Axt → Streitkolben; per Taste zu Streitkolben/Dreizack wechseln, schlagen, zurück |
-| Utility | Cobweb Placer · Tap Reset · Speed Bridge · Fast XP | Netz an die Füße; W-/S-Tap nach Sprint-Treffern; Schleichen an Kanten; XP-Flaschen in jedem Tick |
+| Social | Freunde | Salami-Spieler per Minecraft-Name als Freunde hinzufügen, Anfragen annehmen, chatten (Salami-Menü → Freunde, eigene Taste oder `/salami friends`); Nachrichten und Online-Meldungen auch im Chat, Klick darauf schreibt `/salami msg <name>` vor |
 
-Easy Leave (Taste Ende) schaltet alle Utility-Module sofort aus.
+**Cosmetics** (Salami-Menü → Cosmetics, im Launcher die Seite „Cosmetics“): vorerst der Reiter *Capes*. Klick auf ein Cape legt es an – mit dem Launcher dieselbe Auswahl wie dort –, „Hochladen“ übernimmt ein eigenes PNG (Breite = 2 × Höhe, 64–2048 px) und legt es gleich an. Eigene Capes erscheinen erst nach der Freigabe durch einen Admin.
 
-Über *ClickGUI → Configs* lassen sich alle Einstellungen als JSON-Datei exportieren, importieren oder auf Standard zurücksetzen. Ein aktiver Safe Mode bleibt dabei an.
+Über *ClickGUI → Configs* lassen sich alle Einstellungen als JSON-Datei exportieren, importieren oder auf Standard zurücksetzen.
 
-## Hinweis zu Utility-Modulen
+## Hinweis
 
-Kampf-Automatisierung (Auto Totem, Crystal Macro, Anchors …) ist auf den meisten Servern verboten und führt dort zum Bann. Diese Module sind in der ClickGUI klar als *Utility* markiert. Gedacht sind sie für Singleplayer, eigene Server und Server, die so etwas ausdrücklich erlauben.
-
-Der Salami Client enthält **keine** Funktionen, um Anti-Cheat oder Server-Moderation zu umgehen oder zu täuschen.
+Der Salami Client enthält keine Kampf-Automatisierung mehr (die frühere Kategorie *Utility* mit Crystal- und Anchor-Makros, Auto Totem usw. wurde entfernt) und **keine** Funktionen, um Anti-Cheat oder Server-Moderation zu umgehen oder zu täuschen.
 
 ## Lizenz
 

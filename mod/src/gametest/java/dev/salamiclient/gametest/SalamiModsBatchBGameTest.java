@@ -4,7 +4,6 @@ import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.ModuleManager;
-import dev.salamiclient.modules.client.SafeModeModule;
 import dev.salamiclient.modules.hud.ScoreboardModule;
 import dev.salamiclient.modules.hud.TitlesModule;
 import dev.salamiclient.modules.visual.ArrowTrailModule;
@@ -52,7 +51,6 @@ public final class SalamiModsBatchBGameTest implements FabricClientGameTest {
 			return;
 		}
 		ModuleManager modules = SalamiClient.get().modules();
-		context.runOnClient(c -> modules.setEnabled(modules.get(SafeModeModule.class), false));
 
 		try (TestSingleplayerContext world = context.worldBuilder().create()) {
 			GametestCompat.waitForChunksRender(world);

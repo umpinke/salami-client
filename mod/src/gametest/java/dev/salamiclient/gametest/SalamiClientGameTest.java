@@ -3,14 +3,15 @@ package dev.salamiclient.gametest;
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.gui.ConfigsScreen;
+import dev.salamiclient.gui.CosmeticsScreen;
+import dev.salamiclient.gui.FriendsScreen;
 import dev.salamiclient.gui.SalamiMenuScreen;
 import dev.salamiclient.gui.clickgui.ClickGuiScreen;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.ModuleManager;
-import dev.salamiclient.modules.client.SafeModeModule;
 import dev.salamiclient.modules.client.SalamiThemeModule;
-import dev.salamiclient.modules.utility.CrystalMacroModule;
+import dev.salamiclient.modules.misc.AutoReconnectModule;
 import dev.salamiclient.setting.NumberSetting;
 import dev.salamiclient.setting.Setting;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
@@ -27,7 +28,7 @@ import java.nio.file.Path;
  * End-to-End-Test für salami-core: echte Tasten- und Mausereignisse, echte Welt.
  *
  * <p>Prüft ClickGUI (öffnen, Modul umschalten, Einstellungen aufklappen),
- * Salami-Theme und Easy Leave / Safe Mode. Screenshots landen unter
+ * Salami-Theme, Freunde- und Cosmetics-Menü und das Configs-Menü. Screenshots landen unter
  * {@code build/run/clientGameTest/screenshots}.
  */
 public final class SalamiClientGameTest implements FabricClientGameTest {
@@ -37,20 +38,15 @@ public final class SalamiClientGameTest implements FabricClientGameTest {
 	private static final int HEADER_HEIGHT = 15;
 	private static final int MODULE_HEIGHT = 14;
 
-	/** Test-Utility-Modul, um Easy Leave ohne echte Kampfmodule zu prüfen. */
-	private static final class DummyUtility extends Module {
-		DummyUtility() {
-			super("gametest_dummy", Category.UTILITY);
-		}
-	}
-
 	@Override
 	public void runTest(ClientGameTestContext context) {
 		if (!GametestCompat.selected(this)) {
 			return;
 		}
 		ModuleManager modules = SalamiClient.get().modules();
-		Module dummy = context.computeOnClient(client -> modules.register(new DummyUtility()));
+		check(context.computeOnClient(c -> modules.all().stream().noneMatch(m -> m.id().contains("crystal") || m.id().contains("anchor"))),
+			"Combat modules (Crystal, Anchor) are still registered");
+		check(context.computeOnClient(c -> !modules.byCategory(Category.SOCIAL).isEmpty()), "Social category has no modules");
 
 		// --- Titelbildschirm im Salami-Modus (Logo + Buttons) ---
 		context.runOnClient(client -> modules.setEnabled(modules.get(SalamiThemeModule.class), true));
@@ -80,23 +76,25 @@ public final class SalamiClientGameTest implements FabricClientGameTest {
 			check(themeBefore != themeAfter, "Left click on module row did not toggle it");
 			context.takeScreenshot("salami-03-clickgui-default");
 
-			// --- Safe-Mode-Einstellungen per Rechtsklick aufklappen (2. Modul) ---
+			// --- Einstellungen des 2. Moduls per Rechtsklick aufklappen ---
 			click(context, PANEL_X + 20, PANEL_Y + HEADER_HEIGHT + MODULE_HEIGHT + 5, InputConstants.MOUSE_BUTTON_RIGHT);
-			context.takeScreenshot("salami-04-safemode-settings");
+			context.takeScreenshot("salami-04-module-settings");
 
 			// Theme wiederherstellen und GUI schließen
 			click(context, PANEL_X + 20, PANEL_Y + HEADER_HEIGHT + 5, InputConstants.MOUSE_BUTTON_LEFT);
 			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 			context.waitTick();
 
-			// --- Easy Leave ---
-			check(context.computeOnClient(c -> modules.setEnabled(dummy, true)), "Utility module could not be enabled");
-			context.getInput().pressKey(SalamiClient.get().easyLeaveKey());
-			context.waitTicks(2);
-			check(context.computeOnClient(c -> !dummy.isEnabled()), "Easy Leave did not disable utility module");
-			check(context.computeOnClient(c -> modules.get(SafeModeModule.class).isEnabled()), "Easy Leave did not enable Safe Mode");
-			check(context.computeOnClient(c -> !modules.setEnabled(dummy, true)), "Safe Mode did not block enabling a utility module");
-			context.takeScreenshot("salami-05-easy-leave-chat");
+			// --- Freunde und Cosmetics (im Test ohne Server: Hinweis statt Liste) ---
+			context.setScreen(() -> new FriendsScreen(null));
+			context.waitTicks(3);
+			check(context.computeOnClient(c -> c.screen instanceof FriendsScreen friends && friends.isTyping()),
+				"Friends screen did not open with a focused input");
+			context.takeScreenshot("salami-04b-friends");
+			context.setScreen(() -> new CosmeticsScreen(null));
+			context.waitTicks(20); // gemalte Capes brauchen ein paar Ticks für die Vorschau
+			context.takeScreenshot("salami-04c-cosmetics");
+			context.setScreen(() -> null);
 
 			try {
 				testConfigs(context, modules);
@@ -110,48 +108,12 @@ public final class SalamiClientGameTest implements FabricClientGameTest {
 			context.takeScreenshot("salami-06-pause-menu");
 			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 			context.waitTick();
-
-			// Aufräumen: Safe Mode wieder aus, damit die Test-Config neutral bleibt
-			context.runOnClient(c -> modules.setEnabled(modules.get(SafeModeModule.class), false));
-
-			testCombatOff(context, modules, dummy);
 		}
-	}
-
-	/** Launcher-Schalter „Kampf-Module erlauben“ aus ({@code -Dsalami.combat=off}). */
-	private static void testCombatOff(ClientGameTestContext context, ModuleManager modules, Module dummy) {
-		SafeModeModule safeMode = modules.get(SafeModeModule.class);
-		check(context.computeOnClient(c -> modules.setEnabled(dummy, true)), "Utility module could not be enabled");
-		context.runOnClient(c -> modules.setCombatAllowed(false));
-		check(context.computeOnClient(c -> !dummy.isEnabled()), "Combat off did not disable a running utility module");
-		check(context.computeOnClient(c -> !modules.setEnabled(dummy, true)), "Combat off did not block enabling a utility module");
-		check(context.computeOnClient(c -> {
-			modules.restoreState(dummy, true);
-			return !dummy.isEnabled();
-		}), "Combat off did not block a utility module from the config");
-		check(context.computeOnClient(c -> !modules.isAvailable(safeMode) && modules.isAvailable(modules.get(SalamiThemeModule.class))),
-			"Combat off should hide Safe Mode but keep the client modules");
-		context.runOnClient(c -> safeMode.engage(SafeModeModule.Reason.EASY_LEAVE));
-		check(context.computeOnClient(c -> !safeMode.isEnabled()), "Easy Leave enabled Safe Mode although combat is off");
-
-		// ClickGUI ohne Utility-Panel
-		context.getInput().pressKey(SalamiClient.get().clickGuiKey());
-		context.waitTick();
-		check(context.computeOnClient(client -> client.screen instanceof SalamiMenuScreen), "Salami menu did not open with combat off");
-		context.setScreen(() -> new ClickGuiScreen(modules, SalamiClient.get().config()));
-		context.waitTick();
-		context.takeScreenshot("salami-07-clickgui-no-combat");
-		context.getInput().pressKey(InputConstants.KEY_ESCAPE);
-		context.waitTick();
-
-		context.runOnClient(c -> modules.setCombatAllowed(true));
-		check(context.computeOnClient(c -> modules.setEnabled(dummy, true)), "Utility module stayed blocked after combat was allowed again");
-		context.runOnClient(c -> modules.setEnabled(dummy, false));
 	}
 
 	/**
 	 * Configs-Menü: Export → Import stellt Werte wieder her, Zurücksetzen lädt die
-	 * Standardwerte, eine kaputte Datei ändert nichts – und ein aktiver Safe Mode bleibt an.
+	 * Standardwerte, eine kaputte Datei ändert nichts.
 	 * Die Dateidialoge selbst lassen sich im Test nicht bedienen; geprüft wird die Logik dahinter.
 	 */
 	private static void testConfigs(ClientGameTestContext context, ModuleManager modules) throws IOException {
@@ -162,23 +124,19 @@ public final class SalamiClientGameTest implements FabricClientGameTest {
 		context.waitTick();
 		check(context.computeOnClient(c -> c.screen == null), "Configs screen did not close with Esc");
 
-		SafeModeModule safeMode = modules.get(SafeModeModule.class);
-		NumberSetting minCps = (NumberSetting) setting(modules.get(CrystalMacroModule.class), "min_cps");
+		NumberSetting delay = (NumberSetting) setting(modules.get(AutoReconnectModule.class), "delay");
 		Path file = FabricLoader.getInstance().getConfigDir().resolve("salami-gametest-export.json");
 		context.runOnClient(c -> {
-			modules.setEnabled(safeMode, false);
-			minCps.set(5.0);
+			delay.set(12.0);
 			SalamiClient.get().config().exportTo(file);
-			safeMode.engage(SafeModeModule.Reason.MANUAL);
-			minCps.set(15.0);
+			delay.set(20.0);
 			SalamiClient.get().importConfig(file);
 		});
-		check(minCps.get() == 5.0, "Configs: import did not restore the exported value (" + minCps.get() + ")");
-		check(safeMode.isEnabled(), "Configs: import turned Safe Mode off");
+		check(delay.get() == 12.0, "Configs: import did not restore the exported value (" + delay.get() + ")");
 
 		context.runOnClient(c -> {
 			Files.writeString(file, "{ kaputt");
-			minCps.set(15.0);
+			delay.set(20.0);
 		});
 		boolean rejected = context.computeOnClient(c -> {
 			try {
@@ -189,11 +147,10 @@ public final class SalamiClientGameTest implements FabricClientGameTest {
 			}
 		});
 		check(rejected, "Configs: broken file was imported");
-		check(minCps.get() == 15.0, "Configs: broken file changed settings");
+		check(delay.get() == 20.0, "Configs: broken file changed settings");
 
 		context.runOnClient(c -> SalamiClient.get().resetConfig());
-		check(minCps.get().equals(minCps.defaultValue()), "Configs: reset did not restore the default");
-		check(safeMode.isEnabled(), "Configs: reset turned Safe Mode off");
+		check(delay.get().equals(delay.defaultValue()), "Configs: reset did not restore the default");
 		context.runOnClient(c -> Files.deleteIfExists(file));
 	}
 

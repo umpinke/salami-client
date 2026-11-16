@@ -12,7 +12,7 @@ package dev.salamiclient.theme;
  * @param hover       Hover-Overlay
  * @param textDim     Einstellungs-Beschriftungen, Hinweise
  * @param outline     Panel-Rahmen
- * @param warning     Warnfarbe (Utility-Kategorie)
+ * @param warning     Warnfarbe (Fehler, Entfernen)
  */
 public record Theme(
 	String id,

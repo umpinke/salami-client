@@ -15,7 +15,7 @@ import java.util.List;
  * Basisklasse aller Salami-Module.
  *
  * <p>Ein Modul wird ausschließlich über den {@link ModuleManager} an- und
- * ausgeschaltet (der prüft z. B. Safe Mode). Nur aktive Module bekommen
+ * ausgeschaltet. Nur aktive Module bekommen
  * {@link #onTick()} und {@link #onHud} – deaktivierte Module kosten keine Leistung.
  */
 public abstract class Module {
@@ -90,12 +90,15 @@ public abstract class Module {
 	}
 
 	/**
-	 * Gehört zu den Kampf-Modulen, die der Launcher abschalten kann
-	 * ({@code -Dsalami.combat=off}): dann fehlt das Modul im Spiel komplett.
+	 * Modul mit eigenem Menü (z. B. Freunde-Chat): die ClickGUI zeigt neben dem Namen einen
+	 * Knopf, der {@link #openScreen()} aufruft.
 	 */
-	public boolean needsCombat() {
-		return category.isRestricted();
+	public boolean hasScreen() {
+		return false;
 	}
+
+	/** Öffnet das eigene Menü (nur bei {@link #hasScreen()}). */
+	public void openScreen() {}
 
 	final void bindChangeHook(Runnable hook) {
 		this.changeHook = hook;

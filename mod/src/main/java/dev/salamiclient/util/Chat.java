@@ -17,8 +17,22 @@ public final class Chat {
 		send(Component.translatable(key, args).withStyle(ChatFormatting.GOLD));
 	}
 
+	/** Fertige Zeile mit Salami-Präfix (z. B. Nachrichten von Freunden). */
+	public static void raw(Component message) {
+		send(message);
+	}
+
 	public static Component translated(String key) {
 		return Component.translatable(key);
+	}
+
+	/** Meldung mit „[Salami]“ davor (z. B. für Antworten auf Chat-Befehle). */
+	public static MutableComponent prefixed(Component message) {
+		return Component.literal("[")
+			.withStyle(ChatFormatting.DARK_GRAY)
+			.append(Component.literal("Salami").withStyle(ChatFormatting.RED))
+			.append(Component.literal("] ").withStyle(ChatFormatting.DARK_GRAY))
+			.append(message);
 	}
 
 	private static void send(Component message) {
@@ -26,13 +40,9 @@ public final class Chat {
 		if (mc.gui == null) {
 			return;
 		}
-		MutableComponent prefix = Component.literal("[")
-			.withStyle(ChatFormatting.DARK_GRAY)
-			.append(Component.literal("Salami").withStyle(ChatFormatting.RED))
-			.append(Component.literal("] ").withStyle(ChatFormatting.DARK_GRAY));
 		//? if >=26.1 {
-		/*mc.gui.getChat().addClientSystemMessage(prefix.append(message));
+		/*mc.gui.getChat().addClientSystemMessage(prefixed(message));
 		*///?} else
-		mc.gui.getChat().addMessage(prefix.append(message));
+		mc.gui.getChat().addMessage(prefixed(message));
 	}
 }

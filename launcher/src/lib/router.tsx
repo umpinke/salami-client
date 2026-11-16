@@ -4,7 +4,7 @@ import { RouteErrorBoundary } from "../components/RouteErrorBoundary";
 import { PlayTab } from "../components/tabs/PlayTab";
 import ModrinthTabV2 from "../components/tabs/ModrinthTabV2";
 import { SkinsTab } from "../components/tabs/SkinsTab";
-import { SalamiCapesTab } from "../components/salami-capes/SalamiCapesTab";
+import { CosmeticsTab } from "../components/cosmetics/CosmeticsTab";
 import { ClipsPage } from "../components/tabs/ClipsPage";
 import { BrowseTabWrapper } from "../components/profiles/BrowseTabWrapper";
 import { ProfilesTabV2 } from "../components/tabs/ProfilesTabV2";
@@ -64,7 +64,8 @@ export const router = createHashRouter([
       },
       {
         path: "capes",
-        element: <SalamiCapesTab />,
+        // Cosmetics: vorerst nur der Reiter Capes
+        element: <CosmeticsTab />,
       },
       {
         path: "clips",

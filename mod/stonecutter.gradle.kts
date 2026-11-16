@@ -29,6 +29,8 @@ stonecutter parameters {
 			replace("client.keybinding.v1.KeyBindingHelper;", "client.keymapping.v1.KeyMappingHelper;")
 			replace("KeyBindingHelper.registerKeyBinding(", "KeyMappingHelper.registerKeyMapping(")
 			replace("KeyBindingHelper.getBoundKeyOf(", "KeyMappingHelper.getBoundKeyOf(")
+			// Fabric-Client-Befehle: ClientCommandManager heißt ClientCommands
+			replace("ClientCommandManager", "ClientCommands")
 			replace("lifecycle.v1.ClientWorldEvents;", "lifecycle.v1.ClientLevelEvents;")
 			replace("ClientWorldEvents.AFTER_CLIENT_WORLD_CHANGE", "ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE")
 			replace("ClickType", "ContainerInput")

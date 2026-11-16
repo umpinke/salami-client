@@ -6,6 +6,7 @@ import dev.salamiclient.capes.AnimatedCapes;
 import dev.salamiclient.capes.CapeShare;
 import dev.salamiclient.capes.LauncherCapes;
 import dev.salamiclient.capes.SharedCapes;
+import dev.salamiclient.gui.CosmeticsScreen;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.setting.BoolSetting;
@@ -49,7 +50,7 @@ import java.util.function.Supplier;
  * Spieler ohne Salami Client sehen weiter dein Mojang-Cape.
  */
 public final class CapesModule extends Module {
-	public enum Cape { LAUNCHER, SALAMI, AURORA, MAGMA, GALAXY, NEON, PRISM, SAKURA, STORM, DRAGON, PEPPERONI, BOARD, CUSTOM }
+	public enum Cape { LAUNCHER, SALAMI, AURORA, MAGMA, GALAXY, NEON, PRISM, SAKURA, STORM, DRAGON, PEPPERONI, BOARD, CUSTOM, NONE }
 
 	/** Auflösung der gemalten Capes: Breite der Textur in Pixeln. */
 	public enum Quality {
@@ -97,6 +98,41 @@ public final class CapesModule extends Module {
 		super("capes", Category.VISUAL, true);
 		instance = this;
 		cape.onChange(value -> customTried = false);
+	}
+
+	@Override
+	public boolean hasScreen() {
+		return true;
+	}
+
+	/** Cosmetics-Menü (Capes anlegen und hochladen). */
+	@Override
+	public void openScreen() {
+		mc().setScreen(new CosmeticsScreen(mc().screen));
+	}
+
+	public static @Nullable CapesModule instance() {
+		return instance;
+	}
+
+	/** Gewähltes Cape im Spiel ({@code LAUNCHER} = Auswahl aus dem Launcher). */
+	public Cape mode() {
+		return cape.get();
+	}
+
+	/** Cape im Spiel wählen (Cosmetics-Menü); Bilder werden neu geladen. */
+	public void choose(Cape selected) {
+		cape.set(selected);
+		customTried = false;
+	}
+
+	/** Mitgeliefertes Cape für die Vorschau im Cosmetics-Menü (HD, Standbild); {@code null}, solange es gemalt wird. */
+	public static ClientAsset.@Nullable Texture preview(Cape selected) {
+		CapesModule module = instance;
+		if (module == null || selected == Cape.LAUNCHER || selected == Cape.CUSTOM || selected == Cape.NONE) {
+			return null;
+		}
+		return module.builtIn(selected, false);
 	}
 
 	public static Path customCapeFile() {
@@ -173,6 +209,9 @@ public final class CapesModule extends Module {
 		ClientAsset.Texture texture;
 		if (selected == Cape.LAUNCHER) {
 			texture = fromLauncher(launcher);
+		} else if (selected == Cape.NONE) {
+			share = CapeShare.NONE;
+			texture = null;
 		} else if (selected == Cape.CUSTOM) {
 			texture = customFrom(CapesModule::customCapeFile);
 		} else {
@@ -200,7 +239,7 @@ public final class CapesModule extends Module {
 	/** Mitgeliefertes Cape eines anderen Spielers ({@code "salami"} …), unbekannte Namen → {@code null}. */
 	private ClientAsset.@Nullable Texture builtInNamed(String name) {
 		for (Cape cape : Cape.values()) {
-			if (cape != Cape.LAUNCHER && cape != Cape.CUSTOM && cape.name().toLowerCase(Locale.ROOT).equals(name)) {
+			if (cape != Cape.LAUNCHER && cape != Cape.CUSTOM && cape != Cape.NONE && cape.name().toLowerCase(Locale.ROOT).equals(name)) {
 				return builtIn(cape, false);
 			}
 		}
@@ -237,7 +276,7 @@ public final class CapesModule extends Module {
 		if (selection.startsWith("builtin:")) {
 			try {
 				Cape named = Cape.valueOf(selection.substring("builtin:".length()).toUpperCase(Locale.ROOT));
-				return named == Cape.LAUNCHER || named == Cape.CUSTOM ? own(Cape.SALAMI) : own(named);
+				return named == Cape.LAUNCHER || named == Cape.CUSTOM || named == Cape.NONE ? own(Cape.SALAMI) : own(named);
 			} catch (IllegalArgumentException unknown) {
 				return own(Cape.SALAMI);
 			}

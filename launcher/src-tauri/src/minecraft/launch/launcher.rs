@@ -358,11 +358,6 @@ impl MinecraftLauncher {
             "-Dsalami.theme={}",
             if launcher_config.salami_theme { "salami" } else { "default" }
         ));
-        // Kampf-Module: bei "off" blendet salami-core Crystal Macro, Auto Totem & Co. aus
-        command.arg(format!(
-            "-Dsalami.combat={}",
-            if launcher_config.combat_modules { "on" } else { "off" }
-        ));
         // Salami Capes: im Launcher gewähltes Cape (builtin:<name>, Pfad oder none)
         command.arg(format!(
             "-Dsalami.cape={}",

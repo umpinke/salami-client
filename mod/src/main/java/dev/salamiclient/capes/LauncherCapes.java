@@ -46,6 +46,13 @@ public final class LauncherCapes {
 		return selection;
 	}
 
+	/** Nach einer Änderung aus dem Spiel (Cosmetics-Menü): beim nächsten Zugriff sofort neu lesen. */
+	public static synchronized void refreshNow() {
+		checkedAt = 0;
+		storeModified = Long.MIN_VALUE;
+		imageModified = Long.MIN_VALUE;
+	}
+
 	/** Ändert sich, sobald sich die Auswahl oder das gewählte Bild ändert. */
 	public static synchronized int revision() {
 		refresh();

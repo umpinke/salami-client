@@ -139,8 +139,6 @@ export interface LauncherConfig {
   log_level: LogLevel;
   /** Salami-Modus, wird als -Dsalami.theme an salami-core übergeben. */
   salami_theme?: boolean;
-  /** Kampf-Module in salami-core erlauben, wird als -Dsalami.combat übergeben (Standard: an). */
-  combat_modules?: boolean;
   /** Spielzeit und Screenshots mit der Salami-App fürs Handy synchronisieren (Standard: an). */
   salami_app_sync?: boolean;
   /** Clips zur Salami-App hochladen; wirkt nur zusammen mit salami_app_sync (Standard: an). */

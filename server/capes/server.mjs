@@ -34,6 +34,20 @@
  *        freigegebenes Cape melden, das gegen die Cape-Regeln verstößt (reason: REPORT_REASONS).
  *        Eine Meldung pro Spieler und Cape. Ab REPORTS_TO_HIDE Meldungen ist es sofort für alle
  *        unsichtbar, bis ein Admin es behält oder sperrt.
+ * Freunde und Chat (friends.mjs, Antworten und Ereignisse genau in README.md):
+ *   POST /v1/friends/session {"name","serverId"}    → {"token","uuid","name"}
+ *        Anmeldung wie bei PUT /v1/capes/me, Token 30 Tage gültig. Alle weiteren Anfragen mit
+ *        Authorization: Bearer <token>, sonst 401 {"error":"nicht angemeldet"}.
+ *   GET  /v1/friends                                → {"me","friends","incoming","outgoing","unread"}
+ *   POST /v1/friends/request {"name"}               → {"status":"requested"|"friends","uuid","name"}
+ *   POST /v1/friends/accept {"uuid"}                → {"status":"friends","uuid","name"}
+ *   POST /v1/friends/deny {"uuid"}                  → {"status":"none"}   ablehnen oder zurückziehen
+ *   POST /v1/friends/remove {"uuid"}                → {"status":"none"}   löscht auch das Gespräch
+ *   GET  /v1/friends/messages?with=<uuid>           → {"messages":[{"id","from","to","text","at"}]}
+ *   POST /v1/friends/messages {"to","text"}         → {"message":{"id","from","to","text","at"}}
+ *   POST /v1/friends/read {"with"}                  → {"ok":true}
+ *   GET  /v1/friends/events                         → Server-Sent Events, eine Zeile pro Ereignis:
+ *        data: {"type":"ready"|"presence"|"message"|"request"|"friends"|"removed", …}
  * Admins (Authorization: Bearer <token>, siehe ADMIN_TOKENS):
  *   GET  /admin/                                    → Prüf-Webseite
  *   GET  /v1/admin/me                               → {"name":"…"}
@@ -50,6 +64,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync, existsSync } from "node:fs";
 import { createServer } from "node:http";
 import { join } from "node:path";
+import { createFriends } from "./friends.mjs";
 import { capeId, decodeCape, encodeRgba, PngError } from "./png.mjs";
 
 const env = (name, fallback) => {
@@ -76,9 +91,9 @@ const LOOKUP_RATE_PER_MINUTE = env("LOOKUP_RATE_PER_MINUTE", 120);
 const UPLOADS_PER_DAY = env("UPLOADS_PER_DAY", 10);
 /** Höchstens so viele Capes warten gleichzeitig auf Prüfung. */
 const MAX_PENDING = env("MAX_PENDING", 500);
-/** Gleichzeitig offene Live-Verbindungen (eine pro laufendem Spiel). */
+/** Gleichzeitig offene Live-Verbindungen (Capes und Freunde zusammen, pro laufendem Spiel meist zwei). */
 const MAX_STREAMS = env("MAX_STREAMS", 5_000);
-const MAX_STREAMS_PER_IP = env("MAX_STREAMS_PER_IP", 10);
+const MAX_STREAMS_PER_IP = env("MAX_STREAMS_PER_IP", 20);
 /** Lebenszeichen auf offenen Live-Verbindungen, damit Proxy und Spiel tote Verbindungen erkennen. */
 const HEARTBEAT_MS = 20_000;
 /** Ab so vielen Meldungen verschiedener Spieler ist ein freigegebenes Cape sofort versteckt. */
@@ -230,6 +245,7 @@ function sweep(now = Date.now()) {
     for (const [uuid, list] of log) if (!list.some((t) => now - t < 86_400_000)) log.delete(uuid);
   }
   for (const [ip, f] of adminFailures) if (now - f.since >= ADMIN_LOCK_MS) adminFailures.delete(ip);
+  friends.sweep(now);
 }
 
 const SECURITY_HEADERS = {
@@ -613,12 +629,16 @@ async function handleReview(req, res, admin, id, action) {
 
 // ------------------------------------------------------------------ Live-Änderungen (Server-Sent Events)
 
-/** Offene Live-Verbindungen: res → ip */
+/** Offene Live-Verbindungen: res → { ip, kind } – kind "capes" (Cape-Änderungen) oder "friends" (friends.mjs) */
 const streams = new Map();
 
-function openEvents(req, res, ip) {
+/**
+ * Öffnet eine Live-Verbindung. Die Grenzen gelten für Cape- und Freunde-Verbindungen
+ * zusammen; onClose läuft genau einmal, wenn die Verbindung zugeht.
+ */
+function openStream(req, res, ip, kind, onClose) {
   let fromIp = 0;
-  for (const other of streams.values()) if (other === ip) fromIp++;
+  for (const other of streams.values()) if (other.ip === ip) fromIp++;
   if (streams.size >= MAX_STREAMS || fromIp >= MAX_STREAMS_PER_IP) throw new HttpError(503, "zu viele Verbindungen");
   res.writeHead(200, {
     ...SECURITY_HEADERS,
@@ -628,17 +648,20 @@ function openEvents(req, res, ip) {
     "X-Accel-Buffering": "no",
   });
   res.write("retry: 5000\n: verbunden\n\n");
-  streams.set(res, ip);
-  const drop = () => streams.delete(res);
+  streams.set(res, { ip, kind });
+  const drop = () => {
+    if (streams.delete(res)) onClose?.();
+  };
   req.on("close", drop);
+  res.on("close", drop);
   res.on("error", drop);
 }
 
-/** Meldet allen offenen Live-Verbindungen, was andere jetzt von diesem Spieler sehen. */
+/** Meldet allen offenen Cape-Verbindungen, was andere jetzt von diesem Spieler sehen. */
 function broadcast(uuid, cape) {
   if (streams.size === 0) return;
   const event = `data: ${JSON.stringify({ uuid, cape })}\n\n`;
-  for (const res of streams.keys()) res.write(event);
+  for (const [res, stream] of streams) if (stream.kind === "capes") res.write(event);
 }
 
 setInterval(() => {
@@ -712,8 +735,10 @@ async function route(req, res) {
 
   if (req.method === "GET" && path === "/v1/capes/events") {
     if (rateLimited("events", ip, RATE_PER_MINUTE)) throw new HttpError(429, "zu viele Anfragen");
-    return openEvents(req, res, ip);
+    return openStream(req, res, ip, "capes");
   }
+
+  if (path === "/v1/friends" || path.startsWith("/v1/friends/")) return friends.route(req, res, url, ip);
 
   if (req.method === "POST" && path === "/v1/capes/lookup") {
     if (rateLimited("lookup", ip, LOOKUP_RATE_PER_MINUTE)) throw new HttpError(429, "zu viele Anfragen");
@@ -749,6 +774,18 @@ async function route(req, res) {
 }
 
 loadDb();
+const friends = createFriends({
+  dataDir: DATA_DIR,
+  env,
+  verifyPlayer,
+  HttpError,
+  send,
+  readJson,
+  rateLimited,
+  openStream,
+  apiRatePerMinute: RATE_PER_MINUTE,
+  maxBody: MAX_SMALL_BODY,
+});
 if (ADMINS.length === 0) console.warn("[salami-capes] ADMIN_TOKENS ist leer – niemand kann Capes prüfen.");
 for (const admin of ADMINS) if (admin.weak) console.warn(`[salami-capes] Admin-Schlüssel von ${admin.name} ist kürzer als 16 Zeichen.`);
 
@@ -777,6 +814,7 @@ server.listen(PORT, HOST, () => {
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => {
     if (saveTimer) saveNow();
+    friends.flush();
     for (const res of streams.keys()) res.end();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 2_000).unref();

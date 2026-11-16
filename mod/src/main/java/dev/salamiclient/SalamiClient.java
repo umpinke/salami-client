@@ -4,6 +4,9 @@ import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.capes.AnimatedCapes;
 import dev.salamiclient.capes.SharedCapes;
 import dev.salamiclient.config.ConfigManager;
+import dev.salamiclient.friends.Friends;
+import dev.salamiclient.friends.FriendsCommand;
+import dev.salamiclient.gui.FriendsScreen;
 import dev.salamiclient.gui.SalamiMenuScreen;
 import dev.salamiclient.gui.clickgui.ClickGuiScreen;
 import dev.salamiclient.gui.ModSettingsScreen;
@@ -25,6 +28,7 @@ import dev.salamiclient.modules.misc.PanicDisconnectModule;
 import dev.salamiclient.modules.misc.ChatTweaksModule;
 import dev.salamiclient.modules.misc.TabTweaksModule;
 import dev.salamiclient.modules.misc.WaypointsModule;
+import dev.salamiclient.modules.social.FriendsModule;
 import dev.salamiclient.modules.client.BorderlessFullscreenModule;
 import dev.salamiclient.gui.WaypointsScreen;
 import dev.salamiclient.modules.visual.FreeLookModule;
@@ -61,43 +65,10 @@ import dev.salamiclient.modules.visual.NoHurtCamModule;
 import dev.salamiclient.modules.visual.SideShieldModule;
 import dev.salamiclient.modules.visual.ZoomModule;
 import dev.salamiclient.mixin.RecipeBookComponentAccessor;
-import dev.salamiclient.module.Category;
 import dev.salamiclient.module.ModuleManager;
-import dev.salamiclient.modules.client.SafeModeModule;
 import dev.salamiclient.modules.client.GuiScaleModule;
 import dev.salamiclient.modules.client.SalamiThemeModule;
-import dev.salamiclient.modules.utility.AnchorMacroModule;
-import dev.salamiclient.modules.utility.CobwebPlacerModule;
-import dev.salamiclient.modules.utility.CrystalMacroModule;
-import dev.salamiclient.modules.utility.CrystalTweaksModule;
-import dev.salamiclient.modules.utility.FastXpModule;
-import dev.salamiclient.modules.utility.KeyPearlModule;
-import dev.salamiclient.modules.utility.LungeMacroModule;
-import dev.salamiclient.modules.utility.PearlCatchModule;
-import dev.salamiclient.modules.utility.SpeedBridgeModule;
-import dev.salamiclient.modules.utility.StunSlamModule;
-import dev.salamiclient.modules.utility.TapResetModule;
-import dev.salamiclient.modules.utility.AutoTotemModule;
-import dev.salamiclient.modules.utility.DoubleHandTotemModule;
-import dev.salamiclient.modules.utility.GhostSpearModule;
-import dev.salamiclient.modules.utility.HoverTotemModule;
 import dev.salamiclient.modules.misc.KitsModule;
-import dev.salamiclient.modules.utility.AttributeSwapModule;
-import dev.salamiclient.modules.utility.AutoElytraModule;
-import dev.salamiclient.modules.utility.AutoMaceModule;
-import dev.salamiclient.modules.utility.BlockEspModule;
-import dev.salamiclient.modules.utility.PlayerEspModule;
-import dev.salamiclient.modules.utility.TracersModule;
-import dev.salamiclient.modules.utility.TriggerBotModule;
-import dev.salamiclient.modules.utility.AimAssistModule;
-import dev.salamiclient.modules.utility.AutoDTapModule;
-import dev.salamiclient.modules.utility.AutoPotModule;
-import dev.salamiclient.modules.utility.HitboxExpandModule;
-import dev.salamiclient.modules.utility.AutoShieldBreakModule;
-import dev.salamiclient.modules.utility.BowAimModule;
-import dev.salamiclient.modules.utility.BowSpamModule;
-import dev.salamiclient.modules.utility.BreachSwapModule;
-import dev.salamiclient.modules.utility.SpeedLungeModule;
 import dev.salamiclient.modules.visual.ArmorHudModule;
 import dev.salamiclient.modules.visual.BlockOutlineModule;
 import dev.salamiclient.modules.visual.ComboCounterModule;
@@ -113,6 +84,7 @@ import dev.salamiclient.render.WorldLines;
 import dev.salamiclient.modules.visual.WatermarkModule;
 import dev.salamiclient.theme.Theme;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientWorldEvents;
@@ -127,8 +99,6 @@ import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
 //?}
-import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
-import net.fabricmc.fabric.api.client.screen.v1.ScreenKeyboardEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -160,15 +130,12 @@ public final class SalamiClient implements ClientModInitializer {
 
 	/** JVM-Property, über die der Launcher den Salami-Modus mitgibt. */
 	public static final String THEME_PROPERTY = "salami.theme";
-	/** JVM-Property für den Launcher-Schalter „Kampf-Module erlauben“ ({@code on|off}, fehlt = an). */
-	public static final String COMBAT_PROPERTY = "salami.combat";
 
 	private static SalamiClient instance;
 
 	private ModuleManager modules;
 	private ConfigManager config;
 	private KeyMapping clickGuiKey;
-	private KeyMapping easyLeaveKey;
 
 	public static SalamiClient get() {
 		return instance;
@@ -192,12 +159,9 @@ public final class SalamiClient implements ClientModInitializer {
 
 		modules = new ModuleManager();
 		registerModules();
-		modules.setSafeModeCheck(() -> modules.get(SafeModeModule.class).isEnabled());
-		applyLauncherCombat();
 
 		config = new ConfigManager(FabricLoader.getInstance().getConfigDir().resolve(MOD_ID), modules);
 		config.load();
-		enforceSafeModeAfterLoad();
 		applyLauncherTheme();
 		modules.setChangeListener(config::markDirty);
 
@@ -210,7 +174,6 @@ public final class SalamiClient implements ClientModInitializer {
 	private void registerModules() {
 		// Client
 		modules.register(new SalamiThemeModule());
-		modules.register(new SafeModeModule());
 		modules.register(new GuiScaleModule());
 		modules.register(new BorderlessFullscreenModule());
 		// Visual (Overlay-System: alle HudModule sind im HUD-Editor verschiebbar)
@@ -283,50 +246,14 @@ public final class SalamiClient implements ClientModInitializer {
 		modules.register(new ChatTweaksModule());
 		modules.register(new TabTweaksModule());
 		modules.register(new WaypointsModule());
-		// Utility (Kampf-Automatisierung – von Safe Mode / Easy Leave gesperrt)
-		modules.register(new AutoTotemModule());
-		modules.register(new HoverTotemModule());
-		modules.register(new DoubleHandTotemModule());
-		modules.register(new CrystalMacroModule());
-		modules.register(new CrystalTweaksModule());
-		modules.register(new AnchorMacroModule());
-		// Speer-Module (Ghost Spear, Speed Lunge, Lunge Macro): Speere gibt es erst ab 1.21.11
-		//? if >=1.21.11
-		modules.register(new GhostSpearModule());
-		modules.register(new BreachSwapModule());
-		modules.register(new AttributeSwapModule());
-		modules.register(new AutoMaceModule());
-		modules.register(new AutoElytraModule());
-		//? if >=1.21.11
-		modules.register(new SpeedLungeModule());
-		modules.register(new BlockEspModule());
-		modules.register(new PlayerEspModule());
-		modules.register(new TracersModule());
-		modules.register(new TriggerBotModule());
-		modules.register(new AimAssistModule());
-		modules.register(new AutoDTapModule());
-		modules.register(new AutoShieldBreakModule());
-		modules.register(new BowSpamModule());
-		modules.register(new BowAimModule());
-		modules.register(new CobwebPlacerModule());
-		modules.register(new TapResetModule());
-		modules.register(new KeyPearlModule());
-		modules.register(new PearlCatchModule());
-		modules.register(new StunSlamModule());
-		//? if >=1.21.11
-		modules.register(new LungeMacroModule());
-		modules.register(new SpeedBridgeModule());
-		modules.register(new FastXpModule());
-		modules.register(new AutoPotModule());
-		modules.register(new HitboxExpandModule());
+		// Social
+		modules.register(new FriendsModule());
 	}
 
 	private void registerKeybinds() {
 		KeyMapping.Category category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(MOD_ID, "main"));
 		clickGuiKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
 			"key.salami.clickgui", InputConstants.Type.KEYSYM, InputConstants.KEY_RSHIFT, category));
-		easyLeaveKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
-			"key.salami.easy_leave", InputConstants.Type.KEYSYM, InputConstants.KEY_END, category));
 	}
 
 	private void registerEvents() {
@@ -353,7 +280,6 @@ public final class SalamiClient implements ClientModInitializer {
 		//?}
 		WorldLines.init();
 		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
-			modules.get(SafeModeModule.class).onJoin(client.getCurrentServer());
 			TpsModule.reset();
 			AutoReconnectModule.onJoin(client.getCurrentServer());
 		});
@@ -361,14 +287,8 @@ public final class SalamiClient implements ClientModInitializer {
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> modules.get(KitsModule.class).cancel());
 		ClientWorldEvents.AFTER_CLIENT_WORLD_CHANGE.register((client, world) -> modules.get(KitsModule.class).cancel());
 		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> config.saveNow());
-		// Keybinds feuern nur ohne offenes Menü – Easy Leave soll aber auch im
-		// Inventar, Chat oder in der ClickGUI sofort greifen.
-		ScreenEvents.AFTER_INIT.register((client, screen, width, height) ->
-			ScreenKeyboardEvents.afterKeyPress(screen).register((s, event) -> {
-				if (easyLeaveKey.matches(event) && !isTyping(s)) {
-					easyLeave();
-				}
-			}));
+		// Freunde: /salami friends und /salami msg <freund> <text>
+		ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> FriendsCommand.register(dispatcher));
 	}
 
 	/** Fabrics Welt-Render-Kontext der jeweiligen Version als {@link WorldContext} für die Module. */
@@ -392,11 +312,9 @@ public final class SalamiClient implements ClientModInitializer {
 				client.setScreen(new SalamiMenuScreen(modules, config));
 			}
 		}
-		while (easyLeaveKey.consumeClick()) {
-			easyLeave();
-		}
 		modules.tick(client);
 		SharedCapes.tick(client);
+		Friends.tick(client);
 		AnimatedCapes.tick();
 		config.tick();
 	}
@@ -411,7 +329,8 @@ public final class SalamiClient implements ClientModInitializer {
 			// Mods-Menü: Tippen geht immer in die Suche
 			|| screen instanceof ModsScreen
 			|| (screen instanceof ModSettingsScreen settings && settings.wasCapturingKey())
-			|| (screen instanceof WaypointsScreen waypoints && waypoints.isEditing());
+			|| (screen instanceof WaypointsScreen waypoints && waypoints.isEditing())
+			|| (screen instanceof FriendsScreen friends && friends.isTyping());
 	}
 
 	/** Sucht ein fokussiertes Textfeld im Screen – auch Creative-Suche, Buch und Rezeptbuch-Suche. */
@@ -437,43 +356,15 @@ public final class SalamiClient implements ClientModInitializer {
 		return false;
 	}
 
-	/** Easy Leave: alle Kampfmodule sofort aus und gesperrt (Safe Mode). */
-	public void easyLeave() {
-		modules.get(SafeModeModule.class).engage(SafeModeModule.Reason.EASY_LEAVE);
-	}
-
-	/** Falls die Config inkonsistent ist (Safe Mode an + Utility an), gewinnt Safe Mode. */
-	private void enforceSafeModeAfterLoad() {
-		if (modules.get(SafeModeModule.class).isEnabled()) {
-			modules.disableCategory(Category.UTILITY);
-		}
-	}
-
 	/** Configs-Menü: Config aus einer Datei übernehmen und speichern. */
 	public void importConfig(Path file) throws IOException {
-		boolean safeMode = modules.get(SafeModeModule.class).isEnabled();
 		config.importFrom(file);
-		afterConfigReplaced(safeMode);
+		config.saveNow();
 	}
 
 	/** Configs-Menü: alles auf Standard zurücksetzen und speichern. */
 	public void resetConfig() {
-		boolean safeMode = modules.get(SafeModeModule.class).isEnabled();
 		config.resetToDefaults();
-		afterConfigReplaced(safeMode);
-	}
-
-	/**
-	 * Ein aktiver Safe Mode lässt sich nicht per Import oder Zurücksetzen abschalten, und
-	 * auf einem gelisteten Server greift er sofort wieder.
-	 */
-	private void afterConfigReplaced(boolean safeModeBefore) {
-		SafeModeModule safeMode = modules.get(SafeModeModule.class);
-		if (safeModeBefore) {
-			modules.restoreState(safeMode, true);
-		}
-		enforceSafeModeAfterLoad();
-		safeMode.onJoin(Minecraft.getInstance().getCurrentServer());
 		config.saveNow();
 	}
 
@@ -488,14 +379,6 @@ public final class SalamiClient implements ClientModInitializer {
 		LOG.info("Theme vom Launcher: {}", salami ? "Salami" : "Standard");
 	}
 
-	/** Brücke zum Launcher: {@code -Dsalami.combat=off} blendet alle Kampf-Module aus. */
-	private void applyLauncherCombat() {
-		if ("off".equalsIgnoreCase(System.getProperty(COMBAT_PROPERTY))) {
-			modules.setCombatAllowed(false);
-			LOG.info("Kampf-Module im Launcher ausgeschaltet");
-		}
-	}
-
 	public ModuleManager modules() {
 		return modules;
 	}
@@ -506,10 +389,6 @@ public final class SalamiClient implements ClientModInitializer {
 
 	public KeyMapping clickGuiKey() {
 		return clickGuiKey;
-	}
-
-	public KeyMapping easyLeaveKey() {
-		return easyLeaveKey;
 	}
 
 	/** Aktives Farbschema. */

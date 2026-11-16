@@ -6,7 +6,6 @@ import dev.salamiclient.capes.art.CapeDesign;
 import dev.salamiclient.capes.art.CapeDesigns;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.ModuleManager;
-import dev.salamiclient.modules.client.SafeModeModule;
 import dev.salamiclient.modules.visual.CapesModule;
 import dev.salamiclient.setting.Setting;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
@@ -36,7 +35,6 @@ public final class SalamiCapesGameTest implements FabricClientGameTest {
 		}
 		ModuleManager modules = SalamiClient.get().modules();
 		Module capes = modules.get(CapesModule.class);
-		context.runOnClient(c -> modules.setEnabled(modules.get(SafeModeModule.class), false));
 
 		try (TestSingleplayerContext world = context.worldBuilder().create()) {
 			GametestCompat.waitForChunksRender(world);

@@ -5,7 +5,6 @@ import dev.salamiclient.SalamiClient;
 import dev.salamiclient.gui.WaypointsScreen;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.ModuleManager;
-import dev.salamiclient.modules.client.SafeModeModule;
 import dev.salamiclient.modules.hud.ClockModule;
 import dev.salamiclient.modules.hud.DayCounterModule;
 import dev.salamiclient.modules.hud.JumpResetModule;
@@ -48,7 +47,6 @@ public final class SalamiModsBatchCGameTest implements FabricClientGameTest {
 			return;
 		}
 		ModuleManager modules = SalamiClient.get().modules();
-		context.runOnClient(c -> modules.setEnabled(modules.get(SafeModeModule.class), false));
 
 		// Cheats an: AutoText wird über einen Befehl geprüft, den der Spieler selbst ausführen darf
 		try (TestSingleplayerContext world = context.worldBuilder().adjustSettings(settings -> settings.setAllowCommands(true)).create()) {

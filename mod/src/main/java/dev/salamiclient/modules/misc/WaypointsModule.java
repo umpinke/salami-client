@@ -70,7 +70,13 @@ public final class WaypointsModule extends Module implements WorldRenderListener
 		return store;
 	}
 
-	private void openScreen() {
+	@Override
+	public boolean hasScreen() {
+		return true;
+	}
+
+	@Override
+	public void openScreen() {
 		mc().setScreen(new WaypointsScreen(this, mc().screen));
 	}
 

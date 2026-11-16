@@ -19,10 +19,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.BooleanSupplier;
 
 /**
- * Registriert alle Module, schaltet sie (mit Safe-Mode-Prüfung) um und verteilt
+ * Registriert alle Module, schaltet sie um und verteilt
  * Tick-/HUD-Aufrufe ausschließlich an aktive Module.
  */
 public final class ModuleManager {
@@ -33,10 +32,6 @@ public final class ModuleManager {
 	/** Tasten, die im letzten Tick gedrückt waren (Flankenerkennung für Modul-Keybinds). */
 	private final Set<Integer> keysDownLastTick = new HashSet<>();
 	private Runnable changeListener = () -> {};
-	private BooleanSupplier safeModeActive = () -> false;
-	/** Launcher-Schalter „Kampf-Module erlauben“; aus = alle {@link Module#needsCombat()} fehlen. */
-	private boolean combatAllowed = true;
-	private boolean utilityWarningShown;
 	/** Gemessene Zeit der Module (für den Benchmark-Test und zur Fehlersuche). */
 	private long hudNanos;
 	private long hudFrames;
@@ -58,37 +53,6 @@ public final class ModuleManager {
 
 	public void setChangeListener(Runnable listener) {
 		this.changeListener = listener;
-	}
-
-	public void setSafeModeCheck(BooleanSupplier check) {
-		this.safeModeActive = check;
-	}
-
-	/** Kampf-Module erlauben oder komplett ausblenden; ausgeblendete werden sofort abgeschaltet. */
-	public void setCombatAllowed(boolean allowed) {
-		combatAllowed = allowed;
-		if (!allowed) {
-			int count = 0;
-			for (Module module : byId.values()) {
-				if (module.needsCombat() && module.isEnabled()) {
-					applySafely(module, false);
-					count++;
-				}
-			}
-			if (count > 0) {
-				rebuildActive();
-				changeListener.run();
-			}
-		}
-	}
-
-	public boolean combatAllowed() {
-		return combatAllowed;
-	}
-
-	/** Ob das Modul im Spiel vorkommt (in GUIs gelistet, per Taste schaltbar). */
-	public boolean isAvailable(Module module) {
-		return combatAllowed || !module.needsCombat();
 	}
 
 	// --- Abfragen ---
@@ -122,27 +86,13 @@ public final class ModuleManager {
 	// --- Umschalten ---
 
 	/**
-	 * Schaltet ein Modul an/aus. Utility-Module lassen sich bei aktivem Safe Mode
-	 * nicht einschalten.
+	 * Schaltet ein Modul an/aus.
 	 *
 	 * @return {@code true}, wenn der gewünschte Zustand jetzt gilt
 	 */
 	public boolean setEnabled(Module module, boolean enabled) {
 		if (module.isEnabled() == enabled) {
 			return true;
-		}
-		if (enabled && !isAvailable(module)) {
-			return false;
-		}
-		if (enabled && module.category().isRestricted()) {
-			if (safeModeActive.getAsBoolean()) {
-				Chat.warn("salami.safe_mode.blocked");
-				return false;
-			}
-			if (!utilityWarningShown) {
-				utilityWarningShown = true;
-				Chat.warn("salami.category.utility.warning");
-			}
 		}
 		applySafely(module, enabled);
 		rebuildActive();
@@ -154,25 +104,9 @@ public final class ModuleManager {
 		return setEnabled(module, !module.isEnabled());
 	}
 
-	/** Schaltet alle Module einer Kategorie aus und liefert deren Anzahl. */
-	public int disableCategory(Category category) {
-		int count = 0;
-		for (Module module : byId.values()) {
-			if (module.category() == category && module.isEnabled()) {
-				applySafely(module, false);
-				count++;
-			}
-		}
-		if (count > 0) {
-			rebuildActive();
-			changeListener.run();
-		}
-		return count;
-	}
-
-	/** Setzt den Zustand ohne Safe-Mode-Prüfung – nur für das Laden der Config. */
+	/** Setzt den Zustand ohne Rückmeldung an die Config – nur für das Laden der Config. */
 	public void restoreState(Module module, boolean enabled) {
-		applySafely(module, enabled && isAvailable(module));
+		applySafely(module, enabled);
 		rebuildActive();
 	}
 
@@ -300,7 +234,7 @@ public final class ModuleManager {
 		Set<Integer> downNow = new HashSet<>();
 		for (Module module : byId.values()) {
 			int key = module.keybind.key();
-			if (!module.keybind.isBound() || !isAvailable(module)) {
+			if (!module.keybind.isBound()) {
 				continue;
 			}
 			if (Keys.isDown(key)) {

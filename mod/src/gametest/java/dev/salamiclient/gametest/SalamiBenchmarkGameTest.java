@@ -1,11 +1,9 @@
 package dev.salamiclient.gametest;
 
 import dev.salamiclient.SalamiClient;
-import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.ModuleManager;
 import dev.salamiclient.module.TextHudModule;
-import dev.salamiclient.modules.client.SafeModeModule;
 import dev.salamiclient.modules.client.BorderlessFullscreenModule;
 import dev.salamiclient.modules.misc.AutoTextModule;
 import dev.salamiclient.modules.misc.KitsModule;
@@ -37,8 +35,8 @@ public final class SalamiBenchmarkGameTest implements FabricClientGameTest {
 	private static final double MAX_WORLD_MS = 3.0;
 	private static final double MAX_TICK_MS = 2.0;
 
-	/** Nicht im Benchmark: Kampfmodule, Tasten-/Fenster-Module und bewusst teure Nachbearbeitung. */
-	private static final Set<Class<?>> SKIP = Set.of(SafeModeModule.class, BorderlessFullscreenModule.class, AutoTextModule.class,
+	/** Nicht im Benchmark: Tasten-/Fenster-Module und bewusst teure Nachbearbeitung. */
+	private static final Set<Class<?>> SKIP = Set.of(BorderlessFullscreenModule.class, AutoTextModule.class,
 		KitsModule.class, FreeLookModule.class, ZoomModule.class, MotionBlurModule.class, ColorSaturationModule.class);
 
 	@Override
@@ -47,7 +45,6 @@ public final class SalamiBenchmarkGameTest implements FabricClientGameTest {
 			return;
 		}
 		ModuleManager modules = SalamiClient.get().modules();
-		context.runOnClient(c -> modules.setEnabled(modules.get(SafeModeModule.class), false));
 
 		try (TestSingleplayerContext world = context.worldBuilder().create()) {
 			GametestCompat.waitForChunksRender(world);
@@ -65,7 +62,7 @@ public final class SalamiBenchmarkGameTest implements FabricClientGameTest {
 			List<Module> enabled = new ArrayList<>();
 			context.runOnClient(c -> {
 				for (Module module : modules.all()) {
-					if (module.category() == Category.UTILITY || SKIP.contains(module.getClass()) || module.isEnabled()) {
+					if (SKIP.contains(module.getClass()) || module.isEnabled()) {
 						continue;
 					}
 					modules.setEnabled(module, true);

@@ -13,12 +13,9 @@ import dev.salamiclient.module.HudModule;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.ModuleManager;
 import dev.salamiclient.modules.client.GuiScaleModule;
-import dev.salamiclient.modules.client.SafeModeModule;
 import dev.salamiclient.modules.hud.CpsModule;
 import dev.salamiclient.modules.hud.KeystrokesModule;
 import dev.salamiclient.modules.visual.HitboxModule;
-import dev.salamiclient.modules.utility.PlayerEspModule;
-import dev.salamiclient.modules.utility.TracersModule;
 import dev.salamiclient.modules.visual.InfoHudModule;
 import dev.salamiclient.modules.visual.NameTagsModule;
 import dev.salamiclient.setting.ColorSetting;
@@ -32,8 +29,6 @@ import net.minecraft.client.player.RemotePlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.animal.cow.Cow;
-import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.zombie.Zombie;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -54,7 +49,6 @@ public final class SalamiCustomizeGameTest implements FabricClientGameTest {
 			return;
 		}
 		ModuleManager modules = SalamiClient.get().modules();
-		context.runOnClient(c -> modules.setEnabled(modules.get(SafeModeModule.class), false));
 
 		testColorSetting();
 
@@ -67,8 +61,8 @@ public final class SalamiCustomizeGameTest implements FabricClientGameTest {
 			testColorPicker(context, modules);
 			testInterfaceColors(context, modules);
 			testHitboxColors(context, modules);
-			testEspAndNameTags(context, modules, world);
-			testItemTagsAndTracers(context, modules);
+			testNameTags(context, modules, world);
+			testItemTags(context, modules);
 		}
 	}
 
@@ -243,7 +237,7 @@ public final class SalamiCustomizeGameTest implements FabricClientGameTest {
 		});
 	}
 
-	private static void testEspAndNameTags(ClientGameTestContext context, ModuleManager modules, TestSingleplayerContext world) {
+	private static void testNameTags(ClientGameTestContext context, ModuleManager modules, TestSingleplayerContext world) {
 		var server = world.getServer();
 		server.runCommand("summon minecraft:zombie 500.5 -60 6.5 {NoAI:1b,PersistenceRequired:1b,CustomName:\"Testzombie\",CustomNameVisible:1b}");
 		server.runCommand("summon minecraft:cow 503.5 -60 6.5 {NoAI:1b,PersistenceRequired:1b}");
@@ -251,30 +245,13 @@ public final class SalamiCustomizeGameTest implements FabricClientGameTest {
 		server.runCommand("item replace entity @p armor.chest with minecraft:diamond_chestplate");
 		context.waitTicks(20);
 
-		PlayerEspModule esp = modules.get(PlayerEspModule.class);
 		NameTagsModule tags = modules.get(NameTagsModule.class);
 		context.runOnClient(c -> {
-			modules.setEnabled(esp, true);
-			set(esp, "mode", PlayerEspModule.Mode.BOTH);
-			set(esp, "hostile", true);
-			set(esp, "passive", true);
-			set(esp, "items", true);
-			set(esp, "hostile_color", 0xFFFF8C1A);
 			modules.setEnabled(tags, true);
 			set(tags, "mobs", true);
 			c.options.setCameraType(net.minecraft.client.CameraType.THIRD_PERSON_BACK);
 		});
-		check(!setting(esp, "hostile_color").isHidden() && setting(esp, "item_color").isHidden() == false, "ESP colors hidden");
 		AABB area = new AABB(490, -64, -5, 510, -50, 15);
-		boolean espOk = context.computeOnClient(c -> {
-			Zombie zombie = c.level.getEntitiesOfClass(Zombie.class, area).stream().findFirst().orElse(null);
-			Cow cow = c.level.getEntitiesOfClass(Cow.class, area).stream().findFirst().orElse(null);
-			ItemEntity item = c.level.getEntitiesOfClass(ItemEntity.class, area).stream().findFirst().orElse(null);
-			return zombie != null && cow != null && item != null
-				&& PlayerEspModule.glows(zombie) && PlayerEspModule.glows(cow) && PlayerEspModule.glows(item)
-				&& PlayerEspModule.glowColor(zombie, 0) == 0xFF8C1A;
-		});
-		check(espOk, "ESP does not show hostile mobs, passive mobs and items");
 
 		String zombieTag = context.computeOnClient(c -> {
 			Zombie zombie = c.level.getEntitiesOfClass(Zombie.class, area).stream().findFirst().orElseThrow();
@@ -293,17 +270,13 @@ public final class SalamiCustomizeGameTest implements FabricClientGameTest {
 			"name tag scale wrong: " + NameTagsModule.scale(400));
 		context.runOnClient(c -> set(tags, "distance_scale", false));
 		context.waitTicks(5);
-		context.takeScreenshot("salami-63-esp-nametags");
+		context.takeScreenshot("salami-63-nametags");
 
 		context.runOnClient(c -> {
 			c.options.setCameraType(net.minecraft.client.CameraType.FIRST_PERSON);
-			for (String id : List.of("mode", "hostile", "passive", "items", "hostile_color")) {
-				setting(esp, id).resetAll();
-			}
 			for (String id : List.of("mobs", "scale", "distance_scale")) {
 				setting(tags, id).resetAll();
 			}
-			modules.setEnabled(esp, false);
 			modules.setEnabled(tags, false);
 		});
 		check(NameTagsModule.scale(400) == 1F, "name tags still scaled while off");
@@ -312,15 +285,13 @@ public final class SalamiCustomizeGameTest implements FabricClientGameTest {
 	}
 
 	/**
-	 * NameTags-Item-Zeile und Tracers mit Spielern, die nur im Client existieren: einer vorne in
+	 * NameTags-Item-Zeile und Bildschirm-Projektion mit Spielern, die nur im Client existieren: einer vorne in
 	 * (teils beschädigter) Rüstung ohne Schuhe, einer hinter der Kamera, einer unsichtbar.
 	 */
-	private static void testItemTagsAndTracers(ClientGameTestContext context, ModuleManager modules) {
+	private static void testItemTags(ClientGameTestContext context, ModuleManager modules) {
 		NameTagsModule tags = modules.get(NameTagsModule.class);
-		TracersModule tracers = modules.get(TracersModule.class);
 		context.waitTicks(25); // Mobs aus dem vorigen Test zu Ende sterben lassen (ihre Namen lägen sonst darüber)
 		RemotePlayer[] fakes = context.computeOnClient(c -> {
-			// etwas rechts vom Fadenkreuz, damit die Tracer-Linie im Bild zu sehen ist
 			RemotePlayer front = fakePlayer(c, 900_001, "Ruestung", 498.5, -60, 5.5);
 			ItemStack sword = new ItemStack(Items.DIAMOND_SWORD);
 			sword.setDamageValue(sword.getMaxDamage() * 3 / 4);
@@ -338,8 +309,6 @@ public final class SalamiCustomizeGameTest implements FabricClientGameTest {
 		});
 		context.runOnClient(c -> {
 			modules.setEnabled(tags, true);
-			modules.setEnabled(tracers, true);
-			set(tracers, "width", 2.0);
 		});
 		check(!setting(tags, "durability").isHidden(), "NameTags: durability hidden while items are on");
 		context.waitTicks(5);
@@ -363,14 +332,12 @@ public final class SalamiCustomizeGameTest implements FabricClientGameTest {
 		check(!NameTagsModule.inRange(10 * 10) && NameTagsModule.inRange(5 * 5), "NameTags: range not applied");
 		context.runOnClient(c -> setting(tags, "range").resetAll());
 		context.waitTicks(3);
-		context.takeScreenshot("salami-64-nametag-items-tracers");
+		context.takeScreenshot("salami-64-nametag-items");
 
 		context.runOnClient(c -> {
 			for (RemotePlayer fake : fakes) {
 				c.level.removeEntity(fake.getId(), Entity.RemovalReason.DISCARDED);
 			}
-			setting(tracers, "width").resetAll();
-			modules.setEnabled(tracers, false);
 			modules.setEnabled(tags, false);
 		});
 		check(NameTagsModule.inRange(60 * 60), "NameTags: range still applied while off");

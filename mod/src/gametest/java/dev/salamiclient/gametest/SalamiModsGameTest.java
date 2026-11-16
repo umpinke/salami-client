@@ -6,7 +6,6 @@ import dev.salamiclient.gui.ModSettingsScreen;
 import dev.salamiclient.gui.ModsScreen;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.ModuleManager;
-import dev.salamiclient.modules.client.SafeModeModule;
 import dev.salamiclient.modules.hud.CpsModule;
 import dev.salamiclient.modules.hud.KeystrokesModule;
 import dev.salamiclient.modules.hud.PotionStatusModule;
@@ -47,7 +46,6 @@ public final class SalamiModsGameTest implements FabricClientGameTest {
 			return;
 		}
 		ModuleManager modules = SalamiClient.get().modules();
-		context.runOnClient(c -> modules.setEnabled(modules.get(SafeModeModule.class), false));
 
 		try (TestSingleplayerContext world = context.worldBuilder().create()) {
 			GametestCompat.waitForChunksRender(world);

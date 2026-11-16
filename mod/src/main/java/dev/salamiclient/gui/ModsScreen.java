@@ -136,8 +136,7 @@ public final class ModsScreen extends Screen {
 		List<Object> entries = new ArrayList<>();
 		entries.add(null);
 		for (Category category : Category.values()) {
-			// Kampf-Module im Launcher aus: kein leerer Utility-Eintrag
-			if (modules.byCategory(category).stream().anyMatch(modules::isAvailable)) {
+			if (!modules.byCategory(category).isEmpty()) {
 				entries.add(category);
 			}
 		}
@@ -173,7 +172,7 @@ public final class ModsScreen extends Screen {
 		int total = 0;
 		int enabled = 0;
 		for (Module module : modules.all()) {
-			if (!modules.isAvailable(module) || tab != null && module.category() != tab) {
+			if (tab != null && module.category() != tab) {
 				continue;
 			}
 			total++;
@@ -190,7 +189,7 @@ public final class ModsScreen extends Screen {
 		List<Object> list = new ArrayList<>();
 		if (tab != EXTRAS) {
 			for (Module module : modules.all()) {
-				if (!modules.isAvailable(module) || tab != null && module.category() != tab) {
+				if (tab != null && module.category() != tab) {
 					continue;
 				}
 				if (!q.isEmpty() && !matches(module, q)) {
@@ -365,12 +364,6 @@ public final class ModsScreen extends Screen {
 			String label = font.plainSubstrByWidth(tabLabel(key), countX - r[0] - PAD - 8);
 			GuiDraw.text(g, font, label, r[0] + PAD - 1 + (selected ? 2 : 0), r[1] + 4, selected ? theme.headerText() : theme.text(), false);
 			GuiDraw.text(g, font, count, countX, r[1] + 4, selected ? theme.accent() : theme.textDim(), false);
-			if (key instanceof Category category && category.isRestricted()) {
-				GuiDraw.text(g, font, "!", countX - 6, r[1] + 4, theme.warning(), false);
-				if (hovered) {
-					tooltip = Component.translatable("salami.category.utility.warning");
-				}
-			}
 		}
 
 		int[] first = actionRect(Action.values()[0]);
@@ -447,12 +440,8 @@ public final class ModsScreen extends Screen {
 		boolean on = module.isEnabled();
 		renderCardBase(g, theme, card, hovered, on);
 
-		boolean restricted = module.category().isRestricted();
-		String name = font.plainSubstrByWidth(I18n.get(module.translationKey()), CARD_W - 28 - (restricted ? 6 : 0));
+		String name = font.plainSubstrByWidth(I18n.get(module.translationKey()), CARD_W - 28);
 		GuiDraw.text(g, font, name, x + 6, y + 7, on ? theme.headerText() : theme.text(), false);
-		if (restricted) {
-			GuiDraw.text(g, font, "!", x + 8 + font.width(name), y + 7, theme.warning(), false);
-		}
 		renderDescription(g, theme, module.descriptionKey(), x, y);
 
 		// An/Aus-Schalter

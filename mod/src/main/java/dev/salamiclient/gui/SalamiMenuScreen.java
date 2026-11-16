@@ -3,6 +3,7 @@ package dev.salamiclient.gui;
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.config.ConfigManager;
+import dev.salamiclient.friends.Friends;
 import dev.salamiclient.gui.clickgui.ClickGuiScreen;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.ModuleManager;
@@ -24,8 +25,8 @@ import java.util.List;
 
 /**
  * Salami-Menü (Rechte Umschalttaste): Einstieg ins Spielmenü. Links ein Akzentstrich, daneben
- * Logo und Schriftzug, darunter der große Knopf zu den Mods und eine Reihe Kacheln für HUD,
- * Configs, Wegpunkte und die Panel-Ansicht.
+ * Logo und Schriftzug, darunter der große Knopf zu den Mods, eine Reihe Kacheln für HUD,
+ * Configs, Wegpunkte und die Panel-Ansicht und eine zweite für Freunde und Cosmetics.
  *
  * <p>Rechnet wie die übrigen Salami-Menüs in skalierten Koordinaten (Modul „Oberfläche“);
  * Zeichnen und Klicken nutzen dieselben Rechtecke.
@@ -42,17 +43,21 @@ public final class SalamiMenuScreen extends Screen {
 	/** Abstand des Inhalts vom Akzentstrich links. */
 	private static final int INSET = 10;
 
-	/** Kacheln unter dem Mods-Knopf. */
+	/** Kacheln unter dem Mods-Knopf: erste Reihe Werkzeuge, zweite Reihe ({@link #social}) Freunde und Cosmetics. */
 	private enum Tile {
-		HUD("salami.menu.hud"),
-		CONFIGS("salami.clickgui.configs"),
-		WAYPOINTS("salami.menu.waypoints"),
-		PANELS("salami.menu.panels");
+		HUD("salami.menu.hud", false),
+		CONFIGS("salami.clickgui.configs", false),
+		WAYPOINTS("salami.menu.waypoints", false),
+		PANELS("salami.menu.panels", false),
+		FRIENDS("salami.menu.friends", true),
+		COSMETICS("salami.menu.cosmetics", true);
 
 		final String key;
+		final boolean social;
 
-		Tile(String key) {
+		Tile(String key, boolean social) {
 			this.key = key;
+			this.social = social;
 		}
 	}
 
@@ -87,7 +92,7 @@ public final class SalamiMenuScreen extends Screen {
 	}
 
 	private int blockHeight() {
-		return LOGO_SIZE + 12 + MAIN_H + GAP + TILE_H;
+		return LOGO_SIZE + 12 + MAIN_H + GAP + TILE_H + GAP + TILE_H;
 	}
 
 	private int left() {
@@ -105,11 +110,11 @@ public final class SalamiMenuScreen extends Screen {
 		return new int[] {x, y, left() + BLOCK_W, y + MAIN_H};
 	}
 
-	/** Sichtbare Kacheln: Wegpunkte nur, wenn das Modul verfügbar ist. */
-	private List<Tile> tiles() {
+	/** Kacheln einer Reihe ({@code social} = zweite Reihe mit Freunden und Cosmetics). */
+	private List<Tile> tiles(boolean social) {
 		List<Tile> list = new ArrayList<>();
 		for (Tile tile : Tile.values()) {
-			if (tile != Tile.WAYPOINTS || waypoints() != null) {
+			if (tile.social == social) {
 				list.add(tile);
 			}
 		}
@@ -117,18 +122,18 @@ public final class SalamiMenuScreen extends Screen {
 	}
 
 	private WaypointsModule waypoints() {
-		WaypointsModule module = modules.get(WaypointsModule.class);
-		return module != null && modules.isAvailable(module) ? module : null;
+		return modules.get(WaypointsModule.class);
 	}
 
-	private int[] tileRect(int index, int count) {
+	private int[] tileRect(int index, int count, boolean social) {
 		int[] main = mainButton();
 		int total = main[2] - main[0];
 		int w = (total - (count - 1) * GAP) / count;
 		int x = main[0] + index * (w + GAP);
 		// letzte Kachel schließt bündig mit dem Knopf ab
 		int right = index == count - 1 ? main[2] : x + w;
-		return new int[] {x, main[3] + GAP, right, main[3] + GAP + TILE_H};
+		int top = main[3] + GAP + (social ? TILE_H + GAP : 0);
+		return new int[] {x, top, right, top + TILE_H};
 	}
 
 	private static boolean inside(int[] r, double x, double y) {
@@ -192,9 +197,11 @@ public final class SalamiMenuScreen extends Screen {
 		g.pose().popMatrix();
 		GuiDraw.text(g, font, ">", main[2] - 14 + (mainHover ? 2 : 0), main[1] + 9, onAccent, false);
 
-		List<Tile> tiles = tiles();
-		for (int i = 0; i < tiles.size(); i++) {
-			renderTile(g, theme, tiles.get(i), tileRect(i, tiles.size()), mx, my);
+		for (boolean social : new boolean[] {false, true}) {
+			List<Tile> tiles = tiles(social);
+			for (int i = 0; i < tiles.size(); i++) {
+				renderTile(g, theme, tiles.get(i), tileRect(i, tiles.size(), social), mx, my);
+			}
 		}
 
 		GuiDraw.text(g, font, I18n.get("salami.menu.hint"), x, top + blockHeight() + 8, (theme.textDim() & 0x00FFFFFF) | 0x99000000, false);
@@ -206,11 +213,9 @@ public final class SalamiMenuScreen extends Screen {
 		int total = 0;
 		int enabled = 0;
 		for (Module module : modules.all()) {
-			if (modules.isAvailable(module)) {
-				total++;
-				if (module.isEnabled()) {
-					enabled++;
-				}
+			total++;
+			if (module.isEnabled()) {
+				enabled++;
 			}
 		}
 		return I18n.get("salami.menu.status", enabled, total);
@@ -233,6 +238,16 @@ public final class SalamiMenuScreen extends Screen {
 		g.pose().scale(0.75f, 0.75f);
 		GuiDraw.text(g, font, label, 0, 0, hovered ? theme.headerText() : theme.textDim(), false);
 		g.pose().popMatrix();
+		if (tile == Tile.FRIENDS) {
+			// ungelesene Nachrichten und offene Anfragen als Zahl oben rechts
+			int count = Friends.unreadTotal() + (int) Friends.requests().stream().filter(Friends.Request::incoming).count();
+			if (count > 0) {
+				String badge = count > 99 ? "99+" : String.valueOf(count);
+				int bw = font.width(badge) + 6;
+				GuiDraw.roundRect(g, r[2] - bw - 3, r[1] + 3, bw, 10, theme.accent());
+				GuiDraw.text(g, font, badge, r[2] - bw, r[1] + 4, GuiDraw.textOn(theme.accent()), false);
+			}
+		}
 	}
 
 	/** Pixel-Symbole (12x12); (x, y) ist die linke obere Ecke. */
@@ -269,6 +284,20 @@ public final class SalamiMenuScreen extends Screen {
 				g.fill(x + 1, y + 1, x + 4, y + 3, color);
 				g.fill(x + 8, y + 1, x + 11, y + 3, color);
 			}
+			case FRIENDS -> {
+				// zwei Köpfe mit Schultern
+				g.fill(x + 1, y + 1, x + 5, y + 5, color);
+				g.fill(x, y + 7, x + 6, y + 12, color);
+				g.fill(x + 7, y + 2, x + 11, y + 6, color);
+				g.fill(x + 6, y + 8, x + 12, y + 12, color);
+			}
+			case COSMETICS -> {
+				// Cape: breiter Kragen, nach unten schmaler werdend
+				g.fill(x + 1, y, x + 11, y + 2, color);
+				g.fill(x + 2, y + 2, x + 10, y + 9, color);
+				g.fill(x + 3, y + 9, x + 9, y + 12, color);
+				g.fill(x + 5, y + 3, x + 7, y + 8, 0xFF120F10);
+			}
 		}
 	}
 
@@ -289,6 +318,8 @@ public final class SalamiMenuScreen extends Screen {
 				}
 			}
 			case PANELS -> minecraft.setScreen(new ClickGuiScreen(modules, config));
+			case FRIENDS -> minecraft.setScreen(new FriendsScreen(this));
+			case COSMETICS -> minecraft.setScreen(new CosmeticsScreen(this));
 		}
 	}
 
@@ -301,11 +332,13 @@ public final class SalamiMenuScreen extends Screen {
 				openMods();
 				return true;
 			}
-			List<Tile> tiles = tiles();
-			for (int i = 0; i < tiles.size(); i++) {
-				if (inside(tileRect(i, tiles.size()), x, y)) {
-					open(tiles.get(i));
-					return true;
+			for (boolean social : new boolean[] {false, true}) {
+				List<Tile> tiles = tiles(social);
+				for (int i = 0; i < tiles.size(); i++) {
+					if (inside(tileRect(i, tiles.size(), social), x, y)) {
+						open(tiles.get(i));
+						return true;
+					}
 				}
 			}
 		}

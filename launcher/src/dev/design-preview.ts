@@ -75,7 +75,6 @@ const launcherConfig = {
   clips: { enabled: false },
   log_level: "info",
   salami_theme: true,
-  combat_modules: true,
   salami_app_sync: true,
   salami_app_clips: true,
 };

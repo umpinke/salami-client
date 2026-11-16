@@ -393,10 +393,6 @@ pub struct LauncherConfig {
     /// Salami-Modus: wird beim Start als `-Dsalami.theme` an salami-core übergeben.
     #[serde(default)]
     pub salami_theme: bool,
-    /// Kampf-Module (Crystal Macro, Anchor Macro, Auto Totem …) in salami-core erlauben;
-    /// wird beim Start als `-Dsalami.combat=on|off` übergeben.
-    #[serde(default = "default_true_bool")]
-    pub combat_modules: bool,
     /// Spielzeit und Screenshots mit der Salami-App fürs Handy synchronisieren
     /// (`integrations::salami_app`). Standardmäßig an.
     #[serde(default = "default_true_bool")]
@@ -496,7 +492,6 @@ impl Default for LauncherConfig {
             clips: ClipConfig::default(),
             log_level: LogLevel::default(),
             salami_theme: false,
-            combat_modules: true,
             salami_app_sync: true,
             salami_app_clips: true,
         }
@@ -839,7 +834,6 @@ impl ConfigManager {
                     },
                     log_level: new_config.log_level,
                     salami_theme: new_config.salami_theme,
-                    combat_modules: new_config.combat_modules,
                     salami_app_sync: new_config.salami_app_sync,
                     salami_app_clips: new_config.salami_app_clips,
                 };

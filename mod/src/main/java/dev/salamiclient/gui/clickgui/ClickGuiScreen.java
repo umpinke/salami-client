@@ -7,6 +7,7 @@ import dev.salamiclient.SalamiClient;
 import dev.salamiclient.config.ConfigManager;
 import dev.salamiclient.gui.ColorPicker;
 import dev.salamiclient.gui.ConfigsScreen;
+import dev.salamiclient.gui.CosmeticsScreen;
 import dev.salamiclient.gui.HudEditorScreen;
 import dev.salamiclient.gui.ModsScreen;
 import dev.salamiclient.gui.SettingText;
@@ -44,6 +45,7 @@ import java.util.Set;
  *
  * <ul>
  *   <li>Linksklick auf Modul: an/aus · Rechtsklick: Einstellungen auf-/zuklappen</li>
+ *   <li>„Öffnen“ in der Modulzeile: eigenes Menü des Moduls (Freunde, Cosmetics, Wegpunkte)</li>
  *   <li>Kopfzeile ziehen: Panel verschieben · Rechtsklick: Panel einklappen</li>
  *   <li>Einstellungen: Linksklick ändert, Rechtsklick ändert rückwärts bzw. setzt zurück</li>
  * </ul>
@@ -73,6 +75,9 @@ public final class ClickGuiScreen extends Screen {
 	private int sliderWidth;
 	private KeybindSetting listeningKeybind;
 	private boolean capturedLastKey;
+	/** Maus in GUI-Koordinaten (für den Hover des „Öffnen“-Knopfs). */
+	private int lastMouseX;
+	private int lastMouseY;
 
 	private static final class Panel {
 		final Category category;
@@ -138,6 +143,8 @@ public final class ClickGuiScreen extends Screen {
 		Theme theme = SalamiClient.get().theme();
 		int mx = (int) (mouseX / uiScale);
 		int my = (int) (mouseY / uiScale);
+		lastMouseX = mx;
+		lastMouseY = my;
 		Hit hover = (draggedPanel == null && draggedSlider == null) ? hitTest(mx, my) : null;
 
 		graphics.pose().pushMatrix();
@@ -152,6 +159,7 @@ public final class ClickGuiScreen extends Screen {
 		renderHudButton(graphics, theme, mx, my);
 		renderModsButton(graphics, theme, mx, my);
 		renderConfigsButton(graphics, theme, mx, my);
+		renderCosmeticsButton(graphics, theme, mx, my);
 		renderScaleControls(graphics, theme, mx, my);
 		if (picker != null) {
 			picker.render(graphics, font, theme, mx, my);
@@ -197,19 +205,14 @@ public final class ClickGuiScreen extends Screen {
 		int total = 0;
 		int enabled = 0;
 		for (Module module : modules.byCategory(panel.category)) {
-			if (modules.isAvailable(module)) {
-				total++;
-				if (module.isEnabled()) {
-					enabled++;
-				}
+			total++;
+			if (module.isEnabled()) {
+				enabled++;
 			}
 		}
 		String count = enabled + "/" + total;
 		int countX = markerX - 5 - font.width(count);
 		GuiDraw.text(g, font, count, countX, textY, (theme.headerText() & 0x00FFFFFF) | 0x99000000, false);
-		if (panel.category.isRestricted()) {
-			GuiDraw.text(g, font, "!", countX - 7, textY, theme.warning(), false);
-		}
 
 		if (panel.open && rows.isEmpty()) {
 			GuiDraw.text(g, font, I18n.get("salami.clickgui.empty"), panel.x + PADDING, panel.y + HEADER_HEIGHT + 4, theme.textDim(), false);
@@ -289,6 +292,20 @@ public final class ClickGuiScreen extends Screen {
 		int[] b = configsButton();
 		boolean hovered = mouseX >= b[0] && mouseX < b[2] && mouseY >= b[1] && mouseY < b[3];
 		renderTopButton(g, theme, b, I18n.get("salami.clickgui.configs"), 6, hovered, false);
+	}
+
+	// ------------------------------------------------------------------ Cosmetics-Knopf (neben Configs)
+
+	private int[] cosmeticsButton() {
+		int left = configsButton()[2] + 4;
+		int w = font.width(I18n.get("salami.clickgui.cosmetics")) + 12;
+		return new int[] {left, 4, left + w, 18};
+	}
+
+	private void renderCosmeticsButton(GuiGraphics g, Theme theme, int mouseX, int mouseY) {
+		int[] b = cosmeticsButton();
+		boolean hovered = mouseX >= b[0] && mouseX < b[2] && mouseY >= b[1] && mouseY < b[3];
+		renderTopButton(g, theme, b, I18n.get("salami.clickgui.cosmetics"), 6, hovered, false);
 	}
 
 	// ------------------------------------------------------------------ Größe (− 100 % +)
@@ -388,11 +405,28 @@ public final class ClickGuiScreen extends Screen {
 		}
 		boolean expanded = EXPANDED.contains(module.id());
 		int expanderX = right - PADDING - 4;
-		String name = font.plainSubstrByWidth(I18n.get(module.translationKey()), expanderX - panel.x - PADDING - 4);
+		int nameRight = expanderX - 4;
+		if (module.hasScreen()) {
+			int[] b = openButton(panel, row);
+			nameRight = b[0] - 3;
+			boolean overButton = hovered && lastMouseX >= b[0] && lastMouseX < b[2] && lastMouseY >= b[1] && lastMouseY < b[3];
+			GuiDraw.roundRect(g, b[0], b[1], b[2] - b[0], b[3] - b[1], overButton ? theme.accent() : theme.outline());
+			GuiDraw.roundRect(g, b[0] + 1, b[1] + 1, b[2] - b[0] - 2, b[3] - b[1] - 2, overButton ? theme.accent() : theme.panel() | 0xFF000000);
+			GuiDraw.text(g, font, I18n.get("salami.clickgui.open"), b[0] + 4, b[1] + 2,
+				overButton ? GuiDraw.textOn(theme.accent()) : theme.headerText(), false);
+		}
+		String name = font.plainSubstrByWidth(I18n.get(module.translationKey()), nameRight - panel.x - PADDING);
 		GuiDraw.text(g, font, name, panel.x + PADDING + (on ? 2 : 0), row.y() + 4, on ? theme.headerText() : theme.text(), false);
 		if (hasSettings) {
 			drawChevron(g, expanderX, row.y() + (expanded ? 6 : 5), expanded, expanded ? theme.accent() : theme.textDim());
 		}
+	}
+
+	/** „Öffnen“-Knopf links vom Pfeil, nur bei Modulen mit eigenem Menü: {x0, y0, x1, y1}. */
+	private int[] openButton(Panel panel, Row row) {
+		int right = panel.x + PANEL_WIDTH - 1 - PADDING - 4 - 5;
+		int w = font.width(I18n.get("salami.clickgui.open")) + 8;
+		return new int[] {right - w, row.y() + 1, right, row.y() + row.height() - 1};
 	}
 
 	private void renderSettingRow(GuiGraphics g, Panel panel, Row row, Theme theme, boolean hovered) {
@@ -466,9 +500,6 @@ public final class ClickGuiScreen extends Screen {
 		if (hit == null) {
 			return null;
 		}
-		if (hit.header() && hit.panel().category.isRestricted()) {
-			return Component.translatable("salami.category.utility.warning");
-		}
 		if (hit.row() == null) {
 			return null;
 		}
@@ -501,9 +532,6 @@ public final class ClickGuiScreen extends Screen {
 		}
 		int y = panel.y + HEADER_HEIGHT;
 		for (Module module : modules.byCategory(panel.category)) {
-			if (!modules.isAvailable(module)) {
-				continue;
-			}
 			rows.add(new Row(module, null, y, MODULE_HEIGHT));
 			y += MODULE_HEIGHT;
 			if (EXPANDED.contains(module.id())) {
@@ -585,6 +613,11 @@ public final class ClickGuiScreen extends Screen {
 			minecraft.setScreen(new ConfigsScreen(this));
 			return true;
 		}
+		int[] cos = cosmeticsButton();
+		if (event.x() >= cos[0] && event.x() < cos[2] && event.y() >= cos[1] && event.y() < cos[3]) {
+			minecraft.setScreen(new CosmeticsScreen(this));
+			return true;
+		}
 		Hit hit = hitTest(event.x(), event.y());
 		if (hit == null) {
 			return super.mouseClicked(event, doubleClick);
@@ -610,6 +643,13 @@ public final class ClickGuiScreen extends Screen {
 			return true;
 		}
 		if (row.isModule()) {
+			if (button == InputConstants.MOUSE_BUTTON_LEFT && row.module().hasScreen()) {
+				int[] open = openButton(panel, row);
+				if (event.x() >= open[0] && event.x() < open[2]) {
+					row.module().openScreen();
+					return true;
+				}
+			}
 			if (button == InputConstants.MOUSE_BUTTON_LEFT) {
 				modules.toggle(row.module());
 			} else if (button == InputConstants.MOUSE_BUTTON_RIGHT) {
@@ -820,8 +860,7 @@ public final class ClickGuiScreen extends Screen {
 		int y = 26;
 		int rowHeight = 0;
 		for (Category category : Category.values()) {
-			// Kampf-Module im Launcher aus: kein leeres Utility-Panel
-			if (modules.byCategory(category).stream().noneMatch(modules::isAvailable)) {
+			if (modules.byCategory(category).isEmpty()) {
 				continue;
 			}
 			if (x > 10 && x + PANEL_WIDTH > uiWidth() - 10) {
