@@ -383,6 +383,12 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 				context.setScreen(() -> new CosmeticsScreen(null));
 				context.waitTicks(20);
 				context.takeScreenshot("salami-13-cosmetics");
+				// ganz nach unten: die letzte Reihe ist vollständig zu sehen, nichts halb abgeschnitten
+				for (int i = 0; i < 5; i++) {
+					context.getInput().scroll(-1);
+				}
+				context.waitTicks(2);
+				context.takeScreenshot("salami-13b-cosmetics-bottom");
 				context.setScreen(() -> null);
 			} catch (Exception e) {
 				throw new RuntimeException("Cosmetics test failed", e);

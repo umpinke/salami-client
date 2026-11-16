@@ -39,10 +39,14 @@ public final class CosmeticsScreen extends Screen {
 	private static final int TABS = 18;
 	private static final int PAD = 10;
 	private static final int CARD_W = 78;
-	private static final int CARD_H = 84;
+	private static final int CARD_H = 64;
 	private static final int GAP = 6;
-	private static final int PREVIEW_W = 30;
-	private static final int PREVIEW_H = 48;
+	private static final int PREVIEW_W = 22;
+	private static final int PREVIEW_H = 35;
+	/** Abstand der Vorschau vom oberen Kartenrand; darunter Name und Kennzeichen. */
+	private static final int PREVIEW_Y = 5;
+	/** Lange Namen werden bis auf diese Größe verkleinert, erst danach gekürzt. */
+	private static final float MIN_LABEL_SCALE = 0.7f;
 	/** Breite der festen Cape-Bilder in der Jar (Peperoni, Schneidebrett). */
 	private static final int STATIC_SIZE = 256;
 
@@ -59,7 +63,8 @@ public final class CosmeticsScreen extends Screen {
 
 	private final Screen parent;
 	private float uiScale = 1f;
-	private double scroll;
+	/** Erste sichtbare Kartenreihe – es wird immer um ganze Reihen gescrollt, nichts ist halb abgeschnitten. */
+	private int scrollRow;
 	private final List<Card> cards = new ArrayList<>();
 	/** Für eigene Capes registrierte Vorschau-Texturen – beim Schließen wieder freigeben. */
 	private final List<Identifier> previews = new ArrayList<>();
@@ -268,20 +273,40 @@ public final class CosmeticsScreen extends Screen {
 		return Math.max(1, (c[2] - c[0] + GAP) / (CARD_W + GAP));
 	}
 
+	private int rows() {
+		return (cards.size() + columns() - 1) / columns();
+	}
+
+	/** So viele Reihen passen ganz in den Inhalt (mindestens eine). */
+	private int visibleRows() {
+		int[] c = content();
+		return Math.max(1, (c[3] - c[1] + GAP) / (CARD_H + GAP));
+	}
+
+	/** Ob die Kachel {@code index} in einer gerade sichtbaren Reihe liegt. */
+	private boolean visible(int index) {
+		int row = index / columns() - scrollRow;
+		return row >= 0 && row < visibleRows();
+	}
+
+	/** Oberkante der sichtbaren Reihen: bei Platz für mehr als die ganzen Reihen mittig. */
+	private int gridTop() {
+		int[] c = content();
+		int used = Math.min(rows(), visibleRows()) * (CARD_H + GAP) - GAP;
+		return c[1] + Math.max(0, (c[3] - c[1] - used) / 2);
+	}
+
 	/** Linke obere Ecke der Kachel {@code index}, Raster zentriert. */
 	private int[] cardPos(int index) {
 		int[] c = content();
 		int cols = columns();
 		int gridW = cols * CARD_W + (cols - 1) * GAP;
 		int left = c[0] + (c[2] - c[0] - gridW) / 2;
-		return new int[] {left + (index % cols) * (CARD_W + GAP), c[1] + (index / cols) * (CARD_H + GAP) - (int) Math.round(scroll)};
+		return new int[] {left + (index % cols) * (CARD_W + GAP), gridTop() + (index / cols - scrollRow) * (CARD_H + GAP)};
 	}
 
 	private void clampScroll() {
-		int[] c = content();
-		int rows = (cards.size() + columns() - 1) / columns();
-		int total = rows * (CARD_H + GAP) - GAP;
-		scroll = Math.max(0, Math.min(scroll, Math.max(0, total - (c[3] - c[1]))));
+		scrollRow = Math.max(0, Math.min(scrollRow, rows() - visibleRows()));
 	}
 
 	private static boolean inside(int[] r, double x, double y) {
@@ -340,14 +365,15 @@ public final class CosmeticsScreen extends Screen {
 		String current = currentKey;
 		g.enableScissor(c[0], c[1], c[2], c[3]);
 		for (int i = 0; i < cards.size(); i++) {
-			int[] pos = cardPos(i);
-			if (pos[1] + CARD_H < c[1] || pos[1] > c[3]) {
+			if (!visible(i)) {
 				continue;
 			}
+			int[] pos = cardPos(i);
 			boolean hovered = mx >= pos[0] && mx < pos[0] + CARD_W && my >= pos[1] && my < pos[1] + CARD_H && inside(c, mx, my);
 			renderCard(g, theme, cards.get(i), pos[0], pos[1], hovered, cards.get(i).key().equals(current));
 		}
 		g.disableScissor();
+		renderScrollbar(g, theme, c);
 
 		Component line = notice != null ? notice : Component.translatable("salami.cosmetics.info");
 		List<FormattedCharSequence> lines = font.split(line, f[2] - f[0] - 2 * PAD);
@@ -367,7 +393,7 @@ public final class CosmeticsScreen extends Screen {
 			GuiDraw.roundRect(g, x + 1, y + 1, CARD_W - 2, CARD_H - 2, theme.hover());
 		}
 		int px = x + (CARD_W - PREVIEW_W) / 2;
-		int py = y + 7;
+		int py = y + PREVIEW_Y;
 		switch (card.key()) {
 			case "none" -> {
 				GuiDraw.outline(g, px, py, PREVIEW_W, PREVIEW_H, theme.textDim());
@@ -375,8 +401,8 @@ public final class CosmeticsScreen extends Screen {
 			}
 			case "upload" -> {
 				GuiDraw.outline(g, px, py, PREVIEW_W, PREVIEW_H, hovered ? theme.accent() : theme.textDim());
-				g.fill(px + PREVIEW_W / 2 - 1, py + 14, px + PREVIEW_W / 2 + 1, py + PREVIEW_H - 14, hovered ? theme.accent() : theme.text());
-				g.fill(px + 7, py + PREVIEW_H / 2 - 1, px + PREVIEW_W - 7, py + PREVIEW_H / 2 + 1, hovered ? theme.accent() : theme.text());
+				g.fill(px + PREVIEW_W / 2 - 1, py + 12, px + PREVIEW_W / 2 + 1, py + PREVIEW_H - 12, hovered ? theme.accent() : theme.text());
+				g.fill(px + 5, py + PREVIEW_H / 2 - 1, px + PREVIEW_W - 5, py + PREVIEW_H / 2 + 1, hovered ? theme.accent() : theme.text());
 			}
 			default -> {
 				Identifier texture = card.texture();
@@ -403,13 +429,49 @@ public final class CosmeticsScreen extends Screen {
 				}
 			}
 		}
-		String label = font.plainSubstrByWidth(card.label(), CARD_W - 6);
-		GuiDraw.centeredText(g, font, label, x + CARD_W / 2, y + CARD_H - 24, equipped ? theme.headerText() : theme.text());
+		int labelY = py + PREVIEW_H + 5;
+		renderLabel(g, card.label(), x + CARD_W / 2, labelY, CARD_W - 6, equipped ? theme.headerText() : theme.text());
 		if (equipped) {
-			GuiDraw.centeredText(g, font, I18n.get("salami.cosmetics.equipped_badge"), x + CARD_W / 2, y + CARD_H - 13, theme.accent());
+			renderLabel(g, I18n.get("salami.cosmetics.equipped_badge"), x + CARD_W / 2, labelY + 11, CARD_W - 6, theme.accent());
 		} else if (card.key().startsWith("own:") || card.key().equals("custom")) {
-			GuiDraw.centeredText(g, font, I18n.get("salami.cosmetics.own_badge"), x + CARD_W / 2, y + CARD_H - 13, theme.textDim());
+			renderLabel(g, I18n.get("salami.cosmetics.own_badge"), x + CARD_W / 2, labelY + 11, CARD_W - 6, theme.textDim());
 		}
+	}
+
+	/** Zentrierter Text; zu lange Namen werden erst verkleinert, dann mit „…“ gekürzt. */
+	private void renderLabel(GuiGraphics g, String text, int centerX, int y, int maxWidth, int color) {
+		int width = font.width(text);
+		if (width <= maxWidth) {
+			GuiDraw.centeredText(g, font, text, centerX, y, color);
+			return;
+		}
+		float scale = Math.max(MIN_LABEL_SCALE, maxWidth / (float) width);
+		String shown = text;
+		if (width * scale > maxWidth) {
+			int room = (int) (maxWidth / scale) - font.width("…");
+			shown = font.plainSubstrByWidth(text, room).stripTrailing() + "…";
+		}
+		g.pose().pushMatrix();
+		g.pose().translate(centerX - font.width(shown) * scale / 2f, y + (1 - scale) * 4);
+		g.pose().scale(scale, scale);
+		GuiDraw.text(g, font, shown, 0, 0, color, false);
+		g.pose().popMatrix();
+	}
+
+	/** Schmale Leiste rechts neben den Karten, nur wenn nicht alle Reihen passen. */
+	private void renderScrollbar(GuiGraphics g, Theme theme, int[] c) {
+		int rows = rows();
+		int shown = visibleRows();
+		if (rows <= shown) {
+			return;
+		}
+		int x = c[2] + 4;
+		int top = gridTop();
+		int height = shown * (CARD_H + GAP) - GAP;
+		g.fill(x, top, x + 2, top + height, theme.outline());
+		int thumb = Math.max(12, height * shown / rows);
+		int offset = (height - thumb) * scrollRow / Math.max(1, rows - shown);
+		g.fill(x, top + offset, x + 2, top + offset + thumb, theme.accent());
 	}
 
 	// ------------------------------------------------------------------ Eingabe
@@ -430,6 +492,9 @@ public final class CosmeticsScreen extends Screen {
 			return super.mouseClicked(event, doubleClick);
 		}
 		for (int i = 0; i < cards.size(); i++) {
+			if (!visible(i)) {
+				continue;
+			}
 			int[] pos = cardPos(i);
 			if (x >= pos[0] && x < pos[0] + CARD_W && y >= pos[1] && y < pos[1] + CARD_H) {
 				String key = cards.get(i).key();
@@ -446,8 +511,10 @@ public final class CosmeticsScreen extends Screen {
 
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-		scroll -= scrollY * (CARD_H + GAP) / 2.0;
-		clampScroll();
+		if (scrollY != 0) {
+			scrollRow -= (int) Math.signum(scrollY);
+			clampScroll();
+		}
 		return true;
 	}
 }
