@@ -31,6 +31,8 @@ stonecutter parameters {
 			replace("KeyBindingHelper.getBoundKeyOf(", "KeyMappingHelper.getBoundKeyOf(")
 			// Fabric-Client-Befehle: ClientCommandManager heißt ClientCommands
 			replace("ClientCommandManager", "ClientCommands")
+			// Fabric-Render-Schichten: „Feature Renderer“ heißen jetzt Render Layer
+			replace("LivingEntityFeatureRendererRegistrationCallback", "LivingEntityRenderLayerRegistrationCallback")
 			replace("lifecycle.v1.ClientWorldEvents;", "lifecycle.v1.ClientLevelEvents;")
 			replace("ClientWorldEvents.AFTER_CLIENT_WORLD_CHANGE", "ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE")
 			replace("ClickType", "ContainerInput")

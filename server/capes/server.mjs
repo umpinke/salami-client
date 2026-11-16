@@ -9,13 +9,15 @@
  *
  * Spiel (salami-core):
  *   POST /v1/auth/challenge                         → {"serverId":"…"}
- *   PUT  /v1/capes/me  {"name","serverId","cape"}   → {"status":"approved"|"pending"|"rejected", …}
+ *   PUT  /v1/capes/me  {"name","serverId","cape","hat"?} → {"status":"approved"|"pending"|"rejected", …}
  *        cape: {"builtin":"salami"} | {"png":"<base64>"} | null (kein Cape)
+ *        hat: "santa" (Cosmetics → Hüte) oder fehlt/null; unbekannte Hüte werden ignoriert
  *        Anmeldung wie beim Betreten eines Minecraft-Servers: das Spiel meldet die
  *        serverId bei Mojang an (joinServer), dieser Server fragt Mojang (hasJoined).
  *        Das Zugangstoken des Spielers bekommt der Cape-Server nie zu sehen.
  *   POST /v1/capes/lookup {"uuids":[…]}             → {"capes":{"<uuid>":{"builtin":"salami"}|{"id":"<capeId>"}}}
- *        nur sichtbare Capes: mitgelieferte und freigegebene
+ *        nur sichtbare Capes: mitgelieferte und freigegebene; trägt der Spieler einen Hut,
+ *        steht zusätzlich "hat":"santa" darin (auch ohne Cape: {"hat":"santa"})
  *   GET  /v1/capes/img/<capeId>.png                 → freigegebenes Cape-Bild
  *   GET  /v1/capes/gallery                          → {"capes":[{"id","approvedAt","wearers"}]}
  *        alle freigegebenen eigenen Capes, neueste zuerst – der Launcher zeigt sie unter
@@ -101,6 +103,8 @@ const REPORTS_TO_HIDE = env("REPORTS_TO_HIDE", 3);
 /** Meldungen pro Spieler und Tag. */
 const REPORTS_PER_DAY = env("REPORTS_PER_DAY", 20);
 
+/** Hüte von salami-core (dort `HatsModule.Hat`); neue Namen hier nachtragen. */
+const HATS = new Set(["santa"]);
 /** Mitgelieferte Capes von salami-core (dort `CapesModule.Cape`); neue Namen hier nachtragen. */
 const BUILTIN = new Set([
   "salami", "aurora", "magma", "galaxy", "neon", "prism", "sakura", "storm", "dragon", "pepperoni", "board",
@@ -190,10 +194,12 @@ function dropIfOrphanedPending(id) {
 
 /** Was andere Spieler von diesem Spieler sehen (oder null). */
 function visibleCape(player) {
-  if (!player?.cape) return null;
-  if (player.cape.builtin) return { builtin: player.cape.builtin };
-  if (player.cape.id && db.capes[player.cape.id]?.status === "approved") return { id: player.cape.id };
-  return null;
+  if (!player) return null;
+  let cape = null;
+  if (player.cape?.builtin) cape = { builtin: player.cape.builtin };
+  else if (player.cape?.id && db.capes[player.cape.id]?.status === "approved") cape = { id: player.cape.id };
+  // Hut (Cosmetics → Hüte) reist im selben Objekt mit; ältere Clients lesen nur builtin/id
+  return player.hat ? { ...cape, hat: player.hat } : cape;
 }
 
 // ------------------------------------------------------------------ Hilfen
@@ -396,19 +402,23 @@ async function handleSetCape(req, res) {
   const previous = db.players[uuid]?.cape?.id;
   const visibleBefore = JSON.stringify(visibleCape(db.players[uuid]));
   const cape = body.cape ?? null;
+  // Hut: unbekannte Namen (neuere Clients) einfach ignorieren statt die Anfrage abzulehnen
+  const hat = typeof body.hat === "string" && HATS.has(body.hat) ? body.hat : null;
+  const withHat = (player) => (hat ? { ...player, hat } : player);
   const now = new Date().toISOString();
   let result;
 
   if (cape === null) {
-    delete db.players[uuid];
+    if (hat) db.players[uuid] = { name, hat, updatedAt: now };
+    else delete db.players[uuid];
     result = { status: "none" };
   } else if (typeof cape.builtin === "string") {
     if (!BUILTIN.has(cape.builtin)) throw new HttpError(400, "unbekanntes Cape");
-    db.players[uuid] = { name, cape: { builtin: cape.builtin }, updatedAt: now };
+    db.players[uuid] = withHat({ name, cape: { builtin: cape.builtin }, updatedAt: now });
     result = { status: "approved", builtin: cape.builtin };
   } else if (typeof cape.png === "string") {
     const id = storeCape(cape.png, uuid, name, now);
-    db.players[uuid] = { name, cape: { id }, updatedAt: now };
+    db.players[uuid] = withHat({ name, cape: { id }, updatedAt: now });
     result = capeResult(id);
   } else {
     throw new HttpError(400, "cape muss null, {builtin} oder {png} sein");

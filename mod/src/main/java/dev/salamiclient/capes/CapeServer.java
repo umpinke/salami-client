@@ -50,7 +50,7 @@ final class CapeServer {
 	private static final Gson GSON = new Gson();
 
 	/** Antwort auf {@code lookup}: mitgeliefertes Cape ({@code builtin}) oder freigegebenes eigenes ({@code id}). */
-	record Remote(@Nullable String builtin, @Nullable String id) {}
+	record Remote(@Nullable String builtin, @Nullable String id, @Nullable String hat) {}
 
 	/** Ergebnis des Teilens: {@code approved}, {@code pending}, {@code rejected} oder {@code none}; {@code id} bei eigenen Bildern. */
 	record Published(String status, @Nullable String id, @Nullable String reason) {}
@@ -145,7 +145,7 @@ final class CapeServer {
 				}
 				JsonObject cape = entry.getValue().getAsJsonObject();
 				try {
-					result.put(UUID.fromString(entry.getKey()), new Remote(string(cape, "builtin"), string(cape, "id")));
+					result.put(UUID.fromString(entry.getKey()), new Remote(string(cape, "builtin"), string(cape, "id"), string(cape, "hat")));
 				} catch (IllegalArgumentException ignored) {
 					// kaputte UUID überspringen
 				}
@@ -175,9 +175,9 @@ final class CapeServer {
 
 	/** Teilt das eigene Cape: anmelden (Mojang) und setzen. Läuft im Hintergrund. */
 	//? if >=26.3 {
-	/*CompletableFuture<Published> publish(User user, SessionService session, CapeShare share) {
+	/*CompletableFuture<Published> publish(User user, SessionService session, CapeShare share, @Nullable String hat) {
 	*///?} else
-	CompletableFuture<Published> publish(User user, MinecraftSessionService session, CapeShare share) {
+	CompletableFuture<Published> publish(User user, MinecraftSessionService session, CapeShare share, @Nullable String hat) {
 		return send(post("v1/auth/challenge", new JsonObject())).thenApplyAsync(challenge -> {
 			String serverId = string(challenge, "serverId");
 			if (serverId == null) {
@@ -192,6 +192,10 @@ final class CapeServer {
 			body.addProperty("name", user.getName());
 			body.addProperty("serverId", serverId);
 			body.add("cape", share.toJson());
+			// Hut (Cosmetics → Hüte); ältere Cape-Server ignorieren das Feld
+			if (hat != null) {
+				body.addProperty("hat", hat);
+			}
 			return body;
 		}, executor).thenCompose(body -> send(request("v1/capes/me").PUT(json(body)).build()))
 			.thenApply(json -> new Published(String.valueOf(string(json, "status")), string(json, "id"), string(json, "reason")));
@@ -253,7 +257,7 @@ final class CapeServer {
 			}
 			JsonElement cape = json.get("cape");
 			Remote remote = cape != null && cape.isJsonObject()
-				? new Remote(string(cape.getAsJsonObject(), "builtin"), string(cape.getAsJsonObject(), "id"))
+				? new Remote(string(cape.getAsJsonObject(), "builtin"), string(cape.getAsJsonObject(), "id"), string(cape.getAsJsonObject(), "hat"))
 				: null;
 			onEvent.accept(UUID.fromString(uuid), remote);
 		} catch (RuntimeException ignored) {

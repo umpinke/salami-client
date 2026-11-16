@@ -11,6 +11,7 @@ import dev.salamiclient.module.Module;
 import dev.salamiclient.module.ModuleManager;
 import dev.salamiclient.modules.client.GuiScaleModule;
 import dev.salamiclient.modules.visual.CapesModule;
+import dev.salamiclient.modules.visual.HatsModule;
 import dev.salamiclient.modules.visual.InfoHudModule;
 import dev.salamiclient.modules.visual.LiveTrackerModule;
 import dev.salamiclient.modules.visual.ParticlesModule;
@@ -67,6 +68,7 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 			testLiveTracker(context, server, modules);
 			testParticles(context, server, modules);
 			testCapes(context, server, modules);
+			testHats(context, modules);
 			testSharedCapes(context, modules);
 			testLauncherLiveCapes(context);
 			testGuiScale(context, modules);
@@ -446,6 +448,26 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 	private static boolean capeIs(ClientGameTestContext context, String name) {
 		return context.computeOnClient(c -> c.player.getSkin().cape() != null
 			&& c.player.getSkin().cape().texturePath().equals(Identifier.fromNamespaceAndPath("salami", "textures/cape/" + name + ".png")));
+	}
+
+	// ------------------------------------------------------------------ Hüte
+
+	/** Weihnachtsmütze auf der Schulter: trägt man sie, wird sie geteilt und von vorne gezeigt. */
+	private static void testHats(ClientGameTestContext context, ModuleManager modules) {
+		Module hats = modules.get(HatsModule.class);
+		set(hats, "hat", HatsModule.Hat.SANTA);
+		context.runOnClient(c -> {
+			modules.setEnabled(hats, true);
+			c.options.setCameraType(CameraType.THIRD_PERSON_FRONT);
+		});
+		context.waitTicks(5);
+		check(context.computeOnClient(c -> HatsModule.wearsSanta(c.player.getId())), "Hats: own player does not wear the santa hat");
+		check("santa".equals(HatsModule.sharedHat()), "Hats: santa hat is not shared");
+		context.takeScreenshot("salami-10d-santa-hat");
+		context.runOnClient(c -> c.options.setCameraType(CameraType.FIRST_PERSON));
+		set(hats, "hat", HatsModule.Hat.NONE);
+		check(HatsModule.sharedHat() == null, "Hats: hat still shared after taking it off");
+		check(context.computeOnClient(c -> !HatsModule.wearsSanta(c.player.getId())), "Hats: hat still shown after taking it off");
 	}
 
 	// ------------------------------------------------------------------ Live Tracker

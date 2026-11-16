@@ -110,10 +110,10 @@ async function call(method, path, body, headers = {}) {
 const admin = (method, path, body) => call(method, path, body, { Authorization: `Bearer ${ADMIN}` });
 
 /** Wie salami-core: Challenge holen, bei „Mojang“ anmelden, Cape setzen. */
-async function setCape(name, cape, { join = true } = {}) {
+async function setCape(name, cape, { join = true, hat } = {}) {
   const { body } = await call("POST", "/v1/auth/challenge");
   if (join) joined.add(`${name}|${body.serverId}`);
-  return call("PUT", "/v1/capes/me", { name, serverId: body.serverId, cape });
+  return call("PUT", "/v1/capes/me", { name, serverId: body.serverId, cape, ...(hat !== undefined ? { hat } : {}) });
 }
 
 /** Wie der Launcher: Challenge holen, bei „Mojang“ anmelden, Cape zur Prüfung einreichen. */
@@ -503,6 +503,37 @@ test("Melden: eine Meldung pro Spieler, ab REPORTS_TO_HIDE sofort versteckt, Adm
   assert.equal((await report("Pepper_99", { id, reason: "other" })).status, 404);
   assert.equal((await adminEntry("rejected")).reports, undefined);
   assert.equal((await admin("GET", "/v1/admin/capes?status=bogus")).status, 400);
+});
+
+test("Hüte: Weihnachtsmütze wird mit dem Cape geteilt, auch ohne Cape", async () => {
+  const live = await openEvents();
+  try {
+    const uuid = uuidOf("Brotzeit");
+    const mine = (e) => e.uuid === uuid;
+    const lookup = async () => (await call("POST", "/v1/capes/lookup", { uuids: [uuid] })).body.capes[uuid];
+
+    // Cape und Mütze zusammen
+    assert.equal((await setCape("Brotzeit", { builtin: "board" }, { hat: "santa" })).status, 200);
+    assert.deepEqual(await lookup(), { builtin: "board", hat: "santa" });
+    assert.deepEqual(await live.next(mine), { uuid, cape: { builtin: "board", hat: "santa" } });
+
+    // nur die Mütze, kein Cape: der Spieler bleibt gespeichert
+    await setCape("Brotzeit", null, { hat: "santa" });
+    assert.deepEqual(await lookup(), { hat: "santa" });
+    assert.deepEqual(await live.next(mine), { uuid, cape: { hat: "santa" } });
+
+    // unbekannter Hut (neuerer Client) wird ignoriert, nicht abgelehnt
+    assert.equal((await setCape("Brotzeit", { builtin: "board" }, { hat: "zylinder" })).status, 200);
+    assert.deepEqual(await lookup(), { builtin: "board" });
+    assert.deepEqual(await live.next(mine), { uuid, cape: { builtin: "board" } });
+
+    // Mütze ab und kein Cape: der Spieler verschwindet wie bisher
+    await setCape("Brotzeit", null);
+    assert.equal(await lookup(), undefined);
+    assert.deepEqual(await live.next(mine), { uuid, cape: null });
+  } finally {
+    live.close();
+  }
 });
 
 test("Daten überstehen einen Neustart", async () => {

@@ -79,6 +79,8 @@ import dev.salamiclient.modules.visual.LiveTrackerModule;
 import dev.salamiclient.modules.visual.LogoOverlayModule;
 import dev.salamiclient.modules.visual.ParticlesModule;
 import dev.salamiclient.modules.visual.CapesModule;
+import dev.salamiclient.modules.visual.HatsModule;
+import dev.salamiclient.render.SantaHatLayer;
 import dev.salamiclient.render.WorldContext;
 import dev.salamiclient.render.WorldLines;
 import dev.salamiclient.modules.visual.WatermarkModule;
@@ -90,6 +92,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientWorldEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.LivingEntityFeatureRendererRegistrationCallback;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 //? if >=26.1 {
@@ -101,6 +104,7 @@ import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
 //?}
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.KeyMapping;
+import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.MultiLineEditBox;
@@ -188,6 +192,7 @@ public final class SalamiClient implements ClientModInitializer {
 		modules.register(new LogoOverlayModule());
 		modules.register(new ParticlesModule());
 		modules.register(new CapesModule());
+		modules.register(new HatsModule());
 		// Mods (Batch A): Optik
 		modules.register(new SideShieldModule());
 		modules.register(new HideArmorModule());
@@ -289,6 +294,12 @@ public final class SalamiClient implements ClientModInitializer {
 		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> config.saveNow());
 		// Freunde: /salami friends und /salami msg <freund> <text>
 		ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> FriendsCommand.register(dispatcher));
+		// Hüte (Cosmetics): Weihnachtsmütze auf der Schulter aller Spieler-Modelle
+		LivingEntityFeatureRendererRegistrationCallback.EVENT.register((entityType, renderer, helper, context) -> {
+			if (renderer instanceof AvatarRenderer<?> avatar) {
+				helper.register(new SantaHatLayer(avatar));
+			}
+		});
 	}
 
 	/** Fabrics Welt-Render-Kontext der jeweiligen Version als {@link WorldContext} für die Module. */

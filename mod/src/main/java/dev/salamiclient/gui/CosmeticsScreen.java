@@ -7,6 +7,7 @@ import dev.salamiclient.capes.AnimatedCapes;
 import dev.salamiclient.capes.CapeLibrary;
 import dev.salamiclient.modules.client.GuiScaleModule;
 import dev.salamiclient.modules.visual.CapesModule;
+import dev.salamiclient.modules.visual.HatsModule;
 import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.theme.Theme;
 import net.minecraft.client.gui.GuiGraphics;
@@ -30,7 +31,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Cosmetics: vorerst nur der Reiter „Capes“. Ein Klick auf ein Cape legt es an (mit dem
+ * Cosmetics: Reiter „Capes“ und „Hüte“. Ein Klick auf ein Cape legt es an (mit dem
  * Launcher: dieselbe Auswahl wie dort), „Hochladen“ fügt ein eigenes PNG hinzu und legt es
  * gleich an. Eigene Bilder sehen andere Salami-Spieler erst nach der Freigabe durch einen Admin.
  */
@@ -61,7 +62,23 @@ public final class CosmeticsScreen extends Screen {
 		}
 	}
 
+	/** Reiter des Menüs. */
+	public enum Tab {
+		CAPES("salami.cosmetics.tab.capes"),
+		HATS("salami.cosmetics.tab.hats");
+
+		final String key;
+
+		Tab(String key) {
+			this.key = key;
+		}
+	}
+
+	private static final Identifier SANTA_ICON = Identifier.fromNamespaceAndPath(SalamiClient.MOD_ID, "textures/cosmetics/santa_hat_icon.png");
+	private static final int ICON_SIZE = 32;
+
 	private final Screen parent;
+	private Tab tab;
 	private float uiScale = 1f;
 	/** Erste sichtbare Kartenreihe – es wird immer um ganze Reihen gescrollt, nichts ist halb abgeschnitten. */
 	private int scrollRow;
@@ -75,8 +92,13 @@ public final class CosmeticsScreen extends Screen {
 	private long currentReadAt;
 
 	public CosmeticsScreen(@Nullable Screen parent) {
+		this(parent, Tab.CAPES);
+	}
+
+	public CosmeticsScreen(@Nullable Screen parent, Tab tab) {
 		super(Component.translatable("salami.cosmetics.title"));
 		this.parent = parent;
+		this.tab = tab;
 	}
 
 	@Override
@@ -107,6 +129,11 @@ public final class CosmeticsScreen extends Screen {
 	private void reload() {
 		releasePreviews();
 		cards.clear();
+		if (tab == Tab.HATS) {
+			cards.add(new Card("hat:none", I18n.get("salami.cosmetics.hat.none"), null, 0));
+			cards.add(new Card("hat:santa", I18n.get("salami.module.hats.setting.hat.santa"), SANTA_ICON, ICON_SIZE));
+			return;
+		}
 		cards.add(new Card("none", I18n.get("salami.cosmetics.none"), null, 0));
 		for (CapesModule.Cape builtin : CapesModule.Cape.values()) {
 			if (builtin == CapesModule.Cape.LAUNCHER || builtin == CapesModule.Cape.CUSTOM || builtin == CapesModule.Cape.NONE) {
@@ -159,7 +186,11 @@ public final class CosmeticsScreen extends Screen {
 	}
 
 	/** Was gerade angelegt ist, als Kachel-Schlüssel. */
-	private static String current() {
+	private String current() {
+		if (tab == Tab.HATS) {
+			HatsModule hats = HatsModule.instance();
+			return hats == null || !hats.isEnabled() ? "hat:none" : "hat:" + hats.selected().name().toLowerCase(Locale.ROOT);
+		}
 		CapesModule module = CapesModule.instance();
 		if (module == null || !module.isEnabled()) {
 			return "none";
@@ -179,6 +210,22 @@ public final class CosmeticsScreen extends Screen {
 			case NONE -> "none";
 			default -> "builtin:" + module.mode().name().toLowerCase(Locale.ROOT);
 		};
+	}
+
+	/** Hut aufsetzen ({@code hat:santa}) oder abnehmen ({@code hat:none}). */
+	private void chooseHat(String key) {
+		HatsModule hats = HatsModule.instance();
+		if (hats == null) {
+			return;
+		}
+		if (!hats.isEnabled()) {
+			SalamiClient.get().modules().setEnabled(hats, true);
+		}
+		HatsModule.Hat hat = HatsModule.Hat.valueOf(key.substring("hat:".length()).toUpperCase(Locale.ROOT));
+		hats.choose(hat);
+		setNotice(Component.translatable(hat == HatsModule.Hat.NONE ? "salami.cosmetics.hat.removed" : "salami.cosmetics.hat.equipped"), false);
+		currentReadAt = 0;
+		SalamiClient.get().config().markDirty();
 	}
 
 	/** Cape anlegen. Mit Launcher wird dessen Auswahl geändert, damit beide dasselbe zeigen. */
@@ -257,10 +304,18 @@ public final class CosmeticsScreen extends Screen {
 		return new int[] {f[0] + 4, f[1] + 5, f[0] + 4 + font.width(I18n.get("salami.mods.back")) + 12, f[1] + 19};
 	}
 
-	private int[] capesTab() {
+	/** Reiter oben, nebeneinander: {x0, y0, x1, y1}. */
+	private int[] tabRect(Tab which) {
 		int[] f = frame();
-		int w = font.width(I18n.get("salami.cosmetics.tab.capes")) + 14;
-		return new int[] {f[0] + PAD, f[1] + HEADER + 4, f[0] + PAD + w, f[1] + HEADER + 4 + TABS - 2};
+		int x = f[0] + PAD;
+		for (Tab t : Tab.values()) {
+			int w = font.width(I18n.get(t.key)) + 14;
+			if (t == which) {
+				return new int[] {x, f[1] + HEADER + 4, x + w, f[1] + HEADER + 4 + TABS - 2};
+			}
+			x += w + 4;
+		}
+		throw new IllegalArgumentException(String.valueOf(which));
 	}
 
 	private int[] content() {
@@ -350,11 +405,20 @@ public final class CosmeticsScreen extends Screen {
 		GuiDraw.roundRect(g, back[0] + 1, back[1] + 1, back[2] - back[0] - 2, back[3] - back[1] - 2, backHover ? theme.header() : theme.panel() | 0xFF000000);
 		GuiDraw.text(g, font, I18n.get("salami.mods.back"), back[0] + 6, back[1] + 3, theme.headerText(), false);
 
-		// Reiter: vorerst nur Capes
-		int[] tab = capesTab();
-		GuiDraw.roundRect(g, tab[0], tab[1], tab[2] - tab[0], tab[3] - tab[1], theme.accent());
-		GuiDraw.text(g, font, I18n.get("salami.cosmetics.tab.capes"), tab[0] + 7, tab[1] + 4, GuiDraw.textOn(theme.accent()), false);
-		GuiDraw.text(g, font, I18n.get("salami.cosmetics.more_soon"), tab[2] + 8, tab[1] + 4, theme.textDim(), false);
+		// Reiter: Capes, Hüte
+		int[] last = null;
+		for (Tab t : Tab.values()) {
+			int[] r = tabRect(t);
+			boolean active = t == tab;
+			boolean hovered = inside(r, mx, my);
+			GuiDraw.roundRect(g, r[0], r[1], r[2] - r[0], r[3] - r[1], active ? theme.accent() : hovered ? theme.textDim() : theme.outline());
+			if (!active) {
+				GuiDraw.roundRect(g, r[0] + 1, r[1] + 1, r[2] - r[0] - 2, r[3] - r[1] - 2, hovered ? theme.header() : theme.panel() | 0xFF000000);
+			}
+			GuiDraw.text(g, font, I18n.get(t.key), r[0] + 7, r[1] + 4, active ? GuiDraw.textOn(theme.accent()) : theme.headerText(), false);
+			last = r;
+		}
+		GuiDraw.text(g, font, I18n.get("salami.cosmetics.more_soon"), last[2] + 8, last[1] + 4, theme.textDim(), false);
 
 		int[] c = content();
 		long now = System.currentTimeMillis();
@@ -375,7 +439,7 @@ public final class CosmeticsScreen extends Screen {
 		g.disableScissor();
 		renderScrollbar(g, theme, c);
 
-		Component line = notice != null ? notice : Component.translatable("salami.cosmetics.info");
+		Component line = notice != null ? notice : Component.translatable(tab == Tab.HATS ? "salami.cosmetics.hat.info" : "salami.cosmetics.info");
 		List<FormattedCharSequence> lines = font.split(line, f[2] - f[0] - 2 * PAD);
 		for (int i = 0; i < Math.min(2, lines.size()); i++) {
 			GuiDraw.text(g, font, lines.get(i), f[0] + PAD, f[3] - PAD - 18 + i * 10, notice != null && noticeError ? theme.warning() : theme.textDim(), false);
@@ -395,7 +459,7 @@ public final class CosmeticsScreen extends Screen {
 		int px = x + (CARD_W - PREVIEW_W) / 2;
 		int py = y + PREVIEW_Y;
 		switch (card.key()) {
-			case "none" -> {
+			case "none", "hat:none" -> {
 				GuiDraw.outline(g, px, py, PREVIEW_W, PREVIEW_H, theme.textDim());
 				GuiDraw.centeredText(g, font, "—", px + PREVIEW_W / 2, py + PREVIEW_H / 2 - 4, theme.textDim());
 			}
@@ -403,6 +467,12 @@ public final class CosmeticsScreen extends Screen {
 				GuiDraw.outline(g, px, py, PREVIEW_W, PREVIEW_H, hovered ? theme.accent() : theme.textDim());
 				g.fill(px + PREVIEW_W / 2 - 1, py + 12, px + PREVIEW_W / 2 + 1, py + PREVIEW_H - 12, hovered ? theme.accent() : theme.text());
 				g.fill(px + 5, py + PREVIEW_H / 2 - 1, px + PREVIEW_W - 5, py + PREVIEW_H / 2 + 1, hovered ? theme.accent() : theme.text());
+			}
+			case "hat:santa" -> {
+				// Symbol statt Cape-Ausschnitt, quadratisch in der Mitte der Vorschau
+				int size = PREVIEW_H - 3;
+				int ix = x + (CARD_W - size) / 2;
+				g.blit(RenderPipelines.GUI_TEXTURED, SANTA_ICON, ix, py + 2, 0f, 0f, size, size, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
 			}
 			default -> {
 				Identifier texture = card.texture();
@@ -487,6 +557,16 @@ public final class CosmeticsScreen extends Screen {
 			onClose();
 			return true;
 		}
+		for (Tab t : Tab.values()) {
+			if (t != tab && inside(tabRect(t), x, y)) {
+				tab = t;
+				scrollRow = 0;
+				notice = null;
+				reload();
+				currentReadAt = 0;
+				return true;
+			}
+		}
 		int[] c = content();
 		if (!inside(c, x, y)) {
 			return super.mouseClicked(event, doubleClick);
@@ -500,6 +580,8 @@ public final class CosmeticsScreen extends Screen {
 				String key = cards.get(i).key();
 				if (key.equals("upload")) {
 					upload();
+				} else if (key.startsWith("hat:")) {
+					chooseHat(key);
 				} else {
 					choose(key);
 				}

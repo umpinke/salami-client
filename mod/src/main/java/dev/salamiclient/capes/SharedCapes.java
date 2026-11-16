@@ -3,6 +3,7 @@ package dev.salamiclient.capes;
 import com.mojang.blaze3d.platform.NativeImage;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.modules.visual.CapesModule;
+import dev.salamiclient.modules.visual.HatsModule;
 import dev.salamiclient.util.Chat;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
@@ -137,6 +138,32 @@ public final class SharedCapes {
 			return null;
 		}
 		CapeServer cs = server();
+		Entry entry = entry(cs, player);
+		if (entry == null || entry.remote() == null) {
+			return null;
+		}
+		long now = System.currentTimeMillis();
+		if (entry.remote().builtin() != null) {
+			return builtin.apply(entry.remote().builtin());
+		}
+		String id = entry.remote().id();
+		return id != null && CAPE_ID.matcher(id).matches() ? image(cs, id, now) : null;
+	}
+
+	/**
+	 * Hut eines anderen Salami-Spielers ({@code "santa"}) oder {@code null} – vom Cape-Server,
+	 * zusammen mit dem Cape abgefragt. Nur im Render-Thread aufrufen.
+	 */
+	public static @Nullable String hatOf(UUID player) {
+		if (!Minecraft.getInstance().isSameThread()) {
+			return null;
+		}
+		Entry entry = entry(server(), player);
+		return entry == null || entry.remote() == null ? null : entry.remote().hat();
+	}
+
+	/** Bekannter Stand eines Spielers; ist er unbekannt oder veraltet, wird er (neu) abgefragt. */
+	private static @Nullable Entry entry(@Nullable CapeServer cs, UUID player) {
 		// Nur echte Accounts (UUID v4) – Offline-Spieler und NPCs nie anfragen
 		if (cs == null || player.version() != 4) {
 			return null;
@@ -146,14 +173,7 @@ public final class SharedCapes {
 		if ((entry == null || now - entry.fetchedAt() > refreshMs()) && !inFlight.contains(player)) {
 			queue.add(player);
 		}
-		if (entry == null || entry.remote() == null) {
-			return null;
-		}
-		if (entry.remote().builtin() != null) {
-			return builtin.apply(entry.remote().builtin());
-		}
-		String id = entry.remote().id();
-		return id != null && CAPE_ID.matcher(id).matches() ? image(cs, id, now) : null;
+		return entry;
 	}
 
 	/**
@@ -391,12 +411,15 @@ public final class SharedCapes {
 		if (wanted == null || publishing) {
 			return;
 		}
-		if (wanted.key().equals(publishedKey)) {
+		// Hut (Cosmetics → Hüte) wird mit dem Cape geteilt; der Schlüssel umfasst beides
+		String hat = HatsModule.sharedHat();
+		String key = wanted.key() + "|hat:" + hat;
+		if (key.equals(publishedKey)) {
 			wantedKey = null;
 			return;
 		}
-		if (!wanted.key().equals(wantedKey)) {
-			wantedKey = wanted.key();
+		if (!key.equals(wantedKey)) {
+			wantedKey = key;
 			publishAt = Math.max(publishAt, now + PUBLISH_DELAY_MS);
 			return;
 		}
@@ -404,10 +427,10 @@ public final class SharedCapes {
 			return;
 		}
 		publishing = true;
-		cs.publish(mc.getUser(), mc.services().sessionService(), wanted).whenComplete((result, error) -> mc.execute(() -> {
+		cs.publish(mc.getUser(), mc.services().sessionService(), wanted, hat).whenComplete((result, error) -> mc.execute(() -> {
 			publishing = false;
 			if (error == null) {
-				publishedKey = wanted.key();
+				publishedKey = key;
 				publishRetryMs = PUBLISH_RETRY_MIN_MS;
 				if (wanted.png() != null && result.id() != null) {
 					ownId = result.id();
@@ -422,7 +445,7 @@ public final class SharedCapes {
 			Throwable cause = CapeServer.unwrap(error);
 			if (cause instanceof CapeServer.ServerException server && server.permanent()) {
 				// Bild ungültig: nicht endlos neu versuchen
-				publishedKey = wanted.key();
+				publishedKey = key;
 				forgetOwn();
 				if (wanted.png() != null) {
 					Chat.warn("salami.capes.shared.failed", server.getMessage());
@@ -432,8 +455,8 @@ public final class SharedCapes {
 				}
 				return;
 			}
-			if (!wanted.key().equals(loggedFailure)) {
-				loggedFailure = wanted.key();
+			if (!key.equals(loggedFailure)) {
+				loggedFailure = key;
 				SalamiClient.LOG.warn("Cape konnte nicht geteilt werden: {}", cause.getMessage());
 			}
 			publishAt = System.currentTimeMillis() + publishRetryMs;
