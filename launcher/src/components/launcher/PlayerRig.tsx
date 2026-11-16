@@ -9,7 +9,8 @@ import { useSkinPreview } from '../../hooks/useSkinPreview';
 import { useMinecraftAuthStore } from '../../store/minecraft-auth-store';
 
 const NO_ACCOUNT_SKIN_URL = "/skins/steve.png";
-const RIG_SHADOW = 'drop-shadow(5px 10px 5px rgba(0,0,0,0.75))';
+/** Weicher Schatten nach unten statt eines harten Schlagschattens. */
+const RIG_SHADOW = 'drop-shadow(0 14px 12px rgba(0,0,0,0.45))';
 
 export const PLAYER_RIG_WIDTH = 225;
 export const PLAYER_RIG_HEIGHT = 450;
@@ -21,6 +22,8 @@ const flatStyle: React.CSSProperties = {
   height: "100%",
   pointerEvents: "none",
   filter: RIG_SHADOW,
+  // das Bild ist dreifach aufgelöst gerendert und wird geglättet verkleinert – saubere Kanten
+  imageRendering: "auto",
 };
 
 interface PlayerRigProps {
@@ -66,7 +69,7 @@ export function PlayerRig({ playerName, showNametag = true }: PlayerRigProps) {
     nametag: rigNametag,
     width: PLAYER_RIG_WIDTH,
     height: PLAYER_RIG_HEIGHT,
-    dpr: 1.5,
+    dpr: 3,
     fallbackUrl: null,
   });
 

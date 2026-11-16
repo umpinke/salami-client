@@ -329,6 +329,14 @@ fn inject_through_remote_thread(pid: u32, dll: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Whether the capture hook we ship is already inside the process.
+pub fn is_loaded(pid: u32) -> bool {
+    locate_hook_dll()
+        .ok()
+        .and_then(|dll| dll.file_name().and_then(|n| n.to_str()).map(str::to_owned))
+        .is_some_and(|name| is_module_loaded(pid, &name).unwrap_or(false))
+}
+
 pub fn is_module_loaded(pid: u32, file_name: &str) -> Result<bool> {
     let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid) }
         .with_context(|| format!("could not list the modules of process {pid}"))?;

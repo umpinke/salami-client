@@ -1,4 +1,4 @@
-import { IdleAnimation, SkinViewer } from "skinview3d";
+import { SkinViewer } from "skinview3d";
 import { disposeViewer } from "./dispose";
 import type { SkinVariant } from "./flat-render";
 import type { SkinViewerCape } from "./SkinViewer3D";
@@ -21,9 +21,9 @@ export interface SkinSnapshotOptions {
   quality?: number;
 }
 
-const DEFAULT_ROTATION = -0.5;
-/** Zeitpunkt der Leerlauf-Animation für die Pose (Arme leicht vom Körper). */
-const POSE_TIME = 1.2;
+/** Fast von vorn, nur leicht gedreht und geneigt – so wirkt die Figur ruhig und trotzdem räumlich. */
+const DEFAULT_ROTATION = -0.32;
+const TILT = 0.09;
 /** Nach so langer Ruhe wird der WebGL-Kontext freigegeben. */
 const IDLE_DISPOSE_MS = 15_000;
 
@@ -55,11 +55,12 @@ async function draw(request: SkinSnapshotRequest, options: SkinSnapshotOptions):
     else viewer.loadCape(null);
     viewer.nameTag = request.nametag || null;
 
+    // gerade stehend, Arme am Körper – keine Pose aus der Leerlauf-Animation
     viewer.playerObject.resetJoints();
-    new IdleAnimation().update(viewer.playerObject, POSE_TIME);
     viewer.playerWrapper.rotation.y = request.rotation ?? DEFAULT_ROTATION;
-    // etwas Abstand, damit Arme und Namensschild ganz aufs Bild passen
-    viewer.zoom = request.nametag ? 0.68 : 0.78;
+    viewer.playerWrapper.rotation.x = TILT;
+    // etwas Abstand, damit auch das Namensschild ganz aufs Bild passt
+    viewer.zoom = request.nametag ? 0.68 : 0.84;
     viewer.render();
 
     return await new Promise<Blob>((resolve, reject) =>

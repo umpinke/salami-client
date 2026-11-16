@@ -12,7 +12,7 @@ import {
 } from "./skin3d";
 
 /** Ändert sich die Darstellung, Version erhöhen – alte Bilder im Cache werden dann nicht mehr benutzt. */
-const RENDER_VERSION = "skinview3d-1";
+const RENDER_VERSION = "skinview3d-2";
 const RENDER_WIDTH = 280;
 const RENDER_HEIGHT = 560;
 

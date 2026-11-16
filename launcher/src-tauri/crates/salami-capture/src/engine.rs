@@ -26,6 +26,7 @@ const PROGRESS_EVERY: Duration = Duration::from_millis(150);
 const MIN_CAPTURE_SIDE: u32 = 128;
 const ENCODE_DRAIN_BUDGET: Duration = Duration::from_millis(2_000);
 const ATTACH_TIMEOUT: Duration = Duration::from_secs(60);
+const HOOK_BUDGET: Duration = Duration::from_millis(6_000);
 const EMPTY_RING_GRACE: Duration = Duration::from_secs(8);
 
 pub struct Engine {
@@ -34,6 +35,8 @@ pub struct Engine {
     active: Option<Pipeline>,
     pending_attach: Option<window::WindowSearch>,
     resize_settling: Option<((u32, u32), Instant)>,
+    hook_retry: Instant,
+    hook_standby: Option<HookStandby>,
     retired: Option<Retired>,
     buffering_enabled: bool,
     paused_pid: Option<u32>,
@@ -41,6 +44,14 @@ pub struct Engine {
     rate_sample: std::cell::Cell<(u64, u64, Instant)>,
     keyframe_warned: std::cell::Cell<bool>,
     empty_warned: std::cell::Cell<bool>,
+}
+
+/// A hook session kept open while window capture records, so the pipeline can move to the
+/// hook as soon as it has a texture.
+struct HookStandby {
+    hwnd: windows::Win32::Foundation::HWND,
+    session: crate::capture::hook::HookSession,
+    ready: bool,
 }
 
 enum FrameSource {
@@ -240,6 +251,8 @@ impl Engine {
             active: None,
             pending_attach: None,
             resize_settling: None,
+            hook_retry: Instant::now(),
+            hook_standby: None,
             retired: None,
             buffering_enabled: true,
             paused_pid: None,
@@ -268,6 +281,7 @@ impl Engine {
 
             self.step_pending_attach();
             self.step_resize_watch();
+            self.step_hook_upgrade();
 
             if self.retired.as_ref().is_some_and(|r| r.at.elapsed() >= RETAIN_FOR) {
                 log::debug!("Releasing the buffer kept across the last rebuild");
@@ -529,6 +543,91 @@ impl Engine {
         }
     }
 
+    /// Window capture is only the fallback: while it runs, Windows draws the pointer in
+    /// software, and that pointer is invisible to the player once the game covers the whole
+    /// screen. So a hook session stays open next to it, and the moment the hook delivers a
+    /// texture the pipeline moves over to it.
+    fn step_hook_upgrade(&mut self) {
+        use crate::capture::hook::{self, HookStep};
+
+        const RETRY_EVERY: Duration = Duration::from_secs(3);
+        const RETRY_AFTER_FAILURE: Duration = Duration::from_secs(30);
+
+        let Some(pipeline) = self.active.as_ref() else {
+            if self.pending_attach.is_none() {
+                self.hook_standby = None;
+            }
+            return;
+        };
+        if !matches!(pipeline.source, FrameSource::Window(_)) {
+            self.hook_standby = None;
+            return;
+        }
+        if self.pending_attach.is_some() {
+            return;
+        }
+
+        let hwnd = pipeline.target.hwnd;
+        let pid = pipeline.target.pid;
+        let fps = pipeline.settings.fps;
+
+        if self.hook_standby.as_ref().is_some_and(|s| s.hwnd != hwnd) {
+            self.hook_standby = None;
+        }
+
+        if self.hook_standby.is_none() {
+            if Instant::now() < self.hook_retry {
+                return;
+            }
+            self.hook_retry = Instant::now() + RETRY_EVERY;
+
+            // Loading the hook can block for seconds; that was tried when the pipeline
+            // attached. Here only a hook that is already in the game is asked again.
+            if !hook::is_loaded(pid) {
+                return;
+            }
+            match hook::HookSession::new(pid, hwnd, fps) {
+                Ok(session) => {
+                    self.hook_standby = Some(HookStandby {
+                        hwnd,
+                        session,
+                        ready: false,
+                    })
+                }
+                Err(e) => {
+                    log::debug!("Could not ask the graphics hook again: {e:#}");
+                    return;
+                }
+            }
+        }
+
+        let Some(standby) = self.hook_standby.as_mut() else {
+            return;
+        };
+        if !standby.ready {
+            match standby.session.poll() {
+                HookStep::Waiting => return,
+                HookStep::Ready(_) => standby.ready = true,
+                HookStep::Failed(e) => {
+                    log::debug!("The graphics hook is still unavailable: {e:#}");
+                    self.hook_standby = None;
+                    self.hook_retry = Instant::now() + RETRY_AFTER_FAILURE;
+                    return;
+                }
+            }
+        }
+
+        // Attaching needs a window with a drawable area; whether it is in front does not matter.
+        let state = window::state_of(hwnd);
+        if !state.alive || state.minimized {
+            return;
+        }
+
+        log::info!("The graphics hook delivers now; leaving window capture for it");
+        self.detach_retaining_buffer();
+        self.pending_attach = Some(window::WindowSearch::new(pid, ATTACH_TIMEOUT));
+    }
+
     fn choose_encoder(&self) -> Result<(salami_ipc::ClipCodec, salami_ipc::EncoderPreference)> {
         let matrix = crate::encoder::capabilities();
         let requested = self.config.codec;
@@ -614,7 +713,21 @@ impl Engine {
             anyhow::bail!("encoder produced no global header; clips would not decode");
         }
 
-        let hooked = hook_handshake(&target, settings.fps);
+        // A standby session that already has a texture is taken over as it is; shaking
+        // hands a second time would only give the hook a chance to miss it.
+        let standby = self
+            .hook_standby
+            .take()
+            .filter(|s| s.ready && s.hwnd == target.hwnd)
+            .and_then(|s| match s.session.refresh_texture(0) {
+                Ok(Some(texture)) => Some((s.session, texture)),
+                _ => None,
+            });
+        let hooked = match standby {
+            Some(ready) => Ok(ready),
+            None => hook_handshake(&target, settings.fps),
+        };
+        self.hook_retry = Instant::now();
 
         let converter = if let Ok((_, texture)) = &hooked {
             let mut converter =
@@ -1783,7 +1896,6 @@ fn hook_handshake(
     crate::capture::hook::HookTexture,
 )> {
     use crate::capture::hook::{self, HookStep};
-    const BUDGET: Duration = Duration::from_millis(6_000);
 
     let dll = hook::locate_hook_dll()?;
 
@@ -1814,8 +1926,8 @@ fn hook_handshake(
             }
             HookStep::Failed(e) => return Err(e),
             HookStep::Waiting => {
-                if started.elapsed() > BUDGET {
-                    anyhow::bail!("the hook did not produce a texture within {BUDGET:?}");
+                if started.elapsed() > HOOK_BUDGET {
+                    anyhow::bail!("the hook did not produce a texture within {HOOK_BUDGET:?}");
                 }
                 std::thread::sleep(Duration::from_millis(25));
             }

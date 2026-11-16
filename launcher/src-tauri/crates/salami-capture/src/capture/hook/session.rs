@@ -98,6 +98,10 @@ impl HookSession {
         self.pid
     }
 
+    pub fn hwnd(&self) -> HWND {
+        self.hwnd
+    }
+
     pub fn poll(&mut self) -> HookStep {
         if self.stage == Stage::Done {
             return HookStep::Waiting;

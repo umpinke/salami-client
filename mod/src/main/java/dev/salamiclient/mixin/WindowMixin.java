@@ -81,17 +81,24 @@ public abstract class WindowMixin {
 			}
 			//? if >=26.2 {
 			/*VideoMode mode = monitor.currentMode();
-			x = monitor.x();
-			y = monitor.y();
+			int targetX = monitor.x();
+			int targetY = monitor.y();
 			*///?} else {
 			VideoMode mode = monitor.getCurrentMode();
-			x = monitor.getX();
-			y = monitor.getY();
+			int targetX = monitor.getX();
+			int targetY = monitor.getY();
 			//?}
-			width = mode.getWidth();
-			height = mode.getHeight();
+			int targetWidth = mode.getWidth();
+			int targetHeight = mode.getHeight();
+			// Erst den Rahmen entfernen, dann die Felder setzen: Bei maximiertem Fenster ändert das
+			// Entfernen die Fenstergröße, und Minecrafts Größen-Callbacks überschreiben dabei
+			// x/y/width/height. Mit den überschriebenen Werten blieb das Fenster sonst maximiert.
 			GLFW.glfwSetWindowAttrib(handle, GLFW.GLFW_DECORATED, GLFW.GLFW_FALSE);
-			GLFW.glfwSetWindowMonitor(handle, 0L, x, y, width, height, GLFW.GLFW_DONT_CARE);
+			x = targetX;
+			y = targetY;
+			width = targetWidth;
+			height = targetHeight;
+			GLFW.glfwSetWindowMonitor(handle, 0L, targetX, targetY, targetWidth, targetHeight, GLFW.GLFW_DONT_CARE);
 			salami$borderless = true;
 			ci.cancel();
 			return;

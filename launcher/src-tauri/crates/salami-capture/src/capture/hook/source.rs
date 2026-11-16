@@ -6,6 +6,7 @@ use anyhow::{Context, Result};
 
 use windows::Win32::Graphics::Direct3D11::ID3D11Texture2D;
 
+use super::cursor::CursorOverlay;
 use super::session::{HookSession, HookTexture};
 use crate::capture::wgc::{BgraFrame, FrameSink};
 use crate::capture::{shared, CaptureDevice};
@@ -104,6 +105,7 @@ fn run(
     };
 
     let mut next = Instant::now();
+    let mut cursor = CursorOverlay::new(session.hwnd(), session.pid());
 
     while !stop.load(Ordering::Relaxed) {
         let now = Instant::now();
@@ -150,6 +152,7 @@ fn run(
         unsafe {
             device.context.CopyResource(&staging, &opened);
         }
+        cursor.draw(&device, &staging, texture.flip);
 
         sink.on_frame(BgraFrame {
             texture: &staging,
