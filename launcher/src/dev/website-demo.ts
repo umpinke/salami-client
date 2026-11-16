@@ -111,7 +111,7 @@ const launcherConfig = {
 
 const capeStore = {
   selected: "builtin:salami" as string | null,
-  builtin: ["salami", "pepperoni", "board"],
+  builtin: ["salami", "aurora", "magma", "galaxy", "neon", "prism", "sakura", "storm", "dragon", "pepperoni", "board"],
   capes: [{ id: "vorlage", name: "Vorlage", created: now, image: capeTemplateUrl }] as {
     id: string;
     name: string;

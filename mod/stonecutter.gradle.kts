@@ -77,6 +77,7 @@ stonecutter parameters {
 			replace("Lcom/mojang/blaze3d/pipeline/RenderPipeline;", "Lcom/mojang/renderpearl/api/pipeline/RenderPipeline;")
 			replace("com.mojang.blaze3d.pipeline.DepthStencilState;", "com.mojang.renderpearl.api.pipeline.DepthStencilState;")
 			replace("com.mojang.blaze3d.platform.CompareOp;", "com.mojang.renderpearl.api.pipeline.CompareOp;")
+			replace("com.mojang.blaze3d.textures.FilterMode;", "com.mojang.renderpearl.api.textures.FilterMode;")
 			replace("Lcom/mojang/blaze3d/buffers/GpuBufferSlice;", "Lcom/mojang/renderpearl/api/buffers/GpuBufferSlice;")
 			// SDL statt GLFW: Tastaturtasten sind Scancodes
 			replace("InputConstants.Type.KEYSYM", "InputConstants.Type.KEYBOARD")

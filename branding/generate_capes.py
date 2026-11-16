@@ -1,7 +1,14 @@
 """Salami-Capes für salami-core (CapesModule) und den Launcher (Cape-Galerie, Vorlage).
 
-Erzeugt Cape-Texturen im Minecraft-Layout (64x32, hier 4-fach = 256x128):
-Cape-Box bei (0,0) mit 10x16x1, Elytra-Box bei (22,0) mit 10x20x2.
+Die animierten Capes (Salami, Polarlicht, Magma …) sind in der Mod als Rechenvorschrift
+gemalt (mod/src/main/java/dev/salamiclient/capes/art) und werden im Spiel in der gewählten
+Auflösung berechnet. Dieses Skript lässt denselben Code laufen (branding/CapeExport.java,
+braucht ein JDK 21+) und legt für den Launcher die Vorschau ab: ein Standbild und alle
+Frames als WebP-Raster.
+
+Die beiden klassischen Capes (Peperoni, Schneidebrett) und die Vorlage zum Selbermalen
+entstehen hier direkt im Minecraft-Layout (64x32, hier 4-fach = 256x128): Cape-Box bei
+(0,0) mit 10x16x1, Elytra-Box bei (22,0) mit 10x20x2.
 
     python branding/generate_capes.py
 """
@@ -9,7 +16,11 @@ Cape-Box bei (0,0) mit 10x16x1, Elytra-Box bei (22,0) mit 10x20x2.
 from __future__ import annotations
 
 import math
+import os
 import random
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -20,11 +31,8 @@ OUT = ROOT / "mod/src/main/resources/assets/salami/textures/cape"
 S = 4  # Skalierung gegenüber 64x32
 RED = (178, 58, 58, 255)
 RED_LIGHT = (208, 96, 96, 255)
-RED_DARK = (122, 36, 37, 255)
 FAT = (243, 227, 211, 255)
 FAT_DIM = (222, 196, 180, 255)
-PEPPER = (43, 29, 26, 255)
-CASING = (122, 74, 53, 255)
 CASING_DARK = (74, 40, 30, 255)
 PEPPERONI = (196, 52, 38, 255)
 PEPPERONI_DARK = (150, 30, 24, 255)
@@ -42,19 +50,6 @@ ELYTRA_BACK = (36, 2, 10, 20)
 def box(area):
     x, y, w, h = area
     return (x * S, y * S, (x + w) * S - 1, (y + h) * S - 1)
-
-
-def meat(draw: ImageDraw.ImageDraw, area, rng: random.Random, base=RED, spots=FAT, spot_dim=FAT_DIM, pepper=PEPPER) -> None:
-    x0, y0, x1, y1 = box(area)
-    draw.rectangle((x0, y0, x1, y1), fill=base)
-    w, h = x1 - x0, y1 - y0
-    for _ in range(w * h // 55):
-        cx, cy = rng.randint(x0, x1), rng.randint(y0, y1)
-        r = rng.choice((1, 1, 2, 2, 3))
-        draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill=rng.choice((spots, spots, spot_dim)))
-    for _ in range(w * h // 160):
-        cx, cy = rng.randint(x0, x1), rng.randint(y0, y1)
-        draw.rectangle((cx, cy, cx + 1, cy + 1), fill=pepper)
 
 
 def border(draw: ImageDraw.ImageDraw, area, outer, inner, width=S) -> None:
@@ -79,19 +74,6 @@ def slice_disc(draw: ImageDraw.ImageDraw, cx: int, cy: int, r: int, rng: random.
 def canvas() -> tuple[Image.Image, ImageDraw.ImageDraw]:
     img = Image.new("RGBA", (64 * S, 32 * S), (0, 0, 0, 0))
     return img, ImageDraw.Draw(img)
-
-
-def salami() -> Image.Image:
-    rng = random.Random(7)
-    img, draw = canvas()
-    draw.rectangle((0, 0, 22 * S - 1, 17 * S - 1), fill=CASING)       # Kanten der Cape-Box
-    draw.rectangle((22 * S, 0, 46 * S - 1, 22 * S - 1), fill=CASING)  # Kanten der Elytra-Box
-    for area in (CAPE_FRONT, ELYTRA_FRONT, ELYTRA_BACK):
-        meat(draw, area, rng)
-        if area is CAPE_FRONT:  # Elytra: Rand folgt der Flügelform (elytra_wing_shape)
-            border(draw, area, CASING_DARK, CASING)
-    meat(draw, CAPE_BACK, rng, base=RED_DARK, spots=FAT_DIM)
-    return img
 
 
 def pepperoni() -> Image.Image:
@@ -256,11 +238,54 @@ def elytra_wing_shape(img: Image.Image, outline) -> Image.Image:
     return img
 
 
+ART = ROOT / "mod/src/main/java/dev/salamiclient/capes/art"
+ANIMATION_INFO = ROOT / "launcher/src/components/salami-capes/animated-capes.json"
+# Launcher-Vorschau: große Frames (ganzer Ausschnitt, 3D-Vorschau) und kleine (nur Außenseite, Karten)
+SHEET_SCALE, SHEET_COLUMNS = 12, 8
+FACE_SCALE, FACE_COLUMNS = 10, 9
+WEBP_QUALITY = 86
+
+
+def jdk_tool(name: str) -> str:
+    """javac/java aus JAVA_HOME oder dem PATH."""
+    home = os.environ.get("JAVA_HOME")
+    if home:
+        tool = Path(home) / "bin" / name
+        if tool.exists() or tool.with_suffix(".exe").exists():
+            return str(tool)
+    found = shutil.which(name)
+    if not found:
+        raise SystemExit(f"{name} nicht gefunden – JDK 21+ installieren oder JAVA_HOME setzen")
+    return found
+
+
+def animated() -> None:
+    """Gemalte Capes aus der Mod: Standbild + Frames für die Vorschau im Launcher."""
+    with tempfile.TemporaryDirectory() as tmp:
+        classes, out = Path(tmp) / "classes", Path(tmp) / "out"
+        sources = [str(p) for p in sorted(ART.glob("*.java"))] + [str(ROOT / "branding/CapeExport.java")]
+        subprocess.run([jdk_tool("javac"), "-encoding", "UTF-8", "-d", str(classes), *sources], check=True)
+        subprocess.run(
+            [jdk_tool("java"), "-cp", str(classes), "CapeExport", "frames", str(out),
+             str(SHEET_SCALE), str(SHEET_COLUMNS), str(FACE_SCALE), str(FACE_COLUMNS)],
+            check=True, stdout=subprocess.DEVNULL,
+        )
+        for image in sorted(out.glob("*.png")):
+            if image.name.endswith((".frames.png", ".face.png")):
+                target = LAUNCHER_CAPES / image.name.replace(".png", ".webp")
+                Image.open(image).save(target, "WEBP", quality=WEBP_QUALITY, method=6)
+            else:
+                target = LAUNCHER_CAPES / image.name
+                Image.open(image).save(target, optimize=True)
+            print(target.relative_to(ROOT), f"{target.stat().st_size // 1024} KB")
+        ANIMATION_INFO.write_text((out / "capes.json").read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
+        print(ANIMATION_INFO.relative_to(ROOT))
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     LAUNCHER_CAPES.mkdir(parents=True, exist_ok=True)
     for name, make, outline in (
-        ("salami", salami, CASING_DARK),
         ("pepperoni", pepperoni, PEPPERONI_DARK),
         ("board", board, WOOD_DARK),
     ):
@@ -271,6 +296,7 @@ def main() -> None:
     TEMPLATE_OUT.parent.mkdir(parents=True, exist_ok=True)
     template().save(TEMPLATE_OUT)
     print(TEMPLATE_OUT.relative_to(ROOT))
+    animated()
 
 
 if __name__ == "__main__":

@@ -32,7 +32,8 @@ const PALETTE = [
   "#ffffff", "#aaaaaa", "#555555", "#000000", "#ff5555", "#ffaa00", "#ffff55", "#55ff55",
   "#55ffff", "#5555ff", "#ff55ff", "#c4966a",
 ];
-const STARTERS = ["salami", "pepperoni", "board"] as const;
+// Nur die Pixel-Capes: die animierten sind fein gemalt und taugen nicht als Vorlage zum Pixeln
+const STARTERS = ["pepperoni", "board"] as const;
 
 const hexToRgba = (hex: string): Rgba => [
   parseInt(hex.slice(1, 3), 16),

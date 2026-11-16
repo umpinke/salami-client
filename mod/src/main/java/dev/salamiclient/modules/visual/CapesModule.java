@@ -2,6 +2,7 @@ package dev.salamiclient.modules.visual;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import dev.salamiclient.SalamiClient;
+import dev.salamiclient.capes.AnimatedCapes;
 import dev.salamiclient.capes.CapeShare;
 import dev.salamiclient.capes.LauncherCapes;
 import dev.salamiclient.capes.SharedCapes;
@@ -38,13 +39,28 @@ import java.util.function.Supplier;
  * Salami-Designs und {@code CUSTOM} = {@code config/salami/cape.png} (Cape-Layout 64x32
  * oder ein Vielfaches).
  *
+ * <p>Die meisten mitgelieferten Capes sind gemalt und animiert ({@link AnimatedCapes}): Sie
+ * liegen nicht als Bild in der Jar, sondern werden in der unter {@code quality} gewählten
+ * Auflösung berechnet. {@code PEPPERONI} und {@code BOARD} sind die alten festen Bilder.
+ *
  * <p>Andere Salami-Spieler sehen dein Cape über den Cape-Server ({@link SharedCapes}):
  * mitgelieferte sofort, eigene Bilder erst nach Freigabe durch einen Admin. Ein eigenes Bild
  * trägst auch du selbst erst nach der Freigabe; bis dahin wird es nur zur Prüfung eingereicht.
  * Spieler ohne Salami Client sehen weiter dein Mojang-Cape.
  */
 public final class CapesModule extends Module {
-	public enum Cape { LAUNCHER, SALAMI, PEPPERONI, BOARD, CUSTOM }
+	public enum Cape { LAUNCHER, SALAMI, AURORA, MAGMA, GALAXY, NEON, PRISM, SAKURA, STORM, DRAGON, PEPPERONI, BOARD, CUSTOM }
+
+	/** Auflösung der gemalten Capes: Breite der Textur in Pixeln. */
+	public enum Quality {
+		HD(AnimatedCapes.SCALE_HD), QHD(AnimatedCapes.SCALE_2K), UHD(AnimatedCapes.SCALE_4K);
+
+		final int scale;
+
+		Quality(int scale) {
+			this.scale = scale;
+		}
+	}
 
 	/** Vom Launcher übergebene Auswahl (siehe {@code salami_capes.rs}). */
 	private static final String LAUNCHER_PROPERTY = "salami.cape";
@@ -54,9 +70,13 @@ public final class CapesModule extends Module {
 	private static final int MAX_FILE_BYTES = 4 * 1024 * 1024;
 	private static final int MIN_WIDTH = 64;
 	private static final int MAX_WIDTH = 2048;
+	/** Capes, die als festes Bild in der Jar liegen ({@code textures/cape/<name>.png}). */
+	private static final java.util.Set<Cape> STATIC = java.util.EnumSet.of(Cape.PEPPERONI, Cape.BOARD);
 	private static CapesModule instance;
 
 	private final ModeSetting<Cape> cape = add(new ModeSetting<>("cape", Cape.LAUNCHER));
+	private final ModeSetting<Quality> quality = add(new ModeSetting<>("quality", Quality.QHD));
+	private final BoolSetting animated = add(new BoolSetting("animated", true));
 	private final BoolSetting elytra = add(new BoolSetting("elytra", true));
 	private final BoolSetting others = add(new BoolSetting("others", true));
 
@@ -174,22 +194,35 @@ public final class CapesModule extends Module {
 		if (!name.equals(share.builtin())) {
 			share = CapeShare.builtin(name);
 		}
-		return builtIn(selected);
+		return builtIn(selected, true);
 	}
 
 	/** Mitgeliefertes Cape eines anderen Spielers ({@code "salami"} …), unbekannte Namen → {@code null}. */
 	private ClientAsset.@Nullable Texture builtInNamed(String name) {
-		return switch (name) {
-			case "salami" -> builtIn(Cape.SALAMI);
-			case "pepperoni" -> builtIn(Cape.PEPPERONI);
-			case "board" -> builtIn(Cape.BOARD);
-			default -> null;
-		};
+		for (Cape cape : Cape.values()) {
+			if (cape != Cape.LAUNCHER && cape != Cape.CUSTOM && cape.name().toLowerCase(Locale.ROOT).equals(name)) {
+				return builtIn(cape, false);
+			}
+		}
+		return null;
 	}
 
-	private ClientAsset.Texture builtIn(Cape selected) {
+	/**
+	 * Mitgeliefertes Cape: gemalt und animiert, sonst das feste Bild aus der Jar. Das eigene
+	 * Cape kommt in der gewählten Auflösung, die der anderen in HD – sie sind meist weit weg.
+	 * {@code null}, solange ein gemaltes Cape ohne festes Bild noch berechnet wird.
+	 */
+	private ClientAsset.@Nullable Texture builtIn(Cape selected, boolean own) {
+		String name = selected.name().toLowerCase(Locale.ROOT);
+		if (AnimatedCapes.has(name)) {
+			int scale = own ? quality.get().scale : Math.min(quality.get().scale, AnimatedCapes.SCALE_HD);
+			ClientAsset.Texture painted = AnimatedCapes.texture(name, scale, animated.isOn());
+			if (painted != null || !STATIC.contains(selected)) {
+				return painted;
+			}
+		}
 		return builtIn.computeIfAbsent(selected, c -> new ClientAsset.ResourceTexture(
-			Identifier.fromNamespaceAndPath(SalamiClient.MOD_ID, "cape/" + c.name().toLowerCase(Locale.ROOT))));
+			Identifier.fromNamespaceAndPath(SalamiClient.MOD_ID, "cape/" + name)));
 	}
 
 	/** {@code null}/leer = Spiel ohne Launcher gestartet → Salami-Cape. */

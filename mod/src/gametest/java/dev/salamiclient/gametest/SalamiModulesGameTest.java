@@ -295,13 +295,18 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 
 	// ------------------------------------------------------------------ Capes
 
+	/** Salami-Cape: gemalt und animiert, die Textur heißt {@code cape/salami/…}. */
+	private static boolean salamiCape(Identifier texture) {
+		return texture.getNamespace().equals("salami") && texture.getPath().startsWith("cape/salami/");
+	}
+
 	private static void testCapes(ClientGameTestContext context, TestServerContext server, ModuleManager modules) {
 		Module capes = modules.get(CapesModule.class);
 		set(capes, "cape", CapesModule.Cape.SALAMI);
 		context.runOnClient(c -> modules.setEnabled(capes, true));
-		context.waitTick();
-		check(context.computeOnClient(c -> c.player.getSkin().cape() != null
-				&& c.player.getSkin().cape().texturePath().equals(Identifier.fromNamespaceAndPath("salami", "textures/cape/salami.png"))),
+		// das Cape wird erst gemalt – das dauert ein paar Zehntelsekunden
+		check(waitFor(context, 200, c -> c.player.getSkin().cape() != null
+				&& salamiCape(c.player.getSkin().cape().texturePath())),
 			"Capes: own player has no salami cape");
 		context.runOnClient(c -> c.options.setCameraType(CameraType.THIRD_PERSON_BACK));
 		context.waitTicks(5);
@@ -311,7 +316,7 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 		server.runCommand("item replace entity @p armor.chest with minecraft:elytra");
 		context.waitTicks(5);
 		check(context.computeOnClient(c -> c.player.getSkin().elytra() != null
-				&& c.player.getSkin().elytra().texturePath().equals(Identifier.fromNamespaceAndPath("salami", "textures/cape/salami.png"))),
+				&& salamiCape(c.player.getSkin().elytra().texturePath())),
 			"Capes: elytra does not use the cape texture");
 		context.takeScreenshot("salami-10b-elytra-salami");
 		// eigenes HD-Cape (512x256) – hier die Vorlage aus dem Launcher

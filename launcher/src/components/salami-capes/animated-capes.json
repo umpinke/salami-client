@@ -1,0 +1,15 @@
+{
+  "sheet": {"scale": 12, "columns": 8},
+  "face": {"scale": 10, "columns": 9},
+  "capes": {
+    "salami": {"frames": 36, "frameMs": 83},
+    "aurora": {"frames": 36, "frameMs": 83},
+    "magma": {"frames": 32, "frameMs": 62},
+    "galaxy": {"frames": 48, "frameMs": 83},
+    "neon": {"frames": 24, "frameMs": 62},
+    "prism": {"frames": 36, "frameMs": 83},
+    "sakura": {"frames": 36, "frameMs": 83},
+    "storm": {"frames": 40, "frameMs": 50},
+    "dragon": {"frames": 32, "frameMs": 62}
+  }
+}

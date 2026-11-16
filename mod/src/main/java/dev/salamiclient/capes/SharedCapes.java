@@ -424,7 +424,12 @@ public final class SharedCapes {
 				// Bild ungültig: nicht endlos neu versuchen
 				publishedKey = wanted.key();
 				forgetOwn();
-				Chat.warn("salami.capes.shared.failed", server.getMessage());
+				if (wanted.png() != null) {
+					Chat.warn("salami.capes.shared.failed", server.getMessage());
+				} else {
+					// mitgeliefertes Cape, das der Cape-Server (noch) nicht kennt: du trägst es trotzdem
+					SalamiClient.LOG.warn("Cape {} konnte nicht geteilt werden: {}", wanted.key(), server.getMessage());
+				}
 				return;
 			}
 			if (!wanted.key().equals(loggedFailure)) {

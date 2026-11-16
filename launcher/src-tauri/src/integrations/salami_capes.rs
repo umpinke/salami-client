@@ -29,7 +29,21 @@ use std::time::{Duration, Instant};
 use uuid::Uuid;
 
 /// Mitgelieferte Capes (Dateinamen in salami-core und `launcher/public/capes`).
-pub const BUILTIN_CAPES: [&str; 3] = ["salami", "pepperoni", "board"];
+/// Reihenfolge der Galerie. Bis auf `pepperoni` und `board` (feste Bilder) sind alle in der
+/// Mod gemalt und animiert (`capes/art` in salami-core).
+pub const BUILTIN_CAPES: [&str; 11] = [
+    "salami",
+    "aurora",
+    "magma",
+    "galaxy",
+    "neon",
+    "prism",
+    "sakura",
+    "storm",
+    "dragon",
+    "pepperoni",
+    "board",
+];
 pub const BUILTIN_PREFIX: &str = "builtin:";
 const DEFAULT_SELECTION: &str = "builtin:salami";
 const STORE_FILE: &str = "capes.json";

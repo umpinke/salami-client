@@ -262,6 +262,11 @@ test("mitgelieferte Capes sind sofort für alle sichtbar", async () => {
   const lookup = await call("POST", "/v1/capes/lookup", { uuids: [uuidOf("Salamander"), uuidOf("Pepper_99"), "kaputt"] });
   assert.deepEqual(lookup.body.capes, { [uuidOf("Salamander")]: { builtin: "pepperoni" } });
   assert.equal((await setCape("Salamander", { builtin: "gibtsnicht" })).status, 400);
+  // die animierten Capes sind genauso mitgeliefert
+  for (const builtin of ["aurora", "magma", "galaxy", "neon", "prism", "sakura", "storm", "dragon"]) {
+    assert.deepEqual((await setCape("Salamander", { builtin })).body, { status: "approved", builtin });
+  }
+  await setCape("Salamander", { builtin: "pepperoni" });
 });
 
 test("eigenes Cape: erst nach Freigabe sichtbar", async () => {

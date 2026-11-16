@@ -109,7 +109,7 @@ const SAMPLE_LOG = [
 /** Cape-Speicher im Speicher (statt salami_capes/ im Launcher-Ordner). */
 const capeStore = {
   selected: "builtin:salami" as string | null,
-  builtin: ["salami", "pepperoni", "board"],
+  builtin: ["salami", "aurora", "magma", "galaxy", "neon", "prism", "sakura", "storm", "dragon", "pepperoni", "board"],
   // Beispiel: die Vorlage selbst als eigenes Cape (zeigt Cape- und Elytra-Flächen)
   capes: [
     { id: "vorlage", name: "Vorlage", created: now, image: "/src-tauri/assets/salami_cape_template.png", share_id: "a".repeat(64) },

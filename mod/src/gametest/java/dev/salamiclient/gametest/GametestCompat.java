@@ -38,6 +38,13 @@ final class GametestCompat {
 		world.getClientWorld().waitForChunksRender();
 	}
 
+	/** HUD ausblenden wie mit F1 (für Screenshots). Ab 26.2 gehört das zum Hud und bleibt hier, wie es ist. */
+	static void hideHud(Minecraft client, boolean hidden) {
+		//? if <26.2 {
+		client.options.hideGui = hidden;
+		//?}
+	}
+
 	/** Anzahl aller Partikel; ab 26.2 liefert Minecraft „Art Anzahl … T Summe“ statt nur der Zahl. */
 	static int particleCount(Minecraft client) {
 		String counts = client.particleEngine.countParticles().trim();

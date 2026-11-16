@@ -3,7 +3,7 @@
  * Salami Cape-Server: welches Cape jeder Salami-Spieler trägt – damit alle mit dem
  * Client die Capes der anderen sehen – und die Prüfung eigener Capes durch Admins.
  *
- * Mitgelieferte Capes (salami, pepperoni, board) sind sofort für alle sichtbar. Eigene
+ * Mitgelieferte Capes (salami, aurora, magma … board) sind sofort für alle sichtbar. Eigene
  * Bilder landen erst in der Warteschlange und sind für andere unsichtbar, bis ein Admin
  * sie auf der Prüf-Webseite (/admin) freigibt.
  *
@@ -86,7 +86,10 @@ const REPORTS_TO_HIDE = env("REPORTS_TO_HIDE", 3);
 /** Meldungen pro Spieler und Tag. */
 const REPORTS_PER_DAY = env("REPORTS_PER_DAY", 20);
 
-const BUILTIN = new Set(["salami", "pepperoni", "board"]);
+/** Mitgelieferte Capes von salami-core (dort `CapesModule.Cape`); neue Namen hier nachtragen. */
+const BUILTIN = new Set([
+  "salami", "aurora", "magma", "galaxy", "neon", "prism", "sakura", "storm", "dragon", "pepperoni", "board",
+]);
 const STATUSES = ["pending", "approved", "rejected"];
 /** Reiter der Prüf-Webseite: die drei Status und alle Capes mit offenen Meldungen. */
 const ADMIN_TABS = [...STATUSES, "reported"];

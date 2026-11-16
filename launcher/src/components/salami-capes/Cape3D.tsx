@@ -1,10 +1,11 @@
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, useTexture } from "@react-three/drei";
 import * as THREE from "three";
 import { cn } from "../../lib/utils";
 import { WebGLBoundary } from "../WebGLBoundary";
+import { SHEET_UNITS, capeAnimation, currentFrame, frameOrigin } from "./animated-capes";
 import { CapeFace } from "./CapeFace";
 import { CAPE, TEXTURE_HEIGHT, TEXTURE_WIDTH, type CapeRect } from "./cape-layout";
 import "./i18n";
@@ -33,12 +34,46 @@ function texturedBox(size: [number, number, number], faces: CapeRect[]): THREE.B
   return geometry;
 }
 
+/**
+ * Textur eines Capes. Die animierten Salami-Capes laufen: ihre Frames liegen als Raster in
+ * einem Bild, der aktuelle wird in eine Zeichenfläche im Cape-Layout kopiert.
+ */
 function useCapeTexture(src: string): THREE.Texture {
-  const texture = useTexture(src);
-  texture.magFilter = THREE.NearestFilter;
-  texture.minFilter = THREE.NearestFilter;
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
+  const animation = useMemo(() => capeAnimation(src), [src]);
+  const loaded = useTexture(animation ? animation.sheet.url : src);
+  const shown = useRef(-1);
+  const animated = useMemo(() => {
+    if (!animation) return null;
+    const canvas = document.createElement("canvas");
+    canvas.width = TEXTURE_WIDTH * animation.sheet.scale;
+    canvas.height = TEXTURE_HEIGHT * animation.sheet.scale;
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    shown.current = -1;
+    return texture;
+  }, [animation]);
+  useEffect(() => () => animated?.dispose(), [animated]);
+  useFrame(() => {
+    if (!animation || !animated) return;
+    const frame = currentFrame(animation);
+    if (frame === shown.current) return;
+    const canvas = animated.image as HTMLCanvasElement;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    shown.current = frame;
+    const { sheet } = animation;
+    const w = SHEET_UNITS.width * sheet.scale;
+    const h = SHEET_UNITS.height * sheet.scale;
+    const [x, y] = frameOrigin(sheet, frame, SHEET_UNITS.width, SHEET_UNITS.height);
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(loaded.image as CanvasImageSource, x, y, w, h, 0, 0, w, h);
+    animated.needsUpdate = true;
+  });
+  if (animated) return animated;
+  loaded.magFilter = THREE.NearestFilter;
+  loaded.minFilter = THREE.NearestFilter;
+  loaded.colorSpace = THREE.SRGBColorSpace;
+  return loaded;
 }
 
 /** Cape 10x16x1, „Vorne“ zeigt zur Kamera (so sieht man es im Spiel von hinten). */
