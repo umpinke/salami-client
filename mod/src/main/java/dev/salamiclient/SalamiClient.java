@@ -3,6 +3,7 @@ package dev.salamiclient;
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.capes.SharedCapes;
 import dev.salamiclient.config.ConfigManager;
+import dev.salamiclient.gui.SalamiMenuScreen;
 import dev.salamiclient.gui.clickgui.ClickGuiScreen;
 import dev.salamiclient.gui.ModSettingsScreen;
 import dev.salamiclient.gui.ModsScreen;
@@ -387,7 +388,7 @@ public final class SalamiClient implements ClientModInitializer {
 	private void onTick(Minecraft client) {
 		while (clickGuiKey.consumeClick()) {
 			if (client.screen == null) {
-				client.setScreen(new ClickGuiScreen(modules, config));
+				client.setScreen(new SalamiMenuScreen(modules, config));
 			}
 		}
 		while (easyLeaveKey.consumeClick()) {

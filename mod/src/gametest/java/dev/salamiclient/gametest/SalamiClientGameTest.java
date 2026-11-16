@@ -3,6 +3,7 @@ package dev.salamiclient.gametest;
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.gui.ConfigsScreen;
+import dev.salamiclient.gui.SalamiMenuScreen;
 import dev.salamiclient.gui.clickgui.ClickGuiScreen;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
@@ -64,7 +65,12 @@ public final class SalamiClientGameTest implements FabricClientGameTest {
 			// --- ClickGUI über die echte Taste öffnen ---
 			context.getInput().pressKey(SalamiClient.get().clickGuiKey());
 			context.waitTick();
-			check(context.computeOnClient(client -> client.screen instanceof ClickGuiScreen), "ClickGUI did not open via keybind");
+			check(context.computeOnClient(client -> client.screen instanceof SalamiMenuScreen), "Salami menu did not open via keybind");
+			context.takeScreenshot("salami-02-menu");
+
+			// --- Panel-Ansicht (über die Kachel „Panels“ erreichbar) ---
+			context.setScreen(() -> new ClickGuiScreen(modules, SalamiClient.get().config()));
+			context.waitTick();
 			context.takeScreenshot("salami-02-clickgui-salami");
 
 			// --- Salami-Modus per Linksklick ausschalten (1. Modul im Client-Panel) ---
@@ -131,7 +137,9 @@ public final class SalamiClientGameTest implements FabricClientGameTest {
 		// ClickGUI ohne Utility-Panel
 		context.getInput().pressKey(SalamiClient.get().clickGuiKey());
 		context.waitTick();
-		check(context.computeOnClient(client -> client.screen instanceof ClickGuiScreen), "ClickGUI did not open with combat off");
+		check(context.computeOnClient(client -> client.screen instanceof SalamiMenuScreen), "Salami menu did not open with combat off");
+		context.setScreen(() -> new ClickGuiScreen(modules, SalamiClient.get().config()));
+		context.waitTick();
 		context.takeScreenshot("salami-07-clickgui-no-combat");
 		context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 		context.waitTick();
