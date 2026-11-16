@@ -5306,7 +5306,7 @@ dependencies = [
 
 [[package]]
 name = "salami-client-launcher"
-version = "1.7.1"
+version = "1.7.2-beta.1"
 dependencies = [
  "anyhow",
  "async-compression",
