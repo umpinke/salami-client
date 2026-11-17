@@ -541,16 +541,16 @@
 	"salami.menu.friends": "Freunde",
 	"salami.menu.cosmetics": "Cosmetics",
 	"salami.module.hats": "Salami-Hüte",
-	"salami.module.hats.desc": "Ein kleiner Hut auf der Schulter – vorerst die Weihnachtsmütze. Andere Salami-Spieler sehen ihn auch. Auswahl unter Cosmetics → Hüte.",
+	"salami.module.hats.desc": "Ein kleiner Hut, der über deiner Schulter schwebt – vorerst die Weihnachtsmütze. Andere Salami-Spieler sehen ihn auch. Auswahl unter Cosmetics → Hüte.",
 	"salami.module.hats.setting.hat": "Hut",
-	"salami.module.hats.setting.hat.desc": "Welcher Hut auf deiner Schulter sitzt. Links, oder rechts, wenn dort schon ein Papagei sitzt.",
+	"salami.module.hats.setting.hat.desc": "Welcher Hut über deiner Schulter schwebt. Links, oder rechts, wenn dort schon ein Papagei sitzt.",
 	"salami.module.hats.setting.hat.none": "Kein Hut",
 	"salami.module.hats.setting.hat.santa": "Weihnachtsmütze",
 	"salami.module.hats.setting.others": "Hüte anderer",
 	"salami.module.hats.setting.others.desc": "Hüte anderer Salami-Spieler anzeigen.",
 	"salami.cosmetics.tab.hats": "Hüte",
 	"salami.cosmetics.hat.none": "Kein Hut",
-	"salami.cosmetics.hat.equipped": "Weihnachtsmütze aufgesetzt – sie sitzt auf deiner Schulter (F5 zum Ansehen).",
+	"salami.cosmetics.hat.equipped": "Weihnachtsmütze aufgesetzt – sie schwebt über deiner Schulter (F5 zum Ansehen).",
 	"salami.cosmetics.hat.removed": "Hut abgenommen.",
-	"salami.cosmetics.hat.info": "Der Hut sitzt auf deiner linken Schulter, mit einem Papagei dort auf der rechten. Andere Salami-Spieler sehen ihn, wenn sie eine aktuelle Version haben."
+	"salami.cosmetics.hat.info": "Der Hut schwebt über deiner linken Schulter, mit einem Papagei dort über der rechten. Andere Salami-Spieler sehen ihn, wenn sie eine aktuelle Version haben."
 }

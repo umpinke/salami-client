@@ -541,16 +541,16 @@
 	"salami.menu.friends": "Friends",
 	"salami.menu.cosmetics": "Cosmetics",
 	"salami.module.hats": "Salami Hats",
-	"salami.module.hats.desc": "A small hat on your shoulder – for now the Santa hat. Other Salami players see it too. Pick it under Cosmetics → Hats.",
+	"salami.module.hats.desc": "A small hat floating above your shoulder – for now the Santa hat. Other Salami players see it too. Pick it under Cosmetics → Hats.",
 	"salami.module.hats.setting.hat": "Hat",
-	"salami.module.hats.setting.hat.desc": "Which hat sits on your shoulder. Left, or right if a parrot already sits there.",
+	"salami.module.hats.setting.hat.desc": "Which hat floats above your shoulder. Left, or right if a parrot already sits there.",
 	"salami.module.hats.setting.hat.none": "No hat",
 	"salami.module.hats.setting.hat.santa": "Santa hat",
 	"salami.module.hats.setting.others": "Others' hats",
 	"salami.module.hats.setting.others.desc": "Show the hats of other Salami players.",
 	"salami.cosmetics.tab.hats": "Hats",
 	"salami.cosmetics.hat.none": "No hat",
-	"salami.cosmetics.hat.equipped": "Santa hat on – it sits on your shoulder (F5 to look).",
+	"salami.cosmetics.hat.equipped": "Santa hat on – it floats above your shoulder (F5 to look).",
 	"salami.cosmetics.hat.removed": "Hat taken off.",
-	"salami.cosmetics.hat.info": "The hat sits on your left shoulder, or on the right if a parrot is on the left. Other Salami players see it if they have a recent version."
+	"salami.cosmetics.hat.info": "The hat floats above your left shoulder, or above the right one if a parrot is on the left. Other Salami players see it if they have a recent version."
 }
