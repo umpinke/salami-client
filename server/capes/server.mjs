@@ -9,15 +9,18 @@
  *
  * Spiel (salami-core):
  *   POST /v1/auth/challenge                         → {"serverId":"…"}
- *   PUT  /v1/capes/me  {"name","serverId","cape","hat"?} → {"status":"approved"|"pending"|"rejected", …}
+ *   PUT  /v1/capes/me  {"name","serverId","cape","hat"?,"minime"?} → {"status":"approved"|"pending"|"rejected", …}
  *        cape: {"builtin":"salami"} | {"png":"<base64>"} | null (kein Cape)
  *        hat: "santa" (Cosmetics → Hüte) oder fehlt/null; unbekannte Hüte werden ignoriert
+ *        minime: {"name":"<Minecraft-Name>","place":"hand"|"shoulder"|"head"|"follow"}
+ *        (Cosmetics → Mini Me) oder fehlt/null; Ungültiges wird ebenso ignoriert
  *        Anmeldung wie beim Betreten eines Minecraft-Servers: das Spiel meldet die
  *        serverId bei Mojang an (joinServer), dieser Server fragt Mojang (hasJoined).
  *        Das Zugangstoken des Spielers bekommt der Cape-Server nie zu sehen.
  *   POST /v1/capes/lookup {"uuids":[…]}             → {"capes":{"<uuid>":{"builtin":"salami"}|{"id":"<capeId>"}}}
  *        nur sichtbare Capes: mitgelieferte und freigegebene; trägt der Spieler einen Hut,
- *        steht zusätzlich "hat":"santa" darin (auch ohne Cape: {"hat":"santa"})
+ *        steht zusätzlich "hat":"santa" darin (auch ohne Cape: {"hat":"santa"}), ebenso
+ *        sein Mini Me als "minime":{"name","place"}
  *   GET  /v1/capes/img/<capeId>.png                 → freigegebenes Cape-Bild
  *   GET  /v1/capes/gallery                          → {"capes":[{"id","approvedAt","wearers"}]}
  *        alle freigegebenen eigenen Capes, neueste zuerst – der Launcher zeigt sie unter
@@ -105,6 +108,10 @@ const REPORTS_PER_DAY = env("REPORTS_PER_DAY", 20);
 
 /** Hüte von salami-core (dort `HatsModule.Hat`); neue Namen hier nachtragen. */
 const HATS = new Set(["santa"]);
+/** Plätze des Mini Me in salami-core (dort `MiniMeModule.Place`, ohne `none`). */
+const MINIME_PLACES = new Set(["hand", "shoulder", "head", "follow"]);
+/** Gültiger Minecraft-Name – nur dessen Skin zeigt das Mini Me. */
+const MC_NAME = /^[A-Za-z0-9_]{1,16}$/;
 /** Mitgelieferte Capes von salami-core (dort `CapesModule.Cape`); neue Namen hier nachtragen. */
 const BUILTIN = new Set([
   "salami", "aurora", "magma", "galaxy", "neon", "prism", "sakura", "storm", "dragon", "pepperoni", "board",
@@ -198,8 +205,21 @@ function visibleCape(player) {
   let cape = null;
   if (player.cape?.builtin) cape = { builtin: player.cape.builtin };
   else if (player.cape?.id && db.capes[player.cape.id]?.status === "approved") cape = { id: player.cape.id };
-  // Hut (Cosmetics → Hüte) reist im selben Objekt mit; ältere Clients lesen nur builtin/id
-  return player.hat ? { ...cape, hat: player.hat } : cape;
+  // Hut und Mini Me (Cosmetics) reisen im selben Objekt mit; ältere Clients lesen nur builtin/id
+  const extras = {
+    ...(player.hat ? { hat: player.hat } : {}),
+    ...(player.minime ? { minime: { name: player.minime.name, place: player.minime.place } } : {}),
+  };
+  return Object.keys(extras).length ? { ...cape, ...extras } : cape;
+}
+
+/** Mini Me aus der Anfrage: {name, place} oder null (fehlt oder ungültig). */
+function parseMiniMe(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const { name, place } = value;
+  if (typeof name !== "string" || !MC_NAME.test(name)) return null;
+  if (typeof place !== "string" || !MINIME_PLACES.has(place)) return null;
+  return { name, place };
 }
 
 // ------------------------------------------------------------------ Hilfen
@@ -402,14 +422,15 @@ async function handleSetCape(req, res) {
   const previous = db.players[uuid]?.cape?.id;
   const visibleBefore = JSON.stringify(visibleCape(db.players[uuid]));
   const cape = body.cape ?? null;
-  // Hut: unbekannte Namen (neuere Clients) einfach ignorieren statt die Anfrage abzulehnen
+  // Hut und Mini Me: Unbekanntes (neuere Clients) einfach ignorieren statt die Anfrage abzulehnen
   const hat = typeof body.hat === "string" && HATS.has(body.hat) ? body.hat : null;
-  const withHat = (player) => (hat ? { ...player, hat } : player);
+  const minime = parseMiniMe(body.minime);
+  const withHat = (player) => ({ ...player, ...(hat ? { hat } : {}), ...(minime ? { minime } : {}) });
   const now = new Date().toISOString();
   let result;
 
   if (cape === null) {
-    if (hat) db.players[uuid] = { name, hat, updatedAt: now };
+    if (hat || minime) db.players[uuid] = withHat({ name, updatedAt: now });
     else delete db.players[uuid];
     result = { status: "none" };
   } else if (typeof cape.builtin === "string") {

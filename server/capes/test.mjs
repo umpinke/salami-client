@@ -110,10 +110,16 @@ async function call(method, path, body, headers = {}) {
 const admin = (method, path, body) => call(method, path, body, { Authorization: `Bearer ${ADMIN}` });
 
 /** Wie salami-core: Challenge holen, bei „Mojang“ anmelden, Cape setzen. */
-async function setCape(name, cape, { join = true, hat } = {}) {
+async function setCape(name, cape, { join = true, hat, minime } = {}) {
   const { body } = await call("POST", "/v1/auth/challenge");
   if (join) joined.add(`${name}|${body.serverId}`);
-  return call("PUT", "/v1/capes/me", { name, serverId: body.serverId, cape, ...(hat !== undefined ? { hat } : {}) });
+  return call("PUT", "/v1/capes/me", {
+    name,
+    serverId: body.serverId,
+    cape,
+    ...(hat !== undefined ? { hat } : {}),
+    ...(minime !== undefined ? { minime } : {}),
+  });
 }
 
 /** Wie der Launcher: Challenge holen, bei „Mojang“ anmelden, Cape zur Prüfung einreichen. */
@@ -528,6 +534,45 @@ test("Hüte: Weihnachtsmütze wird mit dem Cape geteilt, auch ohne Cape", async 
     assert.deepEqual(await live.next(mine), { uuid, cape: { builtin: "board" } });
 
     // Mütze ab und kein Cape: der Spieler verschwindet wie bisher
+    await setCape("Brotzeit", null);
+    assert.equal(await lookup(), undefined);
+    assert.deepEqual(await live.next(mine), { uuid, cape: null });
+  } finally {
+    live.close();
+  }
+});
+
+test("Mini Me: Name und Platz werden mit dem Cape geteilt, Ungültiges ignoriert", async () => {
+  const live = await openEvents();
+  try {
+    const uuid = uuidOf("Brotzeit");
+    const mine = (e) => e.uuid === uuid;
+    const lookup = async () => (await call("POST", "/v1/capes/lookup", { uuids: [uuid] })).body.capes[uuid];
+
+    // nur ein Mini Me, kein Cape: der Spieler bleibt gespeichert
+    await setCape("Brotzeit", null, { minime: { name: "Salamander", place: "follow" } });
+    assert.deepEqual(await lookup(), { minime: { name: "Salamander", place: "follow" } });
+    assert.deepEqual(await live.next(mine), { uuid, cape: { minime: { name: "Salamander", place: "follow" } } });
+
+    // mit Cape und Mütze zusammen; zusätzliche Felder fallen weg
+    assert.equal(
+      (await setCape("Brotzeit", { builtin: "board" }, { hat: "santa", minime: { name: "Pepper_99", place: "head", x: 1 } })).status,
+      200,
+    );
+    assert.deepEqual(await lookup(), { builtin: "board", hat: "santa", minime: { name: "Pepper_99", place: "head" } });
+    assert.deepEqual(await live.next(mine), {
+      uuid,
+      cape: { builtin: "board", hat: "santa", minime: { name: "Pepper_99", place: "head" } },
+    });
+
+    // ungültiger Name oder Platz wird ignoriert, nicht abgelehnt
+    for (const minime of [{ name: "kein name!", place: "hand" }, { name: "Salamander", place: "rucksack" }, "Salamander", [1]]) {
+      assert.equal((await setCape("Brotzeit", { builtin: "board" }, { minime })).status, 200);
+      assert.deepEqual(await lookup(), { builtin: "board" });
+    }
+    assert.deepEqual(await live.next(mine), { uuid, cape: { builtin: "board" } });
+
+    // alles ab: der Spieler verschwindet
     await setCape("Brotzeit", null);
     assert.equal(await lookup(), undefined);
     assert.deepEqual(await live.next(mine), { uuid, cape: null });

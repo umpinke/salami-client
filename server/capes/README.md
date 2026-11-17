@@ -165,8 +165,8 @@ Startet den Server mit einem nachgebauten Mojang-Dienst und prüft Anmeldung, Wa
 | Anfrage | Antwort |
 |---|---|
 | `POST /v1/auth/challenge` | `{"serverId":"…"}`, 60 s gültig, nur einmal verwendbar |
-| `PUT /v1/capes/me` mit `{"name","serverId","cape","hat"?}` | `{"status":"approved"\|"pending"\|"rejected","id"?,"reason"?}` – `cape`: `{"builtin":"salami"}`, `{"png":"<base64>"}` oder `null` – `hat`: `"santa"` (Weihnachtsmütze, Cosmetics → Hüte) oder weglassen; unbekannte Hüte werden ignoriert |
-| `POST /v1/capes/lookup` mit `{"uuids":[…]}` (max. 200) | `{"capes":{"<uuid>":{"builtin":"salami"}\|{"id":"<capeId>"}}}` – nur sichtbare Capes. Trägt der Spieler einen Hut, steht zusätzlich `"hat":"santa"` darin (auch ohne Cape: `{"hat":"santa"}`) |
+| `PUT /v1/capes/me` mit `{"name","serverId","cape","hat"?,"minime"?}` | `{"status":"approved"\|"pending"\|"rejected","id"?,"reason"?}` – `cape`: `{"builtin":"salami"}`, `{"png":"<base64>"}` oder `null` – `hat`: `"santa"` (Weihnachtsmütze, Cosmetics → Hüte) oder weglassen; unbekannte Hüte werden ignoriert – `minime`: `{"name":"<Minecraft-Name>","place":"hand"\|"shoulder"\|"head"\|"follow"}` (Cosmetics → Mini Me) oder weglassen; Ungültiges wird ignoriert |
+| `POST /v1/capes/lookup` mit `{"uuids":[…]}` (max. 200) | `{"capes":{"<uuid>":{"builtin":"salami"}\|{"id":"<capeId>"}}}` – nur sichtbare Capes. Trägt der Spieler einen Hut, steht zusätzlich `"hat":"santa"` darin (auch ohne Cape: `{"hat":"santa"}`), ebenso sein Mini Me als `"minime":{"name","place"}` |
 | `GET /v1/capes/img/<capeId>.png` | freigegebenes Cape-Bild |
 | `GET /v1/capes/gallery` | `{"capes":[{"id","approvedAt","wearers"}]}` – alle freigegebenen eigenen Capes (höchstens 500, neueste zuerst), für die Galerie im Launcher |
 | `GET /v1/capes/events` | Server-Sent Events: `data: {"uuid":"…","cape":{…}\|null}` bei jeder sichtbaren Änderung, `: ping` alle 20 s |

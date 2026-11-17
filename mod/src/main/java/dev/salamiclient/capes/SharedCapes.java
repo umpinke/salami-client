@@ -1,9 +1,11 @@
 package dev.salamiclient.capes;
 
+import com.google.gson.JsonObject;
 import com.mojang.blaze3d.platform.NativeImage;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.modules.visual.CapesModule;
 import dev.salamiclient.modules.visual.HatsModule;
+import dev.salamiclient.modules.visual.MiniMeModule;
 import dev.salamiclient.util.Chat;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
@@ -160,6 +162,21 @@ public final class SharedCapes {
 		}
 		Entry entry = entry(server(), player);
 		return entry == null || entry.remote() == null ? null : entry.remote().hat();
+	}
+
+	/** Mini Me eines anderen Spielers: Name des Skins und Platz ({@code hand}, {@code follow} …). */
+	public record SharedMiniMe(String name, String place) {}
+
+	/** Mini Me eines anderen Salami-Spielers oder {@code null}. Nur im Render-/Client-Thread aufrufen. */
+	public static @Nullable SharedMiniMe miniMeOf(UUID player) {
+		if (!Minecraft.getInstance().isSameThread()) {
+			return null;
+		}
+		Entry entry = entry(server(), player);
+		if (entry == null || entry.remote() == null || entry.remote().miniMeName() == null || entry.remote().miniMePlace() == null) {
+			return null;
+		}
+		return new SharedMiniMe(entry.remote().miniMeName(), entry.remote().miniMePlace());
 	}
 
 	/** Bekannter Stand eines Spielers; ist er unbekannt oder veraltet, wird er (neu) abgefragt. */
@@ -411,9 +428,16 @@ public final class SharedCapes {
 		if (wanted == null || publishing) {
 			return;
 		}
-		// Hut (Cosmetics → Hüte) wird mit dem Cape geteilt; der Schlüssel umfasst beides
+		// Hut und Mini Me (Cosmetics) werden mit dem Cape geteilt; der Schlüssel umfasst alles
 		String hat = HatsModule.sharedHat();
-		String key = wanted.key() + "|hat:" + hat;
+		MiniMeModule.Wish mini = MiniMeModule.own();
+		JsonObject miniMe = null;
+		if (mini != null) {
+			miniMe = new JsonObject();
+			miniMe.addProperty("name", mini.name());
+			miniMe.addProperty("place", mini.place().name().toLowerCase(java.util.Locale.ROOT));
+		}
+		String key = wanted.key() + "|hat:" + hat + "|minime:" + miniMe;
 		if (key.equals(publishedKey)) {
 			wantedKey = null;
 			return;
@@ -427,7 +451,7 @@ public final class SharedCapes {
 			return;
 		}
 		publishing = true;
-		cs.publish(mc.getUser(), mc.services().sessionService(), wanted, hat).whenComplete((result, error) -> mc.execute(() -> {
+		cs.publish(mc.getUser(), mc.services().sessionService(), wanted, hat, miniMe).whenComplete((result, error) -> mc.execute(() -> {
 			publishing = false;
 			if (error == null) {
 				publishedKey = key;

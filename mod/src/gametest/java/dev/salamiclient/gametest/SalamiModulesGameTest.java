@@ -12,6 +12,8 @@ import dev.salamiclient.module.ModuleManager;
 import dev.salamiclient.modules.client.GuiScaleModule;
 import dev.salamiclient.modules.visual.CapesModule;
 import dev.salamiclient.modules.visual.HatsModule;
+import dev.salamiclient.modules.visual.MiniMeModule;
+import dev.salamiclient.minime.MiniMeSkins;
 import dev.salamiclient.modules.visual.InfoHudModule;
 import dev.salamiclient.modules.visual.LiveTrackerModule;
 import dev.salamiclient.modules.visual.ParticlesModule;
@@ -69,6 +71,7 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 			testParticles(context, server, modules);
 			testCapes(context, server, modules);
 			testHats(context, modules);
+			testMiniMe(context, modules);
 			testSharedCapes(context, modules);
 			testLauncherLiveCapes(context);
 			testGuiScale(context, modules);
@@ -468,6 +471,60 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 		set(hats, "hat", HatsModule.Hat.NONE);
 		check(HatsModule.sharedHat() == null, "Hats: hat still shared after taking it off");
 		check(context.computeOnClient(c -> !HatsModule.wearsSanta(c.player.getId())), "Hats: hat still shown after taking it off");
+	}
+
+	// ------------------------------------------------------------------ Mini Me
+
+	/** Mini Me mit dem Skin eines Namens: läuft hinterher, sitzt auf Kopf und Schulter, hängt an der Hand. */
+	private static void testMiniMe(ClientGameTestContext context, ModuleManager modules) {
+		MiniMeModule mini = modules.get(MiniMeModule.class);
+		context.runOnClient(c -> {
+			mini.setName("Notch");
+			mini.setPlace(MiniMeModule.Place.FOLLOW);
+			modules.setEnabled(mini, true);
+			c.options.setCameraType(CameraType.THIRD_PERSON_FRONT);
+		});
+		// Skin von Mojang laden (braucht Netz; ohne Netz bleibt es beim Standard-Skin)
+		for (int i = 0; i < 300 && context.computeOnClient(c -> MiniMeSkins.state("Notch")) == MiniMeSkins.State.LOADING; i++) {
+			context.waitTicks(1);
+		}
+		MiniMeSkins.State loaded = context.computeOnClient(c -> MiniMeSkins.state("Notch"));
+		if (loaded != MiniMeSkins.State.READY) {
+			System.out.println("[salami-test] Mini Me: skin of Notch not loaded (" + loaded + "), default skin is shown");
+		}
+		MiniMeModule.Wish own = MiniMeModule.own();
+		check(own != null && own.name().equals("Notch") && own.place() == MiniMeModule.Place.FOLLOW, "Mini Me: own wish missing");
+		check(context.computeOnClient(c -> MiniMeModule.of(c.player)) != null, "Mini Me: own player has no Mini Me");
+		// von hinten: das Mini Me läuft schräg hinter dem Spieler
+		context.runOnClient(c -> {
+			c.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+			c.gui.getChat().clearMessages(false); // Chat und Meldungen verdecken sonst das Mini Me
+			c.getToastManager().clear();
+		});
+		context.waitTicks(20);
+		context.takeScreenshot("salami-10e-minime-follow");
+		context.runOnClient(c -> c.options.setCameraType(CameraType.THIRD_PERSON_FRONT));
+
+		String[] shots = {"head", "shoulder", "hand"};
+		MiniMeModule.Place[] places = {MiniMeModule.Place.HEAD, MiniMeModule.Place.SHOULDER, MiniMeModule.Place.HAND};
+		for (int i = 0; i < places.length; i++) {
+			MiniMeModule.Place place = places[i];
+			context.runOnClient(c -> mini.setPlace(place));
+			context.waitTicks(5);
+			context.takeScreenshot("salami-10f-minime-" + shots[i]);
+		}
+
+		// Cosmetics-Reiter mit Namensfeld und den Plätzen
+		context.runOnClient(c -> c.options.setCameraType(CameraType.FIRST_PERSON));
+		context.setScreen(() -> new CosmeticsScreen(null, CosmeticsScreen.Tab.MINIME));
+		context.waitTicks(10);
+		context.takeScreenshot("salami-13c-cosmetics-minime");
+		context.setScreen(() -> null);
+
+		// Platz „Kein Mini Me“: nichts mehr zu sehen und nichts geteilt
+		context.runOnClient(c -> mini.setPlace(MiniMeModule.Place.NONE));
+		check(MiniMeModule.own() == null, "Mini Me: still shared after putting it away");
+		context.runOnClient(c -> modules.setEnabled(mini, false));
 	}
 
 	// ------------------------------------------------------------------ Live Tracker

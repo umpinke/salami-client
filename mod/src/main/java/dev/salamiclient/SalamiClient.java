@@ -6,6 +6,7 @@ import dev.salamiclient.capes.SharedCapes;
 import dev.salamiclient.config.ConfigManager;
 import dev.salamiclient.friends.Friends;
 import dev.salamiclient.friends.FriendsCommand;
+import dev.salamiclient.gui.CosmeticsScreen;
 import dev.salamiclient.gui.FriendsScreen;
 import dev.salamiclient.gui.SalamiMenuScreen;
 import dev.salamiclient.gui.clickgui.ClickGuiScreen;
@@ -80,6 +81,8 @@ import dev.salamiclient.modules.visual.LogoOverlayModule;
 import dev.salamiclient.modules.visual.ParticlesModule;
 import dev.salamiclient.modules.visual.CapesModule;
 import dev.salamiclient.modules.visual.HatsModule;
+import dev.salamiclient.modules.visual.MiniMeModule;
+import dev.salamiclient.render.MiniMeLayer;
 import dev.salamiclient.render.SantaHatLayer;
 import dev.salamiclient.render.WorldContext;
 import dev.salamiclient.render.WorldLines;
@@ -193,6 +196,7 @@ public final class SalamiClient implements ClientModInitializer {
 		modules.register(new ParticlesModule());
 		modules.register(new CapesModule());
 		modules.register(new HatsModule());
+		modules.register(new MiniMeModule());
 		// Mods (Batch A): Optik
 		modules.register(new SideShieldModule());
 		modules.register(new HideArmorModule());
@@ -298,6 +302,7 @@ public final class SalamiClient implements ClientModInitializer {
 		LivingEntityFeatureRendererRegistrationCallback.EVENT.register((entityType, renderer, helper, context) -> {
 			if (renderer instanceof AvatarRenderer<?> avatar) {
 				helper.register(new SantaHatLayer(avatar));
+				helper.register(new MiniMeLayer(avatar));
 			}
 		});
 	}
@@ -341,7 +346,8 @@ public final class SalamiClient implements ClientModInitializer {
 			|| screen instanceof ModsScreen
 			|| (screen instanceof ModSettingsScreen settings && settings.wasCapturingKey())
 			|| (screen instanceof WaypointsScreen waypoints && waypoints.isEditing())
-			|| (screen instanceof FriendsScreen friends && friends.isTyping());
+			|| (screen instanceof FriendsScreen friends && friends.isTyping())
+			|| (screen instanceof CosmeticsScreen cosmetics && cosmetics.isTyping());
 	}
 
 	/** Sucht ein fokussiertes Textfeld im Screen – auch Creative-Suche, Buch und Rezeptbuch-Suche. */

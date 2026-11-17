@@ -8,13 +8,18 @@ import dev.salamiclient.capes.CapeLibrary;
 import dev.salamiclient.modules.client.GuiScaleModule;
 import dev.salamiclient.modules.visual.CapesModule;
 import dev.salamiclient.modules.visual.HatsModule;
+import dev.salamiclient.modules.visual.MiniMeModule;
+import dev.salamiclient.minime.MiniMeSkins;
 import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.theme.Theme;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.core.ClientAsset;
 import net.minecraft.network.chat.Component;
@@ -31,7 +36,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Cosmetics: Reiter „Capes“ und „Hüte“. Ein Klick auf ein Cape legt es an (mit dem
+ * Cosmetics: Reiter „Capes“, „Hüte“ und „Mini Me“. Ein Klick auf ein Cape legt es an (mit dem
  * Launcher: dieselbe Auswahl wie dort), „Hochladen“ fügt ein eigenes PNG hinzu und legt es
  * gleich an. Eigene Bilder sehen andere Salami-Spieler erst nach der Freigabe durch einen Admin.
  */
@@ -65,7 +70,8 @@ public final class CosmeticsScreen extends Screen {
 	/** Reiter des Menüs. */
 	public enum Tab {
 		CAPES("salami.cosmetics.tab.capes"),
-		HATS("salami.cosmetics.tab.hats");
+		HATS("salami.cosmetics.tab.hats"),
+		MINIME("salami.cosmetics.tab.minime");
 
 		final String key;
 
@@ -77,8 +83,14 @@ public final class CosmeticsScreen extends Screen {
 	private static final Identifier SANTA_ICON = Identifier.fromNamespaceAndPath(SalamiClient.MOD_ID, "textures/cosmetics/santa_hat_icon.png");
 	private static final int ICON_SIZE = 32;
 
+	/** Höhe der Zeile mit dem Namensfeld im Reiter Mini Me. */
+	private static final int NAME_ROW = 26;
+
 	private final Screen parent;
 	private Tab tab;
+	/** Eingabe im Namensfeld (Mini Me) und ob es gerade die Tastatur hat. */
+	private String nameBuffer = "";
+	private boolean nameFocused;
 	private float uiScale = 1f;
 	/** Erste sichtbare Kartenreihe – es wird immer um ganze Reihen gescrollt, nichts ist halb abgeschnitten. */
 	private int scrollRow;
@@ -118,17 +130,22 @@ public final class CosmeticsScreen extends Screen {
 		minecraft.setScreen(parent);
 	}
 
-	@Override
-	public void removed() {
-		releasePreviews();
-		super.removed();
-	}
-
 	// ------------------------------------------------------------------ Daten
 
 	private void reload() {
 		releasePreviews();
 		cards.clear();
+		if (tab == Tab.MINIME) {
+			MiniMeModule mini = MiniMeModule.instance();
+			if (!nameFocused) { // init() läuft auch beim Ändern der Fenstergröße: Getipptes behalten
+				nameBuffer = mini == null ? "" : mini.name();
+			}
+			for (MiniMeModule.Place place : MiniMeModule.Place.values()) {
+				String id = place.name().toLowerCase(Locale.ROOT);
+				cards.add(new Card("minime:" + id, I18n.get("salami.module.minime.setting.place." + id), null, 0));
+			}
+			return;
+		}
 		if (tab == Tab.HATS) {
 			cards.add(new Card("hat:none", I18n.get("salami.cosmetics.hat.none"), null, 0));
 			cards.add(new Card("hat:santa", I18n.get("salami.module.hats.setting.hat.santa"), SANTA_ICON, ICON_SIZE));
@@ -191,6 +208,10 @@ public final class CosmeticsScreen extends Screen {
 			HatsModule hats = HatsModule.instance();
 			return hats == null || !hats.isEnabled() ? "hat:none" : "hat:" + hats.selected().name().toLowerCase(Locale.ROOT);
 		}
+		if (tab == Tab.MINIME) {
+			MiniMeModule mini = MiniMeModule.instance();
+			return mini == null || !mini.isEnabled() ? "minime:none" : "minime:" + mini.place().name().toLowerCase(Locale.ROOT);
+		}
 		CapesModule module = CapesModule.instance();
 		if (module == null || !module.isEnabled()) {
 			return "none";
@@ -210,6 +231,53 @@ public final class CosmeticsScreen extends Screen {
 			case NONE -> "none";
 			default -> "builtin:" + module.mode().name().toLowerCase(Locale.ROOT);
 		};
+	}
+
+	/** Platz des Mini Me wählen ({@code minime:follow} …); ohne gültigen Namen geht es nicht. */
+	private void chooseMiniMe(String key) {
+		MiniMeModule mini = MiniMeModule.instance();
+		if (mini == null) {
+			return;
+		}
+		MiniMeModule.Place place = MiniMeModule.Place.valueOf(key.substring("minime:".length()).toUpperCase(Locale.ROOT));
+		applyName();
+		if (place != MiniMeModule.Place.NONE && !MiniMeSkins.NAME.matcher(mini.name()).matches()) {
+			setNotice(Component.translatable("salami.cosmetics.minime.need_name"), true);
+			nameFocused = true;
+			return;
+		}
+		if (!mini.isEnabled()) {
+			SalamiClient.get().modules().setEnabled(mini, true);
+		}
+		mini.setPlace(place);
+		setNotice(Component.translatable(place == MiniMeModule.Place.NONE ? "salami.cosmetics.minime.removed" : "salami.cosmetics.minime.placed",
+			I18n.get("salami.module.minime.setting.place." + place.name().toLowerCase(Locale.ROOT))), false);
+		currentReadAt = 0;
+		SalamiClient.get().config().markDirty();
+	}
+
+	/** Namen aus dem Feld übernehmen (lädt den Skin). */
+	private void applyName() {
+		MiniMeModule mini = MiniMeModule.instance();
+		String name = nameBuffer.trim();
+		if (mini == null || name.equals(mini.name())) {
+			return;
+		}
+		if (!name.isEmpty() && !MiniMeSkins.NAME.matcher(name).matches()) {
+			setNotice(Component.translatable("salami.cosmetics.minime.bad_name"), true);
+			return;
+		}
+		mini.setName(name);
+		SalamiClient.get().config().markDirty();
+		if (!name.isEmpty()) {
+			MiniMeSkins.state(name); // Laden anstoßen
+			setNotice(Component.translatable("salami.cosmetics.minime.name_set", name), false);
+		}
+	}
+
+	/** Für {@link SalamiClient#isTyping}: das Namensfeld hat die Tastatur. */
+	public boolean isTyping() {
+		return tab == Tab.MINIME && nameFocused;
 	}
 
 	/** Hut aufsetzen ({@code hat:santa}) oder abnehmen ({@code hat:none}). */
@@ -320,7 +388,8 @@ public final class CosmeticsScreen extends Screen {
 
 	private int[] content() {
 		int[] f = frame();
-		return new int[] {f[0] + PAD, f[1] + HEADER + 4 + TABS + 4, f[2] - PAD, f[3] - PAD - 22};
+		int top = f[1] + HEADER + 4 + TABS + 4 + (tab == Tab.MINIME ? NAME_ROW : 0);
+		return new int[] {f[0] + PAD, top, f[2] - PAD, f[3] - PAD - 22};
 	}
 
 	private int columns() {
@@ -364,6 +433,19 @@ public final class CosmeticsScreen extends Screen {
 		scrollRow = Math.max(0, Math.min(scrollRow, rows() - visibleRows()));
 	}
 
+	/** Namensfeld im Reiter Mini Me: {x0, y0, x1, y1}. */
+	private int[] nameField() {
+		int[] f = frame();
+		int y = f[1] + HEADER + 4 + TABS + 6;
+		return new int[] {f[0] + PAD + 22, y, f[0] + PAD + 22 + 140, y + 16};
+	}
+
+	private int[] nameButton() {
+		int[] field = nameField();
+		int w = font.width(I18n.get("salami.cosmetics.minime.apply")) + 12;
+		return new int[] {field[2] + 4, field[1], field[2] + 4 + w, field[3]};
+	}
+
 	private static boolean inside(int[] r, double x, double y) {
 		return x >= r[0] && x < r[2] && y >= r[1] && y < r[3];
 	}
@@ -405,7 +487,7 @@ public final class CosmeticsScreen extends Screen {
 		GuiDraw.roundRect(g, back[0] + 1, back[1] + 1, back[2] - back[0] - 2, back[3] - back[1] - 2, backHover ? theme.header() : theme.panel() | 0xFF000000);
 		GuiDraw.text(g, font, I18n.get("salami.mods.back"), back[0] + 6, back[1] + 3, theme.headerText(), false);
 
-		// Reiter: Capes, Hüte
+		// Reiter: Capes, Hüte, Mini Me
 		int[] last = null;
 		for (Tab t : Tab.values()) {
 			int[] r = tabRect(t);
@@ -420,6 +502,9 @@ public final class CosmeticsScreen extends Screen {
 		}
 		GuiDraw.text(g, font, I18n.get("salami.cosmetics.more_soon"), last[2] + 8, last[1] + 4, theme.textDim(), false);
 
+		if (tab == Tab.MINIME) {
+			renderNameRow(g, theme, mx, my);
+		}
 		int[] c = content();
 		long now = System.currentTimeMillis();
 		if (now - currentReadAt > 1_000L) {
@@ -439,7 +524,11 @@ public final class CosmeticsScreen extends Screen {
 		g.disableScissor();
 		renderScrollbar(g, theme, c);
 
-		Component line = notice != null ? notice : Component.translatable(tab == Tab.HATS ? "salami.cosmetics.hat.info" : "salami.cosmetics.info");
+		Component line = notice != null ? notice : Component.translatable(switch (tab) {
+			case HATS -> "salami.cosmetics.hat.info";
+			case MINIME -> "salami.cosmetics.minime.info";
+			default -> "salami.cosmetics.info";
+		});
 		List<FormattedCharSequence> lines = font.split(line, f[2] - f[0] - 2 * PAD);
 		for (int i = 0; i < Math.min(2, lines.size()); i++) {
 			GuiDraw.text(g, font, lines.get(i), f[0] + PAD, f[3] - PAD - 18 + i * 10, notice != null && noticeError ? theme.warning() : theme.textDim(), false);
@@ -459,7 +548,7 @@ public final class CosmeticsScreen extends Screen {
 		int px = x + (CARD_W - PREVIEW_W) / 2;
 		int py = y + PREVIEW_Y;
 		switch (card.key()) {
-			case "none", "hat:none" -> {
+			case "none", "hat:none", "minime:none" -> {
 				GuiDraw.outline(g, px, py, PREVIEW_W, PREVIEW_H, theme.textDim());
 				GuiDraw.centeredText(g, font, "—", px + PREVIEW_W / 2, py + PREVIEW_H / 2 - 4, theme.textDim());
 			}
@@ -467,6 +556,10 @@ public final class CosmeticsScreen extends Screen {
 				GuiDraw.outline(g, px, py, PREVIEW_W, PREVIEW_H, hovered ? theme.accent() : theme.textDim());
 				g.fill(px + PREVIEW_W / 2 - 1, py + 12, px + PREVIEW_W / 2 + 1, py + PREVIEW_H - 12, hovered ? theme.accent() : theme.text());
 				g.fill(px + 5, py + PREVIEW_H / 2 - 1, px + PREVIEW_W - 5, py + PREVIEW_H / 2 + 1, hovered ? theme.accent() : theme.text());
+			}
+			case "minime:hand", "minime:shoulder", "minime:head", "minime:follow" -> {
+				int size = PREVIEW_W;
+				renderFace(g, miniMeTexture(), x + (CARD_W - size) / 2, py + (PREVIEW_H - size) / 2, size);
 			}
 			case "hat:santa" -> {
 				// Symbol statt Cape-Ausschnitt, quadratisch in der Mitte der Vorschau
@@ -528,6 +621,53 @@ public final class CosmeticsScreen extends Screen {
 		g.pose().popMatrix();
 	}
 
+	/** Gesicht des Mini-Me-Skins (mit Kopfbedeckungs-Schicht) als Quadrat. */
+	private void renderFace(GuiGraphics g, Identifier texture, int x, int y, int size) {
+		g.blit(RenderPipelines.GUI_TEXTURED, texture, x, y, 8f, 8f, size, size, 8, 8, 64, 64);
+		g.blit(RenderPipelines.GUI_TEXTURED, texture, x, y, 40f, 8f, size, size, 8, 8, 64, 64);
+	}
+
+	private Identifier miniMeTexture() {
+		MiniMeModule mini = MiniMeModule.instance();
+		MiniMeSkins.Skin skin = mini == null ? null : MiniMeSkins.get(mini.name());
+		return skin != null ? skin.texture() : DefaultPlayerSkin.getDefaultTexture();
+	}
+
+	/** Gesicht, Namensfeld, Übernehmen und der Ladezustand des Skins. */
+	private void renderNameRow(GuiGraphics g, Theme theme, int mx, int my) {
+		int[] field = nameField();
+		renderFace(g, miniMeTexture(), field[0] - 20, field[1], 16);
+		GuiDraw.roundRect(g, field[0], field[1], field[2] - field[0], field[3] - field[1], nameFocused ? theme.accent() : theme.outline());
+		GuiDraw.roundRect(g, field[0] + 1, field[1] + 1, field[2] - field[0] - 2, field[3] - field[1] - 2, 0xFF0C0C10);
+		if (nameBuffer.isEmpty() && !nameFocused) {
+			GuiDraw.text(g, font, I18n.get("salami.cosmetics.minime.placeholder"), field[0] + 4, field[1] + 4, theme.textDim(), false);
+		} else {
+			GuiDraw.text(g, font, nameBuffer, field[0] + 4, field[1] + 4, theme.text(), false);
+		}
+		if (nameFocused && (System.currentTimeMillis() / 500) % 2 == 0) {
+			int cx = field[0] + 4 + font.width(nameBuffer);
+			g.fill(cx, field[1] + 3, cx + 1, field[3] - 3, theme.text());
+		}
+		int[] b = nameButton();
+		boolean hovered = inside(b, mx, my);
+		GuiDraw.roundRect(g, b[0], b[1], b[2] - b[0], b[3] - b[1], theme.accent());
+		if (hovered) {
+			GuiDraw.roundRect(g, b[0] + 1, b[1] + 1, b[2] - b[0] - 2, b[3] - b[1] - 2, 0x30FFFFFF);
+		}
+		GuiDraw.text(g, font, I18n.get("salami.cosmetics.minime.apply"), b[0] + 6, b[1] + 4, GuiDraw.textOn(theme.accent()), false);
+		MiniMeModule mini = MiniMeModule.instance();
+		String name = mini == null ? "" : mini.name();
+		if (!name.isEmpty()) {
+			String key = switch (MiniMeSkins.state(name)) {
+				case LOADING -> "salami.cosmetics.minime.loading";
+				case READY -> "salami.cosmetics.minime.ready";
+				case NOT_FOUND -> "salami.cosmetics.minime.not_found";
+			};
+			int color = MiniMeSkins.state(name) == MiniMeSkins.State.NOT_FOUND ? theme.warning() : theme.textDim();
+			GuiDraw.text(g, font, I18n.get(key, name), b[2] + 8, b[1] + 4, color, false);
+		}
+	}
+
 	/** Schmale Leiste rechts neben den Karten, nur wenn nicht alle Reihen passen. */
 	private void renderScrollbar(GuiGraphics g, Theme theme, int[] c) {
 		int rows = rows();
@@ -557,6 +697,18 @@ public final class CosmeticsScreen extends Screen {
 			onClose();
 			return true;
 		}
+		if (tab == Tab.MINIME) {
+			if (inside(nameField(), x, y)) {
+				nameFocused = true;
+				return true;
+			}
+			if (inside(nameButton(), x, y)) {
+				applyName();
+				nameFocused = false;
+				return true;
+			}
+			nameFocused = false;
+		}
 		for (Tab t : Tab.values()) {
 			if (t != tab && inside(tabRect(t), x, y)) {
 				tab = t;
@@ -582,6 +734,8 @@ public final class CosmeticsScreen extends Screen {
 					upload();
 				} else if (key.startsWith("hat:")) {
 					chooseHat(key);
+				} else if (key.startsWith("minime:")) {
+					chooseMiniMe(key);
 				} else {
 					choose(key);
 				}
@@ -589,6 +743,51 @@ public final class CosmeticsScreen extends Screen {
 			}
 		}
 		return true;
+	}
+
+	@Override
+	public boolean keyPressed(KeyEvent event) {
+		if (isTyping()) {
+			switch (event.key()) {
+				case InputConstants.KEY_RETURN, InputConstants.KEY_NUMPADENTER -> {
+					applyName();
+					nameFocused = false;
+				}
+				case InputConstants.KEY_ESCAPE -> nameFocused = false;
+				case InputConstants.KEY_BACKSPACE -> {
+					if (!nameBuffer.isEmpty()) {
+						nameBuffer = nameBuffer.substring(0, nameBuffer.length() - 1);
+					}
+				}
+				default -> {
+					// Zeichen kommen über charTyped
+				}
+			}
+			return true;
+		}
+		return super.keyPressed(event);
+	}
+
+	@Override
+	public boolean charTyped(CharacterEvent event) {
+		if (isTyping()) {
+			String typed = event.codepointAsString();
+			// Minecraft-Namen: nur Buchstaben, Ziffern, _ und höchstens 16 Zeichen
+			if (typed.matches("[A-Za-z0-9_]") && nameBuffer.length() < 16) {
+				nameBuffer += typed;
+			}
+			return true;
+		}
+		return super.charTyped(event);
+	}
+
+	@Override
+	public void removed() {
+		if (nameFocused) {
+			applyName();
+		}
+		releasePreviews();
+		super.removed();
 	}
 
 	@Override
