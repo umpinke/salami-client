@@ -2,6 +2,7 @@ package dev.salamiclient.module;
 
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.modules.client.GuiScaleModule;
+import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.setting.BoolSetting;
 import dev.salamiclient.setting.ColorSetting;
 import dev.salamiclient.setting.NumberSetting;
@@ -11,24 +12,32 @@ import net.minecraft.client.gui.GuiGraphics;
 /**
  * Basis für verschiebbare HUD-Elemente (Overlay-System).
  *
- * <p>Position als Anteil der Bildschirmgröße (0..1, linke obere Ecke), damit sie
- * bei jeder Auflösung und GUI-Skalierung stimmt. Verschoben wird im HUD-Editor;
- * die Positions-Settings sind in der ClickGUI ausgeblendet.
+ * <p>Position als Anteil der Bildschirmgröße (0..1, linke obere Ecke des Kastens samt Innenabstand),
+ * damit sie bei jeder Auflösung und GUI-Skalierung stimmt. Verschoben und vergrößert wird im
+ * HUD-Editor; die Positions-Settings sind in den Menüs ausgeblendet.
  *
- * <p>Darstellung bei jedem HUD-Element gleich (nach den Modul-Einstellungen angezeigt):
- * Größe, Hintergrund und dessen Farbe, Textschatten und – mit „Eigene Farben“ –
- * Akzent- und Textfarbe statt der Theme-Farben.
+ * <p>Aussehen: standardmäßig der gemeinsame HUD-Stil aus dem Modul „Oberfläche“ (Clean, Minimal
+ * oder Klassisch). Mit „Eigener Stil“ bekommt das Element eigenen Hintergrund, Eckenradius und
+ * Textschatten; mit „Eigene Farben“ eigene Akzent- und Textfarbe statt der Theme-Farben.
  */
 public abstract class HudModule extends Module {
+	public static final double MIN_SCALE = 0.5;
+	public static final double MAX_SCALE = 4.0;
+
 	public final NumberSetting x;
 	public final NumberSetting y;
 	public final NumberSetting scale;
+	private final BoolSetting ownStyle;
 	private final BoolSetting background;
 	private final ColorSetting backgroundColor;
+	private final NumberSetting cornerRadius;
 	private final BoolSetting textShadow;
 	private final BoolSetting customColors;
 	private final ColorSetting accentColor;
 	private final ColorSetting textColor;
+
+	/** Stil des gerade gezeichneten Frames (für {@link #shadow()} usw. während {@link #render}). */
+	private HudStyle frameStyle;
 
 	protected HudModule(String id, Category category, boolean enabledByDefault, double defaultX, double defaultY) {
 		super(id, category, enabledByDefault);
@@ -36,19 +45,24 @@ public abstract class HudModule extends Module {
 		this.y = add(new NumberSetting("y", defaultY, 0, 1, 0.001));
 		x.hide();
 		y.hide();
-		this.scale = add(new NumberSetting("scale", 1.0, 0.5, 2.0, 0.1));
+		this.scale = add(new NumberSetting("scale", 1.0, MIN_SCALE, MAX_SCALE, 0.05));
 		scale.appearance();
 
+		ownStyle = add(new BoolSetting("own_style", false));
+		ownStyle.appearance();
 		background = add(new BoolSetting("background", defaultBackground()));
-		background.appearance();
+		background.appearance().showIf(ownStyle::isOn);
 		backgroundColor = add(new ColorSetting("background_color", 0x80000000));
-		backgroundColor.appearance().showIf(background::isOn);
+		backgroundColor.appearance().showIf(() -> ownStyle.isOn() && background.isOn());
+		cornerRadius = add(new NumberSetting("corner_radius", 3, 0, GuiDraw.MAX_RADIUS, 1));
+		cornerRadius.appearance().showIf(() -> ownStyle.isOn() && background.isOn());
 		if (!usesBackground()) {
 			background.hide();
 			backgroundColor.hide();
+			cornerRadius.hide();
 		}
 		textShadow = add(new BoolSetting("text_shadow", defaultShadow()));
-		textShadow.appearance();
+		textShadow.appearance().showIf(ownStyle::isOn);
 		customColors = add(new BoolSetting("custom_colors", false));
 		customColors.appearance();
 		accentColor = add(new ColorSetting("accent_color", 0xFFB23A3A));
@@ -61,18 +75,21 @@ public abstract class HudModule extends Module {
 			accentColor.hide();
 			textColor.hide();
 		}
+		if (!usesBackground() && !usesText()) {
+			ownStyle.hide();
+		}
 	}
 
 	// --- Was das Element unterstützt (Konstanten, werden schon im Konstruktor gefragt) ---
 
-	/** Hintergrund standardmäßig an? */
+	/** Hintergrund bei „Eigener Stil“ standardmäßig an? */
 	protected boolean defaultBackground() {
-		return false;
+		return true;
 	}
 
-	/** Textschatten standardmäßig an? */
+	/** Textschatten bei „Eigener Stil“ standardmäßig an? */
 	protected boolean defaultShadow() {
-		return true;
+		return false;
 	}
 
 	/** Gibt es überhaupt einen Hintergrund? */
@@ -85,9 +102,12 @@ public abstract class HudModule extends Module {
 		return false;
 	}
 
-	/** Rand um den Inhalt, wenn die Basis den Hintergrund zeichnet (0 = Inhalt hat schon Rand). */
-	protected int backgroundPadding() {
-		return 2;
+	/**
+	 * Braucht das Element Innenabstand um den Inhalt, wenn die Basis den Hintergrund zeichnet?
+	 * {@code false}, wenn der Inhalt den Rand schon enthält (einzeilige Textanzeigen).
+	 */
+	protected boolean padded() {
+		return true;
 	}
 
 	/** Zeigt das Element Text (sonst keine Text-Einstellungen)? */
@@ -95,16 +115,44 @@ public abstract class HudModule extends Module {
 		return true;
 	}
 
-	// --- Farben für die Unterklassen ---
+	// --- Stil und Farben für die Unterklassen ---
 
-	/** Bezeichnungen und Hervorhebungen. */
+	/** Aktueller Stil: eigener oder der gemeinsame aus „Oberfläche“. */
+	public final HudStyle style() {
+		if (!ownStyle.isOn()) {
+			HudStyle global = GuiScaleModule.hudStyle();
+			if (!usesBackground() && global.hasBackground()) {
+				return new HudStyle(0, global.radius(), 0, true, global.accentLabels(), 0);
+			}
+			return global;
+		}
+		boolean bg = usesBackground() && background.isOn();
+		return new HudStyle(bg ? backgroundColor.argb() : 0, cornerRadius.intValue(), 0, textShadow.isOn(), false, bg ? 3 : 0);
+	}
+
+	private HudStyle currentStyle() {
+		return frameStyle != null ? frameStyle : style();
+	}
+
+	/** Hervorhebungen (z. B. hohe Combo, „Bereit“). */
 	public final int accentColor() {
 		return customColors.isOn() ? accentColor.argb() : SalamiClient.get().theme().accent();
 	}
 
-	/** Normaler Text. */
+	/** Normaler Text und Werte. */
 	public final int textColor() {
 		return customColors.isOn() ? textColor.argb() : SalamiClient.get().theme().text();
+	}
+
+	/**
+	 * Bezeichnungen vor Werten („FPS“, „Ping“): ruhig und etwas blasser als der Wert – oder in der
+	 * Akzentfarbe (Stil „Klassisch“, Einstellung „Bezeichnungen in Akzentfarbe“, eigene Farben).
+	 */
+	public final int labelColor() {
+		if (customColors.isOn() || currentStyle().accentLabels()) {
+			return accentColor();
+		}
+		return GuiDraw.fade(textColor(), 0.62F);
 	}
 
 	/** Nebensächlicher Text (etwas blasser als {@link #textColor()}). */
@@ -112,26 +160,52 @@ public abstract class HudModule extends Module {
 		if (!customColors.isOn()) {
 			return SalamiClient.get().theme().textDim();
 		}
-		int text = textColor.argb();
-		int alpha = Math.round((text >>> 24) * 0.7F);
-		return (text & 0x00FFFFFF) | (alpha << 24);
+		return GuiDraw.fade(textColor.argb(), 0.7F);
 	}
 
-	/** Hintergrundfarbe oder 0, wenn der Hintergrund aus ist. */
+	/** Hintergrundfarbe oder 0, wenn das Element keinen Hintergrund hat. */
 	public final int backgroundColor() {
-		return background.isOn() ? backgroundColor.argb() : 0;
+		return currentStyle().background();
 	}
 
 	public final boolean shadow() {
-		return textShadow.isOn();
+		return currentStyle().shadow();
 	}
 
-	/** Breite/Höhe in unskalierten GUI-Pixeln (für Editor-Rahmen und Begrenzung am Rand). */
+	/** Eckenradius des aktuellen Stils (für Elemente, die Flächen selbst zeichnen). */
+	public final int cornerRadius() {
+		return currentStyle().radius();
+	}
+
+	/** Fläche im aktuellen Stil (Hintergrund, Ecken, Rand) – z. B. eine Taste der Keystrokes. */
+	protected final void panel(GuiGraphics graphics, int x, int y, int w, int h, int color) {
+		HudStyle style = currentStyle();
+		GuiDraw.rounded(graphics, x, y, w, h, style.radius(), color);
+		if (style.border() != 0) {
+			GuiDraw.roundedOutline(graphics, x, y, w, h, style.radius(), style.border());
+		}
+	}
+
+	/** Breite/Höhe des Inhalts in unskalierten GUI-Pixeln (ohne Innenabstand). */
 	public abstract int width();
 
 	public abstract int height();
 
-	/** Zeichnet bei (0,0) – Verschiebung und Skalierung übernimmt {@link #onHud}. */
+	/** Innenabstand um den Inhalt im aktuellen Stil. */
+	private int padding(HudStyle style) {
+		return padded() && usesBackground() && !drawsOwnBackground() && style.hasBackground() ? style.padding() : 0;
+	}
+
+	/** Breite des ganzen Kastens (Inhalt + Innenabstand) in unskalierten GUI-Pixeln. */
+	public final int boxWidth() {
+		return width() + 2 * padding(style());
+	}
+
+	public final int boxHeight() {
+		return height() + 2 * padding(style());
+	}
+
+	/** Zeichnet den Inhalt bei (0,0) – Verschiebung, Skalierung und Hintergrund übernimmt {@link #onHud}. */
 	protected abstract void render(GuiGraphics graphics, DeltaTracker delta);
 
 	/** Ob das Element gerade etwas anzeigt (Editor zeigt trotzdem einen Rahmen). */
@@ -145,12 +219,12 @@ public abstract class HudModule extends Module {
 	}
 
 	public int screenX(int guiWidth) {
-		int w = Math.round(width() * effectiveScale());
+		int w = Math.round(boxWidth() * effectiveScale());
 		return Math.max(0, Math.min(guiWidth - w, (int) Math.round(x.get() * guiWidth)));
 	}
 
 	public int screenY(int guiHeight) {
-		int h = Math.round(height() * effectiveScale());
+		int h = Math.round(boxHeight() * effectiveScale());
 		return Math.max(0, Math.min(guiHeight - h, (int) Math.round(y.get() * guiHeight)));
 	}
 
@@ -159,20 +233,34 @@ public abstract class HudModule extends Module {
 		y.set((double) guiY / guiHeight);
 	}
 
+	/** Position und Größe auf die Standardwerte (HUD-Editor: Taste R). */
+	public void resetLayout() {
+		x.reset();
+		y.reset();
+		scale.reset();
+	}
+
 	@Override
 	public final void onHud(GuiGraphics graphics, DeltaTracker delta) {
 		if (!hasContent()) {
 			return;
 		}
-		float s = effectiveScale();
-		graphics.pose().pushMatrix();
-		graphics.pose().translate(screenX(graphics.guiWidth()), screenY(graphics.guiHeight()));
-		graphics.pose().scale(s, s);
-		if (usesBackground() && !drawsOwnBackground() && background.isOn()) {
-			int pad = backgroundPadding();
-			graphics.fill(-pad, -pad, width() + pad, height() + pad, backgroundColor.argb());
+		HudStyle style = style();
+		frameStyle = style;
+		try {
+			float s = effectiveScale();
+			int pad = padding(style);
+			graphics.pose().pushMatrix();
+			graphics.pose().translate(screenX(graphics.guiWidth()), screenY(graphics.guiHeight()));
+			graphics.pose().scale(s, s);
+			if (usesBackground() && !drawsOwnBackground() && style.hasBackground()) {
+				panel(graphics, 0, 0, width() + 2 * pad, height() + 2 * pad, style.background());
+			}
+			graphics.pose().translate(pad, pad);
+			render(graphics, delta);
+			graphics.pose().popMatrix();
+		} finally {
+			frameStyle = null;
 		}
-		render(graphics, delta);
-		graphics.pose().popMatrix();
 	}
 }

@@ -23,6 +23,11 @@ public final class LogoOverlayModule extends HudModule {
 	}
 
 	@Override
+	protected boolean usesBackground() {
+		return false; // großes Logo frei über dem Spiel
+	}
+
+	@Override
 	public int width() {
 		return showName.isOn() ? Math.max(SIZE, mc().font.width(SalamiClient.NAME)) : SIZE;
 	}

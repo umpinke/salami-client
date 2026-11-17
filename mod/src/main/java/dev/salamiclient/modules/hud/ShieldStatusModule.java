@@ -52,7 +52,7 @@ public final class ShieldStatusModule extends HudModule {
 			shield = onlyWhenHolding.isOn() ? ItemStack.EMPTY : placeholder();
 		}
 		ready = I18n.get("salami.module.shield_status.ready");
-		width = 22 + mc().font.width(ready) + 4;
+		width = 22 + mc().font.width(ready) + 5;
 	}
 
 	@Override
@@ -74,15 +74,16 @@ public final class ShieldStatusModule extends HudModule {
 	protected void render(GuiGraphics g, DeltaTracker delta) {
 		Theme theme = SalamiClient.get().theme();
 		float progress = mc().player.getCooldowns().getCooldownPercent(shield, delta.getGameTimeDeltaPartialTick(true));
-		GuiDraw.item(g, shield, 1, 1);
+		GuiDraw.item(g, shield, 2, 1);
 		if (progress > 0) {
 			// Axt-Treffer deaktivieren Schilde für 5 Sekunden (100 Ticks)
 			String text = String.format(Locale.ROOT, "%.1fs", progress * 5.0F);
-			int barWidth = width - 22;
-			g.fill(20, 15, 20 + Math.round(barWidth * progress), 17, theme.warning());
-			GuiDraw.text(g, mc().font, text, 20, 5, theme.warning(), shadow());
+			int barWidth = width - 27;
+			GuiDraw.rounded(g, 21, 14, barWidth, 2, 1, GuiDraw.fade(textColor(), 0.25F));
+			GuiDraw.rounded(g, 21, 14, Math.max(2, Math.round(barWidth * progress)), 2, 1, theme.warning());
+			GuiDraw.text(g, mc().font, text, 21, 4, theme.warning(), shadow());
 		} else {
-			GuiDraw.text(g, mc().font, ready, 20, 5, accentColor(), shadow());
+			GuiDraw.text(g, mc().font, ready, 21, 5, textColor(), shadow());
 		}
 	}
 
@@ -92,7 +93,7 @@ public final class ShieldStatusModule extends HudModule {
 	}
 
 	@Override
-	protected int backgroundPadding() {
-		return 0; // Rand ist schon in der Breite enthalten
+	protected boolean padded() {
+		return false; // Rand ist schon in der Breite enthalten
 	}
 }

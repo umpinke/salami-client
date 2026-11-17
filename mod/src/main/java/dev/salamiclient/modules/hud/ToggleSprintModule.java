@@ -89,7 +89,7 @@ public final class ToggleSprintModule extends HudModule {
 				: "salami.module.toggle_sprint.label.held";
 			text = I18n.get(key);
 		}
-		width = Math.max(40, mc().font.width(text) + 2);
+		width = Math.max(10, mc().font.width(text) - 1);
 	}
 
 	@Override
@@ -104,11 +104,11 @@ public final class ToggleSprintModule extends HudModule {
 
 	@Override
 	public int height() {
-		return 10;
+		return 8;
 	}
 
 	@Override
 	protected void render(GuiGraphics graphics, DeltaTracker delta) {
-		GuiDraw.text(graphics, mc().font, text, 0, 0, accentColor(), shadow());
+		GuiDraw.text(graphics, mc().font, text, 0, 0, textColor(), shadow());
 	}
 }

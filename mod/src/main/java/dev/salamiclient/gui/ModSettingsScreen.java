@@ -53,7 +53,12 @@ public final class ModSettingsScreen extends Screen {
 	/** Offener Farbwähler oder {@code null}. */
 	private ColorPicker picker;
 
-	private record Row(Setting<?> setting, int y) {}
+	/** Zeile: eine Einstellung oder ({@code setting == null}) die Überschrift vor den Darstellungs-Einstellungen. */
+	private record Row(Setting<?> setting, int y) {
+		boolean isHeader() {
+			return setting == null;
+		}
+	}
 
 	public ModSettingsScreen(ModuleManager modules, Module module, Screen parent) {
 		super(Component.translatable(module.translationKey()));
@@ -148,10 +153,19 @@ public final class ModSettingsScreen extends Screen {
 		int[] c = content();
 		List<Row> rows = new ArrayList<>();
 		int y = c[1] - (int) Math.round(scroll);
+		boolean header = false;
+		boolean any = false;
 		for (Setting<?> setting : module.settings()) {
 			if (setting.isHidden()) {
 				continue;
 			}
+			// Überschrift „Darstellung“ vor der ersten Darstellungs-Einstellung (nur wenn davor schon etwas steht)
+			if (setting.isAppearance() && !header && any) {
+				header = true;
+				rows.add(new Row(null, y));
+				y += ROW;
+			}
+			any = true;
 			rows.add(new Row(setting, y));
 			y += ROW;
 		}
@@ -159,13 +173,8 @@ public final class ModSettingsScreen extends Screen {
 	}
 
 	private int contentHeight() {
-		int count = 0;
-		for (Setting<?> setting : module.settings()) {
-			if (!setting.isHidden()) {
-				count++;
-			}
-		}
-		return count * ROW;
+		List<Row> rows = rows();
+		return rows.isEmpty() ? 0 : rows.get(rows.size() - 1).y() + ROW - rows.get(0).y();
 	}
 
 	private void clampScroll() {
@@ -210,14 +219,17 @@ public final class ModSettingsScreen extends Screen {
 		g.pose().scale(uiScale, uiScale);
 
 		int[] f = frame();
-		g.fill(f[0], f[1], f[2], f[3], theme.panel());
-		g.fill(f[0], f[1], f[2], f[1] + HEADER - 2, theme.header());
-		GuiDraw.outline(g, f[0], f[1], f[2] - f[0], f[3] - f[1], theme.outline());
+		int fw = f[2] - f[0];
+		int fh = f[3] - f[1];
+		GuiDraw.rounded(g, f[0] + 1, f[1] + 3, fw, fh, 6, 0x50000000);
+		GuiDraw.rounded(g, f[0], f[1], fw, fh, 6, theme.panel() | 0xFF000000);
+		GuiDraw.roundedOutline(g, f[0], f[1], fw, fh, 6, theme.outline());
+		g.fill(f[0] + 1, f[1] + HEADER - 1, f[2] - 1, f[1] + HEADER, theme.outline());
 
 		int[] back = backButton();
 		boolean backHover = inside(back, mx, my);
-		g.fill(back[0], back[1], back[2], back[3], backHover ? theme.accent() : theme.panel());
-		GuiDraw.text(g, font, I18n.get("salami.mods.back"), back[0] + 6, back[1] + 3, theme.headerText(), false);
+		GuiDraw.rounded(g, back[0], back[1], back[2] - back[0], back[3] - back[1], 3, backHover ? theme.hover() | 0x20000000 : 0);
+		GuiDraw.text(g, font, I18n.get("salami.mods.back"), back[0] + 6, back[1] + 3, backHover ? theme.headerText() : theme.textDim(), false);
 
 		String name = I18n.get(module.translationKey());
 		GuiDraw.centeredText(g, font, name, (f[0] + f[2]) / 2, f[1] + 8, module.isEnabled() ? theme.accent() : theme.headerText());
@@ -236,9 +248,15 @@ public final class ModSettingsScreen extends Screen {
 			if (row.y() + ROW < c[1] || row.y() > c[3]) {
 				continue;
 			}
+			if (row.isHeader()) {
+				String title = I18n.get("salami.mods.appearance");
+				GuiDraw.text(g, font, title, c[0], row.y() + 8, theme.accent(), false);
+				g.fill(c[0] + font.width(title) + 6, row.y() + 12, c[2], row.y() + 13, theme.outline());
+				continue;
+			}
 			boolean hovered = !overPicker && mx >= c[0] && mx < c[2] && my >= row.y() && my < row.y() + ROW && my >= c[1] && my < c[3];
 			if (hovered) {
-				g.fill(c[0] - 4, row.y(), c[2] + 4, row.y() + ROW, theme.hover());
+				GuiDraw.rounded(g, c[0] - 4, row.y(), c[2] - c[0] + 8, ROW, 3, theme.hover());
 				String desc = SettingText.description(row.setting());
 				if (desc != null) {
 					tooltip = Component.literal(desc);
@@ -270,37 +288,41 @@ public final class ModSettingsScreen extends Screen {
 			String value = number.display();
 			int trackRight = r[2] - font.width(value) - 6;
 			int trackY = (r[1] + r[3]) / 2;
-			g.fill(r[0], trackY, trackRight, trackY + 1, theme.outline());
+			GuiDraw.rounded(g, r[0], trackY - 1, trackRight - r[0], 3, 1, theme.outline());
 			int knobX = r[0] + (int) Math.round((trackRight - r[0]) * number.fraction());
-			g.fill(r[0], trackY, knobX, trackY + 1, theme.accent());
-			g.fill(knobX - 2, trackY - 3, knobX + 2, trackY + 4, theme.accent());
+			GuiDraw.rounded(g, r[0], trackY - 1, Math.max(3, knobX - r[0]), 3, 1, theme.accent());
+			GuiDraw.rounded(g, knobX - 3, trackY - 3, 7, 7, 3, theme.headerText());
 			GuiDraw.text(g, font, value, r[2] - font.width(value), textY, theme.text(), false);
 		} else if (setting instanceof ModeSetting<?> mode) {
-			String value = "< " + SettingText.modeLabel(mode) + " >";
-			GuiDraw.text(g, font, value, r[2] - font.width(value), textY, theme.accent(), false);
+			String value = SettingText.modeLabel(mode);
+			int w = font.width(value) + 18;
+			GuiDraw.rounded(g, r[2] - w, r[1], w, r[3] - r[1], 3, 0x14FFFFFF);
+			GuiDraw.text(g, font, value, r[2] - w + 9, textY, theme.headerText(), false);
+			GuiDraw.text(g, font, "<", r[2] - w + 3, textY, theme.textDim(), false);
+			GuiDraw.text(g, font, ">", r[2] - 7, textY, theme.textDim(), false);
 		} else if (setting instanceof KeybindSetting keybind) {
 			String value = listeningKeybind == keybind ? "..." : keybind.keyName();
 			int w = Math.max(40, font.width(value) + 10);
-			g.fill(r[2] - w, r[1], r[2], r[3], listeningKeybind == keybind ? theme.accent() : 0xFF0B0B0E);
-			GuiDraw.outline(g, r[2] - w, r[1], w, r[3] - r[1], theme.outline());
+			GuiDraw.rounded(g, r[2] - w, r[1], w, r[3] - r[1], 3, listeningKeybind == keybind ? theme.accent() : 0xFF0B0B0E);
+			GuiDraw.roundedOutline(g, r[2] - w, r[1], w, r[3] - r[1], 3, theme.outline());
 			GuiDraw.text(g, font, value, r[2] - w + (w - font.width(value)) / 2, textY, listeningKeybind == keybind ? 0xFF000000 : theme.text(), false);
 		} else if (setting instanceof ColorSetting color) {
 			String hex = color.isChroma() ? I18n.get("salami.colorpicker.chroma") : ColorSetting.toHex(color.get());
 			GuiDraw.text(g, font, hex, r[2] - 24 - font.width(hex), textY, theme.textDim(), false);
-			g.fill(r[2] - 20, r[1], r[2], r[3], color.argb());
-			GuiDraw.outline(g, r[2] - 20, r[1], 20, r[3] - r[1], picker != null && picker.setting() == color ? theme.accent() : theme.outline());
+			GuiDraw.rounded(g, r[2] - 20, r[1], 20, r[3] - r[1], 3, color.argb());
+			GuiDraw.roundedOutline(g, r[2] - 20, r[1], 20, r[3] - r[1], 3, picker != null && picker.setting() == color ? theme.accent() : theme.outline());
 		} else if (setting instanceof StringListSetting list) {
 			String value = I18n.get("salami.clickgui.entries", list.get().size());
 			GuiDraw.text(g, font, value, r[2] - font.width(value), textY, theme.textDim(), false);
 		} else if (setting instanceof ActionSetting) {
 			boolean hovered = inside(r, mx, my);
-			g.fill(r[0], r[1], r[2], r[3], hovered ? theme.accent() : theme.header());
+			GuiDraw.rounded(g, r[0], r[1], r[2] - r[0], r[3] - r[1], 3, hovered ? theme.accent() : theme.header());
 			String label = I18n.get("salami.mods.open");
 			GuiDraw.text(g, font, label, r[0] + (r[2] - r[0] - font.width(label)) / 2, textY, hovered ? 0xFF000000 : theme.headerText(), false);
 		} else if (setting instanceof TextSetting text) {
 			boolean editing = editingText == text;
-			g.fill(r[0], r[1], r[2], r[3], 0xFF0B0B0E);
-			GuiDraw.outline(g, r[0], r[1], r[2] - r[0], r[3] - r[1], editing ? theme.accent() : theme.outline());
+			GuiDraw.rounded(g, r[0], r[1], r[2] - r[0], r[3] - r[1], 3, 0xFF0B0B0E);
+			GuiDraw.roundedOutline(g, r[0], r[1], r[2] - r[0], r[3] - r[1], 3, editing ? theme.accent() : theme.outline());
 			String value = editing ? editBuffer : text.get();
 			String shown = font.plainSubstrByWidth(value, r[2] - r[0] - 8, editing);
 			GuiDraw.text(g, font, shown, r[0] + 3, textY, value.isEmpty() && !editing ? theme.textDim() : theme.text(), false);
@@ -315,10 +337,11 @@ public final class ModSettingsScreen extends Screen {
 	}
 
 	private void drawSwitch(GuiGraphics g, Theme theme, int[] r, boolean on) {
-		g.fill(r[0], r[1], r[2], r[3], on ? theme.accent() : 0xFF3A3A44);
-		int size = r[3] - r[1] - 2;
+		int h = r[3] - r[1];
+		GuiDraw.rounded(g, r[0], r[1], r[2] - r[0], h, h / 2, on ? theme.accent() : 0xFF3A3A44);
+		int size = h - 2;
 		int knob = on ? r[2] - 1 - size : r[0] + 1;
-		g.fill(knob, r[1] + 1, knob + size, r[3] - 1, on ? 0xFF1A1A1F : 0xFFF3F3F3);
+		GuiDraw.rounded(g, knob, r[1] + 1, size, size, size / 2, on ? GuiDraw.textOn(theme.accent()) : 0xFFF3F3F3);
 	}
 
 	// ------------------------------------------------------------------ Eingabe
@@ -355,6 +378,9 @@ public final class ModSettingsScreen extends Screen {
 				continue;
 			}
 			Setting<?> setting = row.setting();
+			if (row.isHeader()) {
+				return true;
+			}
 			if (setting instanceof BoolSetting bool) {
 				bool.toggle();
 			} else if (setting instanceof NumberSetting number) {

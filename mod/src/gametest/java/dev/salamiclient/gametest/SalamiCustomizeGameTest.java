@@ -7,17 +7,23 @@ import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.config.ConfigManager;
 import dev.salamiclient.gui.ColorPicker;
+import dev.salamiclient.gui.HudEditorScreen;
 import dev.salamiclient.gui.ModSettingsScreen;
 import dev.salamiclient.gui.clickgui.ClickGuiScreen;
 import dev.salamiclient.module.HudModule;
+import dev.salamiclient.module.HudStyle;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.ModuleManager;
 import dev.salamiclient.modules.client.GuiScaleModule;
+import dev.salamiclient.modules.hud.ClockModule;
 import dev.salamiclient.modules.hud.CpsModule;
 import dev.salamiclient.modules.hud.KeystrokesModule;
+import dev.salamiclient.modules.hud.PotionStatusModule;
+import dev.salamiclient.modules.visual.ArmorHudModule;
 import dev.salamiclient.modules.visual.HitboxModule;
 import dev.salamiclient.modules.visual.InfoHudModule;
 import dev.salamiclient.modules.visual.NameTagsModule;
+import dev.salamiclient.modules.visual.WatermarkModule;
 import dev.salamiclient.setting.ColorSetting;
 import dev.salamiclient.setting.Setting;
 import dev.salamiclient.util.Projection;
@@ -58,6 +64,12 @@ public final class SalamiCustomizeGameTest implements FabricClientGameTest {
 			context.waitTicks(10);
 
 			testHudAppearance(context, modules);
+			testHudStyles(context, world, modules);
+			testHudEditor(context, modules);
+			// Rüstung und Effekte der HUD-Screenshots wieder ablegen (der Namensschild-Test erwartet keine Rüstung)
+			world.getServer().runCommand("clear @p");
+			world.getServer().runCommand("effect clear @p");
+			context.waitTicks(2);
 			testColorPicker(context, modules);
 			testInterfaceColors(context, modules);
 			testHitboxColors(context, modules);
@@ -98,7 +110,8 @@ public final class SalamiCustomizeGameTest implements FabricClientGameTest {
 			}
 		});
 		check(setting(cps, "accent_color").isHidden(), "custom colors visible while turned off");
-		check(!setting(cps, "background_color").isHidden(), "background color hidden while background is on");
+		check(setting(cps, "background_color").isHidden() && setting(cps, "background").isHidden(),
+			"own background visible while own style is off");
 		// Darstellung steht nach den Modul-Einstellungen
 		List<Setting<?>> order = cps.settings();
 		check(order.indexOf(setting(cps, "show_right")) < order.indexOf(setting(cps, "scale")), "appearance settings not at the end");
@@ -108,10 +121,12 @@ public final class SalamiCustomizeGameTest implements FabricClientGameTest {
 				set(module, "custom_colors", true);
 				set(module, "text_color", 0xFF55FFFF);
 				set(module, "accent_color", 0xFFFFAA00);
+				set(module, "own_style", true);
+				set(module, "background", true);
 				set(module, "background_color", 0xA0202060);
 			}
-			set(info, "background", true);
 		});
+		check(!setting(cps, "background_color").isHidden(), "background color hidden while own style and background are on");
 		check(!setting(cps, "accent_color").isHidden(), "custom colors hidden while turned on");
 		check(cps.textColor() == 0xFF55FFFF && cps.accentColor() == 0xFFFFAA00, "custom HUD colors not used");
 		check(cps.backgroundColor() == 0xA0202060, "background color not used");
@@ -123,13 +138,160 @@ public final class SalamiCustomizeGameTest implements FabricClientGameTest {
 
 		context.runOnClient(c -> {
 			for (HudModule module : List.of(cps, info, keys)) {
-				for (String id : List.of("custom_colors", "text_color", "accent_color", "background_color", "background")) {
+				for (String id : List.of("custom_colors", "text_color", "accent_color", "background_color", "background", "own_style")) {
 					setting(module, id).resetAll();
 				}
 				modules.setEnabled(module, false);
 			}
 		});
 		check(cps.textColor() == SalamiClient.get().theme().text(), "HUD does not fall back to the theme");
+	}
+
+	/** HUD-Elemente, die für Stil- und Editor-Screenshots eingeschaltet werden. */
+	private static List<HudModule> showcase(ModuleManager modules) {
+		return List.of(modules.get(WatermarkModule.class), modules.get(InfoHudModule.class), modules.get(CpsModule.class),
+			modules.get(KeystrokesModule.class), modules.get(ClockModule.class), modules.get(PotionStatusModule.class),
+			modules.get(ArmorHudModule.class));
+	}
+
+	/** Gemeinsamer HUD-Stil (Clean, Minimal, Klassisch), „Eigener Stil“ pro Element und größere HUD-Größe. */
+	private static void testHudStyles(ClientGameTestContext context, TestSingleplayerContext world, ModuleManager modules) {
+		GuiScaleModule gui = modules.get(GuiScaleModule.class);
+		CpsModule cps = modules.get(CpsModule.class);
+		InfoHudModule info = modules.get(InfoHudModule.class);
+		world.getServer().runCommand("effect give @p minecraft:speed 120 1");
+		world.getServer().runCommand("effect give @p minecraft:night_vision 120 0");
+		world.getServer().runCommand("item replace entity @p armor.head with minecraft:diamond_helmet");
+		world.getServer().runCommand("item replace entity @p armor.chest with minecraft:iron_chestplate");
+		world.getServer().runCommand("item replace entity @p weapon.mainhand with minecraft:diamond_sword");
+		context.runOnClient(c -> {
+			modules.setEnabled(gui, true);
+			for (HudModule module : showcase(modules)) {
+				modules.setEnabled(module, true);
+			}
+		});
+		context.waitTicks(5);
+
+		HudStyle clean = context.computeOnClient(c -> cps.style());
+		check(clean.hasBackground() && clean.radius() == 3 && !clean.shadow() && !clean.accentLabels(), "Clean style wrong: " + clean);
+		check(context.computeOnClient(c -> cps.labelColor() != cps.accentColor()), "Clean style: labels in accent color");
+		context.takeScreenshot("salami-64-hud-clean");
+
+		context.runOnClient(c -> set(gui, "hud_style", GuiScaleModule.HudLook.MINIMAL));
+		HudStyle minimal = context.computeOnClient(c -> cps.style());
+		check(!minimal.hasBackground() && minimal.shadow(), "Minimal style wrong: " + minimal);
+		check(setting(gui, "hud_radius").isHidden() && setting(gui, "hud_opacity").isHidden(), "Minimal style shows background settings");
+		context.waitTicks(2);
+		context.takeScreenshot("salami-65-hud-minimal");
+
+		context.runOnClient(c -> set(gui, "hud_style", GuiScaleModule.HudLook.CLASSIC));
+		HudStyle classic = context.computeOnClient(c -> cps.style());
+		check(classic.hasBackground() && classic.radius() == 0 && classic.accentLabels(), "Classic style wrong: " + classic);
+		check(context.computeOnClient(c -> cps.labelColor() == cps.accentColor()), "Classic style: labels not in accent color");
+		context.waitTicks(2);
+		context.takeScreenshot("salami-66-hud-classic");
+		context.runOnClient(c -> setting(gui, "hud_style").resetAll());
+
+		// Eigener Stil gilt nur für das eine Element
+		context.runOnClient(c -> {
+			set(cps, "own_style", true);
+			set(cps, "background", false);
+		});
+		check(!context.computeOnClient(c -> cps.style()).hasBackground() && context.computeOnClient(c -> info.style()).hasBackground(),
+			"own style leaked into other elements");
+		context.runOnClient(c -> {
+			setting(cps, "own_style").resetAll();
+			setting(cps, "background").resetAll();
+		});
+
+		// Größer als früher möglich: HUD bis 300 %, einzelne Elemente bis 400 %
+		context.runOnClient(c -> {
+			set(gui, "hud_scale", 3.0);
+			set(cps, "scale", 4.0);
+		});
+		check(Math.abs(GuiScaleModule.hudScale() - 3F) < 0.001F && Math.abs(cps.effectiveScale() - 12F) < 0.001F,
+			"HUD scale not raised: " + cps.effectiveScale());
+		context.runOnClient(c -> {
+			setting(gui, "hud_scale").resetAll();
+			setting(cps, "scale").resetAll();
+		});
+	}
+
+	/** HUD-Editor: Mausrad und Griff vergrößern, Einrasten an der Bildschirmmitte, Rechtsklick öffnet Einstellungen. */
+	private static void testHudEditor(ClientGameTestContext context, ModuleManager modules) {
+		CpsModule cps = modules.get(CpsModule.class);
+		InfoHudModule info = modules.get(InfoHudModule.class);
+		context.setScreen(() -> new HudEditorScreen(null));
+		context.waitTicks(2);
+		context.takeScreenshot("salami-67-hud-editor");
+
+		// Mausrad über CPS: +5 %
+		int[] box = context.computeOnClient(c -> guiBox(c, cps));
+		moveTo(context, box[0] + box[2] / 2, box[1] + box[3] / 2);
+		context.getInput().scroll(1);
+		context.waitTick();
+		check(Math.abs(cps.scale.get() - 1.05) < 0.001, "mouse wheel did not grow the element: " + cps.scale.get());
+
+		// Griff unten rechts ziehen: doppelte Breite = doppelte Größe
+		box = context.computeOnClient(c -> guiBox(c, cps));
+		double before = cps.scale.get();
+		moveTo(context, box[0] + box[2] - 2, box[1] + box[3] - 2);
+		context.getInput().holdMouse(InputConstants.MOUSE_BUTTON_LEFT);
+		context.waitTick();
+		moveTo(context, box[0] + box[2] * 2 - 2, box[1] + box[3] - 2);
+		context.waitTick();
+		context.getInput().releaseMouse(InputConstants.MOUSE_BUTTON_LEFT);
+		context.waitTick();
+		check(cps.scale.get() > before * 1.6, "resize handle did not grow the element: " + before + " -> " + cps.scale.get());
+
+		// Info HUD knapp neben die Bildschirmmitte ziehen: linke Kante rastet auf der Mitte ein
+		int[] infoBox = context.computeOnClient(c -> guiBox(c, info));
+		int center = context.computeOnClient(c -> c.getWindow().getGuiScaledWidth() / 2);
+		moveTo(context, infoBox[0] + 3, infoBox[1] + 3);
+		context.getInput().holdMouse(InputConstants.MOUSE_BUTTON_LEFT);
+		context.waitTick();
+		moveTo(context, center + 2 + 3, infoBox[1] + 3);
+		context.waitTick();
+		context.takeScreenshot("salami-68-hud-editor-snap");
+		context.getInput().releaseMouse(InputConstants.MOUSE_BUTTON_LEFT);
+		context.waitTick();
+		int snappedX = context.computeOnClient(c -> guiBox(c, info)[0]);
+		check(snappedX == center, "element did not snap to the screen center: x=" + snappedX + ", center=" + center);
+
+		// Elementliste und Rechtsklick → Einstellungen des Elements
+		context.runOnClient(c -> HudEditorScreen.showElementList(true));
+		context.waitTicks(2);
+		context.takeScreenshot("salami-69-hud-editor-elements");
+		context.runOnClient(c -> HudEditorScreen.showElementList(false));
+		box = context.computeOnClient(c -> guiBox(c, cps));
+		moveTo(context, box[0] + 3, box[1] + 3);
+		context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_RIGHT);
+		context.waitTick();
+		check(context.computeOnClient(c -> c.screen instanceof ModSettingsScreen), "right click did not open the element settings");
+		context.waitTicks(2);
+		context.takeScreenshot("salami-70-hud-element-settings");
+
+		context.setScreen(() -> null);
+		context.runOnClient(c -> {
+			for (HudModule module : showcase(modules)) {
+				module.resetLayout();
+				modules.setEnabled(module, module.enabledByDefault());
+			}
+		});
+	}
+
+	/** Kasten eines HUD-Elements in GUI-Koordinaten {x, y, Breite, Höhe}. */
+	private static int[] guiBox(Minecraft client, HudModule hud) {
+		int w = client.getWindow().getGuiScaledWidth();
+		int h = client.getWindow().getGuiScaledHeight();
+		float s = hud.effectiveScale();
+		return new int[] {hud.screenX(w), hud.screenY(h), Math.round(hud.boxWidth() * s), Math.round(hud.boxHeight() * s)};
+	}
+
+	/** Maus auf GUI-Koordinaten setzen (wird auf Fensterpixel umgerechnet). */
+	private static void moveTo(ClientGameTestContext context, double guiX, double guiY) {
+		double scale = context.computeOnClient(client -> (double) client.getWindow().getGuiScale());
+		context.getInput().setCursorPos(guiX * scale + scale / 2, guiY * scale + scale / 2);
 	}
 
 	private static void testColorPicker(ClientGameTestContext context, ModuleManager modules) {

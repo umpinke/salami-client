@@ -5,7 +5,6 @@ import dev.salamiclient.module.Category;
 import dev.salamiclient.module.HudModule;
 import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.setting.BoolSetting;
-import dev.salamiclient.theme.Theme;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -13,12 +12,18 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.resources.Identifier;
 
-/** Salami-Logo + Name im HUD (Standard: oben links, verschiebbar im HUD-Editor). */
+/**
+ * Salami-Logo + Name im HUD (Standard: oben links, verschiebbar im HUD-Editor). Schlicht: Name in der
+ * Textfarbe, Version und Slogan nur auf Wunsch.
+ */
 public final class WatermarkModule extends HudModule {
 	static final Identifier LOGO = Identifier.fromNamespaceAndPath(SalamiClient.MOD_ID, "textures/gui/logo.png");
 	static final int LOGO_TEXTURE_SIZE = 64;
+	private static final int LOGO_SIZE = 10;
 
-	private final BoolSetting showVersion = add(new BoolSetting("show_version", true));
+	private final BoolSetting logo = add(new BoolSetting("logo", true));
+	private final BoolSetting showVersion = add(new BoolSetting("version", false));
+	private final BoolSetting tagline = add(new BoolSetting("tagline", false));
 
 	public WatermarkModule() {
 		super("watermark", Category.HUD, true, 0.005, 0.008);
@@ -39,12 +44,16 @@ public final class WatermarkModule extends HudModule {
 		if (showVersion.isOn()) {
 			text.append(SalamiClient.version());
 		}
-		if (SalamiClient.get().theme().isSalami()) {
+		if (tagline.isOn() && SalamiClient.get().theme().isSalami()) {
 			text.append("  ").append(I18n.get("salami.theme.tagline"));
 		}
 		rest = text.toString().trim();
 		nameWidth = mc().font.width(SalamiClient.NAME);
-		width = 15 + nameWidth + (rest.isEmpty() ? 0 : 4 + mc().font.width(rest));
+		width = textX() + nameWidth - 1 + (rest.isEmpty() ? 0 : 5 + mc().font.width(rest));
+	}
+
+	private int textX() {
+		return logo.isOn() ? LOGO_SIZE + 4 : 0;
 	}
 
 	@Override
@@ -57,22 +66,24 @@ public final class WatermarkModule extends HudModule {
 
 	@Override
 	public int height() {
-		return 12;
+		return LOGO_SIZE;
 	}
 
 	@Override
 	protected void render(GuiGraphics graphics, DeltaTracker delta) {
 		Font font = mc().font;
-		graphics.blit(RenderPipelines.GUI_TEXTURED, LOGO, 0, 0, 0f, 0f, 12, 12,
-			LOGO_TEXTURE_SIZE, LOGO_TEXTURE_SIZE, LOGO_TEXTURE_SIZE, LOGO_TEXTURE_SIZE);
 		if (rest == null) {
 			updateText();
 		}
-		int x = 15;
-		GuiDraw.text(graphics, font, SalamiClient.NAME, x, 2, accentColor(), shadow());
+		if (logo.isOn()) {
+			graphics.blit(RenderPipelines.GUI_TEXTURED, LOGO, 0, 0, 0f, 0f, LOGO_SIZE, LOGO_SIZE,
+				LOGO_TEXTURE_SIZE, LOGO_TEXTURE_SIZE, LOGO_TEXTURE_SIZE, LOGO_TEXTURE_SIZE);
+		}
+		int x = textX();
+		GuiDraw.text(graphics, font, SalamiClient.NAME, x, 1, textColor(), shadow());
 		x += nameWidth + 4;
 		if (!rest.isEmpty()) {
-			GuiDraw.text(graphics, font, rest, x, 2, dimColor(), shadow());
+			GuiDraw.text(graphics, font, rest, x, 1, labelColor(), shadow());
 		}
 	}
 }

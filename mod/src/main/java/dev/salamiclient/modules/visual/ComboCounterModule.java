@@ -1,12 +1,10 @@
 package dev.salamiclient.modules.visual;
 
-import dev.salamiclient.SalamiClient;
 import dev.salamiclient.module.AttackListener;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.HudModule;
 import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.setting.NumberSetting;
-import dev.salamiclient.theme.Theme;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.resources.language.I18n;
@@ -70,7 +68,7 @@ public final class ComboCounterModule extends HudModule implements AttackListene
 		if (shownCombo != combo) {
 			shownCombo = combo;
 			text = I18n.get("salami.module.combo_counter.label", Math.max(combo, 0));
-			width = mc().font.width(text) + 2;
+			width = mc().font.width(text) - 1;
 		}
 		return text;
 	}
@@ -83,13 +81,12 @@ public final class ComboCounterModule extends HudModule implements AttackListene
 
 	@Override
 	public int height() {
-		return 10;
+		return 8;
 	}
 
 	@Override
 	protected void render(GuiGraphics graphics, DeltaTracker delta) {
-		Theme theme = SalamiClient.get().theme();
-		int color = combo >= 5 ? theme.warning() : accentColor();
+		int color = combo >= 5 ? accentColor() : textColor();
 		GuiDraw.text(graphics, mc().font, text(), 0, 0, color, shadow());
 	}
 }

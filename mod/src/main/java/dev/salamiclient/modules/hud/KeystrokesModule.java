@@ -1,53 +1,71 @@
 package dev.salamiclient.modules.hud;
 
-import dev.salamiclient.SalamiClient;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.HudModule;
 import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.setting.BoolSetting;
 import dev.salamiclient.setting.ColorSetting;
-import dev.salamiclient.theme.Theme;
+import dev.salamiclient.setting.NumberSetting;
 import dev.salamiclient.util.ClickTracker;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.GuiGraphics;
 
-/** Keystrokes: zeigt WASD, Maustasten (mit CPS) und Leertaste – gedrückte Tasten leuchten. */
+/**
+ * Keystrokes: zeigt WASD, Maustasten (mit CPS) und Leertaste. Tasten sind Flächen im HUD-Stil;
+ * gedrückte Tasten werden hell (oder in der eigenen Farbe) und blenden weich wieder aus.
+ */
 public final class KeystrokesModule extends HudModule {
-	private static final int KEY = 22;
-	private static final int GAP = 2;
-	private static final int WIDTH = KEY * 3 + GAP * 2;
-	private static final int MOUSE_WIDTH = (WIDTH - GAP) / 2;
-	private static final int SPACE_HEIGHT = 10;
-
+	private final NumberSetting keySize = add(new NumberSetting("key_size", 22, 16, 32, 1));
+	private final NumberSetting gap = add(new NumberSetting("gap", 2, 0, 6, 1));
 	private final BoolSetting mouse = add(new BoolSetting("mouse", true));
 	private final BoolSetting cps = add(new BoolSetting("show_cps", true));
 	private final BoolSetting space = add(new BoolSetting("space", true));
+	private final BoolSetting fade = add(new BoolSetting("fade", true));
 	private final BoolSetting customPressed = add(new BoolSetting("custom_pressed", false));
 	private final ColorSetting pressedColor = add(new ColorSetting("pressed_color", 0xE0B23A3A));
 	private final ColorSetting pressedText = add(new ColorSetting("pressed_text_color", 0xFF000000));
 
 	{
 		pressedColor.showIf(customPressed::isOn);
+		pressedText.showIf(customPressed::isOn);
 	}
+
+	/** Reihenfolge der Tasten: W, A, S, D, linke und rechte Maustaste, Leertaste. */
+	private static final int KEYS = 7;
+	/** Wie weit jede Taste gerade „gedrückt“ aussieht (0..1) – für das weiche Ausblenden. */
+	private final float[] glow = new float[KEYS];
+	private long lastFrameNanos;
 
 	public KeystrokesModule() {
 		super("keystrokes", Category.HUD, false, 0.99, 0.30);
 	}
 
+	private int key() {
+		return keySize.intValue();
+	}
+
+	private int gapPx() {
+		return gap.intValue();
+	}
+
 	@Override
 	public int width() {
-		return WIDTH;
+		return key() * 3 + gapPx() * 2;
+	}
+
+	private int spaceHeight() {
+		return Math.max(8, Math.round(key() * 0.45F));
 	}
 
 	@Override
 	public int height() {
-		int h = KEY * 2 + GAP;
+		int h = key() * 2 + gapPx();
 		if (mouse.isOn()) {
-			h += GAP + KEY;
+			h += gapPx() + key();
 		}
 		if (space.isOn()) {
-			h += GAP + SPACE_HEIGHT;
+			h += gapPx() + spaceHeight();
 		}
 		return h;
 	}
@@ -80,63 +98,105 @@ public final class KeystrokesModule extends HudModule {
 		if (labels[0] == null) {
 			onTick(); // HUD-Editor-Vorschau ohne Welt: noch kein Tick gelaufen
 		}
+		long now = System.nanoTime();
+		// Ausblenden in ~120 ms; Einblenden sofort, damit kein Tastendruck verzögert wirkt
+		float step = lastFrameNanos == 0 ? 1F : Math.min(1F, (now - lastFrameNanos) / 120_000_000F);
+		lastFrameNanos = now;
+
 		var options = mc().options;
-		key(g, options.keyUp, 0, KEY + GAP, 0, KEY, KEY, null, 0);
-		int row2 = KEY + GAP;
-		key(g, options.keyLeft, 1, 0, row2, KEY, KEY, null, 0);
-		key(g, options.keyDown, 2, KEY + GAP, row2, KEY, KEY, null, 0);
-		key(g, options.keyRight, 3, (KEY + GAP) * 2, row2, KEY, KEY, null, 0);
-		int y = row2 + KEY + GAP;
+		int key = key();
+		int gap = gapPx();
+		int width = width();
+		key(g, options.keyUp, 0, key + gap, 0, key, key, null, 0, step);
+		int row2 = key + gap;
+		key(g, options.keyLeft, 1, 0, row2, key, key, null, 0, step);
+		key(g, options.keyDown, 2, key + gap, row2, key, key, null, 0, step);
+		key(g, options.keyRight, 3, (key + gap) * 2, row2, key, key, null, 0, step);
+		int y = row2 + key + gap;
 		if (mouse.isOn()) {
-			key(g, options.keyAttack, 4, 0, y, MOUSE_WIDTH, KEY, leftCps, leftCpsWidth);
-			key(g, options.keyUse, 5, WIDTH - MOUSE_WIDTH, y, MOUSE_WIDTH, KEY, rightCps, rightCpsWidth);
-			y += KEY + GAP;
+			int mouseWidth = (width - gap) / 2;
+			key(g, options.keyAttack, 4, 0, y, mouseWidth, key, leftCps, leftCpsWidth, step);
+			key(g, options.keyUse, 5, width - mouseWidth, y, mouseWidth, key, rightCps, rightCpsWidth, step);
+			y += key + gap;
 		}
 		if (space.isOn()) {
-			boolean down = options.keyJump.isDown();
-			g.fill(0, y, WIDTH, y + SPACE_HEIGHT, down ? pressed() : backgroundColor());
-			int barY = y + SPACE_HEIGHT / 2;
-			g.fill(WIDTH / 2 - 12, barY, WIDTH / 2 + 12, barY + 1, down ? pressedText.argb() : textColor());
+			int h = spaceHeight();
+			float t = press(6, options.keyJump.isDown(), step);
+			surface(g, 0, y, width, h, t);
+			int barY = y + h / 2;
+			int barColor = blend(textColor(), pressedTextColor(), t);
+			GuiDraw.rounded(g, width / 2 - 12, barY, 24, 1, 0, barColor);
 		}
 	}
 
-	private void key(GuiGraphics g, KeyMapping mapping, int index, int x, int y, int w, int h, String sub, int subWidth) {
-		boolean down = mapping.isDown();
-		g.fill(x, y, x + w, y + h, down ? pressed() : backgroundColor());
+	private float press(int index, boolean down, float step) {
+		if (down || !fade.isOn()) {
+			glow[index] = down ? 1F : 0F;
+		} else {
+			glow[index] = Math.max(0F, glow[index] - step);
+		}
+		return glow[index];
+	}
+
+	private void key(GuiGraphics g, KeyMapping mapping, int index, int x, int y, int w, int h, String sub, int subWidth, float step) {
+		float t = press(index, mapping.isDown(), step);
+		surface(g, x, y, w, h, t);
 		String label = labels[index];
 		int labelX = x + (w - labelWidths[index]) / 2;
-		int color = down ? pressedText.argb() : textColor();
+		int color = blend(textColor(), pressedTextColor(), t);
+		boolean textShadow = shadow() && t < 0.5F;
 		var font = mc().font;
 		if (sub == null) {
-			GuiDraw.text(g, font, label, labelX, y + (h - 8) / 2, color, shadow() && !down);
+			GuiDraw.text(g, font, label, labelX, y + (h - 8) / 2, color, textShadow);
 		} else {
-			GuiDraw.text(g, font, label, labelX, y + 3, color, shadow() && !down);
+			int labelY = y + Math.max(2, (h - 14) / 2);
+			GuiDraw.text(g, font, label, labelX, labelY, color, textShadow);
 			g.pose().pushMatrix();
-			g.pose().translate(x + w / 2f, y + 13);
+			g.pose().translate(x + w / 2f, labelY + 10);
 			g.pose().scale(0.5f, 0.5f);
-			GuiDraw.text(g, font, sub, -subWidth / 2, 0, color, false);
+			GuiDraw.text(g, font, sub, -subWidth / 2, 0, GuiDraw.fade(color, 0.8F), false);
 			g.pose().popMatrix();
 		}
 	}
 
-	/** Gedrückte Taste: eigene Farbe oder Akzentfarbe mit etwas Transparenz. */
-	private int pressed() {
-		return customPressed.isOn() ? pressedColor.argb() : (accentColor() & 0x00FFFFFF) | 0xE0000000;
+	/** Tastenfläche: Hintergrund im HUD-Stil, beim Drücken zur Druckfarbe überblendet. */
+	private void surface(GuiGraphics g, int x, int y, int w, int h, float t) {
+		int base = backgroundColor();
+		if (base == 0) {
+			base = 0x30000000; // Stil ohne Hintergrund: Tasten trotzdem leicht andeuten
+		}
+		panel(g, x, y, w, h, t <= 0F ? base : blend(base, pressedColor(), t));
 	}
 
-	@Override
-	protected boolean defaultBackground() {
-		return true; // Hintergrund der nicht gedrückten Tasten
+	/** Gedrückte Taste: eigene Farbe oder hell in der Textfarbe. */
+	private int pressedColor() {
+		return customPressed.isOn() ? pressedColor.argb() : (textColor() & 0x00FFFFFF) | 0xE6000000;
+	}
+
+	private int pressedTextColor() {
+		return customPressed.isOn() ? pressedText.argb() : GuiDraw.textOn(pressedColor());
+	}
+
+	/** Lineare Überblendung zweier ARGB-Farben (t = 0: a, t = 1: b). */
+	private static int blend(int a, int b, float t) {
+		if (t <= 0F) {
+			return a;
+		}
+		if (t >= 1F) {
+			return b;
+		}
+		int result = 0;
+		for (int shift = 0; shift <= 24; shift += 8) {
+			int ca = (a >>> shift) & 0xFF;
+			int cb = (b >>> shift) & 0xFF;
+			result |= Math.round(ca + (cb - ca) * t) << shift;
+		}
+		return result;
 	}
 
 	@Override
 	protected boolean drawsOwnBackground() {
 		return true;
-	}
-
-	@Override
-	protected boolean defaultShadow() {
-		return false;
 	}
 
 	/** „W“, „LMB“, „RMB“ – lange Namen (z. B. „Linke Maustaste“) werden gekürzt. */

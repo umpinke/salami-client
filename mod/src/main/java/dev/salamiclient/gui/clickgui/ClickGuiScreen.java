@@ -405,12 +405,12 @@ public final class ClickGuiScreen extends Screen {
 		int left = panel.x + 1;
 		int right = panel.x + PANEL_WIDTH - 1;
 		boolean on = module.isEnabled();
-		if (on) {
-			g.fill(left, row.y(), right, row.y() + row.height(), theme.enabledRow());
-			g.fill(left, row.y(), left + 2, row.y() + row.height(), theme.accent());
-		}
 		if (hovered) {
-			g.fill(left, row.y(), right, row.y() + row.height(), theme.hover());
+			GuiDraw.rounded(g, left + 2, row.y() + 1, right - left - 4, row.height() - 2, 3, theme.hover());
+		}
+		if (on) {
+			// schmaler Akzent-Strich statt eingefärbter Zeile
+			GuiDraw.rounded(g, left + 2, row.y() + 3, 2, row.height() - 6, 1, theme.accent());
 		}
 		boolean hasSettings = false;
 		for (Setting<?> setting : module.settings()) {

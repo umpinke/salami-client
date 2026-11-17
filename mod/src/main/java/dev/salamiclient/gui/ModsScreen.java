@@ -397,22 +397,15 @@ public final class ModsScreen extends Screen {
 		}
 	}
 
-	/** Kartenfläche: Rahmen und Füllung mit abgeschrägten Ecken; eingeschaltet mit Akzentstreifen oben. */
+	/** Kartenfläche: ruhige, weich abgerundete Fläche; eingeschaltet mit feinem Rand in der Akzentfarbe. */
 	private void renderCardBase(GuiGraphics g, Theme theme, Card card, boolean hovered, boolean on) {
 		int x = card.x();
 		int y = card.y();
-		GuiDraw.roundRect(g, x, y, CARD_W, CARD_H, hovered || on ? theme.accent() : theme.outline());
-		GuiDraw.roundRect(g, x + 1, y + 1, CARD_W - 2, CARD_H - 2, 0xFF120F10);
-		if (on) {
-			g.fill(x + 1, y + 1, x + CARD_W - 1, y + CARD_H - 1, theme.enabledRow());
-			g.fill(x + 2, y + 1, x + CARD_W - 2, y + 3, theme.accent());
-		}
+		GuiDraw.rounded(g, x, y, CARD_W, CARD_H, 4, 0xFF120F10);
 		if (hovered) {
-			g.fill(x + 1, y + 1, x + CARD_W - 1, y + CARD_H - 1, theme.hover());
+			GuiDraw.rounded(g, x, y, CARD_W, CARD_H, 4, theme.hover());
 		}
-		// blasse Platznummer oben rechts, wie in der Mod-Liste des Launchers
-		String number = String.format(Locale.ROOT, "%02d", card.index() + 1);
-		GuiDraw.text(g, font, number, x + CARD_W - 6 - font.width(number), y + 7, 0x30FFFFFF, false);
+		GuiDraw.roundedOutline(g, x, y, CARD_W, CARD_H, 4, on ? GuiDraw.fade(theme.accent(), 0.85F) : hovered ? 0x40FFFFFF : theme.outline());
 	}
 
 	private void renderDescription(GuiGraphics g, Theme theme, String key, int x, int y) {

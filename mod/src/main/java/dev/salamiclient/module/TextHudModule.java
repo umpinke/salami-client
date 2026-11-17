@@ -1,14 +1,22 @@
 package dev.salamiclient.module;
 
 import dev.salamiclient.render.GuiDraw;
+import dev.salamiclient.setting.BoolSetting;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.GuiGraphics;
 
 /**
- * Einzeilige HUD-Anzeige „Bezeichnung: Wert“ im einheitlichen Salami-Look (wie CPS und Reach).
- * Text und Breite werden pro Tick berechnet, nicht pro Frame.
+ * Einzeilige HUD-Anzeige „Bezeichnung Wert“ im einheitlichen Salami-Look: ruhige Bezeichnung,
+ * heller Wert, Innenabstand schon in der Breite. Text und Breite werden pro Tick berechnet,
+ * nicht pro Frame.
  */
 public abstract class TextHudModule extends HudModule {
+	/** Innenabstand links/rechts und oben. */
+	protected static final int PAD_X = 5;
+	protected static final int PAD_Y = 3;
+
+	private final BoolSetting showLabel = add(new BoolSetting("show_label", true));
+
 	private String prefix = "";
 	private String value;
 	private int prefixWidth;
@@ -19,13 +27,8 @@ public abstract class TextHudModule extends HudModule {
 	}
 
 	@Override
-	protected boolean defaultBackground() {
-		return true;
-	}
-
-	@Override
-	protected int backgroundPadding() {
-		return 0; // Rand ist schon in der Breite enthalten
+	protected boolean padded() {
+		return false; // Rand ist schon in der Breite enthalten
 	}
 
 	/** Bezeichnung (bereits übersetzt) oder leer. */
@@ -36,11 +39,11 @@ public abstract class TextHudModule extends HudModule {
 
 	@Override
 	public void onTick() {
-		String label = label();
-		prefix = label.isEmpty() ? "" : label + ": ";
+		String label = showLabel.isOn() ? label() : "";
+		prefix = label.isEmpty() ? "" : label + "  ";
 		value = value();
 		prefixWidth = mc().font.width(prefix);
-		width = prefixWidth + mc().font.width(value == null ? "-" : value) + 8;
+		width = prefixWidth + mc().font.width(value == null ? "-" : value) + 2 * PAD_X - 1;
 	}
 
 	@Override
@@ -60,7 +63,7 @@ public abstract class TextHudModule extends HudModule {
 
 	@Override
 	protected void render(GuiGraphics graphics, DeltaTracker delta) {
-		GuiDraw.text(graphics, mc().font, prefix, 4, 3, accentColor(), shadow());
-		GuiDraw.text(graphics, mc().font, value == null ? "-" : value, 4 + prefixWidth, 3, textColor(), shadow());
+		GuiDraw.text(graphics, mc().font, prefix, PAD_X, PAD_Y, labelColor(), shadow());
+		GuiDraw.text(graphics, mc().font, value == null ? "-" : value, PAD_X + prefixWidth, PAD_Y, textColor(), shadow());
 	}
 }

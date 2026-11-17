@@ -1,12 +1,8 @@
 package dev.salamiclient.modules.hud;
 
 import dev.salamiclient.module.AttackListener;
-import dev.salamiclient.module.Category;
-import dev.salamiclient.module.HudModule;
-import dev.salamiclient.render.GuiDraw;
+import dev.salamiclient.module.TextHudModule;
 import dev.salamiclient.setting.NumberSetting;
-import net.minecraft.client.DeltaTracker;
-import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
@@ -14,16 +10,14 @@ import net.minecraft.world.phys.Vec3;
 import java.util.Locale;
 
 /** Reach Display: Abstand deines letzten Treffers (Augen bis Hitbox des Ziels) in Blöcken. */
-public final class ReachDisplayModule extends HudModule implements AttackListener {
+public final class ReachDisplayModule extends TextHudModule implements AttackListener {
 	private final NumberSetting showSeconds = add(new NumberSetting("show_seconds", 3, 1, 10, 0.5));
 
 	private double lastReach = -1;
 	private long lastHitMillis;
-	private String text = "";
-	private int width = 40;
 
 	public ReachDisplayModule() {
-		super("reach_display", Category.HUD, false, 0.005, 0.25);
+		super("reach_display", 0.005, 0.25);
 	}
 
 	@Override
@@ -43,35 +37,13 @@ public final class ReachDisplayModule extends HudModule implements AttackListene
 	}
 
 	@Override
-	public void onTick() {
+	protected String label() {
+		return I18n.get("salami.module.reach_display.short");
+	}
+
+	@Override
+	protected String value() {
 		boolean recent = lastReach >= 0 && System.currentTimeMillis() - lastHitMillis <= showSeconds.get() * 1000;
-		String value = recent ? String.format(Locale.ROOT, "%.2f", lastReach) : "-";
-		text = I18n.get("salami.module.reach_display.label", value);
-		width = mc().font.width(text) + 8;
-	}
-
-	@Override
-	public int width() {
-		return width;
-	}
-
-	@Override
-	public int height() {
-		return 14;
-	}
-
-	@Override
-	protected void render(GuiGraphics graphics, DeltaTracker delta) {
-		GuiDraw.text(graphics, mc().font, text, 4, 3, textColor(), shadow());
-	}
-
-	@Override
-	protected boolean defaultBackground() {
-		return true;
-	}
-
-	@Override
-	protected int backgroundPadding() {
-		return 0; // Rand ist schon in der Breite enthalten
+		return recent ? String.format(Locale.ROOT, "%.2f", lastReach) : "-";
 	}
 }

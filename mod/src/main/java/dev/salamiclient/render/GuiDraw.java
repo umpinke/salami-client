@@ -1,8 +1,11 @@
 package dev.salamiclient.render;
 
+import dev.salamiclient.SalamiClient;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.item.ItemStack;
 
@@ -80,15 +83,58 @@ public final class GuiDraw {
 		/*g.submitOutline(x, y, width, height, color);*/
 	}
 
-	/** Rechteck mit um 1 Pixel abgeschrägten Ecken – wirkt bei GUI-Skalierung wie abgerundet. */
-	public static void roundRect(GuiGraphics g, int x, int y, int width, int height, int color) {
-		if (width < 3 || height < 3) {
-			g.fill(x, y, x + width, y + height, color);
+	/** Größter Eckenradius, für den es Sprites gibt ({@code textures/gui/sprites/hud/round_N}). */
+	public static final int MAX_RADIUS = 6;
+	private static final Identifier[] ROUND = new Identifier[MAX_RADIUS + 1];
+	private static final Identifier[] RING = new Identifier[MAX_RADIUS + 1];
+
+	static {
+		for (int r = 0; r <= MAX_RADIUS; r++) {
+			if (r > 0) {
+				ROUND[r] = Identifier.fromNamespaceAndPath(SalamiClient.MOD_ID, "hud/round_" + r);
+			}
+			RING[r] = Identifier.fromNamespaceAndPath(SalamiClient.MOD_ID, "hud/ring_" + r);
+		}
+	}
+
+	/** Radius, der in die Fläche passt (halbe kürzere Seite, höchstens {@link #MAX_RADIUS}). */
+	private static int fitRadius(int radius, int width, int height) {
+		return Math.max(0, Math.min(Math.min(radius, MAX_RADIUS), Math.min(width, height) / 2));
+	}
+
+	/**
+	 * Fläche mit glatt abgerundeten Ecken (kantengeglättetes Nine-Slice-Sprite, eingefärbt mit
+	 * {@code color} samt Deckkraft). Radius 0 ist ein normales Rechteck.
+	 */
+	public static void rounded(GuiGraphics g, int x, int y, int width, int height, int radius, int color) {
+		if (width <= 0 || height <= 0 || (color >>> 24) == 0) {
 			return;
 		}
-		g.fill(x + 1, y, x + width - 1, y + 1, color);
-		g.fill(x, y + 1, x + width, y + height - 1, color);
-		g.fill(x + 1, y + height - 1, x + width - 1, y + height, color);
+		int r = fitRadius(radius, width, height);
+		if (r == 0) {
+			g.fill(x, y, x + width, y + height, color);
+		} else {
+			g.blitSprite(RenderPipelines.GUI_TEXTURED, ROUND[r], x, y, width, height, color);
+		}
+	}
+
+	/** Feiner Rand (halber GUI-Pixel) um eine Fläche mit abgerundeten Ecken – passt zu {@link #rounded}. */
+	public static void roundedOutline(GuiGraphics g, int x, int y, int width, int height, int radius, int color) {
+		if (width <= 1 || height <= 1 || (color >>> 24) == 0) {
+			return;
+		}
+		g.blitSprite(RenderPipelines.GUI_TEXTURED, RING[fitRadius(radius, width, height)], x, y, width, height, color);
+	}
+
+	/** Rechteck mit weich abgerundeten Ecken (Radius 3) – für Knöpfe, Karten und Fenster der Menüs. */
+	public static void roundRect(GuiGraphics g, int x, int y, int width, int height, int color) {
+		rounded(g, x, y, width, height, 3, color);
+	}
+
+	/** Farbe mit anderer Deckkraft (0..1 der bisherigen). */
+	public static int fade(int argb, float factor) {
+		int alpha = Math.round((argb >>> 24) * Math.max(0F, Math.min(1F, factor)));
+		return (argb & 0x00FFFFFF) | (alpha << 24);
 	}
 
 	/** Gut lesbare Textfarbe (dunkel oder hell) auf einer deckenden Fläche. */
