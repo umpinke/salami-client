@@ -8,12 +8,12 @@ import "../salami-capes/i18n";
 
 type CosmeticsSection = "capes";
 
-/** Bereiche der Cosmetics-Seite – vorerst nur Capes, weitere kommen als eigener Reiter dazu. */
+/** Bereiche der Shop-Seite – vorerst nur Capes, weitere kommen als eigener Reiter dazu. */
 const SECTIONS: { id: CosmeticsSection; icon: string; labelKey: string }[] = [
   { id: "capes", icon: "solar:hanger-2-bold", labelKey: "salami.cosmetics.tab.capes" },
 ];
 
-/** Cosmetics: Reiter oben, darunter der gewählte Bereich (Capes anlegen, hochladen, zeichnen). */
+/** Shop (früher „Cosmetics“): Reiter oben, darunter der gewählte Bereich (Capes anlegen, hochladen, zeichnen). */
 export function CosmeticsTab() {
   const { t } = useTranslation();
   const accent = useThemeStore((s) => s.accentColor);

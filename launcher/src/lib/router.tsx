@@ -65,7 +65,7 @@ export const router = createHashRouter([
       },
       {
         path: "capes",
-        // Cosmetics: vorerst nur der Reiter Capes
+        // Shop (früher „Cosmetics“): vorerst nur der Reiter Capes
         element: <CosmeticsTab />,
       },
       {
