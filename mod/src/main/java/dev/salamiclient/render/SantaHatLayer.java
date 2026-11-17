@@ -38,11 +38,11 @@ public final class SantaHatLayer extends RenderLayer<AvatarRenderState, PlayerMo
 	/*private static final RenderType TYPE = RenderType.entityCutout(TEXTURE);*/
 
 	/** Größe gegenüber dem Modell in Spieler-Pixeln – eine kleine Mütze. */
-	private static final float SCALE = 0.5f;
-	/** So weit (in Spieler-Pixeln) schwebt die Krempe über der Schulter. */
-	private static final float FLOAT = 2f;
+	private static final float SCALE = 0.35f;
+	/** So weit (in Spieler-Pixeln) schwebt die Krempe über der Schulter; sie wippt darum knapp einen Pixel auf und ab. */
+	private static final float FLOAT = 1f;
 	/** Abstand von der Körpermitte (in Spieler-Pixeln): über der Außenkante der Schulter, frei vom Kopf. */
-	private static final float SHOULDER_X = 8f;
+	private static final float SHOULDER_X = 6.5f;
 
 	private final ModelPart left = build(true);
 	private final ModelPart right = build(false);
@@ -81,9 +81,9 @@ public final class SantaHatLayer extends RenderLayer<AvatarRenderState, PlayerMo
 			return;
 		}
 		float side = leftFree ? 1f : -1f;
-		// sanftes Schweben: etwa alle drei Sekunden auf und ab, langsamer hin und her pendeln
-		float bob = (float) Math.sin(state.ageInTicks * 0.1f) * 0.6f;
-		float sway = (float) Math.sin(state.ageInTicks * 0.07f) * 0.25f;
+		// sanftes Schweben: etwa alle drei Sekunden knapp einen Pixel auf und ab, langsam ein wenig pendeln
+		float bob = (float) Math.sin(state.ageInTicks * 0.1f) * 0.4f;
+		float sway = (float) Math.sin(state.ageInTicks * 0.07f) * 0.15f;
 		poseStack.pushPose();
 		getParentModel().body.translateAndRotate(poseStack);
 		poseStack.translate(side * SHOULDER_X / 16f, (-FLOAT - bob) / 16f, 0f);
