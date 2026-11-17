@@ -14,6 +14,7 @@ pub mod pack_preview;
 pub mod provenance;
 pub mod salami_app;
 pub mod salami_capes;
+pub mod salami_friends;
 pub mod salami_packs;
 pub mod unified_mod;
 

@@ -798,8 +798,9 @@ const server = createServer((req, res) => {
   });
 });
 
-// Uploads bis ~6 MiB brauchen etwas Zeit, hängende Verbindungen trotzdem nicht ewig offen halten.
-server.requestTimeout = 30_000;
+// Clips im Freunde-Chat sind bis zu 50 MB groß und brauchen bei langsamer Leitung ein paar Minuten;
+// die Kopfzeilen müssen trotzdem schnell da sein, damit hängende Verbindungen nicht offen bleiben.
+server.requestTimeout = 300_000;
 server.headersTimeout = 10_000;
 server.keepAliveTimeout = 5_000;
 

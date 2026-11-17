@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -63,6 +63,9 @@ async function startServer(port, mojangPort) {
       RATE_PER_MINUTE: "1000",
       FRIENDS_RATE_PER_MINUTE: "10000",
       FRIENDS_OFFLINE_GRACE_MS: String(GRACE_MS),
+      FRIENDS_IMAGE_MB: "1",
+      FRIENDS_CLIP_MB: "1",
+      FRIENDS_MEDIA_QUOTA_MB: "1",
       MAX_STREAMS_PER_IP: "50",
     },
     stdio: ["ignore", "pipe", "inherit"],
@@ -273,7 +276,7 @@ test("Freundesanfrage per Name: unbekannt 404, Groß-/Kleinschreibung egal, able
 
   const view = (await sal.get("/v1/friends")).body;
   assert.equal(view.friends.length, 1);
-  assert.deepEqual(Object.keys(view.friends[0]).sort(), ["name", "online", "since", "uuid"]);
+  assert.deepEqual(Object.keys(view.friends[0]).sort(), ["name", "online", "since", "status", "uuid"]);
   assert.equal(view.friends[0].uuid, pep.uuid);
   assert.equal(view.friends[0].online, false);
   assert.deepEqual(view.outgoing, []);
@@ -366,7 +369,7 @@ test("Live: ready, Anfragen, Freundschaft, Nachrichten an beide Seiten, removed"
     const pepLive = await pep.events();
     opened.push(pepLive);
     assert.deepEqual(await pepLive.next(() => true), { type: "ready" });
-    assert.deepEqual(await salLive.next(presenceOf(pep.uuid)), { type: "presence", uuid: pep.uuid, name: "Pepper_99", online: true });
+    assert.deepEqual(await salLive.next(presenceOf(pep.uuid)), { type: "presence", uuid: pep.uuid, name: "Pepper_99", online: true, status: "game" });
     // online zuerst, dann nach Namen
     const list = (await sal.get("/v1/friends")).body.friends;
     assert.deepEqual(list.map((f) => [f.name, f.online]), [["Pepper_99", true], ["Brotzeit", false]]);
@@ -380,12 +383,12 @@ test("Live: ready, Anfragen, Freundschaft, Nachrichten an beide Seiten, removed"
     const brotLive = await brot.events();
     opened.push(brotLive);
     await brotLive.next(ofType("ready"));
-    assert.deepEqual(await salLive.next(presenceOf(brot.uuid)), { type: "presence", uuid: brot.uuid, name: "Brotzeit", online: true });
+    assert.deepEqual(await salLive.next(presenceOf(brot.uuid)), { type: "presence", uuid: brot.uuid, name: "Brotzeit", online: true, status: "game" });
 
     // annehmen → beide Seiten, mit Online-Status des anderen
     await pep.post("/v1/friends/accept", { uuid: brot.uuid });
-    assert.deepEqual(await pepLive.next(ofType("friends")), { type: "friends", uuid: brot.uuid, name: "Brotzeit", online: true });
-    assert.deepEqual(await brotLive.next(ofType("friends")), { type: "friends", uuid: pep.uuid, name: "Pepper_99", online: true });
+    assert.deepEqual(await pepLive.next(ofType("friends")), { type: "friends", uuid: brot.uuid, name: "Brotzeit", online: true, status: "game" });
+    assert.deepEqual(await brotLive.next(ofType("friends")), { type: "friends", uuid: pep.uuid, name: "Pepper_99", online: true, status: "game" });
     assert.equal(pepLive.events.some(ofType("presence")), false, "vor der Freundschaft kein Online-Status");
 
     // Nachricht: an den Empfänger und an alle Verbindungen des Absenders, sonst niemanden
@@ -432,7 +435,7 @@ test("Live: offline erst nach der Gnadenfrist, kurzes Neuverbinden flackert nich
     pepLive.close();
     await assert.rejects(salLive.next(presenceOf(pep.uuid), GRACE_MS / 2), "noch in der Gnadenfrist");
     assert.equal((await sal.get("/v1/friends")).body.friends.find((f) => f.uuid === pep.uuid).online, true);
-    assert.deepEqual(await salLive.next(presenceOf(pep.uuid)), { type: "presence", uuid: pep.uuid, name: "Pepper_99", online: false });
+    assert.deepEqual(await salLive.next(presenceOf(pep.uuid)), { type: "presence", uuid: pep.uuid, name: "Pepper_99", online: false, status: null });
     assert.ok(Date.now() - closedAt >= GRACE_MS - 50, "offline kam zu früh");
     assert.equal((await sal.get("/v1/friends")).body.friends.find((f) => f.uuid === pep.uuid).online, false);
 
@@ -564,4 +567,161 @@ test("Daten überstehen einen Neustart, Tokens nur als Hash, Altes wird aufgerä
   // neue Nachrichten-IDs bleiben eindeutig
   const { message } = (await brot.post("/v1/friends/messages", { to: sal.uuid, text: "wieder da" })).body;
   assert.ok(history.every((m) => m.id < message.id));
+});
+
+// ------------------------------------------------------------------ Bilder und Clips
+
+const PNG_HEAD = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const MP4_HEAD = Buffer.from([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d]);
+/** Datei mit passendem Anfang und `size` Bytes. */
+const fileOf = (head, size) => Buffer.concat([head, Buffer.alloc(size - head.length, 7)]);
+
+async function upload(p, to, type, bytes, name = "screenshot.png") {
+  const response = await fetch(`${base}/v1/friends/media?to=${to}&name=${encodeURIComponent(name)}`, {
+    method: "POST",
+    headers: { "Content-Type": type, ...(p ? { Authorization: `Bearer ${p.token}` } : {}) },
+    body: bytes,
+  });
+  return { status: response.status, body: await response.json() };
+}
+
+async function download(p, id) {
+  const response = await fetch(`${base}/v1/friends/media/${id}`, { headers: { Authorization: `Bearer ${p.token}` } });
+  return { status: response.status, type: response.headers.get("content-type"), bytes: Buffer.from(await response.arrayBuffer()) };
+}
+
+const mediaFiles = () => readdirSync(join(dataDir, "friends-media"));
+
+test("Bilder und Clips: nur an Freunde, Typ und Größe geprüft, nur die beiden können sie laden", async () => {
+  const kaese = await player("Kaese");
+  const png = fileOf(PNG_HEAD, 2_000);
+
+  assert.equal((await upload(null, pep.uuid, "image/png", png)).status, 401);
+  assert.deepEqual(await upload(kaese, sal.uuid, "image/png", png), { status: 403, body: { error: "ihr seid keine Freunde" } });
+  assert.equal((await upload(sal, "kein-uuid", "image/png", png)).status, 400);
+  assert.deepEqual(await upload(sal, pep.uuid, "application/zip", png), { status: 415, body: { error: "nur PNG, JPEG, WebP, MP4 und WebM" } });
+  assert.deepEqual(await upload(sal, pep.uuid, "image/jpeg", png), {
+    status: 400,
+    body: { error: "die Datei passt nicht zum angegebenen Typ" },
+  });
+  // im Test ist 1 MB die Grenze
+  const big = await upload(sal, pep.uuid, "image/png", fileOf(PNG_HEAD, 1024 * 1024 + 1));
+  assert.deepEqual(big, { status: 413, body: { error: "Bild ist zu groß (höchstens 1 MB)" } });
+  assert.deepEqual(mediaFiles(), [], "abgelehnte Uploads hinterlassen keine Dateien");
+
+  const pepLive = await pep.events();
+  try {
+    await pepLive.next(ofType("ready"));
+    const sent = await upload(sal, pep.uuid, "image/png", png, "..\\mein §bild.png");
+    assert.equal(sent.status, 200);
+    const { message } = sent.body;
+    assert.deepEqual(Object.keys(message).sort(), ["at", "from", "id", "media", "text", "to"]);
+    assert.match(message.media.id, /^[0-9a-f]{32}$/);
+    assert.deepEqual(message.media, { id: message.media.id, kind: "image", mime: "image/png", size: 2_000, name: "..mein bild.png" });
+    assert.equal(message.text, "[Bild] ..mein bild.png", "Text für Clients ohne Anhänge");
+    assert.deepEqual(await pepLive.next(ofType("message")), { type: "message", message, name: "Salamander" });
+    assert.equal((await pep.get("/v1/friends")).body.unread[sal.uuid], 1);
+
+    for (const p of [sal, pep]) {
+      const got = await download(p, message.media.id);
+      assert.equal(got.status, 200);
+      assert.equal(got.type, "image/png");
+      assert.ok(got.bytes.equals(png));
+    }
+    assert.equal((await download(brot, message.media.id)).status, 404, "Freund von Salamander, aber nicht im Gespräch");
+    assert.equal((await download(kaese, message.media.id)).status, 404);
+    assert.equal((await fetch(`${base}/v1/friends/media/${message.media.id}`)).status, 401);
+    assert.equal((await download(sal, "0".repeat(32))).status, 404);
+
+    const clip = await upload(pep, sal.uuid, "video/mp4", fileOf(MP4_HEAD, 5_000), "clip.mp4");
+    assert.equal(clip.status, 200);
+    assert.equal(clip.body.message.media.kind, "clip");
+    assert.equal(clip.body.message.text, "[Clip] clip.mp4");
+    assert.deepEqual(mediaFiles().sort(), [`${message.media.id}.png`, `${clip.body.message.media.id}.mp4`].sort());
+
+    // im Verlauf stehen die Anhänge mit drin
+    const history = (await pep.get(`/v1/friends/messages?with=${sal.uuid}`)).body.messages;
+    assert.deepEqual(history.slice(-2).map((m) => m.media?.kind), ["image", "clip"]);
+  } finally {
+    pepLive.close();
+    await sleep(GRACE_MS + 300);
+  }
+});
+
+test("Bilder und Clips: eigenes Kontingent – die ältesten laufen ab, die Nachricht bleibt", async () => {
+  // im Test 1 MB pro Spieler
+  const first = (await upload(brot, sal.uuid, "image/png", fileOf(PNG_HEAD, 600_000), "eins.png")).body.message;
+  assert.equal((await download(sal, first.media.id)).status, 200);
+  const second = (await upload(brot, sal.uuid, "image/png", fileOf(PNG_HEAD, 600_000), "zwei.png")).body.message;
+  assert.equal((await download(sal, first.media.id)).status, 404, "das ältere musste Platz machen");
+  assert.equal((await download(sal, second.media.id)).status, 200);
+  const history = (await sal.get(`/v1/friends/messages?with=${brot.uuid}`)).body.messages;
+  assert.equal(history.find((m) => m.id === first.id).media.expired, true);
+  assert.equal(history.find((m) => m.id === second.id).media.expired, undefined);
+  assert.equal(mediaFiles().includes(`${first.media.id}.png`), false);
+});
+
+test("Online-Status: im Launcher oder im Spiel, das Spiel hat Vorrang", async () => {
+  const live = async (p, query = "") => {
+    const controller = new AbortController();
+    const response = await fetch(`${base}/v1/friends/events${query}`, {
+      headers: { Authorization: `Bearer ${p.token}` },
+      signal: controller.signal,
+    });
+    assert.equal(response.status, 200);
+    response.body.getReader().read().catch(() => {});
+    return () => controller.abort();
+  };
+  const statusOfPep = async () => (await sal.get("/v1/friends")).body.friends.find((f) => f.uuid === pep.uuid).status;
+  const salLive = await sal.events();
+  let closeLauncher = () => {};
+  let closeGame = () => {};
+  try {
+    await salLive.next(ofType("ready"));
+    assert.equal(await statusOfPep(), null);
+
+    closeLauncher = await live(pep, "?client=launcher");
+    assert.deepEqual(await salLive.next(presenceOf(pep.uuid)), {
+      type: "presence", uuid: pep.uuid, name: "Pepper_99", online: true, status: "launcher",
+    });
+    assert.equal(await statusOfPep(), "launcher");
+
+    closeGame = await live(pep);
+    assert.equal((await salLive.next(presenceOf(pep.uuid))).status, "game");
+    assert.equal(await statusOfPep(), "game");
+
+    closeGame();
+    assert.deepEqual(await salLive.next(presenceOf(pep.uuid)), {
+      type: "presence", uuid: pep.uuid, name: "Pepper_99", online: true, status: "launcher",
+    });
+
+    closeLauncher();
+    assert.deepEqual(await salLive.next(presenceOf(pep.uuid)), {
+      type: "presence", uuid: pep.uuid, name: "Pepper_99", online: false, status: null,
+    });
+  } finally {
+    closeLauncher();
+    closeGame();
+    salLive.close();
+    await sleep(GRACE_MS + 300);
+  }
+});
+
+test("Bilder und Clips überstehen einen Neustart; Entfernen löscht sie mit dem Gespräch", async () => {
+  const before = mediaFiles();
+  assert.equal(before.length, 3); // Bild und Clip (Salamander/Pepper), ein Bild von Brotzeit
+  await sleep(700);
+  await stopServer();
+  // eine verwaiste Datei (abgebrochener Upload) verschwindet beim Start
+  writeFileSync(join(dataDir, "friends-media", `${"f".repeat(32)}.part`), "rest");
+  await startServer(serverPort, mojangPort);
+  assert.deepEqual(mediaFiles().sort(), before.sort());
+
+  const history = (await sal.get(`/v1/friends/messages?with=${pep.uuid}`)).body.messages;
+  const image = history.find((m) => m.media?.kind === "image");
+  assert.equal((await download(pep, image.media.id)).status, 200);
+
+  await pep.post("/v1/friends/remove", { uuid: sal.uuid });
+  assert.equal((await download(pep, image.media.id)).status, 404);
+  assert.equal(mediaFiles().length, 1, "nur das Bild von Brotzeit bleibt");
 });

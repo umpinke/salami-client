@@ -394,7 +394,7 @@ fn cape_server_down(e: reqwest::Error) -> AppError {
 /// Anmeldung beim Cape-Server wie beim Betreten eines Minecraft-Servers: der Launcher meldet
 /// eine serverId bei Mojang an, der Cape-Server fragt dort nach. Das Zugangstoken geht nur an
 /// Mojang. → serverId für die eigentliche Anfrage (nur einmal verwendbar)
-async fn authenticate(base: &str, player_id: Uuid, access_token: &str) -> Result<String> {
+pub(crate) async fn authenticate(base: &str, player_id: Uuid, access_token: &str) -> Result<String> {
     let challenge: Challenge = cape_server_json(
         HTTP_CLIENT
             .post(format!("{base}/v1/auth/challenge"))

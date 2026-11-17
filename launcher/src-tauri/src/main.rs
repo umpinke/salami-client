@@ -107,6 +107,13 @@ use commands::salami_app_command::{
     salami_app_status,
 };
 
+// Salami: Freunde und Chat (Liste, Anfragen, Nachrichten, Bilder und Clips)
+use commands::salami_friends_command::{
+    salami_friends_media, salami_friends_messages, salami_friends_overview, salami_friends_read,
+    salami_friends_reconnect, salami_friends_request, salami_friends_respond, salami_friends_send,
+    salami_friends_send_file, salami_friends_set_enabled, salami_friends_state,
+};
+
 // Import vanilla cape commands
 use commands::vanilla_cape_command::{
     get_owned_vanilla_capes, get_currently_equipped_vanilla_cape, equip_vanilla_cape,
@@ -436,6 +443,9 @@ async fn main() {
                 // Salami: anonym beim Online-Zähler melden (Anzeige im Spielen-Tab).
                 utils::online_counter::start(state_init_app_handle.clone());
 
+                // Salami: Freunde – verbindet nur, wenn der Nutzer sie eingeschaltet hat.
+                integrations::salami_friends::start(state_init_app_handle.clone());
+
                 #[cfg(windows)]
                 commands::clip_commands::start_on_launch(state_init_app_handle.clone());
 
@@ -730,6 +740,17 @@ async fn main() {
             salami_capes_gallery_image,
             salami_capes_adopt,
             salami_capes_report,
+            salami_friends_state,
+            salami_friends_set_enabled,
+            salami_friends_reconnect,
+            salami_friends_overview,
+            salami_friends_request,
+            salami_friends_respond,
+            salami_friends_messages,
+            salami_friends_send,
+            salami_friends_read,
+            salami_friends_send_file,
+            salami_friends_media,
             salami_app_status,
             salami_app_pair_code,
             salami_app_devices,

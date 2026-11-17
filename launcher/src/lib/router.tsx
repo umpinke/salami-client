@@ -6,6 +6,7 @@ import ModrinthTabV2 from "../components/tabs/ModrinthTabV2";
 import { SkinsTab } from "../components/tabs/SkinsTab";
 import { CosmeticsTab } from "../components/cosmetics/CosmeticsTab";
 import { ClipsPage } from "../components/tabs/ClipsPage";
+import { FriendsTab } from "../features/friends/FriendsTab";
 import { BrowseTabWrapper } from "../components/profiles/BrowseTabWrapper";
 import { ProfilesTabV2 } from "../components/tabs/ProfilesTabV2";
 import { ProfileDetailViewV2Wrapper } from "../components/profiles/ProfileDetailViewV2Wrapper";
@@ -70,6 +71,10 @@ export const router = createHashRouter([
       {
         path: "clips",
         element: <ClipsPage />,
+      },
+      {
+        path: "friends",
+        element: <FriendsTab />,
       },
     ],
   },

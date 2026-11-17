@@ -1,5 +1,7 @@
 "use client";
 
+import { selectFriendsBadge, useFriendsStore } from "../../features/friends/friends-store";
+import "../../features/friends/i18n";
 import type React from "react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
@@ -80,12 +82,25 @@ export function AppLayout({
     void refreshClips();
   }, [refreshClips]);
 
+  // Freunde: Zustand einmal laden, damit der Zähler auch ohne offenen Reiter stimmt.
+  const initFriends = useFriendsStore((state) => state.init);
+  const friendsBadge = useFriendsStore(selectFriendsBadge);
+  useEffect(() => {
+    void initFriends();
+  }, [initFriends]);
+
   const navItems: TopNavItem[] = [
     { id: "play", icon: "solar:play-bold", label: t("nav.play") },
     { id: "profiles", icon: "solar:user-id-bold", label: t("nav.profiles") },
     { id: "mods", icon: "solar:widget-bold", label: t("nav.mods") },
     { id: "skins", icon: "solar:emoji-funny-circle-bold", label: t("nav.skins") },
     { id: "capes", icon: "solar:hanger-2-bold", label: t("nav.capes") },
+    {
+      id: "friends",
+      icon: "solar:users-group-rounded-bold",
+      // ungelesene Nachrichten und offene Anfragen stehen hinter dem Namen
+      label: friendsBadge > 0 ? `${t("nav.friends")} · ${friendsBadge}` : t("nav.friends"),
+    },
     ...(clipsEnabled
       ? [{ id: "clips", icon: "solar:videocamera-record-bold", label: t("nav.clips") }]
       : []),

@@ -155,9 +155,87 @@ function previewQr(): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n + 4} ${n + 4}" shape-rendering="crispEdges"><rect width="${n + 4}" height="${n + 4}" fill="#fff"/><path d="${path}" fill="#000"/></svg>`;
 }
 
+// ── Freunde und Chat ─────────────────────────────────────────────────────────────
+// /design-preview.html?friends=off zeigt die Einschalt-Seite.
+let friendsEnabled = new URLSearchParams(location.search).get("friends") !== "off";
+const friendsMe = { uuid: "00000000-0000-4000-8000-000000000001", name: "SalamiFan" };
+const friendUuid = (n: number) => `00000000-0000-4000-8000-0000000001${String(n).padStart(2, "0")}`;
+const friendsList = [
+  { uuid: friendUuid(1), name: "killall123", online: true, status: "game", since: "2026-11-10T17:00:00Z" },
+  { uuid: friendUuid(2), name: "Pepper_99", online: true, status: "launcher", since: "2026-11-12T17:00:00Z" },
+  { uuid: friendUuid(3), name: "Brotzeit", online: false, status: null, since: "2026-11-01T17:00:00Z" },
+  { uuid: friendUuid(4), name: "KaeseKoenig", online: false, status: null, since: "2026-10-21T17:00:00Z" },
+];
+let friendsIncoming = [{ uuid: friendUuid(9), name: "Wurstwasser", at: new Date().toISOString() }];
+let friendsOutgoing = [{ uuid: friendUuid(8), name: "Schinken_LP", at: new Date().toISOString() }];
+const friendsUnread: Record<string, number> = { [friendUuid(2)]: 2 };
+let friendMessageId = 100;
+const friendMessage = (from: string, to: string, text: string, minutesAgo: number, media?: Record<string, unknown>) => ({
+  id: (friendMessageId++).toString(16).padStart(12, "0"),
+  from,
+  to,
+  text,
+  at: new Date(Date.now() - minutesAgo * 60_000).toISOString(),
+  ...(media ? { media } : {}),
+});
+const friendsMessages: Record<string, ReturnType<typeof friendMessage>[]> = {
+  [friendUuid(1)]: [
+    friendMessage(friendUuid(1), friendsMe.uuid, "bist du gleich on?", 60 * 26),
+    friendMessage(friendsMe.uuid, friendUuid(1), "ja, 5 min", 60 * 26 - 2),
+    friendMessage(friendUuid(1), friendsMe.uuid, "schau dir den Clip an", 14),
+    friendMessage(friendUuid(1), friendsMe.uuid, "[Clip] clutch.mp4", 13, { id: "a".repeat(32), kind: "clip", mime: "video/mp4", size: 18_400_000, name: "clutch.mp4", expired: true }),
+    friendMessage(friendsMe.uuid, friendUuid(1), "stark! Hier meine neue Base", 9),
+    friendMessage(friendsMe.uuid, friendUuid(1), "[Bild] 2026-11-17_18.02.11.png", 8, { id: "b".repeat(32), kind: "image", mime: "image/png", size: 1_240_000, name: "2026-11-17_18.02.11.png" }),
+    friendMessage(friendUuid(1), friendsMe.uuid, "sieht richtig gut aus", 2),
+  ],
+  [friendUuid(2)]: [
+    friendMessage(friendUuid(2), friendsMe.uuid, "hey", 30),
+    friendMessage(friendUuid(2), friendsMe.uuid, "Lust auf Bedwars?", 29),
+  ],
+};
+
+function friendsMock(cmd: string, a: Record<string, unknown>): unknown {
+  switch (cmd) {
+    case "salami_friends_state":
+      return { available: true, enabled: friendsEnabled, connected: friendsEnabled, signedIn: true };
+    case "salami_friends_set_enabled":
+      friendsEnabled = a.enabled as boolean;
+      return { available: true, enabled: friendsEnabled, connected: friendsEnabled, signedIn: true };
+    case "salami_friends_reconnect":
+      return null;
+    case "salami_friends_overview":
+      return structuredClone({ me: friendsMe, friends: friendsList, incoming: friendsIncoming, outgoing: friendsOutgoing, unread: friendsUnread });
+    case "salami_friends_request":
+      friendsOutgoing = [{ uuid: friendUuid(7), name: a.name as string, at: new Date().toISOString() }, ...friendsOutgoing];
+      return { status: "requested", uuid: friendUuid(7), name: a.name };
+    case "salami_friends_respond":
+      friendsIncoming = friendsIncoming.filter((r) => r.uuid !== a.uuid);
+      friendsOutgoing = friendsOutgoing.filter((r) => r.uuid !== a.uuid);
+      return { status: "none" };
+    case "salami_friends_messages":
+      delete friendsUnread[a.with as string];
+      return { messages: structuredClone(friendsMessages[a.with as string] ?? []) };
+    case "salami_friends_send": {
+      const message = friendMessage(friendsMe.uuid, a.to as string, a.text as string, 0);
+      (friendsMessages[a.to as string] ??= []).push(message);
+      return { message };
+    }
+    case "salami_friends_read":
+      return null;
+    case "salami_friends_send_file":
+      throw new Error("Vorschau: Dateien lassen sich hier nicht verschicken");
+    case "salami_friends_media":
+      // In der Vorschau gibt es kein Asset-Protokoll: das Bild bleibt beim Ladehinweis.
+      return new Promise(() => undefined);
+  }
+  return undefined;
+}
+
 mockWindows("main");
 mockIPC((cmd, args) => {
   const a = (args ?? {}) as Record<string, unknown>;
+  const friendsResult = friendsMock(cmd, a);
+  if (friendsResult !== undefined) return friendsResult;
   switch (cmd) {
     case "salami_app_status":
       return {

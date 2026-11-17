@@ -21,29 +21,31 @@ Benötigt **Node.js 18 oder neuer**. Es gibt keine Abhängigkeiten und kein `npm
 
 ## Freunde und Chat
 
-Salami-Spieler können sich gegenseitig als Freunde hinzufügen, sehen, wer von ihren Freunden gerade spielt, und sich kurze Nachrichten schreiben – im Spiel (salami-core), später vielleicht auch im Launcher. Der Code steckt in `friends.mjs`, die Daten in `friends.json` im Datenordner.
+Salami-Spieler können sich gegenseitig als Freunde hinzufügen, sehen, wer von ihren Freunden gerade spielt, und sich kurze Nachrichten schreiben – im Spiel (salami-core) und im Launcher (Reiter „Freunde“, dort auch mit Bildern und Clips). Der Code steckt in `friends.mjs`, die Daten in `friends.json` im Datenordner.
 
 - **Anmeldung** wie bei den Capes: Challenge holen, bei Mojang anmelden (`joinServer`), dann `POST /v1/friends/session`. Der Server gibt ein zufälliges Token zurück, 30 Tage gültig. Pro Spieler gelten höchstens 5 Tokens (Spiel, Launcher, zweiter PC …), beim sechsten fällt das älteste weg. Gespeichert wird nur der SHA-256 des Tokens: ein Neustart meldet niemanden ab, und wer `friends.json` liest, kann sich damit nicht anmelden. Alle anderen Anfragen schicken `Authorization: Bearer <token>`. Fehlt es oder ist es abgelaufen, kommt `401 {"error":"nicht angemeldet"}` und der Client meldet sich einfach neu an.
 - **Freundesanfragen** gehen per Minecraft-Name (Groß-/Kleinschreibung egal), aber nur an Spieler, die sich schon einmal mit dem Salami Client angemeldet haben. Fragen sich zwei gegenseitig an, sind sie sofort befreundet. Ablehnen und Zurückziehen ist dieselbe Anfrage (`deny`). Offene Anfragen verfallen nach 30 Tagen.
-- **Online** ist, wer mindestens eine Live-Verbindung (`/v1/friends/events`) offen hat. Bricht die letzte ab, wartet der Server 10 s, bevor die Freunde „offline“ sehen – kurzes Neuverbinden flackert also nicht.
+- **Online** ist, wer mindestens eine Live-Verbindung (`/v1/friends/events`) offen hat. Der Launcher verbindet sich mit `?client=launcher`, das Spiel ohne Angabe. Freunde sehen dazu `status`: `"game"` (im Spiel, hat Vorrang) oder `"launcher"`, offline `null`. Ändert sich das (Spiel startet, während der Launcher offen ist), kommt ein weiteres `presence`-Ereignis. Bricht die letzte ab, wartet der Server 10 s, bevor die Freunde „offline“ sehen – kurzes Neuverbinden flackert also nicht.
 - **Nachrichten** gibt es nur zwischen Freunden, 1–256 Zeichen. Steuerzeichen und `§` (Minecraft-Farbcodes) werden entfernt, Leerzeichen am Anfang und Ende abgeschnitten. Jede Nachricht kommt sofort beim Empfänger an und auch auf allen Verbindungen des Absenders (zweiter Client). Ungelesene zählt der Server pro Freund mit, Abrufen des Verlaufs oder `read` setzt den Zähler zurück.
+- **Bilder und Clips** (`POST /v1/friends/media?to=<uuid>&name=<Dateiname>`, Körper = die Datei, `Content-Type` = ihr Typ): PNG, JPEG, WebP bis 10 MB, MP4 und WebM bis 50 MB, nur an Freunde. Der Server prüft Typ und die ersten Bytes, schreibt die Datei nach `friends-media/` im Datenordner und legt eine Nachricht mit `media: { id, kind: "image"|"clip", mime, size, name }` an. Ihr `text` ist `[Bild] <Name>` bzw. `[Clip] <Name>` – das zeigen Clients, die keine Anhänge kennen. Abholen mit `GET /v1/friends/media/<id>` (Token nötig): nur die beiden, zwischen denen die Datei verschickt wurde, alle anderen bekommen 404. Die Datei verschwindet zusammen mit ihrer Nachricht (30 Tage, mehr als 100 Nachrichten, Freundschaft beendet). Jeder Spieler hat 500 MB für seine verschickten Dateien; ist das voll, laufen seine ältesten ab – die Nachricht bleibt und trägt `media.expired: true`. Höchstens 10 Dateien in 10 Minuten pro Spieler, alle Dateien zusammen höchstens 20 GB (danach `507`). Einstellbar: `FRIENDS_IMAGE_MB`, `FRIENDS_CLIP_MB`, `FRIENDS_MEDIA_QUOTA_MB`, `FRIENDS_MEDIA_TOTAL_MB`.
 - **Grenzen**: 100 Freunde pro Spieler, 50 eigene offene Anfragen, 100 offene Anfragen an denselben Spieler, 8 Nachrichten in 10 Sekunden, 5 Live-Verbindungen pro Spieler, 240 Anfragen pro IP und Minute. Die Anmeldung zählt wie die Cape-Anmeldung zu `RATE_PER_MINUTE`, die Live-Verbindungen zusätzlich zu `MAX_STREAMS` und `MAX_STREAMS_PER_IP`.
 - **Datenschutz**:
   - Nachrichten liegen **im Klartext** auf dem Server (`friends.json`), höchstens 30 Tage lang und höchstens die letzten 100 pro Gespräch. Beendet einer die Freundschaft, ist das Gespräch für beide weg.
   - Es gibt keine Admin-API und keine Webseite, um Nachrichten zu lesen, und sie landen nicht im Log. Wer Zugriff auf den Server selbst hat, könnte die Datei aber öffnen.
   - Wer online ist, sehen nur Freunde – auch nicht, wer einem nur eine Anfrage geschickt hat.
   - Gespeichert pro Spieler: UUID, letzter Name, letzte Anmeldung, Freundschaften (seit wann), offene Anfragen, Nachrichten, Ungelesen-Zähler und die Token-Hashes.
-- **nginx**: nichts zu ändern. Der bestehende `location /capes/`-Block (ohne Puffern, 1 h Timeout) trägt auch `/capes/v1/friends/events`.
+  - Bilder und Clips liegen wie die Nachrichten unverschlüsselt auf dem Server (`friends-media/`), höchstens 30 Tage. Abrufen können sie nur Absender und Empfänger. Geprüft oder freigegeben werden sie nicht – anders als Capes sieht sie nur der Freund, an den sie gehen.
+- **nginx**: Der bestehende `location /capes/`-Block (ohne Puffern, 1 h Timeout) trägt auch `/capes/v1/friends/events`. Für Clips braucht er `client_max_body_size 55m;` (bisher 8m, sonst antwortet nginx bei größeren Clips mit 413) und am besten `proxy_request_buffering off;`, damit Uploads direkt durchgereicht werden.
 
 Live-Ereignisse auf `/v1/friends/events` (Token in der `Authorization`-Kopfzeile), je eine Zeile `data: <json>`. Zeilen ohne `data: ` (`retry: 5000`, `: verbunden`, `: ping` alle 20 s) einfach überspringen.
 
 | Ereignis | Wann |
 |---|---|
 | `{"type":"ready"}` | sofort nach dem Verbinden, immer das erste. Danach `GET /v1/friends` für den aktuellen Stand holen |
-| `{"type":"presence","uuid","name","online":true\|false}` | ein Freund kommt online oder geht offline (offline erst nach der Gnadenfrist) |
-| `{"type":"message","message":{"id","from","to","text","at"},"name":"<Absender>"}` | neue Nachricht – beim Empfänger und auf allen Verbindungen des Absenders, auch der, die sie geschickt hat (doppelte per `id` erkennen) |
+| `{"type":"presence","uuid","name","online":true\|false,"status":"game"\|"launcher"\|null}` | ein Freund kommt online, wechselt zwischen Launcher und Spiel oder geht offline (offline erst nach der Gnadenfrist) |
+| `{"type":"message","message":{"id","from","to","text","at","media"?},"name":"<Absender>"}` | neue Nachricht – beim Empfänger und auf allen Verbindungen des Absenders, auch der, die sie geschickt hat (doppelte per `id` erkennen) |
 | `{"type":"request","uuid","name"}` | neue Freundesanfrage an mich |
-| `{"type":"friends","uuid","name","online"}` | Freundschaft beginnt – an beide, `uuid`/`name`/`online` sind jeweils der andere |
+| `{"type":"friends","uuid","name","online","status"}` | Freundschaft beginnt – an beide, `uuid`/`name`/`online` sind jeweils der andere |
 | `{"type":"removed","uuid"}` | der andere hat die Freundschaft beendet, meine Anfrage abgelehnt oder seine zurückgezogen |
 
 ## Einrichten (Linux-Server mit systemd)
@@ -87,8 +89,11 @@ Live-Ereignisse auf `/v1/friends/events` (Token in der `Authorization`-Kopfzeile
        proxy_pass http://127.0.0.1:8788/;
        proxy_set_header Host $host;
        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-       # nginx erlaubt sonst nur 1 MiB – Capes sind bis 4 MiB groß (Base64 ~5,4 MiB)
-       client_max_body_size 8m;
+       # nginx erlaubt sonst nur 1 MiB – Capes sind bis 4 MiB groß (Base64 ~5,4 MiB),
+       # Clips im Freunde-Chat bis 50 MiB
+       client_max_body_size 55m;
+       # Uploads direkt durchreichen statt erst auf die Platte zu puffern
+       proxy_request_buffering off;
        # Live-Verbindung (/v1/capes/events): nicht puffern, lange offen lassen
        proxy_buffering off;
        proxy_read_timeout 1h;
