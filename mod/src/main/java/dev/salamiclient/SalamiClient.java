@@ -85,8 +85,11 @@ import dev.salamiclient.modules.visual.LogoOverlayModule;
 import dev.salamiclient.modules.visual.ParticlesModule;
 import dev.salamiclient.modules.visual.CapesModule;
 import dev.salamiclient.modules.visual.HatsModule;
+import dev.salamiclient.modules.visual.BuddyModule;
 import dev.salamiclient.modules.visual.MiniMeModule;
 import dev.salamiclient.render.HatLayer;
+import dev.salamiclient.render.BuddyLayer;
+import dev.salamiclient.render.EmotePropLayer;
 import dev.salamiclient.render.MiniMeLayer;
 import dev.salamiclient.render.WorldContext;
 import dev.salamiclient.render.WorldLines;
@@ -201,6 +204,7 @@ public final class SalamiClient implements ClientModInitializer {
 		modules.register(new ParticlesModule());
 		modules.register(new CapesModule());
 		modules.register(new HatsModule());
+		modules.register(new BuddyModule());
 		modules.register(new MiniMeModule());
 		// Mods (Batch A): Optik
 		modules.register(new SideShieldModule());
@@ -312,10 +316,12 @@ public final class SalamiClient implements ClientModInitializer {
 			FriendsCommand.register(dispatcher);
 			EmoteCommand.register(dispatcher);
 		});
-		// Hüte und Mini Me (Cosmetics) an allen Spieler-Modellen
+		// Hüte, Buddys, Mini Me und Emote-Requisiten (Cosmetics) an allen Spieler-Modellen
 		LivingEntityFeatureRendererRegistrationCallback.EVENT.register((entityType, renderer, helper, context) -> {
 			if (renderer instanceof AvatarRenderer<?> avatar) {
 				helper.register(new HatLayer(avatar));
+				helper.register(new BuddyLayer(avatar));
+				helper.register(new EmotePropLayer(avatar));
 				helper.register(new MiniMeLayer(avatar));
 			}
 		});

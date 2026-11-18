@@ -7,15 +7,20 @@ import com.mojang.blaze3d.platform.NativeImage;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.capes.CapeLibrary;
 import dev.salamiclient.capes.OfficialCapes;
+import dev.salamiclient.cosmetics.BoxModel;
+import dev.salamiclient.cosmetics.BuddyCatalog;
+import dev.salamiclient.cosmetics.BuddyFollowers;
 import dev.salamiclient.cosmetics.Hat;
 import dev.salamiclient.cosmetics.HatCatalog;
 import dev.salamiclient.emotes.Emote;
 import dev.salamiclient.emotes.EmoteCatalog;
+import dev.salamiclient.emotes.EmoteEffects;
 import dev.salamiclient.emotes.Emotes;
 import dev.salamiclient.gui.CosmeticsScreen;
 import dev.salamiclient.gui.EmoteWheelScreen;
 import dev.salamiclient.module.ModuleManager;
 import dev.salamiclient.modules.social.EmotesModule;
+import dev.salamiclient.modules.visual.BuddyModule;
 import dev.salamiclient.modules.visual.HatsModule;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -32,11 +37,12 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Cosmetics und Emotes: jeder Hut aus dem Katalog (Screenshot von vorn), Cosmetics-Menü mit Hüten und
- * Emotes, Emote-Rad mit Seiten, alle Emotes aus dem Katalog (Haltung wird gezeichnet, Bewegen
- * beendet sie, Kamera kommt zurück), Kataloge vom Server mit einem neuen Emote, einem neuen Hut und
- * einem offiziellen Cape (kein Update nötig) und das Emote eines anderen Spielers, wie es vom
- * Cape-Server käme.
+ * Cosmetics und Emotes: jeder Hut aus dem Katalog (Screenshot von vorn), jeder Buddy an jedem Platz
+ * (Hand, Schulter, Kopf, läuft hinterher), Cosmetics-Menü mit Hüten, Buddys und Emotes, Emote-Rad mit
+ * Seiten, alle Emotes aus dem Katalog (Haltung wird gezeichnet, Bewegen beendet sie, Kamera kommt
+ * zurück), was Emotes mitbringen (der Schneeball fliegt los, die Verwandlung zum Rentier), Kataloge
+ * vom Server mit einem neuen Emote, einem neuen Hut und einem offiziellen Cape (kein Update nötig)
+ * und das Emote eines anderen Spielers, wie es vom Cape-Server käme.
  */
 public final class SalamiCosmeticsGameTest implements FabricClientGameTest {
 	@Override
@@ -51,8 +57,10 @@ public final class SalamiCosmeticsGameTest implements FabricClientGameTest {
 			world.getServer().runCommand("tp @p 0.5 -60 0.5 0 0");
 			context.waitTicks(10);
 			testHats(context, world, modules);
+			testBuddies(context, world, modules);
 			testMenu(context);
 			testOwnEmotes(context, modules);
+			testEmoteExtras(context, world);
 			testServerCatalog(context);
 			testHatCatalog(context, modules);
 			testOfficialCapes(context);
@@ -77,6 +85,9 @@ public final class SalamiCosmeticsGameTest implements FabricClientGameTest {
 		check(halo != null && halo.glow() && halo.anchor() == Hat.Anchor.HEAD
 			&& halo.colors().length >= 6 && halo.colors().length % 6 == 0, "Hats: halo read wrong");
 		for (Hat hat : all) {
+			if (BuddyCatalog.isBuddy(hat.id())) {
+				continue; // nur noch für ältere Versionen im Hut-Katalog: siehe testBuddies
+			}
 			context.runOnClient(c -> hats.choose(hat.id()));
 			check(context.computeOnClient(c -> HatsModule.hatOf(c.player.getId())) == hat, "Hats: own player does not wear " + hat.id());
 			check(hat.id().equals(HatsModule.sharedHat()), "Hats: " + hat.id() + " is not shared");
@@ -96,6 +107,184 @@ public final class SalamiCosmeticsGameTest implements FabricClientGameTest {
 		world.getServer().runCommand("item replace entity @p armor.head with minecraft:air");
 		check(HatCatalog.get("zylinder") == null && HatCatalog.get("top_hat") != null && HatsModule.sharedHat() == null,
 			"Hats: name lookup wrong");
+	}
+
+	/**
+	 * Buddys: jeder aus dem Katalog über der Schulter, einer an jedem Platz (Hand, Kopf, läuft
+	 * hinterher), die Auswahl im Menü – und wer einen Buddy noch als Schulter-Hut trägt (so war es vor
+	 * den Buddys), bekommt ihn als Buddy.
+	 */
+	private static void testBuddies(ClientGameTestContext context, TestSingleplayerContext world, ModuleManager modules) {
+		HatsModule hats = modules.get(HatsModule.class);
+		BuddyModule buddies = modules.get(BuddyModule.class);
+		context.runOnClient(c -> {
+			modules.setEnabled(hats, true);
+			modules.setEnabled(buddies, true);
+			buddies.choose(null);
+			c.options.setCameraType(CameraType.THIRD_PERSON_FRONT);
+		});
+		// ohne Server gilt die Kopie des Katalogs aus der Jar (beim Bauen aus server/capes/buddies.json genommen)
+		List<Hat> all = context.computeOnClient(c -> BuddyCatalog.all());
+		check(all.size() >= 7 && BuddyCatalog.get("salami_buddy") != null && BuddyCatalog.get("tree_buddy") != null,
+			"Buddies: bundled catalog missing or incomplete (" + all.size() + ")");
+		for (Hat buddy : all) {
+			check(HatCatalog.get(buddy.id()) != null, "Buddies: " + buddy.id() + " is missing as a hat for older versions");
+		}
+		check(BuddyModule.own() == null, "Buddies: a buddy without choosing one");
+
+		// als Hut gewählt (ältere Einstellung): wird zum Buddy über der Schulter
+		context.runOnClient(c -> hats.choose("salami_buddy"));
+		context.waitTicks(3);
+		check(context.computeOnClient(c -> hats.selected()) == null && buddies.selected() == BuddyCatalog.get("salami_buddy")
+			&& buddies.place() == BuddyModule.Place.SHOULDER, "Buddies: a buddy worn as a hat did not become a buddy");
+		check(context.computeOnClient(c -> HatsModule.hatOf(c.player.getId())) == null, "Buddies: buddy is still drawn as a hat");
+		check("salami_buddy".equals(HatsModule.sharedHat()), "Buddies: shoulder buddy is not shared as a hat for older versions");
+
+		for (Hat buddy : all) {
+			context.runOnClient(c -> buddies.choose(buddy.id()));
+			BuddyModule.Wish wish = context.computeOnClient(c -> BuddyModule.of(c.player));
+			check(wish != null && wish.buddy() == buddy && wish.place() == BuddyModule.Place.SHOULDER, "Buddies: own player has no " + buddy.id());
+			context.waitTicks(3);
+			context.takeScreenshot("salami-90-buddy-" + buddy.id());
+		}
+
+		// die anderen Plätze – auf dem Kopf steht er auf dem Hut
+		context.runOnClient(c -> {
+			buddies.choose("snowman_buddy");
+			buddies.setPlace(BuddyModule.Place.HAND);
+		});
+		context.waitTicks(5);
+		check(HatsModule.sharedHat() == null, "Buddies: a buddy that is not on the shoulder is shared as a hat");
+		context.takeScreenshot("salami-91-buddy-place-hand");
+		context.runOnClient(c -> {
+			hats.choose("crown");
+			buddies.setPlace(BuddyModule.Place.HEAD);
+		});
+		context.waitTicks(5);
+		context.takeScreenshot("salami-91-buddy-place-head");
+		context.runOnClient(c -> {
+			hats.choose(null);
+			buddies.choose("reindeer_buddy");
+			buddies.setPlace(BuddyModule.Place.FOLLOW);
+		});
+		context.waitTicks(10);
+		UUID me = context.computeOnClient(c -> c.player.getUUID());
+		check(context.computeOnClient(c -> BuddyFollowers.positionOf(me)) != null, "Buddies: nothing follows the player");
+		context.takeScreenshot("salami-91-buddy-place-follow");
+		// läuft hinterher, wenn der Spieler sich entfernt
+		world.getServer().runCommand("tp @p 8.5 -60 0.5 0 0");
+		context.waitTicks(50);
+		double distance = context.computeOnClient(c -> BuddyFollowers.positionOf(me).distanceTo(c.player.position()));
+		check(distance < 3.2, "Buddies: the follower did not come along (" + distance + " blocks away)");
+		context.takeScreenshot("salami-91-buddy-followed");
+		world.getServer().runCommand("tp @p 0.5 -60 0.5 0 0");
+		context.waitTicks(5);
+
+		// Menü: Platz oben, Buddys darunter
+		CosmeticsScreen screen = context.computeOnClient(c -> new CosmeticsScreen(null, CosmeticsScreen.Tab.BUDDIES));
+		context.setScreen(() -> screen);
+		context.waitTicks(2);
+		context.takeScreenshot("salami-92-cosmetics-buddies");
+		context.runOnClient(c -> {
+			screen.pick("buddyplace:head");
+			screen.pick("buddy:tree_buddy");
+		});
+		check(buddies.selected() == BuddyCatalog.get("tree_buddy") && buddies.place() == BuddyModule.Place.HEAD, "Buddies: picking in the menu did nothing");
+		context.waitTicks(3);
+		check(context.computeOnClient(c -> BuddyFollowers.positionOf(me)) == null, "Buddies: follower stays although the buddy is on the head");
+		context.runOnClient(c -> screen.pick("buddy:none"));
+		check(BuddyModule.own() == null, "Buddies: putting the buddy away did nothing");
+		context.setScreen(() -> null);
+		context.runOnClient(c -> {
+			buddies.setPlace(BuddyModule.Place.SHOULDER);
+			c.options.setCameraType(CameraType.FIRST_PERSON);
+		});
+	}
+
+	/**
+	 * Was Emotes mitbringen: der Schneeball liegt erst in der Hand und fliegt dann wirklich los (nur
+	 * Optik), die Glocke hängt in der Hand, und beim Rentier steht eine Figur anstelle des Spielers.
+	 */
+	private static void testEmoteExtras(ClientGameTestContext context, TestSingleplayerContext world) {
+		Emote snowball = EmoteCatalog.get("snowball");
+		Emote bell = EmoteCatalog.get("bell");
+		Emote gift = EmoteCatalog.get("gift");
+		Emote reindeer = EmoteCatalog.get("reindeer");
+		check(snowball != null && snowball.thrown() != null && snowball.props().size() == 1 && snowball.sounds().size() == 1,
+			"Emote extras: snowball has no throw");
+		check(bell != null && bell.props().size() == 1 && bell.sounds().size() == 8, "Emote extras: bell has no bell");
+		check(gift != null && gift.props().size() == 1, "Emote extras: gift has no present");
+		check(reindeer != null && reindeer.costume() != null && reindeer.costume().body() != null
+			&& reindeer.costume().pieces().size() == 5 && reindeer.costume().tracks().size() == 5, "Emote extras: reindeer has no costume");
+		check(EmoteCatalog.get("wave").props().isEmpty() && EmoteCatalog.get("wave").thrown() == null
+			&& EmoteCatalog.get("wave").costume() == null, "Emote extras: wave has extras");
+
+		// kaputte Angaben: das ganze Emote fällt weg
+		String base = "{\"id\":\"x\",\"names\":{\"en_us\":\"x\"},\"duration\":1,\"tracks\":{\"head\":{\"keys\":[{\"t\":0,\"rot\":[0,0,0]}]}},";
+		String ball = "\"parts\":[{\"color\":\"#ffffff\",\"boxes\":[[-1,-1,-1,2,2,2]]}]";
+		for (String broken : List.of(
+			"\"props\":[{\"on\":\"tail\"," + ball + "}]}",
+			"\"props\":[{\"on\":\"head\",\"from\":1,\"to\":0.5," + ball + "}]}",
+			"\"throw\":{" + ball + "}}",
+			"\"throw\":{\"t\":0.5,\"impact\":\"explosion\"," + ball + "}}",
+			"\"sounds\":[{\"t\":0,\"sound\":\"creeper\"}]}",
+			"\"costume\":{\"parts\":[]}}",
+			"\"costume\":{\"parts\":[{\"follow\":\"tail\",\"color\":\"#ffffff\",\"boxes\":[[0,0,0,1,1,1]]}]}}")) {
+			boolean rejected;
+			try {
+				Emote.parse(JsonParser.parseString(base + broken).getAsJsonObject());
+				rejected = false;
+			} catch (IllegalArgumentException expected) {
+				rejected = true;
+			}
+			check(rejected, "Emote extras: accepted " + broken);
+		}
+		Emote parsed = Emote.parse(JsonParser.parseString(base + "\"props\":[{\"on\":\"body\"," + ball + "}],\"throw\":{\"t\":0.2," + ball + "}}").getAsJsonObject());
+		check(parsed.props().get(0).on() == Emote.Limb.BODY && parsed.thrown().impact().equals("none"), "Emote extras: read wrong");
+
+		// von hinten gesehen: der Schneeball fliegt vom Spieler weg
+		long launched = EmoteEffects.launchedCount();
+		context.runOnClient(c -> {
+			c.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+			Emotes.play(snowball);
+		});
+		context.waitTicks(6);
+		check(EmoteEffects.launchedCount() == launched, "Emote extras: snowball thrown before its time");
+		context.takeScreenshot("salami-93-emote-snowball-in-hand");
+		context.waitTicks(9);
+		check(EmoteEffects.launchedCount() == launched + 1, "Emote extras: snowball was not thrown");
+		check(context.computeOnClient(c -> EmoteEffects.flyingCount()) == 1, "Emote extras: nothing is flying");
+		context.takeScreenshot("salami-93-emote-snowball-flying");
+		context.waitTicks(60);
+		check(context.computeOnClient(c -> EmoteEffects.flyingCount()) == 0, "Emote extras: the snowball never landed");
+		check(EmoteEffects.launchedCount() == launched + 1, "Emote extras: snowball thrown twice");
+
+		context.runOnClient(c -> Emotes.play(bell));
+		context.waitTicks(10);
+		context.takeScreenshot("salami-93-emote-bell-in-hand");
+		context.runOnClient(c -> Emotes.play(gift));
+		context.waitTicks(24);
+		context.takeScreenshot("salami-93-emote-gift-in-hands");
+
+		// Verwandlung: der Spieler ist weg, an seiner Stelle steht das Rentier – auch mit Rüstung und etwas in der Hand
+		world.getServer().runCommand("item replace entity @p armor.chest with minecraft:diamond_chestplate");
+		world.getServer().runCommand("item replace entity @p weapon.mainhand with minecraft:diamond_sword");
+		context.runOnClient(c -> Emotes.play(reindeer));
+		context.waitTicks(14);
+		Emotes.Active active = context.computeOnClient(c -> Emotes.activeOf(c.player));
+		check(active != null && active.emote() == reindeer && active.weight() > 0.9f, "Emote extras: reindeer is not running");
+		context.takeScreenshot("salami-94-emote-reindeer-from-behind");
+		context.runOnClient(c -> c.options.setCameraType(CameraType.THIRD_PERSON_FRONT));
+		context.waitTicks(4);
+		context.takeScreenshot("salami-94-emote-reindeer-from-front");
+		context.runOnClient(c -> {
+			Emotes.clear();
+			c.options.setCameraType(CameraType.FIRST_PERSON);
+		});
+		world.getServer().runCommand("item replace entity @p armor.chest with minecraft:air");
+		world.getServer().runCommand("item replace entity @p weapon.mainhand with minecraft:air");
+		context.waitTicks(3);
+		check(context.computeOnClient(c -> Emotes.activeOf(c.player)) == null, "Emote extras: emote still running after clear");
 	}
 
 	/**
@@ -137,7 +326,7 @@ public final class SalamiCosmeticsGameTest implements FabricClientGameTest {
 			"Hats: server catalog not applied: " + now.size());
 		check(HatCatalog.revision() != revision, "Hats: catalog change not announced to the menu");
 		Hat wizard = HatCatalog.get("wizard");
-		check(wizard != null && wizard.colors().length == 5 * 6 && wizard.quads().length == 5 * 6 * Hat.QUAD, "Hats: new hat read wrong");
+		check(wizard != null && wizard.colors().length == 5 * 6 && wizard.quads().length == 5 * 6 * BoxModel.QUAD, "Hats: new hat read wrong");
 
 		// die neuen Hüte lassen sich tragen wie jeder andere, im Menü stehen sie mit gezeichnetem Symbol
 		context.runOnClient(c -> {
@@ -276,7 +465,9 @@ public final class SalamiCosmeticsGameTest implements FabricClientGameTest {
 			check(context.computeOnClient(c -> c.options.getCameraType()) == CameraType.THIRD_PERSON_FRONT,
 				"Emotes: camera did not turn to the front for " + emote.id());
 			context.waitTicks(12);
-			check(Emotes.posedCount() > before, "Emotes: " + emote.id() + " pose was never drawn");
+			// bei einer Verwandlung wird das Spielermodell gar nicht gezeichnet – dort steht die Figur
+			check(emote.costume() != null ? context.computeOnClient(c -> Emotes.activeOf(c.player)) != null : Emotes.posedCount() > before,
+				"Emotes: " + emote.id() + " pose was never drawn");
 			context.takeScreenshot("salami-85-emote-" + emote.id());
 		}
 		// Bewegen beendet das Emote, die Kamera kommt zurück
@@ -363,6 +554,24 @@ public final class SalamiCosmeticsGameTest implements FabricClientGameTest {
 		context.runOnClient(c -> other.snapTo(5.5, -60, 4.5, 180F, 0F));
 		context.waitTicks(2);
 		check(!Emotes.playingFor(uuid), "Emotes: remote emote did not stop when the player moved");
+		// der andere wirft einen Schneeball und wird zum Rentier – so, wie es jeder Mitspieler sieht
+		long launched = EmoteEffects.launchedCount();
+		context.runOnClient(c -> {
+			// er schaut zur Seite, damit der Schneeball quer durchs Bild fliegt
+			other.snapTo(5.5, -60, 4.5, 90F, 0F);
+			other.setYHeadRot(90F);
+			other.yBodyRot = 90F;
+			Emotes.onRemote(uuid, "snowball");
+		});
+		context.waitTicks(15);
+		check(EmoteEffects.launchedCount() == launched + 1, "Emotes: remote snowball was not thrown");
+		check(context.computeOnClient(c -> EmoteEffects.flyingCount()) == 1, "Emotes: remote snowball is not flying");
+		context.takeScreenshot("salami-86c-emote-remote-snowball");
+		context.runOnClient(c -> Emotes.onRemote(uuid, "reindeer"));
+		context.waitTicks(14);
+		Emotes.Active theirs = context.computeOnClient(c -> Emotes.activeOf(other));
+		check(theirs != null && theirs.emote().costume() != null, "Emotes: remote player did not turn into the reindeer");
+		context.takeScreenshot("salami-86b-emote-remote-reindeer");
 		context.runOnClient(c -> {
 			other.discard();
 			Emotes.clear();

@@ -51,14 +51,17 @@ final class CapeServer {
 
 	/** Antwort auf {@code lookup}: mitgeliefertes Cape ({@code builtin}) oder freigegebenes eigenes ({@code id}). */
 	record Remote(@Nullable String builtin, @Nullable String id, @Nullable String hat,
-		@Nullable String miniMeName, @Nullable String miniMePlace) {}
+		@Nullable String miniMeName, @Nullable String miniMePlace, @Nullable String buddyId, @Nullable String buddyPlace) {}
 
-	/** Cape, Hut und Mini Me aus einem Objekt von lookup oder events. */
+	/** Cape, Hut, Mini Me und Buddy aus einem Objekt von lookup oder events. */
 	private static Remote remote(JsonObject cape) {
 		JsonElement miniMe = cape.get("minime");
 		JsonObject mini = miniMe != null && miniMe.isJsonObject() ? miniMe.getAsJsonObject() : null;
+		JsonElement rawBuddy = cape.get("buddy");
+		JsonObject buddy = rawBuddy != null && rawBuddy.isJsonObject() ? rawBuddy.getAsJsonObject() : null;
 		return new Remote(string(cape, "builtin"), string(cape, "id"), string(cape, "hat"),
-			mini == null ? null : string(mini, "name"), mini == null ? null : string(mini, "place"));
+			mini == null ? null : string(mini, "name"), mini == null ? null : string(mini, "place"),
+			buddy == null ? null : string(buddy, "id"), buddy == null ? null : string(buddy, "place"));
 	}
 
 	/** Ergebnis des Teilens: {@code approved}, {@code pending}, {@code rejected} oder {@code none}; {@code id} bei eigenen Bildern. */
@@ -184,9 +187,9 @@ final class CapeServer {
 
 	/** Teilt das eigene Cape: anmelden (Mojang) und setzen. Läuft im Hintergrund. */
 	//? if >=26.3 {
-	/*CompletableFuture<Published> publish(User user, SessionService session, CapeShare share, @Nullable String hat, @Nullable JsonObject miniMe) {
+	/*CompletableFuture<Published> publish(User user, SessionService session, CapeShare share, @Nullable String hat, @Nullable JsonObject miniMe, @Nullable JsonObject buddy) {
 	*///?} else
-	CompletableFuture<Published> publish(User user, MinecraftSessionService session, CapeShare share, @Nullable String hat, @Nullable JsonObject miniMe) {
+	CompletableFuture<Published> publish(User user, MinecraftSessionService session, CapeShare share, @Nullable String hat, @Nullable JsonObject miniMe, @Nullable JsonObject buddy) {
 		return send(post("v1/auth/challenge", new JsonObject())).thenApplyAsync(challenge -> {
 			String serverId = string(challenge, "serverId");
 			if (serverId == null) {
@@ -201,12 +204,15 @@ final class CapeServer {
 			body.addProperty("name", user.getName());
 			body.addProperty("serverId", serverId);
 			body.add("cape", share.toJson());
-			// Hut und Mini Me (Cosmetics); ältere Cape-Server ignorieren die Felder
+			// Hut, Mini Me und Buddy (Cosmetics); ältere Cape-Server ignorieren die Felder
 			if (hat != null) {
 				body.addProperty("hat", hat);
 			}
 			if (miniMe != null) {
 				body.add("minime", miniMe);
+			}
+			if (buddy != null) {
+				body.add("buddy", buddy);
 			}
 			return body;
 		}, executor).thenCompose(body -> send(request("v1/capes/me").PUT(json(body)).build()))

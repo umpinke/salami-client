@@ -46,8 +46,11 @@ function triple(raw, min, max, what) {
   return raw.map((value) => number(value, min, max, what));
 }
 
-/** Prüft ein Teil samt Unterteilen; `count` zählt Teile und Würfel des ganzen Hutes mit. */
-function parsePart(raw, depth, count) {
+/**
+ * Prüft ein Teil samt Unterteilen; `count` ({ parts, boxes }) zählt Teile und Würfel des ganzen Modells mit.
+ * Auch für Buddys (buddies.mjs) und alles, was Emotes mitbringen (emotes.mjs): dasselbe Würfel-Format.
+ */
+export function parsePart(raw, depth, count) {
   object(raw, "Teil");
   if (depth > MAX_DEPTH) throw new CatalogError(`Teile höchstens ${MAX_DEPTH} Ebenen tief`);
   if (++count.parts > MAX_PARTS) throw new CatalogError(`mehr als ${MAX_PARTS} Teile`);
@@ -85,15 +88,27 @@ export function parseHat(raw) {
     if (!ANCHORS.includes(raw.anchor)) throw new CatalogError("anchor unbekannt");
     hat.anchor = raw.anchor;
   }
-  if (raw.scale !== undefined && raw.scale !== 1) hat.scale = number(raw.scale, 0.1, 3, "scale");
-  if (raw.glow === true) hat.glow = true;
-  if (raw.bob !== undefined && raw.bob !== 0) hat.bob = number(raw.bob, 0, 4, "bob");
-  if (raw.sway !== undefined && raw.sway !== 0) hat.sway = number(raw.sway, 0, 45, "sway");
-  if (!Array.isArray(raw.parts) || raw.parts.length === 0) throw new CatalogError("parts fehlt");
-  const count = { parts: 0, boxes: 0 };
-  hat.parts = raw.parts.map((part) => parsePart(part, 1, count));
-  if (count.boxes === 0) throw new CatalogError("mindestens ein Würfel nötig");
+  parseLook(raw, hat);
+  hat.parts = parseParts(raw.parts);
   return hat;
+}
+
+/** Prüft ein ganzes Modell (Liste von Teilen) mit den Grenzen eines Hutes; wirft bei Fehlern. */
+export function parseParts(raw) {
+  if (!Array.isArray(raw) || raw.length === 0) throw new CatalogError("parts fehlt");
+  const count = { parts: 0, boxes: 0 };
+  const parts = raw.map((part) => parsePart(part, 1, count));
+  if (count.boxes === 0) throw new CatalogError("mindestens ein Würfel nötig");
+  return parts;
+}
+
+/** Größe, Leuchten, Schweben und Pendeln – gelten für Hüte und Buddys gleich. */
+export function parseLook(raw, into) {
+  if (raw.scale !== undefined && raw.scale !== 1) into.scale = number(raw.scale, 0.1, 3, "scale");
+  if (raw.glow === true) into.glow = true;
+  if (raw.bob !== undefined && raw.bob !== 0) into.bob = number(raw.bob, 0, 4, "bob");
+  if (raw.sway !== undefined && raw.sway !== 0) into.sway = number(raw.sway, 0, 45, "sway");
+  return into;
 }
 
 /** Prüft den ganzen Katalog ({"hats":[…]}); fehlerhafte oder doppelte Einträge stehen in `skipped`. */

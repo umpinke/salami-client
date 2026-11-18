@@ -9,6 +9,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { after, before, test } from "node:test";
 import zlib from "node:zlib";
+import { CatalogError } from "./catalog.mjs";
+import { parseEmote } from "./emotes.mjs";
 import { capeId, decodeCape, encodeRgba } from "./png.mjs";
 
 const ADMIN = "test-admin-token-1234567890";
@@ -43,6 +45,9 @@ copyFileSync(fileURLToPath(new URL("./emotes.json", import.meta.url)), emotesFil
 /** Ebenso die Hüte; die offiziellen Capes beginnen leer (Bilder im Ordner official-capes daneben). */
 const hatsFile = join(dataDir, "hats-test.json");
 copyFileSync(fileURLToPath(new URL("./hats.json", import.meta.url)), hatsFile);
+/** Und die Buddys. */
+const buddiesFile = join(dataDir, "buddies-test.json");
+copyFileSync(fileURLToPath(new URL("./buddies.json", import.meta.url)), buddiesFile);
 const officialFile = join(dataDir, "official-capes.json");
 const officialDir = join(dataDir, "official-capes");
 mkdirSync(officialDir);
@@ -73,6 +78,7 @@ async function startServer(port, mojangPort) {
       REPORTS_TO_HIDE: "2",
       EMOTES_FILE: emotesFile,
       HATS_FILE: hatsFile,
+      BUDDIES_FILE: buddiesFile,
       OFFICIAL_CAPES_FILE: officialFile,
       CATALOG_RELOAD_MS: "100",
     },
@@ -124,7 +130,7 @@ async function call(method, path, body, headers = {}) {
 const admin = (method, path, body) => call(method, path, body, { Authorization: `Bearer ${ADMIN}` });
 
 /** Wie salami-core: Challenge holen, bei „Mojang“ anmelden, Cape setzen. */
-async function setCape(name, cape, { join = true, hat, minime } = {}) {
+async function setCape(name, cape, { join = true, hat, minime, buddy } = {}) {
   const { body } = await call("POST", "/v1/auth/challenge");
   if (join) joined.add(`${name}|${body.serverId}`);
   return call("PUT", "/v1/capes/me", {
@@ -133,6 +139,7 @@ async function setCape(name, cape, { join = true, hat, minime } = {}) {
     cape,
     ...(hat !== undefined ? { hat } : {}),
     ...(minime !== undefined ? { minime } : {}),
+    ...(buddy !== undefined ? { buddy } : {}),
   });
 }
 
@@ -865,6 +872,144 @@ test("Mini Me: Name und Platz werden mit dem Cape geteilt, Ungültiges ignoriert
     assert.deepEqual(await live.next(mine), { uuid, cape: null });
   } finally {
     live.close();
+  }
+});
+
+test("Buddys: Katalog wird ausgeliefert, Buddy und Platz werden geteilt, neue kommen ohne Neustart", async () => {
+  const catalog = async () => (await call("GET", "/v1/buddies/catalog")).body;
+  const before = await catalog();
+  assert.match(before.version, /^[0-9a-f]{16}$/);
+  // welche Buddys es gibt, steht in der Datei – hier zählt, dass sie so ankommen
+  const inFile = JSON.parse(readFileSync(buddiesFile, "utf8")).buddies;
+  assert.deepEqual(before.buddies, inFile);
+  assert.ok(before.buddies.some((b) => b.id === "salami_buddy"));
+  for (const buddy of before.buddies) assert.equal(buddy.anchor, undefined, "den Platz wählt der Spieler");
+
+  // jeder Buddy steht für ältere Spiele auch noch als Schulter-Hut in hats.json, mit demselben Modell
+  const hats = JSON.parse(readFileSync(fileURLToPath(new URL("./hats.json", import.meta.url)), "utf8")).hats;
+  for (const buddy of inFile) {
+    const hat = hats.find((h) => h.id === buddy.id);
+    assert.ok(hat, `${buddy.id} fehlt in hats.json`);
+    assert.deepEqual({ ...buddy, anchor: "shoulder" }, hat);
+  }
+
+  const live = await openEvents();
+  try {
+    const uuid = uuidOf("Brotzeit");
+    const mine = (e) => e.uuid === uuid;
+    const lookup = async () => (await call("POST", "/v1/capes/lookup", { uuids: [uuid] })).body.capes[uuid];
+
+    // nur ein Buddy, kein Cape: der Spieler bleibt gespeichert
+    await setCape("Brotzeit", null, { buddy: { id: "salami_buddy", place: "follow" } });
+    assert.deepEqual(await lookup(), { buddy: { id: "salami_buddy", place: "follow" } });
+    assert.deepEqual(await live.next(mine), { uuid, cape: { buddy: { id: "salami_buddy", place: "follow" } } });
+
+    // zusammen mit Cape, Hut und Mini Me; zusätzliche Felder fallen weg
+    await setCape("Brotzeit", { builtin: "board" }, {
+      hat: "crown",
+      minime: { name: "Pepper_99", place: "head" },
+      buddy: { id: "salami_buddy", place: "hand", x: 1 },
+    });
+    assert.deepEqual(await lookup(), {
+      builtin: "board",
+      hat: "crown",
+      minime: { name: "Pepper_99", place: "head" },
+      buddy: { id: "salami_buddy", place: "hand" },
+    });
+    await live.next(mine);
+
+    // unbekannter Buddy oder Platz wird ignoriert, nicht abgelehnt
+    for (const buddy of [{ id: "drache", place: "hand" }, { id: "salami_buddy", place: "rucksack" }, "salami_buddy", [1]]) {
+      assert.equal((await setCape("Brotzeit", { builtin: "board" }, { buddy })).status, 200);
+      assert.deepEqual(await lookup(), { builtin: "board" });
+    }
+    assert.deepEqual(await live.next(mine), { uuid, cape: { builtin: "board" } });
+
+    // neuer Buddy in die Datei: ein gültiger, einer mit Platz (den gibt es bei Buddys nicht mehr, fällt weg)
+    const file = JSON.parse(readFileSync(buddiesFile, "utf8"));
+    file.buddies.push(
+      { id: "drache", names: { en_us: "Dragon buddy" }, anchor: "shoulder", bob: 1, parts: [{ color: "#2A9A4B", boxes: [[-1, -3, -1, 2, 3, 2]] }] },
+      { id: "kaputt", names: { en_us: "Broken" }, parts: [{ color: "grün", boxes: [[-1, -3, -1, 2, 3, 2]] }] },
+      { id: "none", names: { en_us: "None" }, parts: [{ color: "#ffffff", boxes: [[-1, -3, -1, 2, 3, 2]] }] },
+    );
+    writeFileSync(buddiesFile, JSON.stringify(file));
+    const changed = await live.next((e) => e.kind === "buddies");
+    const after = await catalog();
+    assert.equal(changed.catalog, after.version);
+    assert.equal(after.buddies.length, before.buddies.length + 1);
+    assert.deepEqual(after.buddies.at(-1), {
+      id: "drache",
+      names: { en_us: "Dragon buddy" },
+      bob: 1,
+      parts: [{ color: "#2a9a4b", boxes: [[-1, -3, -1, 2, 3, 2]] }],
+    });
+
+    // der neue Buddy lässt sich sofort mitnehmen
+    await setCape("Brotzeit", null, { buddy: { id: "drache", place: "shoulder" } });
+    assert.deepEqual(await lookup(), { buddy: { id: "drache", place: "shoulder" } });
+
+    await setCape("Brotzeit", null);
+    assert.equal(await lookup(), undefined);
+  } finally {
+    live.close();
+  }
+});
+
+test("Emotes: Requisiten, Wurf, Geräusche und Verwandlung werden geprüft und bereinigt", () => {
+  const ball = [{ color: "#FFFFFF", boxes: [[-1, -1, -1, 2, 2, 2]] }];
+  const base = {
+    id: "zauber",
+    names: { en_us: "Magic" },
+    duration: 2,
+    tracks: { right_arm: { keys: [{ t: 0, rot: [-90, 0, 0] }] } },
+  };
+  const clean = [{ color: "#ffffff", boxes: [[-1, -1, -1, 2, 2, 2]] }];
+
+  // ohne die neuen Felder bleibt alles wie bisher
+  assert.deepEqual(parseEmote(base), base);
+
+  const full = parseEmote({
+    ...base,
+    props: [{ on: "right_arm", from: 0, to: 0.6, at: [-1, 10, 0], rot: [0, 0, 0], scale: 1, parts: ball, extra: 1 }],
+    throw: { t: 0.6, speed: 1.2, up: 0.1, gravity: 0.03, spin: 20, impact: "snow", parts: ball },
+    sounds: [{ t: 0.6, sound: "snowball", loud: true }],
+    costume: {
+      hop: 1,
+      parts: [
+        { color: "#9a6a3c", boxes: [[-4, 6, -9, 8, 8, 18]] },
+        { follow: "right_leg", at: [-2.5, 14, 7], color: "#6b4226", boxes: [[-1.5, 0, -1.5, 3, 10, 3]] },
+      ],
+      tracks: { right_leg: { cycle: 0.5, keys: [{ t: 0, rot: [0, 0, 0] }, { t: 0.25, rot: [-40, 0, 0] }] } },
+    },
+  });
+  assert.deepEqual(full.props, [{ on: "right_arm", to: 0.6, at: [-1, 10, 0], rot: [0, 0, 0], parts: clean }]);
+  assert.deepEqual(full.throw, { t: 0.6, speed: 1.2, up: 0.1, gravity: 0.03, spin: 20, impact: "snow", parts: clean });
+  assert.deepEqual(full.sounds, [{ t: 0.6, sound: "snowball" }]);
+  assert.deepEqual(full.costume, {
+    hop: 1,
+    hop_cycle: 0.5,
+    parts: [
+      { color: "#9a6a3c", boxes: [[-4, 6, -9, 8, 8, 18]] },
+      { at: [-2.5, 14, 7], color: "#6b4226", boxes: [[-1.5, 0, -1.5, 3, 10, 3]], follow: "right_leg" },
+    ],
+    tracks: { right_leg: { cycle: 0.5, keys: [{ t: 0, rot: [0, 0, 0] }, { t: 0.25, rot: [-40, 0, 0] }] } },
+  });
+
+  // Fehler in einem der neuen Felder: das ganze Emote fällt weg (im Katalog wird es übersprungen)
+  for (const broken of [
+    { props: [{ on: "tail", parts: ball }] },
+    { props: [{ on: "head", from: 1, to: 0.5, parts: ball }] },
+    { props: Array(5).fill({ on: "head", parts: ball }) },
+    { props: [{ on: "head", parts: [] }] },
+    { throw: { parts: ball } },
+    { throw: { t: 0.5, speed: 9, parts: ball } },
+    { throw: { t: 0.5, impact: "explosion", parts: ball } },
+    { sounds: [{ t: 0, sound: "creeper" }] },
+    { costume: { parts: [] } },
+    { costume: { parts: [{ follow: "tail", color: "#ffffff", boxes: [[0, 0, 0, 1, 1, 1]] }] } },
+    { costume: { parts: [{ at: [0, 0, 0] }] } },
+  ]) {
+    assert.throws(() => parseEmote({ ...base, ...broken }), CatalogError, JSON.stringify(broken).slice(0, 60));
   }
 });
 

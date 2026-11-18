@@ -2,16 +2,17 @@
 
 ## Neue Cosmetics: kein Release
 
-Emotes, Hüte und offizielle Capes sind Daten auf dem Cape-Server, kein Code in der Mod:
+Emotes, Hüte, Buddys und offizielle Capes sind Daten auf dem Cape-Server, kein Code in der Mod:
 
 - Emotes: `server/capes/emotes.json`
 - Hüte: `server/capes/hats.json` (Würfel mit Farbe; Modell und Symbol zeichnet das Spiel daraus)
+- Buddys: `server/capes/buddies.json` (dasselbe Format ohne Platz) und zusätzlich als Schulter-Hut in `hats.json`
 - Offizielle Capes: `server/capes/official-capes.json` und das Bild als `server/capes/official-capes/<id>.png`
 
 Aufbau jeweils in `server/capes/README.md` („… hinzufügen“). Für etwas Neues nur diese Dateien ändern, committen
 und der „salami“-Session zum Hochladen auf den Server geben – der Cape-Server lädt sie von selbst neu und alle
 Spiele bekommen es ohne Launcher-Update. Der Nutzer will ausdrücklich kein Update pro Cosmetic. Die Mod bündelt
-`emotes.json` und `hats.json` beim Bauen nur als Notfall-Kopie. Neue Arten von Cosmetics genauso bauen (Katalog
+`emotes.json`, `hats.json` und `buddies.json` beim Bauen nur als Notfall-Kopie. Neue Arten von Cosmetics genauso bauen (Katalog
 auf dem Server, `RemoteCatalog` in der Mod), nicht fest in den Code.
 
 Hüte baut man am einfachsten in Blender: `scripts/hats/hats.blend` (Würfel an einer Figur, eine Sammlung
@@ -19,10 +20,22 @@ Hüte baut man am einfachsten in Blender: `scripts/hats/hats.blend` (Würfel an 
 Blender-Anbindung geht das nur, wenn Blender läuft. Die id `wizard` ist in den Tests (Server und Gametest) der
 Hut, den es nicht gibt – nie als echte id vergeben (der Zauberhut heißt deshalb `wizard_hat`).
 
-Der Shop im Launcher (Reiter Hüte, Emotes, Mini Me) zeigt dieselben Kataloge an der eigenen Figur: geholt über
+Buddys (der Nutzer sagt „Buddys“, im Spiel heißen sie „…-Kumpel“) sind etwas anderes als Mini Me: Begleiter
+aus Würfeln mit eigenem Katalog `server/capes/buddies.json`, eigenem Modul (`BuddyModule`) und denselben
+Plätzen wie ein Mini Me (Hand, Schulter, Kopf, läuft hinterher – `FollowerSim` teilen sich beide). Jeder Buddy
+steht zusätzlich als Schulter-Hut in `hats.json`, damit Spiele vor 1.8.5 ihn weiter sehen; neuere blenden
+solche Hüte im Reiter Hüte aus. In Blender ist ein Buddy ein Schulter-Hut mit der Eigenschaft `buddy`
+(`write_buddies_json`).
+
+Emotes können mehr als Bewegung: Requisiten an einem Körperteil (`props`), ein Wurf (`throw`, nur Optik),
+Geräusche (`sounds`) und eine Verwandlung (`costume`, der Spieler wird nicht gezeichnet, an seiner Stelle steht
+eine Figur). Das alles sind Daten in `emotes.json` aus denselben Würfeln wie Hüte (`BoxModel`); die Modelle
+stehen in `hats.blend` als Sammlungen `emote:<id>:<platz>` (`write_emote_models`).
+
+Der Shop im Launcher (Reiter Hüte, Buddys, Emotes, Mini Me) zeigt dieselben Kataloge an der eigenen Figur: geholt über
 `salami_cosmetics_catalog`, geprüft in `launcher/src/services/salami-cosmetics-service.ts`, gezeichnet in
-`launcher/src/lib/skin3d/cosmetics.ts`. Auch er hat die beiden Dateien als Notfall-Kopie. Kommt ein neues Feld
-ins Hut- oder Emote-Format, muss es an drei Stellen gelesen werden: Server, Mod und Launcher.
+`launcher/src/lib/skin3d/cosmetics.ts`. Auch er hat die Dateien als Notfall-Kopie. Kommt ein neues Feld
+ins Hut-, Buddy- oder Emote-Format, muss es an drei Stellen gelesen werden: Server, Mod und Launcher.
 
 ## Versionsnummern bei Releases
 

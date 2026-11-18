@@ -6,7 +6,7 @@ import net.minecraft.client.Minecraft;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Alle Cosmetics-Kataloge, die vom Salami-Server kommen: Emotes, Hüte und offizielle Capes. Neues in
+ * Alle Cosmetics-Kataloge, die vom Salami-Server kommen: Emotes, Hüte, Buddys und offizielle Capes. Neues in
  * einem davon braucht kein Update – der Server meldet die Änderung, das Spiel lädt die Liste neu.
  */
 public final class Catalogs {
@@ -16,11 +16,12 @@ public final class Catalogs {
 	public static void tick(Minecraft mc) {
 		EmoteCatalog.tick(mc);
 		HatCatalog.tick(mc);
+		BuddyCatalog.tick(mc);
 		OfficialCapes.tick(mc);
 	}
 
 	/**
-	 * Der Server hat eine Änderung gemeldet: {@code emotes}, {@code hats} oder {@code capes} – bei
+	 * Der Server hat eine Änderung gemeldet: {@code emotes}, {@code hats}, {@code buddies} oder {@code capes} – bei
 	 * {@code null} (unbekannt, oder die Verbindung war unterbrochen) alle neu laden.
 	 */
 	public static void refreshSoon(@Nullable String kind) {
@@ -29,6 +30,9 @@ public final class Catalogs {
 		}
 		if (kind == null || kind.equals("hats")) {
 			HatCatalog.refreshSoon();
+		}
+		if (kind == null || kind.equals("buddies")) {
+			BuddyCatalog.refreshSoon();
 		}
 		if (kind == null || kind.equals("capes")) {
 			OfficialCapes.refreshSoon();

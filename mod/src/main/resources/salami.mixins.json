@@ -5,6 +5,7 @@
 	"client": [
 		"AbstractButtonMixin",
 		"AbstractClientPlayerMixin",
+		"AvatarRendererMixin",
 		"CameraMixin",
 		"ChatComponentMixin",
 		"ClientLevelDataMixin",

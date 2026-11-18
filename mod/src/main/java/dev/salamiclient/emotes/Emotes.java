@@ -11,6 +11,7 @@ import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
+import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
@@ -32,7 +33,9 @@ import java.util.UUID;
  *   <li>Emotes anderer enden nach ihrer Dauer oder sobald sich der Spieler bewegt.</li>
  * </ul>
  *
- * Gezeichnet wird über {@code PlayerModelMixin} → {@link #pose}. Alles auf dem Client-/Render-Thread.
+ * Gezeichnet wird über {@code PlayerModelMixin} → {@link #pose}. Was ein Emote sonst mitbringt –
+ * Requisiten, einen Wurf, Geräusche, eine Verwandlung –, lösen {@link #tick} und {@link EmoteEffects}
+ * aus. Alles auf dem Client-/Render-Thread.
  */
 public final class Emotes {
 	/** Weiches Ein- und Ausblenden. */
@@ -47,6 +50,11 @@ public final class Emotes {
 		final long startAt;
 		long stopAt = -1;
 		@Nullable Vec3 origin;
+		/** Schon geworfen, schon abgespielte Geräusche (ein Bit je Eintrag), schon verwandelt und zurück. */
+		boolean thrown;
+		int soundsPlayed;
+		boolean poofedIn;
+		boolean poofedOut;
 
 		Playing(Emote emote, long startAt) {
 			this.emote = emote;
@@ -120,31 +128,103 @@ public final class Emotes {
 		others.put(player, new Playing(emote, System.currentTimeMillis()));
 	}
 
+	/** Ein laufendes Emote von außen gesehen: seit {@code seconds} dabei, {@code weight} 0..1 blendet ein und aus. */
+	public record Active(Emote emote, float seconds, float weight) {}
+
+	/** Läuft überhaupt irgendein Emote? */
+	public static boolean anyPlaying() {
+		return own != null || !others.isEmpty();
+	}
+
+	/** Das Emote, das dieser Spieler gerade zeigt (auch während es ausblendet), oder {@code null}. */
+	public static @Nullable Active activeOf(Player player) {
+		if (own == null && others.isEmpty()) {
+			return null;
+		}
+		Playing playing = player == Minecraft.getInstance().player ? own : others.get(player.getUUID());
+		if (playing == null) {
+			return null;
+		}
+		long now = System.currentTimeMillis();
+		float weight = playing.weight(now);
+		return weight <= 0f ? null : new Active(playing.emote, (now - playing.startAt) / 1000f, weight);
+	}
+
+	/**
+	 * Ist dieser Spieler gerade verwandelt (sein Emote hat eine Figur)? Dann zeichnet Minecraft weder
+	 * sein Modell noch Rüstung, Cape und was er hält – an seiner Stelle steht die Figur.
+	 */
+	public static boolean transformed(LivingEntityRenderState state) {
+		if ((own == null && others.isEmpty()) || !(state instanceof AvatarRenderState avatar)) {
+			return false;
+		}
+		Minecraft mc = Minecraft.getInstance();
+		Entity entity = mc.level == null ? null : mc.level.getEntity(avatar.id);
+		if (!(entity instanceof Player player)) {
+			return false;
+		}
+		Active active = activeOf(player);
+		return active != null && active.emote().costume() != null;
+	}
+
+	/** Wurf, Geräusche und Rauch eines laufenden Emotes auslösen, sobald ihre Zeit gekommen ist. */
+	private static void effects(Minecraft mc, Player player, Playing playing, long now) {
+		Emote emote = playing.emote;
+		boolean ending = playing.stopAt >= 0 || now >= playing.startAt + emote.durationMs();
+		if (emote.costume() != null) {
+			if (!playing.poofedIn) {
+				playing.poofedIn = true;
+				EmoteEffects.poof(mc, player);
+			} else if (ending && !playing.poofedOut) {
+				playing.poofedOut = true;
+				EmoteEffects.poof(mc, player);
+			}
+		}
+		if (ending) {
+			return;
+		}
+		float t = (now - playing.startAt) / 1000f;
+		Emote.Throw thrown = emote.thrown();
+		if (thrown != null && !playing.thrown && t >= thrown.t()) {
+			playing.thrown = true;
+			EmoteEffects.launch(player, thrown);
+		}
+		for (int i = 0; i < emote.sounds().size(); i++) {
+			Emote.Sound sound = emote.sounds().get(i);
+			if ((playing.soundsPlayed & 1 << i) == 0 && t >= sound.t()) {
+				playing.soundsPlayed |= 1 << i;
+				EmoteEffects.sound(mc, player, sound.sound());
+			}
+		}
+	}
+
 	/** Für Gametests und den Befehl: alles beenden, Kamera zurück. */
 	public static void clear() {
 		own = null;
 		others.clear();
+		EmoteEffects.clear();
 		restoreCamera(Minecraft.getInstance());
 		EmoteSync.reset();
 	}
 
 	public static void tick(Minecraft mc) {
 		long now = System.currentTimeMillis();
+		EmoteEffects.tick(mc);
 		Playing playing = own;
 		if (playing != null) {
 			if (mc.player == null || mc.player.isRemoved() || playing.finished(now)) {
 				own = null;
-			} else if (playing.stopAt < 0 && (movementInput(mc.options) || mc.player.hurtTime > 0)) {
-				playing.stop(now);
+			} else {
+				if (playing.stopAt < 0 && (movementInput(mc.options) || mc.player.hurtTime > 0)) {
+					playing.stop(now);
+				}
+				effects(mc, mc.player, playing, now);
 			}
 		}
 		if (own == null || own.stopAt >= 0 || now >= own.startAt + own.emote.durationMs()) {
 			restoreCamera(mc);
 		}
 
-		if (others.isEmpty()) {
-			return;
-		}
 		for (Iterator<Map.Entry<UUID, Playing>> it = others.entrySet().iterator(); it.hasNext(); ) {
 			Map.Entry<UUID, Playing> entry = it.next();
 			Playing other = entry.getValue();
@@ -160,6 +240,9 @@ public final class Emotes {
 				} else if (position.subtract(other.origin).horizontalDistance() > REMOTE_MOVE) {
 					other.stop(now);
 				}
+			}
+			if (player != null) {
+				effects(mc, player, other, now);
 			}
 		}
 	}

@@ -9,19 +9,21 @@
  *
  * Spiel (salami-core):
  *   POST /v1/auth/challenge                         → {"serverId":"…"}
- *   PUT  /v1/capes/me  {"name","serverId","cape","hat"?,"minime"?} → {"status":"approved"|"pending"|"rejected", …}
+ *   PUT  /v1/capes/me  {"name","serverId","cape","hat"?,"minime"?,"buddy"?} → {"status":"approved"|"pending"|"rejected", …}
  *        cape: {"builtin":"salami"} | {"png":"<base64>"} | null (kein Cape)
  *        hat: "santa", "crown" … (Cosmetics → Hüte, ein Hut aus dem Katalog hats.json) oder fehlt/null;
  *        unbekannte Hüte werden ignoriert
  *        minime: {"name":"<Minecraft-Name>","place":"hand"|"shoulder"|"head"|"follow"}
  *        (Cosmetics → Mini Me) oder fehlt/null; Ungültiges wird ebenso ignoriert
+ *        buddy: {"id":"tree_buddy","place":"hand"|"shoulder"|"head"|"follow"} (Cosmetics → Buddys, ein Buddy
+ *        aus dem Katalog buddies.json) oder fehlt/null; Unbekanntes wird ebenso ignoriert
  *        Anmeldung wie beim Betreten eines Minecraft-Servers: das Spiel meldet die
  *        serverId bei Mojang an (joinServer), dieser Server fragt Mojang (hasJoined).
  *        Das Zugangstoken des Spielers bekommt der Cape-Server nie zu sehen.
  *   POST /v1/capes/lookup {"uuids":[…]}             → {"capes":{"<uuid>":{"builtin":"salami"}|{"id":"<capeId>"}}}
  *        nur sichtbare Capes: mitgelieferte und freigegebene; trägt der Spieler einen Hut,
  *        steht zusätzlich "hat":"santa" darin (auch ohne Cape: {"hat":"santa"}), ebenso
- *        sein Mini Me als "minime":{"name","place"}
+ *        sein Mini Me als "minime":{"name","place"} und sein Buddy als "buddy":{"id","place"}
  *   GET  /v1/capes/img/<capeId>.png                 → freigegebenes Cape-Bild
  *   GET  /v1/capes/gallery                          → {"capes":[{"id","approvedAt","wearers","official"?,"names"?}]}
  *        alle freigegebenen Capes: zuerst die offiziellen (mit "official":true und "names"), dann die
@@ -32,6 +34,8 @@
  *        Bild-ID für /v1/capes/img/<cape>.png. Das Spiel zeigt sie unter Cosmetics → Capes.
  *   GET  /v1/hats/catalog                           → {"version":"…","hats":[…]}
  *        alle Hüte als Daten (hats.json, Format in hats.mjs).
+ *   GET  /v1/buddies/catalog                        → {"version":"…","buddies":[…]}
+ *        alle Buddys als Daten (buddies.json, Format in buddies.mjs).
  *   GET  /v1/capes/events                           → Server-Sent Events, eine Zeile pro Änderung:
  *        data: {"uuid":"…","cape":{"builtin":"salami"}|{"id":"…"}|null}
  *        (Cape gewechselt oder von einem Admin freigegeben/gesperrt) – so sehen alle
@@ -44,9 +48,9 @@
  *        spielt ein Emote aus dem Katalog für alle Mitspieler ab; nichts davon wird gespeichert.
  *   GET  /v1/emotes/catalog                          → {"version":"…","emotes":[…]}
  *        alle Emotes als Daten (emotes.json, Format in emotes.mjs). Das Spiel lädt sie beim Start.
- *        Ändert sich einer der drei Kataloge (Emotes, Hüte, offizielle Capes), lädt der Server ihn von
- *        selbst neu und meldet es auf /v1/capes/events als
- *        data: {"catalog":"<version>","kind":"emotes"|"hats"|"capes"} – Neues braucht kein Update.
+ *        Ändert sich einer der vier Kataloge (Emotes, Hüte, Buddys, offizielle Capes), lädt der Server ihn
+ *        von selbst neu und meldet es auf /v1/capes/events als
+ *        data: {"catalog":"<version>","kind":"emotes"|"hats"|"buddies"|"capes"} – Neues braucht kein Update.
  * Launcher:
  *   POST /v1/capes/status {"ids":[…]}               → {"status":{"<capeId>":{"status":"pending"|…,"reason"?}}}
  *   POST /v1/capes/submit {"name","serverId","png"} → {"status":"approved"|"pending"|"rejected","id","reason"?}
@@ -88,6 +92,7 @@ import { mkdirSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync,
 import { createServer } from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { BUDDY_PLACES, parseBuddyCatalog } from "./buddies.mjs";
 import { parseCatalog } from "./emotes.mjs";
 import { createFriends } from "./friends.mjs";
 import { parseHatCatalog } from "./hats.mjs";
@@ -132,6 +137,8 @@ const REPORTS_PER_DAY = env("REPORTS_PER_DAY", 20);
 const EMOTES_FILE = process.env.EMOTES_FILE || fileURLToPath(new URL("./emotes.json", import.meta.url));
 /** Hut-Katalog (Format: hats.mjs): welche Hüte es gibt und wie sie aussehen. */
 const HATS_FILE = process.env.HATS_FILE || fileURLToPath(new URL("./hats.json", import.meta.url));
+/** Buddy-Katalog (Format: buddies.mjs): welche Buddys es gibt und wie sie aussehen. */
+const BUDDIES_FILE = process.env.BUDDIES_FILE || fileURLToPath(new URL("./buddies.json", import.meta.url));
 /** Offizielle Capes (Format: official.mjs): die Liste, die Bilder liegen als <id>.png im Ordner daneben. */
 const OFFICIAL_CAPES_FILE =
   process.env.OFFICIAL_CAPES_FILE || fileURLToPath(new URL("./official-capes.json", import.meta.url));
@@ -241,10 +248,11 @@ function visibleCape(player) {
   let cape = null;
   if (player.cape?.builtin) cape = { builtin: player.cape.builtin };
   else if (player.cape?.id && db.capes[player.cape.id]?.status === "approved") cape = { id: player.cape.id };
-  // Hut und Mini Me (Cosmetics) reisen im selben Objekt mit; ältere Clients lesen nur builtin/id
+  // Hut, Mini Me und Buddy (Cosmetics) reisen im selben Objekt mit; ältere Clients lesen nur, was sie kennen
   const extras = {
     ...(player.hat ? { hat: player.hat } : {}),
     ...(player.minime ? { minime: { name: player.minime.name, place: player.minime.place } } : {}),
+    ...(player.buddy ? { buddy: { id: player.buddy.id, place: player.buddy.place } } : {}),
   };
   return Object.keys(extras).length ? { ...cape, ...extras } : cape;
 }
@@ -256,6 +264,15 @@ function parseMiniMe(value) {
   if (typeof name !== "string" || !MC_NAME.test(name)) return null;
   if (typeof place !== "string" || !MINIME_PLACES.has(place)) return null;
   return { name, place };
+}
+
+/** Buddy aus der Anfrage: {id, place} oder null (fehlt, unbekannt oder ungültig). */
+function parseBuddyWish(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const { id, place } = value;
+  if (typeof id !== "string" || !buddyCatalog.ids.has(id)) return null;
+  if (typeof place !== "string" || !BUDDY_PLACES.has(place)) return null;
+  return { id, place };
 }
 
 // ------------------------------------------------------------------ Hilfen
@@ -459,15 +476,21 @@ async function handleSetCape(req, res) {
   const previous = db.players[uuid]?.cape?.id;
   const visibleBefore = JSON.stringify(visibleCape(db.players[uuid]));
   const cape = body.cape ?? null;
-  // Hut und Mini Me: Unbekanntes (neuere Clients) einfach ignorieren statt die Anfrage abzulehnen
+  // Hut, Mini Me und Buddy: Unbekanntes (neuere Clients) einfach ignorieren statt die Anfrage abzulehnen
   const hat = typeof body.hat === "string" && hatCatalog.ids.has(body.hat) ? body.hat : null;
   const minime = parseMiniMe(body.minime);
-  const withHat = (player) => ({ ...player, ...(hat ? { hat } : {}), ...(minime ? { minime } : {}) });
+  const buddy = parseBuddyWish(body.buddy);
+  const withHat = (player) => ({
+    ...player,
+    ...(hat ? { hat } : {}),
+    ...(minime ? { minime } : {}),
+    ...(buddy ? { buddy } : {}),
+  });
   const now = new Date().toISOString();
   let result;
 
   if (cape === null) {
-    if (hat || minime) db.players[uuid] = withHat({ name, updatedAt: now });
+    if (hat || minime || buddy) db.players[uuid] = withHat({ name, updatedAt: now });
     else delete db.players[uuid];
     result = { status: "none" };
   } else if (typeof cape.builtin === "string") {
@@ -815,6 +838,16 @@ const hatCatalog = fileCatalog({
   },
 });
 
+const buddyCatalog = fileCatalog({
+  kind: "buddies",
+  label: "Buddy",
+  file: BUDDIES_FILE,
+  parse: (root) => {
+    const { buddies, skipped } = parseBuddyCatalog(root);
+    return { items: buddies, skipped };
+  },
+});
+
 /** Stand aller Bilder im Ordner der offiziellen Capes – ein neues oder ersetztes Bild lädt den Katalog neu. */
 function officialImagesStamp() {
   try {
@@ -895,7 +928,7 @@ const officialCatalog = fileCatalog({
   applied: applyOfficialCapes,
 });
 
-const CATALOGS = [emoteCatalog, hatCatalog, officialCatalog];
+const CATALOGS = [emoteCatalog, hatCatalog, buddyCatalog, officialCatalog];
 
 // ------------------------------------------------------------------ Emotes
 
@@ -1040,6 +1073,11 @@ async function route(req, res) {
   if (req.method === "GET" && path === "/v1/hats/catalog") {
     if (rateLimited("lookup", ip, LOOKUP_RATE_PER_MINUTE)) throw new HttpError(429, "zu viele Anfragen");
     return send(res, 200, { version: hatCatalog.version, hats: hatCatalog.items });
+  }
+
+  if (req.method === "GET" && path === "/v1/buddies/catalog") {
+    if (rateLimited("lookup", ip, LOOKUP_RATE_PER_MINUTE)) throw new HttpError(429, "zu viele Anfragen");
+    return send(res, 200, { version: buddyCatalog.version, buddies: buddyCatalog.items });
   }
 
   if (req.method === "GET" && path === "/v1/capes/catalog") {

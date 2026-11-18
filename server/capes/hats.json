@@ -467,7 +467,7 @@
     },
     {
       "id": "tree_buddy",
-      "names": { "en_us": "Christmas tree buddy", "de_de": "Tannenbaum-Kumpel" },
+      "names": { "en_us": "Tree buddy", "de_de": "Tannenbaum-Kumpel" },
       "anchor": "shoulder",
       "bob": 0.5,
       "sway": 10,

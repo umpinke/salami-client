@@ -11,12 +11,14 @@ import dev.salamiclient.modules.social.EmotesModule;
 import dev.salamiclient.capes.AnimatedCapes;
 import dev.salamiclient.capes.CapeLibrary;
 import dev.salamiclient.capes.OfficialCapes;
+import dev.salamiclient.cosmetics.BuddyCatalog;
 import dev.salamiclient.cosmetics.Hat;
 import dev.salamiclient.cosmetics.HatCatalog;
 import dev.salamiclient.cosmetics.HatIcons;
 import dev.salamiclient.modules.client.GuiScaleModule;
 import dev.salamiclient.modules.visual.CapesModule;
 import dev.salamiclient.modules.visual.HatsModule;
+import dev.salamiclient.modules.visual.BuddyModule;
 import dev.salamiclient.modules.visual.MiniMeModule;
 import dev.salamiclient.minime.MiniMeSkins;
 import dev.salamiclient.render.GuiDraw;
@@ -84,6 +86,7 @@ public final class CosmeticsScreen extends Screen {
 	public enum Tab {
 		CAPES("salami.cosmetics.tab.capes"),
 		HATS("salami.cosmetics.tab.hats"),
+		BUDDIES("salami.cosmetics.tab.buddies"),
 		MINIME("salami.cosmetics.tab.minime"),
 		EMOTES("salami.cosmetics.tab.emotes");
 
@@ -94,7 +97,7 @@ public final class CosmeticsScreen extends Screen {
 		}
 	}
 
-	/** Höhe der Zeile mit dem Namensfeld im Reiter Mini Me. */
+	/** Höhe der Zeile über den Kacheln: das Namensfeld im Reiter Mini Me, die Plätze im Reiter Buddys. */
 	private static final int NAME_ROW = 26;
 
 	private final Screen parent;
@@ -115,6 +118,7 @@ public final class CosmeticsScreen extends Screen {
 	/** Stand der Kataloge (Emotes, Hüte, offizielle Capes), mit dem die Kacheln gebaut wurden. */
 	private int emoteRevision;
 	private int hatRevision;
+	private int buddyRevision;
 	private int capeRevision;
 	private long currentReadAt;
 
@@ -164,9 +168,22 @@ public final class CosmeticsScreen extends Screen {
 		if (tab == Tab.HATS) {
 			// Symbole zeichnet HatIcons aus dem Modell – die Liste kommt vom Server und kann wachsen
 			hatRevision = HatCatalog.revision();
+			buddyRevision = BuddyCatalog.revision();
 			cards.add(new Card("hat:none", I18n.get("salami.cosmetics.hat.none"), null, 0));
 			for (Hat hat : HatCatalog.all()) {
+				if (BuddyCatalog.isBuddy(hat.id())) {
+					continue; // steht im Reiter Buddys (als Hut nur noch für ältere Versionen im Katalog)
+				}
 				cards.add(new Card("hat:" + hat.id(), hat.displayName(), null, 0));
+			}
+			return;
+		}
+		if (tab == Tab.BUDDIES) {
+			// Symbole zeichnet HatIcons aus dem Modell – die Liste kommt vom Server und kann wachsen
+			buddyRevision = BuddyCatalog.revision();
+			cards.add(new Card("buddy:none", I18n.get("salami.cosmetics.buddy.none"), null, 0));
+			for (Hat buddy : BuddyCatalog.all()) {
+				cards.add(new Card("buddy:" + buddy.id(), buddy.displayName(), null, 0));
 			}
 			return;
 		}
@@ -242,6 +259,10 @@ public final class CosmeticsScreen extends Screen {
 		if (tab == Tab.HATS) {
 			HatsModule hats = HatsModule.instance();
 			return hats == null || !hats.isEnabled() || hats.selected() == null ? "hat:none" : "hat:" + hats.selected().id();
+		}
+		if (tab == Tab.BUDDIES) {
+			BuddyModule buddies = BuddyModule.instance();
+			return buddies == null || !buddies.isEnabled() || buddies.selected() == null ? "buddy:none" : "buddy:" + buddies.selected().id();
 		}
 		if (tab == Tab.MINIME) {
 			MiniMeModule mini = MiniMeModule.instance();
@@ -319,6 +340,40 @@ public final class CosmeticsScreen extends Screen {
 	/** Für {@link SalamiClient#isTyping}: das Namensfeld hat die Tastatur. */
 	public boolean isTyping() {
 		return tab == Tab.MINIME && nameFocused;
+	}
+
+	/** Buddy mitnehmen ({@code buddy:tree_buddy}) oder wegpacken ({@code buddy:none}); der Platz steht in der Zeile darüber. */
+	private void chooseBuddy(String key) {
+		BuddyModule buddies = BuddyModule.instance();
+		if (buddies == null) {
+			return;
+		}
+		if (!buddies.isEnabled()) {
+			SalamiClient.get().modules().setEnabled(buddies, true);
+		}
+		Hat buddy = BuddyCatalog.get(key.substring("buddy:".length()));
+		buddies.choose(buddy == null ? null : buddy.id());
+		setNotice(buddy == null ? Component.translatable("salami.cosmetics.buddy.removed")
+			: Component.translatable("salami.cosmetics.buddy.equipped", buddy.displayName(), placeLabel(buddies.place())), false);
+		currentReadAt = 0;
+		SalamiClient.get().config().markDirty();
+	}
+
+	/** Wo der Buddy sein soll (die Zeile über den Kacheln). */
+	private void chooseBuddyPlace(BuddyModule.Place place) {
+		BuddyModule buddies = BuddyModule.instance();
+		if (buddies == null) {
+			return;
+		}
+		buddies.setPlace(place);
+		Hat buddy = buddies.selected();
+		setNotice(buddy == null ? Component.translatable("salami.cosmetics.buddy.place_set", placeLabel(place))
+			: Component.translatable("salami.cosmetics.buddy.equipped", buddy.displayName(), placeLabel(place)), false);
+		SalamiClient.get().config().markDirty();
+	}
+
+	private static String placeLabel(BuddyModule.Place place) {
+		return I18n.get("salami.module.buddy.setting.place." + place.name().toLowerCase(Locale.ROOT));
 	}
 
 	/** Hut aufsetzen ({@code hat:santa}) oder abnehmen ({@code hat:none}). */
@@ -492,7 +547,7 @@ public final class CosmeticsScreen extends Screen {
 
 	private int[] content() {
 		int[] f = frame();
-		int top = f[1] + HEADER + 4 + TABS + 4 + (tab == Tab.MINIME ? NAME_ROW : 0);
+		int top = f[1] + HEADER + 4 + TABS + 4 + (tab == Tab.MINIME || tab == Tab.BUDDIES ? NAME_ROW : 0);
 		return new int[] {f[0] + PAD, top, f[2] - PAD, f[3] - PAD - 22};
 	}
 
@@ -548,6 +603,21 @@ public final class CosmeticsScreen extends Screen {
 		int[] field = nameField();
 		int w = font.width(I18n.get("salami.cosmetics.minime.apply")) + 12;
 		return new int[] {field[2] + 4, field[1], field[2] + 4 + w, field[3]};
+	}
+
+	/** Knopf für einen Platz im Reiter Buddys: {x0, y0, x1, y1}. */
+	private int[] placeButton(BuddyModule.Place which) {
+		int[] f = frame();
+		int y = f[1] + HEADER + 4 + TABS + 6;
+		int x = f[0] + PAD;
+		for (BuddyModule.Place place : BuddyModule.Place.values()) {
+			int w = font.width(placeLabel(place)) + 12;
+			if (place == which) {
+				return new int[] {x, y, x + w, y + 16};
+			}
+			x += w + 4;
+		}
+		throw new IllegalArgumentException(String.valueOf(which));
 	}
 
 	private static boolean inside(int[] r, double x, double y) {
@@ -612,8 +682,12 @@ public final class CosmeticsScreen extends Screen {
 		if (tab == Tab.MINIME) {
 			renderNameRow(g, theme, mx, my);
 		}
+		if (tab == Tab.BUDDIES) {
+			renderPlaceRow(g, theme, mx, my);
+		}
 		if (tab == Tab.EMOTES && emoteRevision != EmoteCatalog.revision()
-			|| tab == Tab.HATS && hatRevision != HatCatalog.revision()
+			|| tab == Tab.HATS && (hatRevision != HatCatalog.revision() || buddyRevision != BuddyCatalog.revision())
+			|| tab == Tab.BUDDIES && buddyRevision != BuddyCatalog.revision()
 			|| tab == Tab.CAPES && capeRevision != OfficialCapes.revision()) {
 			reload(); // Neues vom Server, während das Menü offen ist
 		}
@@ -638,6 +712,7 @@ public final class CosmeticsScreen extends Screen {
 
 		Component line = notice != null ? notice : Component.translatable(switch (tab) {
 			case HATS -> "salami.cosmetics.hat.info";
+			case BUDDIES -> "salami.cosmetics.buddy.info";
 			case EMOTES -> "salami.cosmetics.emote.info";
 			case MINIME -> "salami.cosmetics.minime.info";
 			default -> "salami.cosmetics.info";
@@ -661,7 +736,7 @@ public final class CosmeticsScreen extends Screen {
 		int px = x + (CARD_W - PREVIEW_W) / 2;
 		int py = y + PREVIEW_Y;
 		switch (card.key()) {
-			case "none", "hat:none", "minime:none" -> {
+			case "none", "hat:none", "buddy:none", "minime:none" -> {
 				GuiDraw.outline(g, px, py, PREVIEW_W, PREVIEW_H, theme.textDim());
 				GuiDraw.centeredText(g, font, "—", px + PREVIEW_W / 2, py + PREVIEW_H / 2 - 4, theme.textDim());
 			}
@@ -690,6 +765,14 @@ public final class CosmeticsScreen extends Screen {
 					int size = PREVIEW_H - 3;
 					int ix = x + (CARD_W - size) / 2;
 					g.blit(RenderPipelines.GUI_TEXTURED, HatIcons.texture(hat), ix, py + 2, 0f, 0f, size, size,
+						HatIcons.SIZE, HatIcons.SIZE, HatIcons.SIZE, HatIcons.SIZE);
+					break;
+				}
+				Hat buddy = card.key().startsWith("buddy:") ? BuddyCatalog.get(card.key().substring("buddy:".length())) : null;
+				if (buddy != null) {
+					int size = PREVIEW_H - 3;
+					int ix = x + (CARD_W - size) / 2;
+					g.blit(RenderPipelines.GUI_TEXTURED, HatIcons.texture("buddy", buddy), ix, py + 2, 0f, 0f, size, size,
 						HatIcons.SIZE, HatIcons.SIZE, HatIcons.SIZE, HatIcons.SIZE);
 					break;
 				}
@@ -801,6 +884,21 @@ public final class CosmeticsScreen extends Screen {
 		}
 	}
 
+	/** Die Plätze eines Buddys als Knöpfe; der gewählte ist hervorgehoben. */
+	private void renderPlaceRow(GuiGraphics g, Theme theme, int mx, int my) {
+		BuddyModule buddies = BuddyModule.instance();
+		for (BuddyModule.Place place : BuddyModule.Place.values()) {
+			int[] r = placeButton(place);
+			boolean active = buddies != null && buddies.place() == place;
+			boolean hovered = inside(r, mx, my);
+			GuiDraw.roundRect(g, r[0], r[1], r[2] - r[0], r[3] - r[1], active ? theme.accent() : hovered ? theme.textDim() : theme.outline());
+			if (!active) {
+				GuiDraw.roundRect(g, r[0] + 1, r[1] + 1, r[2] - r[0] - 2, r[3] - r[1] - 2, hovered ? theme.header() : theme.panel() | 0xFF000000);
+			}
+			GuiDraw.text(g, font, placeLabel(place), r[0] + 6, r[1] + 4, active ? GuiDraw.textOn(theme.accent()) : theme.headerText(), false);
+		}
+	}
+
 	/** Schmale Leiste rechts neben den Karten, nur wenn nicht alle Reihen passen. */
 	private void renderScrollbar(GuiGraphics g, Theme theme, int[] c) {
 		int rows = rows();
@@ -842,6 +940,14 @@ public final class CosmeticsScreen extends Screen {
 			}
 			nameFocused = false;
 		}
+		if (tab == Tab.BUDDIES) {
+			for (BuddyModule.Place place : BuddyModule.Place.values()) {
+				if (inside(placeButton(place), x, y)) {
+					chooseBuddyPlace(place);
+					return true;
+				}
+			}
+		}
 		for (Tab t : Tab.values()) {
 			if (t != tab && inside(tabRect(t), x, y)) {
 				tab = t;
@@ -871,7 +977,8 @@ public final class CosmeticsScreen extends Screen {
 
 	/**
 	 * Kachel wählen, als hätte man sie angeklickt: {@code builtin:board}, {@code official:frost},
-	 * {@code own:<id>}, {@code hat:crown}, {@code emote:wave}, {@code minime:head}, {@code upload} …
+	 * {@code own:<id>}, {@code hat:crown}, {@code buddy:tree_buddy}, {@code buddyplace:follow},
+	 * {@code emote:wave}, {@code minime:head}, {@code upload} …
 	 */
 	public void pick(String key) {
 		if (key.equals("upload")) {
@@ -880,6 +987,10 @@ public final class CosmeticsScreen extends Screen {
 			chooseOfficial(key);
 		} else if (key.startsWith("hat:")) {
 			chooseHat(key);
+		} else if (key.startsWith("buddyplace:")) {
+			chooseBuddyPlace(BuddyModule.Place.valueOf(key.substring("buddyplace:".length()).toUpperCase(Locale.ROOT)));
+		} else if (key.startsWith("buddy:")) {
+			chooseBuddy(key);
 		} else if (key.startsWith("emote:")) {
 			playEmote(key);
 		} else if (key.startsWith("minime:")) {

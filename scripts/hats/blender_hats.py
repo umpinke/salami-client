@@ -7,6 +7,7 @@ Claude oder im Reiter „Scripting“:
     spec = importlib.util.spec_from_file_location("blender_hats", r"…\\scripts\\hats\\blender_hats.py")
     hats = importlib.util.module_from_spec(spec); spec.loader.exec_module(hats)
     hats.write_hats_json(r"…\\server\\capes\\hats.json")      # alle Hüte der Szene in die Liste schreiben
+    hats.write_buddies_json(r"…\\server\\capes\\buddies.json")  # die Buddys (siehe unten) in ihre Liste
 
 So ist die Szene (``hats.blend``) aufgebaut:
 
@@ -24,6 +25,20 @@ So ist die Szene (``hats.blend``) aufgebaut:
   seine Mitte.
 - Schulter-Hüte (``anchor = shoulder``) baut man dort, wo sie schweben: über der linken Schulter
   (x 6,5, z 1 ist ihr Ankerpunkt).
+- Buddys sind Schulter-Hüte mit der eigenen Eigenschaft ``buddy`` (``hat(..., buddy=True)``). Sie stehen
+  zusätzlich in ``buddies.json`` – dort ohne Platz, denn den wählt der Spieler (Hand, Schulter, Kopf,
+  läuft hinterher). Ihr Ankerpunkt ist dann der Boden unter ihren Füßen. In ``hats.json`` bleiben sie für
+  ältere Spielversionen, die Buddys nur als Hut kennen.
+
+- Was Emotes mitbringen, sind Sammlungen „emote:<id>:<platz>“ (``emote_model``): ``prop0`` … ``prop3``
+  (Requisite an einem Körperteil), ``throw`` (was geworfen wird) und ``costume`` (die Figur, zu der der
+  Spieler wird). Sie stehen irgendwo neben der Figur; ``origin`` an der Sammlung ist ihr Nullpunkt.
+  Requisiten und Geworfenes baut man um ihren Nullpunkt, eine Verwandlung so, als stünde die
+  Referenz-Figur bei ``origin`` (Hals = Nullpunkt, Boden bei z −24). Ein Empty der obersten Ebene mit der
+  eigenen Eigenschaft ``follow`` (``head``, ``right_arm``, ``left_arm``, ``right_leg``, ``left_leg``) ist
+  ein Teil der Verwandlung, das sich wie dieses Körperteil bewegt. ``write_emote_models`` trägt die Würfel
+  in ``emotes.json`` ein – dort muss der Platz schon stehen (alles außer ``parts`` schreibt man von Hand,
+  Format in ``server/capes/emotes.mjs``).
 
 Grenzen wie im Spiel: 64 Würfel und 32 Teile je Hut, Maße bis 32 Pixel, 64 Hüte insgesamt.
 """
@@ -36,6 +51,9 @@ import bpy
 from mathutils import Euler, Matrix, Vector
 
 PREFIX = "hat:"
+EMOTE_PREFIX = "emote:"
+EMOTE_SLOTS = ("prop0", "prop1", "prop2", "prop3", "throw", "costume")
+FOLLOW = ("head", "right_arm", "left_arm", "right_leg", "left_leg")
 REFERENCE = "Referenz"
 COLOR = re.compile(r"#[0-9a-fA-F]{6}")
 ID = re.compile(r"[a-z0-9_]{1,24}")
@@ -88,8 +106,8 @@ def collection(name):
     return made
 
 
-def hat(hat_id, names, anchor="head", scale=1.0, glow=False, bob=0.0, sway=0.0):
-    """Legt die Sammlung eines Hutes an (eine alte mit demselben Namen wird ersetzt)."""
+def hat(hat_id, names, anchor="head", scale=1.0, glow=False, bob=0.0, sway=0.0, buddy=False):
+    """Legt die Sammlung eines Hutes an (eine alte mit demselben Namen wird ersetzt). ``buddy``: ist ein Buddy."""
     if not ID.fullmatch(hat_id) or hat_id == "none":
         raise ValueError(f"id {hat_id!r} ungültig (a-z, 0-9, _, höchstens 24 Zeichen, nicht „none“)")
     made = collection(PREFIX + hat_id)
@@ -99,6 +117,19 @@ def hat(hat_id, names, anchor="head", scale=1.0, glow=False, bob=0.0, sway=0.0):
     made["glow"] = bool(glow)
     made["bob"] = float(bob)
     made["sway"] = float(sway)
+    made["buddy"] = bool(buddy)
+    return made
+
+
+def emote_model(emote_id, slot, origin=(0.0, 0.0, 0.0)):
+    """
+    Legt die Sammlung für ein Modell eines Emotes an (eine alte mit demselben Namen wird ersetzt):
+    ``slot`` ist ``prop0`` … ``prop3``, ``throw`` oder ``costume``, ``origin`` der Nullpunkt in der Szene.
+    """
+    if not ID.fullmatch(emote_id) or slot not in EMOTE_SLOTS:
+        raise ValueError(f"emote:{emote_id}:{slot} ungültig (Platz: {', '.join(EMOTE_SLOTS)})")
+    made = collection(f"{EMOTE_PREFIX}{emote_id}:{slot}")
+    made["origin"] = [float(v) for v in origin]
     return made
 
 
@@ -212,12 +243,19 @@ def look_at(target="head", turn=-30.0, tilt=18.0, distance=None):
 
 
 def show_only(hat_id=None):
-    """Zeigt in Ansicht und Rendering nur diesen Hut (``None``: alle)."""
+    """
+    Zeigt in Ansicht und Rendering nur diesen Hut (``None``: alle Hüte). Emote-Modelle sind nur zu sehen,
+    wenn man eines nennt (``emote:snowball:throw``).
+    """
     for coll in bpy.data.collections:
         if coll.name.startswith(PREFIX):
             hidden = hat_id is not None and coll.name != PREFIX + hat_id
-            coll.hide_render = hidden
-            coll.hide_viewport = hidden
+        elif coll.name.startswith(EMOTE_PREFIX):
+            hidden = coll.name != hat_id
+        else:
+            continue
+        coll.hide_render = hidden
+        coll.hide_viewport = hidden
 
 
 def render(path, hat_id=None, **view):
@@ -289,7 +327,12 @@ def _parts(children, offset):
     for color, boxes in by_color.items():
         parts.append({"color": color, "boxes": boxes})
     for obj in turned:
-        part = {"at": _game_point(obj.matrix_basis.translation + offset)}
+        part = {}
+        if obj.get("follow"):
+            if obj["follow"] not in FOLLOW:
+                raise ValueError(f"{obj.name}: follow muss eines von {', '.join(FOLLOW)} sein")
+            part["follow"] = obj["follow"]
+        part["at"] = _game_point(obj.matrix_basis.translation + offset)
         rotation = _game_rotation(obj.matrix_basis.to_euler("XYZ"))
         if any(rotation):
             part["rot"] = rotation
@@ -357,9 +400,38 @@ def export_hat(coll):
     return entry
 
 
+def export_emote_model(coll):
+    """Die Teile eines Emote-Modells (Sammlung „emote:<id>:<platz>“), bezogen auf ihren Nullpunkt ``origin``."""
+    origin = Vector(coll.get("origin", (0.0, 0.0, 0.0)))
+    count = {"parts": 0, "boxes": 0}
+    try:
+        parts = _parts([o for o in coll.objects if o.parent is None], -origin)
+        _count(parts, 1, count)
+    except ValueError as error:
+        raise ValueError(f"{coll.name}: {error}") from None
+    if count["boxes"] == 0:
+        raise ValueError(f"{coll.name}: kein Würfel")
+    if count["boxes"] > MAX_BOXES or count["parts"] > MAX_PARTS:
+        raise ValueError(f"{coll.name}: {count['boxes']} Würfel, {count['parts']} Teile – erlaubt sind {MAX_BOXES} und {MAX_PARTS}")
+    return parts
+
+
 def export_hats():
     """Alle Hüte der Szene, in der Reihenfolge ihrer Namen."""
     return [export_hat(c) for c in sorted(bpy.data.collections, key=lambda c: c.name) if c.name.startswith(PREFIX)]
+
+
+def export_buddies():
+    """Alle Buddys der Szene (Sammlungen mit ``buddy``) als Einträge für buddies.json: wie der Hut, ohne Platz."""
+    entries = []
+    for coll in sorted(bpy.data.collections, key=lambda c: c.name):
+        if coll.name.startswith(PREFIX) and coll.get("buddy"):
+            if coll.get("anchor", "head") != "shoulder":
+                raise ValueError(f"{coll.name}: ein Buddy braucht anchor shoulder (sein Nullpunkt ist dann der Boden)")
+            entry = export_hat(coll)
+            del entry["anchor"]
+            entries.append(entry)
+    return entries
 
 
 # ------------------------------------------------------------------ hats.json schreiben
@@ -380,7 +452,7 @@ def _format_part(part, indent):
     if set(part) <= {"color", "boxes"} and len(one_line) <= 150:
         return one_line
     lines = [pad + "{"]
-    keys = [k for k in ("at", "rot", "color", "boxes", "parts") if k in part]
+    keys = [k for k in ("follow", "at", "rot", "color", "boxes", "parts") if k in part]
     for i, key in enumerate(keys):
         comma = "," if i < len(keys) - 1 else ""
         if key == "parts":
@@ -422,17 +494,12 @@ def _entry_span(text, hat_id):
     raise ValueError(f"Eintrag {hat_id} in hats.json nicht zu Ende")
 
 
-def write_hats_json(path, only=None):
-    """
-    Schreibt die Hüte der Szene nach ``path`` (server/capes/hats.json): vorhandene Einträge mit derselben
-    id werden ersetzt, neue hinten angehängt, alles andere bleibt, wie es ist. ``only``: nur diese ids,
-    neue in dieser Reihenfolge (so stehen sie dann auch im Menü). Liefert die geschriebenen ids.
-    """
+def _write_catalog(path, key, entries, only, limit):
+    """Schreibt Einträge in die Liste ``key`` einer Katalog-Datei: gleiche id ersetzen, neue hinten anhängen."""
     with open(path, encoding="utf-8", newline="") as handle:
         text = handle.read()
-    entries = export_hats()
     if only is not None:
-        order = {hat_id: i for i, hat_id in enumerate(only)}
+        order = {entry_id: i for i, entry_id in enumerate(only)}
         entries = sorted((e for e in entries if e["id"] in order), key=lambda e: order[e["id"]])
     written = []
     for entry in entries:
@@ -443,12 +510,140 @@ def write_hats_json(path, only=None):
         else:
             end = text.rstrip().rfind("]")
             last = text.rfind("}", 0, end)
-            text = text[: last + 1] + ",\n" + block + text[last + 1 :]
+            if last < text.find("["):
+                # die Liste ist noch leer
+                text = text[: text.find("[") + 1] + "\n" + block + "\n  " + text[end:]
+            else:
+                text = text[: last + 1] + ",\n" + block + text[last + 1 :]
         written.append(entry["id"])
     catalog = json.loads(text)
-    ids = [h["id"] for h in catalog["hats"]]
-    if len(ids) != len(set(ids)) or len(ids) > 64:
-        raise ValueError("hats.json: doppelte id oder mehr als 64 Hüte")
+    ids = [e["id"] for e in catalog[key]]
+    if len(ids) != len(set(ids)) or len(ids) > limit:
+        raise ValueError(f"{key}: doppelte id oder mehr als {limit} Einträge")
+    with open(path, "w", encoding="utf-8", newline="") as handle:
+        handle.write(text)
+    return written
+
+
+def write_hats_json(path, only=None):
+    """
+    Schreibt die Hüte der Szene nach ``path`` (server/capes/hats.json): vorhandene Einträge mit derselben
+    id werden ersetzt, neue hinten angehängt, alles andere bleibt, wie es ist. ``only``: nur diese ids,
+    neue in dieser Reihenfolge (so stehen sie dann auch im Menü). Liefert die geschriebenen ids.
+    """
+    return _write_catalog(path, "hats", export_hats(), only, 64)
+
+
+def write_buddies_json(path, only=None):
+    """Schreibt die Buddys der Szene nach ``path`` (server/capes/buddies.json), sonst wie ``write_hats_json``."""
+    return _write_catalog(path, "buddies", export_buddies(), only, 64)
+
+
+# ------------------------------------------------------------------ Emote-Modelle in emotes.json
+
+
+def _json_end(text, start):
+    """Stelle hinter dem JSON-Wert (Liste oder Objekt), der bei ``start`` beginnt."""
+    depth = 0
+    in_string = False
+    i = start
+    while i < len(text):
+        ch = text[i]
+        if in_string:
+            if ch == "\\":
+                i += 1
+            elif ch == '"':
+                in_string = False
+        elif ch == '"':
+            in_string = True
+        elif ch in "[{":
+            depth += 1
+        elif ch in "]}":
+            depth -= 1
+            if depth == 0:
+                return i + 1
+        i += 1
+    raise ValueError("JSON nicht zu Ende")
+
+
+def _json_children(text, start):
+    """Anfänge der direkten Kinder des Werts bei ``start``: bei einem Objekt als {Schlüssel: Stelle}, bei einer Liste als Liste."""
+    is_object = text[start] == "{"
+    found = {} if is_object else []
+    end = _json_end(text, start)
+    i = start + 1
+    key = None
+    while i < end - 1:
+        ch = text[i]
+        if ch in " \t\r\n,":
+            i += 1
+        elif ch == ":":
+            i += 1
+        elif is_object and key is None:
+            close = i + 1
+            while text[close] != '"' or text[close - 1] == "\\":
+                close += 1
+            key = json.loads(text[i : close + 1])
+            i = close + 1
+        else:
+            if is_object:
+                found[key] = i
+                key = None
+            else:
+                found.append(i)
+            if ch in "[{":
+                i = _json_end(text, i)
+            elif ch == '"':
+                close = i + 1
+                while text[close] != '"' or text[close - 1] == "\\":
+                    close += 1
+                i = close + 1
+            else:
+                while text[i] not in ",]}\r\n":
+                    i += 1
+    return found
+
+
+def write_emote_models(path, only=None):
+    """
+    Trägt die Emote-Modelle der Szene in ``path`` (server/capes/emotes.json) ein: je Sammlung
+    „emote:<id>:<platz>“ wird die Liste ``parts`` an diesem Platz ersetzt, alles andere bleibt, wie es ist.
+    Der Platz muss im Emote schon stehen (``props`` mit genug Einträgen, ``throw`` oder ``costume``, jeweils
+    mit ``"parts": []``). ``only``: nur diese Sammlungen. Liefert die geschriebenen Namen.
+    """
+    with open(path, encoding="utf-8", newline="") as handle:
+        text = handle.read()
+    written = []
+    for coll in sorted(bpy.data.collections, key=lambda c: c.name):
+        if not coll.name.startswith(EMOTE_PREFIX) or (only is not None and coll.name not in only):
+            continue
+        _, emote_id, slot = coll.name.split(":")
+        span = _entry_span(text, emote_id)
+        if not span:
+            raise ValueError(f"{coll.name}: das Emote {emote_id} steht nicht in emotes.json")
+        entry = text.index("{", span[0])
+        keys = _json_children(text, entry)
+        if slot.startswith("prop"):
+            props = _json_children(text, keys["props"]) if "props" in keys else []
+            index = int(slot[4:])
+            if index >= len(props):
+                raise ValueError(f"{coll.name}: das Emote hat keinen Eintrag props[{index}]")
+            target = props[index]
+        elif slot in keys:
+            target = keys[slot]
+        else:
+            raise ValueError(f"{coll.name}: das Emote hat kein {slot}")
+        inner = _json_children(text, target)
+        if "parts" not in inner:
+            raise ValueError(f"{coll.name}: dort fehlt \"parts\": []")
+        begin = inner["parts"]
+        indent = begin - (text.rfind("\n", 0, begin) + 1)
+        indent = len(text[begin - indent : begin]) - len(text[begin - indent : begin].lstrip(" "))
+        pad = " " * indent
+        body = ",\n".join(_format_part(part, indent + 2) for part in export_emote_model(coll))
+        text = text[:begin] + "[\n" + body + "\n" + pad + "]" + text[_json_end(text, begin) :]
+        written.append(coll.name)
+    json.loads(text)
     with open(path, "w", encoding="utf-8", newline="") as handle:
         handle.write(text)
     return written

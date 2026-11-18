@@ -39,14 +39,20 @@ public final class HatIcons {
 
 	/** Textur ({@value #SIZE} x {@value #SIZE}) zum Hut; neu gezeichnet, wenn sich seine Daten geändert haben. */
 	public static Identifier texture(Hat hat) {
-		Icon icon = ICONS.get(hat.id());
+		return texture("hat", hat);
+	}
+
+	/** Dasselbe für Buddys ({@code kind} = {@code buddy}): eigene Textur, auch wenn es einen Hut mit derselben id gibt. */
+	public static Identifier texture(String kind, Hat hat) {
+		String key = kind + "_icon_" + hat.id();
+		Icon icon = ICONS.get(key);
 		if (icon == null || icon.hat() != hat) {
-			Identifier id = Identifier.fromNamespaceAndPath(SalamiClient.MOD_ID, "cosmetics/hat_icon_" + hat.id());
+			Identifier id = Identifier.fromNamespaceAndPath(SalamiClient.MOD_ID, "cosmetics/" + key);
 			NativeImage image = draw(hat);
 			// register ersetzt und schließt eine ältere Textur mit derselben ID
-			Minecraft.getInstance().getTextureManager().register(id, new DynamicTexture(() -> "salami hat " + hat.id(), image));
+			Minecraft.getInstance().getTextureManager().register(id, new DynamicTexture(() -> "salami " + key, image));
 			icon = new Icon(hat, id);
-			ICONS.put(hat.id(), icon);
+			ICONS.put(key, icon);
 		}
 		return icon.texture();
 	}
@@ -66,7 +72,7 @@ public final class HatIcons {
 		float maxX = -Float.MAX_VALUE;
 		float maxY = -Float.MAX_VALUE;
 		for (int i = 0; i < count; i++) {
-			int o = i * Hat.QUAD;
+			int o = i * BoxModel.QUAD;
 			for (int corner = 0; corner < 4; corner++) {
 				view.transformPosition(quads[o + corner * 3], quads[o + corner * 3 + 1], quads[o + corner * 3 + 2], v);
 				points[i * 12 + corner * 3] = v.x;

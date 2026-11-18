@@ -1,6 +1,7 @@
 package dev.salamiclient.modules.visual;
 
 import dev.salamiclient.capes.SharedCapes;
+import dev.salamiclient.cosmetics.BuddyCatalog;
 import dev.salamiclient.cosmetics.Hat;
 import dev.salamiclient.cosmetics.HatCatalog;
 import dev.salamiclient.gui.CosmeticsScreen;
@@ -60,9 +61,17 @@ public final class HatsModule extends Module {
 		return id.equals("none") ? "" : id;
 	}
 
-	/** Der gewählte Hut oder {@code null} (keiner, oder es gibt ihn nicht mehr). */
+	/**
+	 * Der gewählte Hut oder {@code null} (keiner, oder es gibt ihn nicht mehr). Wer noch einen Buddy
+	 * als Schulter-Hut gewählt hat (so war es vor Cosmetics → Buddys), bekommt ihn hier als Buddy.
+	 */
 	public @Nullable Hat selected() {
-		return HatCatalog.get(selectedId());
+		String id = selectedId();
+		if (!id.isEmpty() && BuddyModule.adoptHat(id)) {
+			hat.set("");
+			return null;
+		}
+		return HatCatalog.get(id);
 	}
 
 	/** Hut aufsetzen; {@code null} oder leer nimmt ihn ab. */
@@ -70,14 +79,20 @@ public final class HatsModule extends Module {
 		hat.set(id == null ? "" : id);
 	}
 
-	/** Was andere Salami-Spieler von dir sehen sollen ({@code "santa"}, {@code "crown"} …) oder {@code null}. */
+	/**
+	 * Was andere Salami-Spieler von dir sehen sollen ({@code "santa"}, {@code "crown"} …) oder {@code null}.
+	 * Ohne Hut wird ein Buddy über der Schulter auch als Hut gemeldet: so sehen ihn Spieler mit einer
+	 * älteren Version weiter, die Buddys nur als Schulter-Hut kennt.
+	 */
 	public static @Nullable String sharedHat() {
 		HatsModule module = instance;
-		if (module == null || !module.isEnabled()) {
-			return null;
+		Hat selected = module == null || !module.isEnabled() ? null : module.selected();
+		if (selected != null) {
+			return selected.id();
 		}
-		Hat selected = module.selected();
-		return selected == null ? null : selected.id();
+		BuddyModule.Wish buddy = BuddyModule.own();
+		return buddy != null && buddy.place() == BuddyModule.Place.SHOULDER && HatCatalog.get(buddy.buddy().id()) != null
+			? buddy.buddy().id() : null;
 	}
 
 	/**
@@ -101,6 +116,9 @@ public final class HatsModule extends Module {
 			return null;
 		}
 		String id = SharedCapes.hatOf(player.getUUID());
+		if (id != null && BuddyCatalog.isBuddy(id) && SharedCapes.buddyOf(player.getUUID()) != null) {
+			return null; // ihr Buddy, für ältere Versionen zusätzlich als Hut gemeldet: zeichnet BuddyLayer
+		}
 		Hat theirs = HatCatalog.get(id);
 		if (theirs == null && id != null && !id.equals(module.askedFor)) {
 			// jemand trägt einen Hut, den es hier noch nicht gibt: Katalog neu holen

@@ -9,7 +9,7 @@ Adresse: **https://salami-client-zaehler.umpinke.de/capes** – derselbe nginx u
 - **Mitgelieferte Capes** (Salami, Peperoni, Schneidebrett) sehen alle Salami-Spieler sofort.
 - **Live**: Jedes laufende Spiel hält eine Verbindung zu `/v1/capes/events` (Server-Sent Events). Wechselt jemand sein Cape oder gibt ein Admin eines frei, sehen es alle Mitspieler sofort. Gesendet werden nur UUID und sichtbares Cape, alle 20 s kommt ein Lebenszeichen.
 - **Emotes** (Winken, Tanzen …): Das Spiel meldet sich einmal an (`POST /v1/emotes/session`, wie beim Cape über Mojang) und schickt Emotes mit dem Token an `POST /v1/emotes`. Der Server gibt sie sofort über `/v1/capes/events` an alle weiter und speichert nichts. Das Token liegt nur im Speicher (12 h), nach einem Neustart meldet sich das Spiel neu an. Höchstens 20 Emotes pro Spieler und Minute (`EMOTES_PER_MINUTE`).
-- **Neue Cosmetics ohne Update**: Welche Emotes, Hüte und offiziellen Capes es gibt, steht als Daten neben `server.mjs` – in [`emotes.json`](emotes.json), [`hats.json`](hats.json) und [`official-capes.json`](official-capes.json) (dazu die Cape-Bilder im Ordner `official-capes/`). Das Spiel holt die Listen beim Start (`GET /v1/emotes/catalog`, `/v1/hats/catalog`, `/v1/capes/catalog`). Der Server sieht alle 30 s nach, ob sich eine Datei geändert hat, lädt sie dann neu und meldet es allen offenen Spielen – ein neues Emote, ein neuer Hut oder ein neues Cape ist nach spätestens einer halben Minute bei allen, ohne Neustart und ohne Launcher-Update. Auch der Launcher holt die Hut- und die Emote-Liste: Sein Shop zeigt unter „Hüte“ und „Emotes“ alles, was es gibt, an der eigenen Figur. Siehe [Emotes hinzufügen](#emotes-hinzufügen), [Hüte hinzufügen](#hüte-hinzufügen) und [Offizielle Capes hinzufügen](#offizielle-capes-hinzufügen).
+- **Neue Cosmetics ohne Update**: Welche Emotes, Hüte, Buddys und offiziellen Capes es gibt, steht als Daten neben `server.mjs` – in [`emotes.json`](emotes.json), [`hats.json`](hats.json), [`buddies.json`](buddies.json) und [`official-capes.json`](official-capes.json) (dazu die Cape-Bilder im Ordner `official-capes/`). Das Spiel holt die Listen beim Start (`GET /v1/emotes/catalog`, `/v1/hats/catalog`, `/v1/buddies/catalog`, `/v1/capes/catalog`). Der Server sieht alle 30 s nach, ob sich eine Datei geändert hat, lädt sie dann neu und meldet es allen offenen Spielen – ein neues Emote, ein neuer Hut, ein neuer Buddy oder ein neues Cape ist nach spätestens einer halben Minute bei allen, ohne Neustart und ohne Launcher-Update. Auch der Launcher holt die Hut-, die Buddy- und die Emote-Liste: Sein Shop zeigt unter „Hüte“, „Buddys“ und „Emotes“ alles, was es gibt, an der eigenen Figur. Siehe [Emotes hinzufügen](#emotes-hinzufügen), [Hüte hinzufügen](#hüte-hinzufügen), [Buddys hinzufügen](#buddys-hinzufügen) und [Offizielle Capes hinzufügen](#offizielle-capes-hinzufügen).
 - **Eigene Capes** reicht der Launcher (ab 1.3.4) gleich nach dem Hinzufügen ein (`/v1/capes/submit`), ohne das getragene Cape zu ändern. Ältere Versionen schicken sie erst beim Spielen mit dem Cape (salami-core). Sie landen in der Warteschlange. Bis ein Admin sie freigibt, sieht sie nur der Spieler selbst. Lehnt ein Admin ab, bekommt der Spieler den Grund im Spiel und im Launcher angezeigt.
 - **Anmeldung** wie beim Betreten eines Minecraft-Servers: Das Spiel meldet eine zufällige `serverId` bei Mojang an, der Cape-Server fragt bei Mojang nach (`hasJoined`). Das Zugangstoken des Spielers sieht der Cape-Server nie. So kann niemand ein Cape für einen fremden Account setzen.
 - **Bilder** werden vollständig dekodiert und als schlichtes PNG neu gespeichert (keine Metadaten, nichts Kaputtes). Die Cape-ID ist ein Hash über die Pixel: dasselbe Bild muss nur einmal geprüft werden, egal wer es hochlädt.
@@ -62,7 +62,7 @@ Live-Ereignisse auf `/v1/friends/events` (Token in der `Authorization`-Kopfzeile
 
    ```bash
    sudo mkdir -p /opt/salami-capes
-   sudo cp -r /tmp/salami-capes/*.mjs /tmp/salami-capes/emotes.json /tmp/salami-capes/hats.json /tmp/salami-capes/official-capes.json /tmp/salami-capes/official-capes /tmp/salami-capes/admin /opt/salami-capes/
+   sudo cp -r /tmp/salami-capes/*.mjs /tmp/salami-capes/emotes.json /tmp/salami-capes/hats.json /tmp/salami-capes/buddies.json /tmp/salami-capes/official-capes.json /tmp/salami-capes/official-capes /tmp/salami-capes/admin /opt/salami-capes/
    sudo cp /tmp/salami-capes/salami-capes.service /etc/systemd/system/
    ```
 
@@ -108,7 +108,7 @@ Live-Ereignisse auf `/v1/friends/events` (Token in der `Authorization`-Kopfzeile
 
 6. **Adresse in den Launcher eintragen**: `CAPE_SERVER_URL` in `launcher/src-tauri/src/branding.rs`. Der Launcher gibt sie beim Spielstart als `-Dsalami.capes.url` an salami-core weiter. Danach ein Update veröffentlichen.
 
-Logs: `journalctl -u salami-capes -f`. Nach einem Update der Dateien: `sudo systemctl restart salami-capes`. Zum Dienst gehören alle `.mjs`-Dateien aus `server/capes` (`server.mjs`, `friends.mjs`, `png.mjs`, `catalog.mjs`, `emotes.mjs`, `hats.mjs`, `official.mjs`) – fehlt eine, startet er nicht. Dazu kommen die Kataloge `emotes.json`, `hats.json`, `official-capes.json` und der Ordner `official-capes/` (Schritt 2); ohne einen Katalog gibt es die Emotes, Hüte oder offiziellen Capes einfach nicht. Die Daten liegen in `/var/lib/salami-capes` (`capes.json`, `friends.json` und `images/`) – diesen Ordner ins Backup aufnehmen.
+Logs: `journalctl -u salami-capes -f`. Nach einem Update der Dateien: `sudo systemctl restart salami-capes`. Zum Dienst gehören alle `.mjs`-Dateien aus `server/capes` (`server.mjs`, `friends.mjs`, `png.mjs`, `catalog.mjs`, `emotes.mjs`, `hats.mjs`, `buddies.mjs`, `official.mjs`) – fehlt eine, startet er nicht. Dazu kommen die Kataloge `emotes.json`, `hats.json`, `buddies.json`, `official-capes.json` und der Ordner `official-capes/` (Schritt 2); ohne einen Katalog gibt es die Emotes, Hüte, Buddys oder offiziellen Capes einfach nicht. Die Daten liegen in `/var/lib/salami-capes` (`capes.json`, `friends.json` und `images/`) – diesen Ordner ins Backup aufnehmen.
 
 ## Capes prüfen
 
@@ -148,6 +148,23 @@ Die Seite lässt sich als App aufs Handy legen (PWA: `manifest.webmanifest`, Ser
 
 Entfernen geht genauso: Eintrag löschen, Datei hochladen.
 
+### Requisiten, Wurf, Geräusche und Verwandlung
+
+Ein Emote kann mehr als eine Bewegung sein. Alles davon ist nur Optik, läuft bei jedem Spieler für sich und braucht ein Spiel ab 1.8.5 – ältere Versionen spielen nur die Bewegung.
+
+```json
+"props": [{ "on": "right_arm", "to": 0.58, "at": [-1, 11.5, 0], "parts": [ … ] }],
+"throw": { "t": 0.58, "speed": 1.1, "up": 0.12, "scale": 1.3, "spin": 25, "impact": "snow", "parts": [ … ] },
+"sounds": [{ "t": 0.58, "sound": "snowball" }],
+"costume": { "hop": 1.2, "hop_cycle": 0.25, "tracks": { … }, "parts": [{ "follow": "head", "at": [0, 6, -7], … }] }
+```
+
+- `props`: Requisiten (höchstens 4), die an einem Körperteil hängen (`on`: `head`, `body`, `right_arm`, `left_arm`, `right_leg`, `left_leg`) und sich mit ihm bewegen – der Schneeball in der Hand, die Glocke, das Geschenk. `at` ist der Platz in Pixeln ab dem Gelenk (die rechte Hand liegt bei `[-1, 10, 0]`), `from`/`to` die Zeit, in der man sie sieht.
+- `throw`: zum Zeitpunkt `t` fliegt das Modell in Blickrichtung los und zerplatzt am ersten Block (`impact`: `snow`, `poof` oder `none`). Es fliegt durch Spieler und Tiere hindurch und trifft niemanden; der Server erfährt davon nichts.
+- `sounds`: Geräusche zu einem Zeitpunkt (`snowball`, `snow`, `bell`, `pop`), höchstens 8. Im Spiel abschaltbar (Modul Emotes → Geräusche).
+- `costume`: Solange das Emote läuft, steht eine Figur aus Würfeln anstelle des Spielers (das Rentier). Maße wie am Spielermodell: Nullpunkt mitten im Hals, der Boden liegt bei y 24. Ein Teil der obersten Ebene mit `follow` dreht sich um sein `at` wie dieses Körperteil; wie, steht in `costume.tracks` (Format wie `tracks`). `follow: "head"` schaut außerdem dorthin, wohin der Spieler schaut. `hop` lässt die Figur hüpfen.
+- `parts` sind Würfel wie bei einem Hut (siehe [Hüte hinzufügen](#hüte-hinzufügen)). Am einfachsten baut man sie in Blender: Sammlungen `emote:<id>:prop0` … `prop3`, `emote:<id>:throw` und `emote:<id>:costume` in [`scripts/hats/hats.blend`](../../scripts/hats/hats.blend), `write_emote_models` aus [`blender_hats.py`](../../scripts/hats/blender_hats.py) trägt die Würfel ein. Alles andere schreibt man von Hand; das genaue Format steht oben in [`emotes.mjs`](emotes.mjs).
+
 ## Hüte hinzufügen
 
 Ein Hut ist ein kleines Modell aus farbigen Würfeln. Bild und Symbol braucht er nicht – das Spiel zeichnet beides aus den Daten.
@@ -184,6 +201,30 @@ Ein Hut ist ein kleines Modell aus farbigen Würfeln. Bild und Symbol braucht er
 3. Fertig. Im Spiel steht der Hut unter Cosmetics → Hüte, andere Salami-Spieler sehen ihn, sobald ihn jemand trägt.
 
 Entfernt man einen Hut aus der Datei, ist er bei allen weg, die ihn tragen.
+
+## Buddys hinzufügen
+
+Buddys sind kleine Begleiter (Salami-Kumpel, Tannenbaum, Schneemann …). Wie beim Mini Me wählt der Spieler den Platz: an der Hand, über der Schulter, auf dem Kopf, oder der Buddy läuft ihm hinterher (Cosmetics → Buddys). Sie stehen in [`buddies.json`](buddies.json).
+
+1. Einen Eintrag ergänzen. Ein Buddy hat dasselbe Format wie ein Hut, nur ohne `anchor`:
+
+   ```json
+   {
+     "id": "tree_buddy",
+     "names": { "en_us": "Christmas tree buddy", "de_de": "Tannenbaum-Kumpel" },
+     "bob": 0.5,
+     "sway": 10,
+     "parts": [{ "color": "#1f7a3a", "boxes": [[-2, -2.4, -2, 4, 1.4, 4]] }]
+   }
+   ```
+
+   - Der Nullpunkt liegt unten in der Mitte des Buddys: x 0 ist die Mitte, y 0 der Boden unter ihm, oben ist negativ, vorn ist −z. Ein Buddy ist etwa 4 Pixel breit und 7 hoch; beim Hinterherlaufen zeigt ihn das Spiel 1,6-mal so groß.
+   - `bob` und `sway` gelten über der Schulter (Schweben und Pendeln), `glow` und `scale` überall.
+   - Grenzen wie bei Hüten: höchstens 64 Buddys, je Buddy 64 Würfel und 32 Teile.
+2. Denselben Eintrag mit `"anchor": "shoulder"` auch in `hats.json` aufnehmen. Spiele vor 1.8.5 kennen Buddys nur als Schulter-Hut; neuere zeigen solche Hüte nur noch unter Buddys. Der Server-Test prüft, dass beide Einträge zusammenpassen.
+3. Beide Dateien auf den Server legen. In Blender geht beides in einem Schritt: Ein Schulter-Hut mit der Eigenschaft `buddy` wird von `write_hats_json` und `write_buddies_json` geschrieben.
+
+Entfernt man einen Buddy aus der Datei, ist er bei allen weg, die ihn haben.
 
 ## Offizielle Capes hinzufügen
 
@@ -237,6 +278,7 @@ Verstößt ein freigegebenes Cape doch dagegen und jemand meldet es: schnell pr�
 | `EMOTES_PER_MINUTE` | `20` | Emotes pro Spieler und Minute |
 | `EMOTES_FILE` | `emotes.json` neben `server.mjs` | Emote-Katalog |
 | `HATS_FILE` | `hats.json` neben `server.mjs` | Hut-Katalog |
+| `BUDDIES_FILE` | `buddies.json` neben `server.mjs` | Buddy-Katalog |
 | `OFFICIAL_CAPES_FILE` | `official-capes.json` neben `server.mjs` | Liste der offiziellen Capes |
 | `OFFICIAL_CAPES_DIR` | `official-capes` neben der Liste | Ordner mit den Bildern (`<id>.png`) |
 | `CATALOG_RELOAD_MS` | `30000` | So oft (ms) wird nachgesehen, ob sich ein Katalog geändert hat |
@@ -256,16 +298,17 @@ Startet den Server mit einem nachgebauten Mojang-Dienst und prüft Anmeldung, Wa
 | Anfrage | Antwort |
 |---|---|
 | `POST /v1/auth/challenge` | `{"serverId":"…"}`, 60 s gültig, nur einmal verwendbar |
-| `PUT /v1/capes/me` mit `{"name","serverId","cape","hat"?,"minime"?}` | `{"status":"approved"\|"pending"\|"rejected","id"?,"reason"?}` – `cape`: `{"builtin":"salami"}`, `{"png":"<base64>"}` oder `null` – `hat`: ein Hut aus dem Katalog (`"santa"`, `"crown"` …, Cosmetics → Hüte) oder weglassen; unbekannte Hüte werden ignoriert – `minime`: `{"name":"<Minecraft-Name>","place":"hand"\|"shoulder"\|"head"\|"follow"}` (Cosmetics → Mini Me) oder weglassen; Ungültiges wird ignoriert |
-| `POST /v1/capes/lookup` mit `{"uuids":[…]}` (max. 200) | `{"capes":{"<uuid>":{"builtin":"salami"}\|{"id":"<capeId>"}}}` – nur sichtbare Capes. Trägt der Spieler einen Hut, steht zusätzlich `"hat":"santa"` darin (auch ohne Cape: `{"hat":"santa"}`), ebenso sein Mini Me als `"minime":{"name","place"}` |
+| `PUT /v1/capes/me` mit `{"name","serverId","cape","hat"?,"minime"?,"buddy"?}` | `{"status":"approved"\|"pending"\|"rejected","id"?,"reason"?}` – `cape`: `{"builtin":"salami"}`, `{"png":"<base64>"}` oder `null` – `hat`: ein Hut aus dem Katalog (`"santa"`, `"crown"` …, Cosmetics → Hüte) oder weglassen; unbekannte Hüte werden ignoriert – `minime`: `{"name":"<Minecraft-Name>","place":"hand"\|"shoulder"\|"head"\|"follow"}` (Cosmetics → Mini Me) oder weglassen; Ungültiges wird ignoriert – `buddy`: `{"id":"tree_buddy","place":"hand"\|"shoulder"\|"head"\|"follow"}` (Cosmetics → Buddys, ein Buddy aus dem Katalog) oder weglassen; Unbekanntes wird ignoriert |
+| `POST /v1/capes/lookup` mit `{"uuids":[…]}` (max. 200) | `{"capes":{"<uuid>":{"builtin":"salami"}\|{"id":"<capeId>"}}}` – nur sichtbare Capes. Trägt der Spieler einen Hut, steht zusätzlich `"hat":"santa"` darin (auch ohne Cape: `{"hat":"santa"}`), ebenso sein Mini Me als `"minime":{"name","place"}` und sein Buddy als `"buddy":{"id","place"}` |
 | `GET /v1/capes/img/<capeId>.png` | freigegebenes Cape-Bild |
 | `GET /v1/capes/gallery` | `{"capes":[{"id","approvedAt","wearers","official"?,"names"?}]}` – alle freigegebenen Capes (höchstens 500): zuerst die offiziellen (`"official":true` und `names`), dann die eigenen der Spieler, neueste zuerst – für die Galerie im Launcher |
 | `GET /v1/capes/catalog` | `{"version":"<16 Hex-Zeichen>","capes":[{"id","names","cape","width","height"}]}` – die offiziellen Capes aus `official-capes.json`; `cape` ist die Bild-ID für `/v1/capes/img/<cape>.png` |
 | `GET /v1/hats/catalog` | `{"version":"<16 Hex-Zeichen>","hats":[…]}` – alle Hüte aus `hats.json`, geprüft und bereinigt |
+| `GET /v1/buddies/catalog` | `{"version":"<16 Hex-Zeichen>","buddies":[…]}` – alle Buddys aus `buddies.json`, geprüft und bereinigt |
 | `GET /v1/capes/events` | Server-Sent Events: `data: {"uuid":"…","cape":{…}\|null}` bei jeder sichtbaren Änderung, `data: {"emote":{"uuid":"…","id":"wave"}}` bei jedem Emote (ohne `uuid` oben, damit ältere Spiele die Zeile überspringen), `: ping` alle 20 s |
 | `POST /v1/emotes/session` mit `{"name","serverId"}` | `{"token","uuid","name"}` – Anmeldung wie bei `PUT /v1/capes/me`, Token 12 h gültig, nur im Speicher |
 | `POST /v1/emotes` mit `{"emote":"wave"}` und `Authorization: Bearer <token>` | `{"ok":true}` – erlaubt sind die Emotes aus dem Katalog; unbekannte → 400, ohne gültiges Token → 401, mehr als 20 pro Minute → 429 |
-| `GET /v1/emotes/catalog` | `{"version":"<16 Hex-Zeichen>","emotes":[…]}` – alle Emotes aus `emotes.json`, geprüft und bereinigt. Ändert sich einer der drei Kataloge, kommt auf `/v1/capes/events` zusätzlich `data: {"catalog":"<version>","kind":"emotes"\|"hats"\|"capes"}` |
+| `GET /v1/emotes/catalog` | `{"version":"<16 Hex-Zeichen>","emotes":[…]}` – alle Emotes aus `emotes.json`, geprüft und bereinigt. Ändert sich einer der vier Kataloge, kommt auf `/v1/capes/events` zusätzlich `data: {"catalog":"<version>","kind":"emotes"\|"hats"\|"buddies"\|"capes"}` |
 | `POST /v1/capes/status` mit `{"ids":[…]}` (max. 100) | `{"status":{"<capeId>":{"status":"pending",…}}}` – für den Launcher |
 | `POST /v1/capes/submit` mit `{"name","serverId","png"}` | `{"status":"approved"\|"pending"\|"rejected","id","reason"?}` – Launcher reicht ein eigenes Cape zur Prüfung ein, das getragene Cape bleibt |
 | `POST /v1/capes/report` mit `{"name","serverId","id","reason","note"?}` | `{"status":"reported"\|"already_reported"}` – freigegebenes Cape melden; `reason`: `logo`, `hate`, `sexual`, `person` oder `other`, `note` höchstens 200 Zeichen |

@@ -7,6 +7,7 @@ import dev.salamiclient.cosmetics.Catalogs;
 import dev.salamiclient.emotes.Emotes;
 import dev.salamiclient.modules.visual.CapesModule;
 import dev.salamiclient.modules.visual.HatsModule;
+import dev.salamiclient.modules.visual.BuddyModule;
 import dev.salamiclient.modules.visual.MiniMeModule;
 import dev.salamiclient.util.Chat;
 import net.fabricmc.loader.api.FabricLoader;
@@ -184,6 +185,21 @@ public final class SharedCapes {
 			return null;
 		}
 		return new SharedMiniMe(entry.remote().miniMeName(), entry.remote().miniMePlace());
+	}
+
+	/** Buddy eines anderen Spielers: Name im Katalog und Platz ({@code hand}, {@code follow} …). */
+	public record SharedBuddy(String id, String place) {}
+
+	/** Buddy eines anderen Salami-Spielers oder {@code null}. Nur im Render-/Client-Thread aufrufen. */
+	public static @Nullable SharedBuddy buddyOf(UUID player) {
+		if (!Minecraft.getInstance().isSameThread()) {
+			return null;
+		}
+		Entry entry = entry(server(), player);
+		if (entry == null || entry.remote() == null || entry.remote().buddyId() == null || entry.remote().buddyPlace() == null) {
+			return null;
+		}
+		return new SharedBuddy(entry.remote().buddyId(), entry.remote().buddyPlace());
 	}
 
 	/** Bekannter Stand eines Spielers; ist er unbekannt oder veraltet, wird er (neu) abgefragt. */
@@ -452,7 +468,15 @@ public final class SharedCapes {
 			miniMe.addProperty("name", mini.name());
 			miniMe.addProperty("place", mini.place().name().toLowerCase(java.util.Locale.ROOT));
 		}
-		String key = wanted.key() + "|hat:" + hat + "|minime:" + miniMe;
+		BuddyModule.Wish pal = BuddyModule.own();
+		JsonObject buddy = null;
+		if (pal != null) {
+			buddy = new JsonObject();
+			buddy.addProperty("id", pal.buddy().id());
+			buddy.addProperty("place", pal.place().name().toLowerCase(java.util.Locale.ROOT));
+		}
+		JsonObject sharedBuddy = buddy;
+		String key = wanted.key() + "|hat:" + hat + "|minime:" + miniMe + "|buddy:" + buddy;
 		if (key.equals(publishedKey)) {
 			wantedKey = null;
 			return;
@@ -466,7 +490,7 @@ public final class SharedCapes {
 			return;
 		}
 		publishing = true;
-		cs.publish(mc.getUser(), mc.services().sessionService(), wanted, hat, miniMe).whenComplete((result, error) -> mc.execute(() -> {
+		cs.publish(mc.getUser(), mc.services().sessionService(), wanted, hat, miniMe, sharedBuddy).whenComplete((result, error) -> mc.execute(() -> {
 			publishing = false;
 			if (error == null) {
 				publishedKey = key;
