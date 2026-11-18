@@ -8,6 +8,10 @@
 //   node scripts/release.mjs --dry-run                        (nur bauen + latest.json schreiben)
 //   node scripts/release.mjs --beta --notes "..."             (Beta, Version z. B. 1.1.0-beta.1)
 //   node scripts/release.mjs --setup-ci                       (CurseForge-Key einmalig als GitHub-Secret)
+//   node scripts/release.mjs ... --allow-version-jump         (nur auf ausdrückliche Ansage des Nutzers)
+//
+// Versionsnummer: immer letzte veröffentlichte Version + 0.0.1 (1.8.1 → 1.8.2, Betas 1.8.2-beta.N).
+// Das Skript bricht sonst ab; größere Sprünge (1.9.0, 2.0.0) nur, wenn der Nutzer es so sagt.
 //
 // Windows baut das Skript lokal. macOS und Linux baut GitHub Actions
 // (.github/workflows/launcher-mac-linux.yml) parallel dazu aus dem Release-Commit – der muss
@@ -233,6 +237,30 @@ if (!repo && !flag("--dry-run")) {
 if (repo && capture(`gh release view ${tag} --json tagName`)) {
   console.error(`Release ${tag} gibt es schon – Version in src-tauri/tauri.conf.json erhöhen.`);
   process.exit(1);
+}
+
+// Versionen gehen immer nur einen Mini-Schritt weiter: letzte veröffentlichte Version + 0.0.1
+// (Betas davon: z. B. 1.8.2-beta.1 nach 1.8.1). Größere Sprünge nur, wenn der Nutzer es
+// ausdrücklich sagt – dann mit --allow-version-jump.
+if (repo) {
+  const releases = JSON.parse(capture("gh release list --limit 300 --json tagName") || "[]");
+  const stable = releases
+    .map((r) => r.tagName.replace(/^v/, ""))
+    .filter((v) => /^\d+\.\d+\.\d+$/.test(v))
+    .sort(compareVersions)
+    .at(-1);
+  if (stable) {
+    const [major, minor, patch] = stable.split(".").map(Number);
+    const expected = `${major}.${minor}.${patch + 1}`;
+    const core = version.split("-")[0];
+    if (core !== expected && !flag("--allow-version-jump")) {
+      fail(
+        `Version ${version} passt nicht: Releases gehen immer nur +0.0.1 über die letzte veröffentlichte Version ` +
+          `(${stable}), also ${expected}${beta ? ` bzw. ${expected}-beta.N` : ""}.\n` +
+          "Einen größeren Sprung nur, wenn der Nutzer das ausdrücklich will – dann mit --allow-version-jump.",
+      );
+    }
+  }
 }
 
 // macOS/Linux zuerst anstoßen: GitHub baut, während hier Windows baut
