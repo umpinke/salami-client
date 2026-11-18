@@ -4,6 +4,9 @@ import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.capes.SharedCapes;
 import dev.salamiclient.capes.CapeLibrary;
+import dev.salamiclient.capes.OfficialCapes;
+import dev.salamiclient.cosmetics.HatCatalog;
+import dev.salamiclient.emotes.EmoteCatalog;
 import dev.salamiclient.gui.CosmeticsScreen;
 import dev.salamiclient.gui.clickgui.ClickGuiScreen;
 import dev.salamiclient.module.HudModule;
@@ -47,6 +50,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Funktionstests der Visual-Module in einer echten Welt.
@@ -226,7 +230,8 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 	/**
 	 * Andere Salami-Spieler: ein Mini-Cape-Server liefert für zwei fremde Spieler ein
 	 * mitgeliefertes und ein (freigegebenes) eigenes Cape – der Mod muss beide anzeigen und
-	 * Wechsel über die Live-Verbindung sofort übernehmen.
+	 * Wechsel über die Live-Verbindung sofort übernehmen. Derselbe Server liefert auch die Kataloge:
+	 * ein neuer Hut und ein offizielles Cape kommen ohne Update an.
 	 */
 	private static void testSharedCapes(ClientGameTestContext context, ModuleManager modules) {
 		UUID builtinPlayer = UUID.fromString("0f1e2d3c-4b5a-4978-8796-a5b4c3d2e1f0");
@@ -240,12 +245,24 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 		BlockingQueue<String> events = new LinkedBlockingQueue<>();
 		AtomicBoolean live = new AtomicBoolean();
 		AtomicBoolean stopped = new AtomicBoolean();
+		// Kataloge, wie sie der Server aus hats.json und official-capes.json ausliefert
+		String crown = "{\"id\":\"crown\",\"names\":{\"en_us\":\"Crown\"},\"parts\":[{\"color\":\"#ecbe3a\",\"boxes\":[[-4.5,-9.5,-4.5,9,2,9]]}]}";
+		String wizard = "{\"id\":\"wizard\",\"names\":{\"en_us\":\"Wizard hat\"},\"parts\":[{\"color\":\"#4b2a9e\",\"boxes\":[[-6,-8.75,-6,12,0.75,12],[-3,-13,-3,6,4.25,6]]}]}";
+		String ghost = "{\"id\":\"ghost\",\"names\":{\"en_us\":\"Ghost\"},\"anchor\":\"shoulder\",\"scale\":0.5,\"parts\":[{\"color\":\"#f4f6ff\",\"boxes\":[[-2.5,-6,-2.5,5,6,5]]}]}";
+		AtomicReference<String> hats = new AtomicReference<>("{\"version\":\"h1\",\"hats\":[" + crown + "," + wizard + "]}");
+		AtomicReference<String> official = new AtomicReference<>("{\"version\":\"c0\",\"capes\":[]}");
 		ExecutorService handlers = Executors.newCachedThreadPool();
 		HttpServer http;
 		try {
 			byte[] customPng = Files.readAllBytes(capeTemplate());
+			// Breite und Höhe stehen im PNG-Kopf
+			java.nio.ByteBuffer header = java.nio.ByteBuffer.wrap(customPng, 16, 8);
+			official.set("{\"version\":\"c1\",\"capes\":[{\"id\":\"frost\",\"names\":{\"en_us\":\"Frost\",\"de_de\":\"Frost\"},\"cape\":\"" + customId
+				+ "\",\"width\":" + header.getInt() + ",\"height\":" + header.getInt() + "}]}");
 			http = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
 			http.setExecutor(handlers); // die Live-Verbindung bleibt offen und darf andere Anfragen nicht blockieren
+			http.createContext("/v1/hats/catalog", exchange -> respond(exchange, 200, "application/json", hats.get().getBytes(StandardCharsets.UTF_8)));
+			http.createContext("/v1/capes/catalog", exchange -> respond(exchange, 200, "application/json", official.get().getBytes(StandardCharsets.UTF_8)));
 			http.createContext("/v1/capes/lookup", exchange -> {
 				StringBuilder json = new StringBuilder("{\"capes\":{");
 				visible.forEach((uuid, cape) -> json.append(json.length() > 10 ? "," : "").append('"').append(uuid).append("\":").append(cape));
@@ -312,6 +329,8 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 				"Shared capes: still shown with 'others' off");
 			set(capes, "others", true);
 
+			testCatalogsOverNetwork(context, capes, builtinPlayer, visible, events, hats, crown, wizard, ghost);
+
 			// ohne Cape-Server (Launcher ohne Adresse): keine fremden Salami-Capes, Cache wird geleert
 			System.clearProperty("salami.capes.url");
 			check(context.computeOnClient(c -> !capePath(others[0]).getNamespace().equals("salami")),
@@ -321,7 +340,92 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 			stopped.set(true);
 			http.stop(0);
 			handlers.shutdownNow();
+			// wieder die mitgelieferten Listen, für die Tests danach
+			context.runOnClient(c -> {
+				HatCatalog.clearRemote();
+				OfficialCapes.clearRemote();
+				EmoteCatalog.clearRemote();
+			});
 		}
+	}
+
+	/**
+	 * Kataloge über das Netz (der Mini-Server von {@link #testSharedCapes} läuft): Beim Verbinden holt
+	 * das Spiel Hüte und offizielle Capes, ein Mitspieler trägt einen Hut, den die Mod nicht kennt,
+	 * eine Live-Meldung lädt den Katalog neu, und ein Klick im Menü holt ein offizielles Cape vom
+	 * Server zu den eigenen Capes und zieht es an.
+	 */
+	private static void testCatalogsOverNetwork(ClientGameTestContext context, Module capes, UUID otherPlayer, Map<UUID, String> visible,
+			BlockingQueue<String> events, AtomicReference<String> hats, String crown, String wizard, String ghost) {
+		check(waitFor(context, 200, c -> HatCatalog.get("wizard") != null && OfficialCapes.get("frost") != null),
+			"Catalogs: hats and official capes not loaded from the cape server");
+		check(context.computeOnClient(c -> HatCatalog.all().size()) == 2, "Catalogs: server hat list not applied");
+
+		// ein Mitspieler trägt den neuen Hut
+		visible.put(otherPlayer, "{\"builtin\":\"board\",\"hat\":\"wizard\"}");
+		events.add("{\"uuid\":\"" + otherPlayer + "\",\"cape\":{\"builtin\":\"board\",\"hat\":\"wizard\"}}");
+		check(waitFor(context, 20, c -> "wizard".equals(SharedCapes.hatOf(otherPlayer))), "Catalogs: new hat of another player not received");
+
+		// der Server meldet eine Änderung: der Katalog wird neu geholt, ohne Neustart
+		hats.set("{\"version\":\"h2\",\"hats\":[" + crown + "," + wizard + "," + ghost + "]}");
+		events.add("{\"catalog\":\"h2\",\"kind\":\"hats\"}");
+		check(waitFor(context, 200, c -> HatCatalog.get("ghost") != null), "Catalogs: change announced by the server not loaded");
+
+		// offizielles Cape: die Vorschau lädt vom Server
+		OfficialCapes.Cape frost = context.computeOnClient(c -> OfficialCapes.get("frost"));
+		check(waitFor(context, 100, c -> OfficialCapes.preview(frost) != null), "Catalogs: preview of the official cape not loaded");
+
+		// ein Klick im Menü holt es zu den eigenen Capes (im Launcher-Ordner) und zieht es an
+		Object modeBefore = setting(capes, "cape").get();
+		java.nio.file.Path dir;
+		try {
+			dir = Files.createTempDirectory("salami-capes-official");
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+		System.setProperty("salami.capes.dir", dir.toString());
+		try {
+			context.setScreen(() -> new CosmeticsScreen(null));
+			context.waitTicks(2);
+			for (int i = 0; i < 5; i++) {
+				context.getInput().scroll(-1);
+			}
+			context.waitTicks(2);
+			context.takeScreenshot("salami-13c-cosmetics-official-cape");
+			context.runOnClient(c -> ((CosmeticsScreen) c.screen).pick("official:frost"));
+			String ownId = OfficialCapes.ownId(frost);
+			check(waitFor(context, 100, c -> ownId.equals(CapeLibrary.selected(dir))), "Catalogs: official cape not equipped from the menu");
+			check(context.computeOnClient(c -> CapeLibrary.ownCapes(dir).size()) == 1 && Files.isRegularFile(dir.resolve(ownId + ".png")),
+				"Catalogs: official cape not stored with the own capes");
+			check(waitFor(context, 40, c -> ownCape(c).equals(Identifier.fromNamespaceAndPath("salami", "cape/custom"))),
+				"Catalogs: official cape is not worn (" + context.computeOnClient(SalamiModulesGameTest::ownCape) + ")");
+			// noch ein Klick: nichts wird doppelt geholt
+			context.runOnClient(c -> ((CosmeticsScreen) c.screen).pick("official:frost"));
+			context.waitTicks(25); // das Menü liest die Auswahl einmal pro Sekunde
+			check(context.computeOnClient(c -> CapeLibrary.ownCapes(dir).size()) == 1, "Catalogs: official cape stored twice");
+			context.takeScreenshot("salami-13d-cosmetics-official-equipped");
+			context.setScreen(() -> null);
+		} finally {
+			System.clearProperty("salami.capes.dir");
+			set(capes, "cape", modeBefore);
+			try (var files = Files.list(dir)) {
+				for (java.nio.file.Path file : files.toList()) {
+					Files.deleteIfExists(file);
+				}
+				Files.deleteIfExists(dir);
+			} catch (IOException ignored) {
+				// Temp-Ordner
+			}
+		}
+	}
+
+	private static Setting<?> setting(Module module, String settingId) {
+		for (Setting<?> setting : module.settings()) {
+			if (setting.id().equals(settingId)) {
+				return setting;
+			}
+		}
+		throw new IllegalArgumentException(module.id() + " has no setting " + settingId);
 	}
 
 	/**
@@ -458,19 +562,27 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 	/** Weihnachtsmütze auf der Schulter: trägt man sie, wird sie geteilt und von vorne gezeigt. */
 	private static void testHats(ClientGameTestContext context, ModuleManager modules) {
 		Module hats = modules.get(HatsModule.class);
-		set(hats, "hat", HatsModule.Hat.SANTA);
+		set(hats, "hat", "santa");
 		context.runOnClient(c -> {
 			modules.setEnabled(hats, true);
 			c.options.setCameraType(CameraType.THIRD_PERSON_FRONT);
 		});
 		context.waitTicks(5);
-		check(context.computeOnClient(c -> HatsModule.wearsSanta(c.player.getId())), "Hats: own player does not wear the santa hat");
+		check(context.computeOnClient(c -> {
+			dev.salamiclient.cosmetics.Hat worn = HatsModule.hatOf(c.player.getId());
+			return worn != null && worn.id().equals("santa");
+		}), "Hats: own player does not wear the santa hat");
 		check("santa".equals(HatsModule.sharedHat()), "Hats: santa hat is not shared");
 		context.takeScreenshot("salami-10d-santa-hat");
 		context.runOnClient(c -> c.options.setCameraType(CameraType.FIRST_PERSON));
-		set(hats, "hat", HatsModule.Hat.NONE);
+		// Einstellungen aus älteren Versionen (Auswahl als SANTA/NONE gespeichert) gelten weiter
+		set(hats, "hat", "SANTA");
+		check("santa".equals(HatsModule.sharedHat()), "Hats: old setting SANTA is not understood");
+		set(hats, "hat", "NONE");
+		check(HatsModule.sharedHat() == null, "Hats: old setting NONE is not understood");
+		set(hats, "hat", "");
 		check(HatsModule.sharedHat() == null, "Hats: hat still shared after taking it off");
-		check(context.computeOnClient(c -> !HatsModule.wearsSanta(c.player.getId())), "Hats: hat still shown after taking it off");
+		check(context.computeOnClient(c -> HatsModule.hatOf(c.player.getId()) == null), "Hats: hat still shown after taking it off");
 	}
 
 	// ------------------------------------------------------------------ Mini Me

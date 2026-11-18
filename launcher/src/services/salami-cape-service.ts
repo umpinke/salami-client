@@ -54,6 +54,10 @@ export interface SalamiGalleryCape {
   approvedAt: string;
   /** So viele Salami-Spieler tragen es gerade. */
   wearers: number;
+  /** Offizielles Cape vom Salami-Server – steht vorn in der Galerie und hat einen Namen. */
+  official?: boolean;
+  /** Anzeigenamen je Sprache (`en_us`, `de_de` …); nur offizielle Capes haben welche. */
+  names?: Record<string, string>;
 }
 
 /** Galerie des Cape-Servers, neueste Freigabe zuerst. */

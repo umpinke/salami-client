@@ -10,6 +10,10 @@ import dev.salamiclient.emotes.Emotes;
 import dev.salamiclient.modules.social.EmotesModule;
 import dev.salamiclient.capes.AnimatedCapes;
 import dev.salamiclient.capes.CapeLibrary;
+import dev.salamiclient.capes.OfficialCapes;
+import dev.salamiclient.cosmetics.Hat;
+import dev.salamiclient.cosmetics.HatCatalog;
+import dev.salamiclient.cosmetics.HatIcons;
 import dev.salamiclient.modules.client.GuiScaleModule;
 import dev.salamiclient.modules.visual.CapesModule;
 import dev.salamiclient.modules.visual.HatsModule;
@@ -39,11 +43,15 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.CompletableFuture;
 
 /**
- * Cosmetics: Reiter „Capes“, „Hüte“ und „Mini Me“. Ein Klick auf ein Cape legt es an (mit dem
- * Launcher: dieselbe Auswahl wie dort), „Hochladen“ fügt ein eigenes PNG hinzu und legt es
+ * Cosmetics: Reiter „Capes“, „Hüte“, „Mini Me“ und „Emotes“. Ein Klick auf ein Cape legt es an (mit
+ * dem Launcher: dieselbe Auswahl wie dort), „Hochladen“ fügt ein eigenes PNG hinzu und legt es
  * gleich an. Eigene Bilder sehen andere Salami-Spieler erst nach der Freigabe durch einen Admin.
+ *
+ * <p>Hüte, Emotes und die offiziellen Capes kommen als Listen vom Salami-Server
+ * ({@link dev.salamiclient.cosmetics.Catalogs}) – kommt dort etwas dazu, baut sich das Menü neu auf.
  */
 public final class CosmeticsScreen extends Screen {
 	private static final int HEADER = 24;
@@ -86,9 +94,6 @@ public final class CosmeticsScreen extends Screen {
 		}
 	}
 
-	private static final Identifier SANTA_ICON = Identifier.fromNamespaceAndPath(SalamiClient.MOD_ID, "textures/cosmetics/santa_hat_icon.png");
-	private static final int ICON_SIZE = 32;
-
 	/** Höhe der Zeile mit dem Namensfeld im Reiter Mini Me. */
 	private static final int NAME_ROW = 26;
 
@@ -107,8 +112,10 @@ public final class CosmeticsScreen extends Screen {
 	private boolean noticeError;
 	/** Angelegtes Cape ({@link #current()}), höchstens einmal pro Sekunde neu gelesen – es steht in einer Datei. */
 	private String currentKey = "none";
-	/** Stand des Emote-Katalogs, mit dem die Kacheln gebaut wurden. */
+	/** Stand der Kataloge (Emotes, Hüte, offizielle Capes), mit dem die Kacheln gebaut wurden. */
 	private int emoteRevision;
+	private int hatRevision;
+	private int capeRevision;
 	private long currentReadAt;
 
 	public CosmeticsScreen(@Nullable Screen parent) {
@@ -155,14 +162,11 @@ public final class CosmeticsScreen extends Screen {
 			return;
 		}
 		if (tab == Tab.HATS) {
+			// Symbole zeichnet HatIcons aus dem Modell – die Liste kommt vom Server und kann wachsen
+			hatRevision = HatCatalog.revision();
 			cards.add(new Card("hat:none", I18n.get("salami.cosmetics.hat.none"), null, 0));
-			for (HatsModule.Hat hat : HatsModule.Hat.values()) {
-				if (hat == HatsModule.Hat.NONE) {
-					continue;
-				}
-				Identifier icon = hat == HatsModule.Hat.SANTA ? SANTA_ICON
-					: Identifier.fromNamespaceAndPath(SalamiClient.MOD_ID, "textures/cosmetics/hat_" + hat.id() + "_icon.png");
-				cards.add(new Card("hat:" + hat.id(), I18n.get("salami.module.hats.setting.hat." + hat.id()), icon, ICON_SIZE));
+			for (Hat hat : HatCatalog.all()) {
+				cards.add(new Card("hat:" + hat.id(), hat.displayName(), null, 0));
 			}
 			return;
 		}
@@ -182,9 +186,17 @@ public final class CosmeticsScreen extends Screen {
 			String name = builtin.name().toLowerCase(Locale.ROOT);
 			cards.add(new Card("builtin:" + name, I18n.get("salami.module.capes.setting.cape." + name), null, 0, builtin));
 		}
+		// offizielle Capes vom Server: die Vorschau lädt OfficialCapes, sobald die Kachel zu sehen ist
+		capeRevision = OfficialCapes.revision();
+		for (OfficialCapes.Cape official : OfficialCapes.all()) {
+			cards.add(new Card("official:" + official.id(), official.displayName(), null, 0));
+		}
 		Path dir = CapeLibrary.launcherDir();
 		if (dir != null) {
 			for (CapeLibrary.OwnCape own : CapeLibrary.ownCapes(dir)) {
+				if (OfficialCapes.byOwnId(own.id()) != null) {
+					continue; // angelegtes offizielles Cape: steht schon oben
+				}
 				addOwn("own:" + own.id(), own.name(), own.png());
 			}
 		} else if (Files.isRegularFile(CapesModule.customCapeFile())) {
@@ -229,7 +241,7 @@ public final class CosmeticsScreen extends Screen {
 	private String current() {
 		if (tab == Tab.HATS) {
 			HatsModule hats = HatsModule.instance();
-			return hats == null || !hats.isEnabled() ? "hat:none" : "hat:" + hats.selected().name().toLowerCase(Locale.ROOT);
+			return hats == null || !hats.isEnabled() || hats.selected() == null ? "hat:none" : "hat:" + hats.selected().id();
 		}
 		if (tab == Tab.MINIME) {
 			MiniMeModule mini = MiniMeModule.instance();
@@ -252,7 +264,9 @@ public final class CosmeticsScreen extends Screen {
 						: fromStart.startsWith("builtin:") ? fromStart : "launcher";
 				}
 				String selected = CapeLibrary.selected(dir);
-				yield selected == null ? "none" : selected.startsWith("builtin:") ? selected : "own:" + selected;
+				OfficialCapes.Cape official = OfficialCapes.byOwnId(selected);
+				yield selected == null ? "none" : selected.startsWith("builtin:") ? selected
+					: official != null ? "official:" + official.id() : "own:" + selected;
 			}
 			case CUSTOM -> "custom";
 			case NONE -> "none";
@@ -316,10 +330,10 @@ public final class CosmeticsScreen extends Screen {
 		if (!hats.isEnabled()) {
 			SalamiClient.get().modules().setEnabled(hats, true);
 		}
-		HatsModule.Hat hat = HatsModule.Hat.of(key.substring("hat:".length()));
-		hats.choose(hat);
-		setNotice(hat == HatsModule.Hat.NONE ? Component.translatable("salami.cosmetics.hat.removed")
-			: Component.translatable("salami.cosmetics.hat.equipped", I18n.get("salami.module.hats.setting.hat." + hat.id())), false);
+		Hat hat = HatCatalog.get(key.substring("hat:".length()));
+		hats.choose(hat == null ? null : hat.id());
+		setNotice(hat == null ? Component.translatable("salami.cosmetics.hat.removed")
+			: Component.translatable("salami.cosmetics.hat.equipped", hat.displayName()), false);
 		currentReadAt = 0;
 		SalamiClient.get().config().markDirty();
 	}
@@ -371,6 +385,50 @@ public final class CosmeticsScreen extends Screen {
 			setNotice(Component.translatable("salami.cosmetics.error.save"), true);
 		}
 		SalamiClient.get().config().markDirty();
+	}
+
+	/**
+	 * Offizielles Cape anlegen ({@code official:frost}): das Bild vom Server zu den eigenen Capes holen
+	 * und auswählen. Der Server kennt das Bild schon, deshalb sehen es alle sofort.
+	 */
+	private void chooseOfficial(String key) {
+		OfficialCapes.Cape cape = OfficialCapes.get(key.substring("official:".length()));
+		if (cape == null) {
+			return;
+		}
+		Path dir = CapeLibrary.launcherDir();
+		String ownId = OfficialCapes.ownId(cape);
+		if (dir != null && CapeLibrary.ownCapes(dir).stream().anyMatch(own -> own.id().equals(ownId))) {
+			choose("own:" + ownId); // schon geholt
+			return;
+		}
+		CompletableFuture<byte[]> download = OfficialCapes.download(cape);
+		if (download == null) {
+			setNotice(Component.translatable("salami.cosmetics.official.error"), true);
+			return;
+		}
+		setNotice(Component.translatable("salami.cosmetics.official.loading", cape.displayName()), false);
+		download.whenComplete((png, error) -> minecraft.execute(() -> {
+			if (error != null || png == null) {
+				SalamiClient.LOG.warn("Offizielles Cape {} nicht geladen: {}", cape.id(), String.valueOf(error));
+				setNotice(Component.translatable("salami.cosmetics.official.error"), true);
+				return;
+			}
+			try {
+				if (dir != null) {
+					CapeLibrary.adoptOfficial(dir, ownId, cape.displayName(), png);
+					choose("own:" + ownId);
+				} else {
+					CapeLibrary.replaceCustom(png);
+					choose("custom");
+				}
+			} catch (CapeLibrary.InvalidCapeException e) {
+				setNotice(Component.translatable(e.getMessage()), true);
+			} catch (IOException | RuntimeException e) {
+				SalamiClient.LOG.warn("Offizielles Cape konnte nicht gespeichert werden: {}", e.toString());
+				setNotice(Component.translatable("salami.cosmetics.error.save"), true);
+			}
+		}));
 	}
 
 	private void upload() {
@@ -554,8 +612,10 @@ public final class CosmeticsScreen extends Screen {
 		if (tab == Tab.MINIME) {
 			renderNameRow(g, theme, mx, my);
 		}
-		if (tab == Tab.EMOTES && emoteRevision != EmoteCatalog.revision()) {
-			reload(); // neue Emotes vom Server, während das Menü offen ist
+		if (tab == Tab.EMOTES && emoteRevision != EmoteCatalog.revision()
+			|| tab == Tab.HATS && hatRevision != HatCatalog.revision()
+			|| tab == Tab.CAPES && capeRevision != OfficialCapes.revision()) {
+			reload(); // Neues vom Server, während das Menü offen ist
 		}
 		int[] c = content();
 		long now = System.currentTimeMillis();
@@ -624,15 +684,23 @@ public final class CosmeticsScreen extends Screen {
 						EmoteIcons.SIZE, EmoteIcons.SIZE, EmoteIcons.SIZE, EmoteIcons.SIZE);
 					break;
 				}
-				if (card.key().startsWith("hat:") && card.texture() != null) {
-					// Symbol statt Cape-Ausschnitt, quadratisch in der Mitte der Vorschau
+				Hat hat = card.key().startsWith("hat:") ? HatCatalog.get(card.key().substring("hat:".length())) : null;
+				if (hat != null) {
+					// das Modell des Hutes, quadratisch in der Mitte der Vorschau
 					int size = PREVIEW_H - 3;
 					int ix = x + (CARD_W - size) / 2;
-					g.blit(RenderPipelines.GUI_TEXTURED, card.texture(), ix, py + 2, 0f, 0f, size, size, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
+					g.blit(RenderPipelines.GUI_TEXTURED, HatIcons.texture(hat), ix, py + 2, 0f, 0f, size, size,
+						HatIcons.SIZE, HatIcons.SIZE, HatIcons.SIZE, HatIcons.SIZE);
 					break;
 				}
 				Identifier texture = card.texture();
 				int textureWidth = card.textureWidth();
+				OfficialCapes.Cape official = card.key().startsWith("official:")
+					? OfficialCapes.get(card.key().substring("official:".length())) : null;
+				if (official != null) {
+					texture = OfficialCapes.preview(official);
+					textureWidth = official.width();
+				}
 				if (card.builtin() != null) {
 					ClientAsset.Texture painted = CapesModule.preview(card.builtin());
 					String name = card.builtin().name().toLowerCase(Locale.ROOT);
@@ -645,8 +713,8 @@ public final class CosmeticsScreen extends Screen {
 					int k = textureWidth / 64;
 					g.blit(RenderPipelines.GUI_TEXTURED, texture, px, py, k, k, PREVIEW_W, PREVIEW_H,
 						10 * k, 16 * k, textureWidth, textureWidth / 2);
-				} else if (card.builtin() != null) {
-					// wird gerade gemalt (wenige Zehntelsekunden)
+				} else if (card.builtin() != null || official != null) {
+					// wird gerade gemalt (wenige Zehntelsekunden) oder vom Server geladen
 					GuiDraw.outline(g, px, py, PREVIEW_W, PREVIEW_H, theme.outline());
 					GuiDraw.centeredText(g, font, "…", px + PREVIEW_W / 2, py + PREVIEW_H / 2 - 4, theme.textDim());
 				} else {
@@ -661,6 +729,8 @@ public final class CosmeticsScreen extends Screen {
 			renderLabel(g, I18n.get("salami.cosmetics.equipped_badge"), x + CARD_W / 2, labelY + 11, CARD_W - 6, theme.accent());
 		} else if (card.key().startsWith("own:") || card.key().equals("custom")) {
 			renderLabel(g, I18n.get("salami.cosmetics.own_badge"), x + CARD_W / 2, labelY + 11, CARD_W - 6, theme.textDim());
+		} else if (card.key().startsWith("official:")) {
+			renderLabel(g, I18n.get("salami.cosmetics.official_badge"), x + CARD_W / 2, labelY + 11, CARD_W - 6, theme.textDim());
 		}
 	}
 
@@ -792,22 +862,31 @@ public final class CosmeticsScreen extends Screen {
 			}
 			int[] pos = cardPos(i);
 			if (x >= pos[0] && x < pos[0] + CARD_W && y >= pos[1] && y < pos[1] + CARD_H) {
-				String key = cards.get(i).key();
-				if (key.equals("upload")) {
-					upload();
-				} else if (key.startsWith("hat:")) {
-					chooseHat(key);
-				} else if (key.startsWith("emote:")) {
-					playEmote(key);
-				} else if (key.startsWith("minime:")) {
-					chooseMiniMe(key);
-				} else {
-					choose(key);
-				}
+				pick(cards.get(i).key());
 				return true;
 			}
 		}
 		return true;
+	}
+
+	/**
+	 * Kachel wählen, als hätte man sie angeklickt: {@code builtin:board}, {@code official:frost},
+	 * {@code own:<id>}, {@code hat:crown}, {@code emote:wave}, {@code minime:head}, {@code upload} …
+	 */
+	public void pick(String key) {
+		if (key.equals("upload")) {
+			upload();
+		} else if (key.startsWith("official:")) {
+			chooseOfficial(key);
+		} else if (key.startsWith("hat:")) {
+			chooseHat(key);
+		} else if (key.startsWith("emote:")) {
+			playEmote(key);
+		} else if (key.startsWith("minime:")) {
+			chooseMiniMe(key);
+		} else {
+			choose(key);
+		}
 	}
 
 	@Override

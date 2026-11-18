@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.capes.AnimatedCapes;
 import dev.salamiclient.capes.SharedCapes;
 import dev.salamiclient.config.ConfigManager;
+import dev.salamiclient.cosmetics.Catalogs;
 import dev.salamiclient.friends.Friends;
 import dev.salamiclient.friends.FriendsCommand;
 import dev.salamiclient.gui.CosmeticsScreen;
@@ -87,9 +88,8 @@ import dev.salamiclient.modules.visual.ParticlesModule;
 import dev.salamiclient.modules.visual.CapesModule;
 import dev.salamiclient.modules.visual.HatsModule;
 import dev.salamiclient.modules.visual.MiniMeModule;
-import dev.salamiclient.render.HeadHatLayer;
+import dev.salamiclient.render.HatLayer;
 import dev.salamiclient.render.MiniMeLayer;
-import dev.salamiclient.render.SantaHatLayer;
 import dev.salamiclient.render.WorldContext;
 import dev.salamiclient.render.WorldLines;
 import dev.salamiclient.modules.visual.WatermarkModule;
@@ -315,11 +315,10 @@ public final class SalamiClient implements ClientModInitializer {
 			FriendsCommand.register(dispatcher);
 			EmoteCommand.register(dispatcher);
 		});
-		// Hüte (Cosmetics): Weihnachtsmütze auf der Schulter aller Spieler-Modelle
+		// Hüte und Mini Me (Cosmetics) an allen Spieler-Modellen
 		LivingEntityFeatureRendererRegistrationCallback.EVENT.register((entityType, renderer, helper, context) -> {
 			if (renderer instanceof AvatarRenderer<?> avatar) {
-				helper.register(new SantaHatLayer(avatar));
-				helper.register(new HeadHatLayer(avatar));
+				helper.register(new HatLayer(avatar));
 				helper.register(new MiniMeLayer(avatar));
 			}
 		});
@@ -354,6 +353,7 @@ public final class SalamiClient implements ClientModInitializer {
 		}
 		modules.tick(client);
 		SharedCapes.tick(client);
+		Catalogs.tick(client);
 		Friends.tick(client);
 		AnimatedCapes.tick();
 		config.tick();

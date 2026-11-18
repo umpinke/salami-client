@@ -116,6 +116,12 @@ pub struct GalleryCape {
     /// So viele Salami-Spieler tragen es gerade.
     #[serde(default)]
     pub wearers: u32,
+    /// Offizielles Cape vom Salami-Server (dort `official-capes.json`) – steht vorn in der Galerie.
+    #[serde(default)]
+    pub official: bool,
+    /// Anzeigenamen je Sprache (`en_us`, `de_de` …); nur offizielle Capes haben welche.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub names: HashMap<String, String>,
 }
 
 #[derive(Serialize, Debug)]
@@ -734,7 +740,13 @@ mod tests {
 
         let stale = "f".repeat(64);
         std::fs::write(gallery_png_path(&dir, &stale), &bytes).unwrap();
-        let keep = vec![GalleryCape { id: id.clone(), approved_at: "2026-11-04T00:00:00Z".into(), wearers: 0 }];
+        let keep = vec![GalleryCape {
+            id: id.clone(),
+            approved_at: "2026-11-04T00:00:00Z".into(),
+            wearers: 0,
+            official: false,
+            names: HashMap::new(),
+        }];
         prune_gallery_cache(&dir, &keep);
         assert!(gallery_png_path(&dir, &id).is_file());
         assert!(!gallery_png_path(&dir, &stale).exists());

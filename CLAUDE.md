@@ -1,11 +1,18 @@
 # Salami Client – Hinweise für Claude
 
-## Neue Emotes: kein Release
+## Neue Cosmetics: kein Release
 
-Emotes sind Daten in `server/capes/emotes.json` (Aufbau: `server/capes/README.md`, „Emotes hinzufügen“). Für ein
-neues Emote nur diese Datei ändern, committen und der „salami“-Session zum Hochladen auf den Server geben – der
-Cape-Server lädt sie von selbst neu und alle Spiele bekommen das Emote ohne Launcher-Update. Der Nutzer will
-ausdrücklich kein Update pro Emote. Die Mod bündelt dieselbe Datei beim Bauen nur als Notfall-Kopie.
+Emotes, Hüte und offizielle Capes sind Daten auf dem Cape-Server, kein Code in der Mod:
+
+- Emotes: `server/capes/emotes.json`
+- Hüte: `server/capes/hats.json` (Würfel mit Farbe; Modell und Symbol zeichnet das Spiel daraus)
+- Offizielle Capes: `server/capes/official-capes.json` und das Bild als `server/capes/official-capes/<id>.png`
+
+Aufbau jeweils in `server/capes/README.md` („… hinzufügen“). Für etwas Neues nur diese Dateien ändern, committen
+und der „salami“-Session zum Hochladen auf den Server geben – der Cape-Server lädt sie von selbst neu und alle
+Spiele bekommen es ohne Launcher-Update. Der Nutzer will ausdrücklich kein Update pro Cosmetic. Die Mod bündelt
+`emotes.json` und `hats.json` beim Bauen nur als Notfall-Kopie. Neue Arten von Cosmetics genauso bauen (Katalog
+auf dem Server, `RemoteCatalog` in der Mod), nicht fest in den Code.
 
 ## Versionsnummern bei Releases
 

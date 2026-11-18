@@ -91,7 +91,7 @@ type Reviews = Record<string, SalamiCapeReview>;
 
 /** Cape-Seite: Salami-Capes, eigene Capes, Capes anderer Spieler, Vorlage, Import und Editor. */
 export function SalamiCapesTab() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const accent = useThemeStore((s) => s.accentColor);
   const [overview, setOverview] = useState<SalamiCapeOverview | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -180,6 +180,13 @@ export function SalamiCapesTab() {
     })();
   }, [missingImages]);
 
+  /** Name eines offiziellen Capes in der Sprache des Launchers, sonst englisch; `null` bei Capes von Spielern. */
+  const officialName = (cape: SalamiGalleryCape | undefined): string | null => {
+    if (!cape?.official || !cape.names) return null;
+    const lang = (i18n.language ?? "en").toLowerCase().startsWith("de") ? "de_de" : "en_us";
+    return cape.names[lang] ?? cape.names.en_us ?? null;
+  };
+
   const imageOf = (selection: string | null): string | null => {
     if (!selection || !overview) return null;
     if (selection.startsWith(BUILTIN_PREFIX)) return builtinCapeImage(selection.slice(BUILTIN_PREFIX.length));
@@ -190,7 +197,10 @@ export function SalamiCapesTab() {
   const nameOf = (selection: string | null): string => {
     if (!selection) return t("salami.capes.none");
     if (selection.startsWith(BUILTIN_PREFIX)) return t(`salami.capes.${selection.slice(BUILTIN_PREFIX.length)}`);
-    if (selection.startsWith(GALLERY_PREFIX)) return t("salami.capes.gallery.cape");
+    if (selection.startsWith(GALLERY_PREFIX)) {
+      const id = selection.slice(GALLERY_PREFIX.length);
+      return officialName(galleryList.find((c) => c.id === id)) ?? t("salami.capes.gallery.cape");
+    }
     return overview?.capes.find((c) => c.id === selection)?.name ?? "";
   };
 
@@ -283,7 +293,10 @@ export function SalamiCapesTab() {
     if (adopting) return;
     setAdopting(cape.id);
     try {
-      const adopted = await adoptGalleryCape(cape.id, t("salami.capes.gallery.default_name", { id: cape.id.slice(0, 4) }));
+      const adopted = await adoptGalleryCape(
+        cape.id,
+        officialName(cape) ?? t("salami.capes.gallery.default_name", { id: cape.id.slice(0, 4) }),
+      );
       toast.success(t("salami.capes.gallery.adopted", { name: adopted.name }));
       // Die Karte steht jetzt für das eigene Cape – Vorschau links mitziehen
       setHovered((h) => (h === `${GALLERY_PREFIX}${cape.id}` ? adopted.id : h));
@@ -572,13 +585,18 @@ export function SalamiCapesTab() {
                   `gallery-${entry.id}`,
                   own ? own.id : `${GALLERY_PREFIX}${entry.id}`,
                   image || null,
-                  own?.name ?? t("salami.capes.gallery.cape"),
+                  own?.name ?? officialName(entry) ?? t("salami.capes.gallery.cape"),
                   {
                     onPick: () => void handleAdopt(entry),
                     placeholder: image === false ? "solar:forbidden-circle-bold" : "svg-spinners:ring-resize",
                     extra: (
                       <div className="flex flex-wrap items-center justify-center gap-1">
                         {adopting === entry.id && <Icon icon="svg-spinners:ring-resize" className="h-3.5 w-3.5 text-white/70" />}
+                        {entry.official && (
+                          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/80">
+                            {t("salami.capes.gallery.official")}
+                          </span>
+                        )}
                         {own && (
                           <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/80">
                             {t("salami.capes.gallery.owned")}
@@ -593,7 +611,7 @@ export function SalamiCapesTab() {
                             {entry.wearers}
                           </span>
                         )}
-                        {!own && (
+                        {!own && !entry.official && (
                           <button
                             type="button"
                             title={t("salami.capes.gallery.report")}

@@ -11,7 +11,8 @@
  *   POST /v1/auth/challenge                         → {"serverId":"…"}
  *   PUT  /v1/capes/me  {"name","serverId","cape","hat"?,"minime"?} → {"status":"approved"|"pending"|"rejected", …}
  *        cape: {"builtin":"salami"} | {"png":"<base64>"} | null (kein Cape)
- *        hat: "santa", "crown" … (Cosmetics → Hüte, siehe HATS) oder fehlt/null; unbekannte Hüte werden ignoriert
+ *        hat: "santa", "crown" … (Cosmetics → Hüte, ein Hut aus dem Katalog hats.json) oder fehlt/null;
+ *        unbekannte Hüte werden ignoriert
  *        minime: {"name":"<Minecraft-Name>","place":"hand"|"shoulder"|"head"|"follow"}
  *        (Cosmetics → Mini Me) oder fehlt/null; Ungültiges wird ebenso ignoriert
  *        Anmeldung wie beim Betreten eines Minecraft-Servers: das Spiel meldet die
@@ -22,9 +23,15 @@
  *        steht zusätzlich "hat":"santa" darin (auch ohne Cape: {"hat":"santa"}), ebenso
  *        sein Mini Me als "minime":{"name","place"}
  *   GET  /v1/capes/img/<capeId>.png                 → freigegebenes Cape-Bild
- *   GET  /v1/capes/gallery                          → {"capes":[{"id","approvedAt","wearers"}]}
- *        alle freigegebenen eigenen Capes, neueste zuerst – der Launcher zeigt sie unter
- *        „Von anderen Spielern“, jeder kann sie selbst tragen. Ohne Namen der Einreicher.
+ *   GET  /v1/capes/gallery                          → {"capes":[{"id","approvedAt","wearers","official"?,"names"?}]}
+ *        alle freigegebenen Capes: zuerst die offiziellen (mit "official":true und "names"), dann die
+ *        eigenen der Spieler, neueste zuerst – der Launcher zeigt sie in der „Galerie“,
+ *        jeder kann sie selbst tragen. Ohne Namen der Einreicher.
+ *   GET  /v1/capes/catalog                          → {"version":"…","capes":[{"id","names","cape","width","height"}]}
+ *        die offiziellen Capes (official-capes.json, Bilder im Ordner official-capes): "cape" ist die
+ *        Bild-ID für /v1/capes/img/<cape>.png. Das Spiel zeigt sie unter Cosmetics → Capes.
+ *   GET  /v1/hats/catalog                           → {"version":"…","hats":[…]}
+ *        alle Hüte als Daten (hats.json, Format in hats.mjs).
  *   GET  /v1/capes/events                           → Server-Sent Events, eine Zeile pro Änderung:
  *        data: {"uuid":"…","cape":{"builtin":"salami"}|{"id":"…"}|null}
  *        (Cape gewechselt oder von einem Admin freigegeben/gesperrt) – so sehen alle
@@ -37,8 +44,9 @@
  *        spielt ein Emote aus dem Katalog für alle Mitspieler ab; nichts davon wird gespeichert.
  *   GET  /v1/emotes/catalog                          → {"version":"…","emotes":[…]}
  *        alle Emotes als Daten (emotes.json, Format in emotes.mjs). Das Spiel lädt sie beim Start.
- *        Ändert sich die Datei, lädt der Server sie von selbst neu und meldet es auf
- *        /v1/capes/events als data: {"catalog":"<version>"} – neue Emotes brauchen kein Update.
+ *        Ändert sich einer der drei Kataloge (Emotes, Hüte, offizielle Capes), lädt der Server ihn von
+ *        selbst neu und meldet es auf /v1/capes/events als
+ *        data: {"catalog":"<version>","kind":"emotes"|"hats"|"capes"} – Neues braucht kein Update.
  * Launcher:
  *   POST /v1/capes/status {"ids":[…]}               → {"status":{"<capeId>":{"status":"pending"|…,"reason"?}}}
  *   POST /v1/capes/submit {"name","serverId","png"} → {"status":"approved"|"pending"|"rejected","id","reason"?}
@@ -76,12 +84,14 @@
  * Node 18+, keine Abhängigkeiten. Einstellungen per Umgebungsvariable (siehe README.md).
  */
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync, existsSync } from "node:fs";
 import { createServer } from "node:http";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseCatalog } from "./emotes.mjs";
 import { createFriends } from "./friends.mjs";
+import { parseHatCatalog } from "./hats.mjs";
+import { parseOfficialCatalog } from "./official.mjs";
 import { capeId, decodeCape, encodeRgba, PngError } from "./png.mjs";
 
 const env = (name, fallback) => {
@@ -118,12 +128,16 @@ const REPORTS_TO_HIDE = env("REPORTS_TO_HIDE", 3);
 /** Meldungen pro Spieler und Tag. */
 const REPORTS_PER_DAY = env("REPORTS_PER_DAY", 20);
 
-/** Hüte von salami-core (dort `HatsModule.Hat`); neue Namen hier nachtragen. */
-const HATS = new Set(["santa", "crown", "top_hat", "chef", "halo", "horns", "cat_ears", "party", "beret"]);
 /** Emote-Katalog (Format: emotes.mjs). Neue Emotes dort eintragen – der Server lädt die Datei von selbst neu. */
 const EMOTES_FILE = process.env.EMOTES_FILE || fileURLToPath(new URL("./emotes.json", import.meta.url));
-/** So oft wird nachgesehen, ob sich die Datei geändert hat. */
-const EMOTE_RELOAD_MS = env("EMOTE_RELOAD_MS", 30_000);
+/** Hut-Katalog (Format: hats.mjs): welche Hüte es gibt und wie sie aussehen. */
+const HATS_FILE = process.env.HATS_FILE || fileURLToPath(new URL("./hats.json", import.meta.url));
+/** Offizielle Capes (Format: official.mjs): die Liste, die Bilder liegen als <id>.png im Ordner daneben. */
+const OFFICIAL_CAPES_FILE =
+  process.env.OFFICIAL_CAPES_FILE || fileURLToPath(new URL("./official-capes.json", import.meta.url));
+const OFFICIAL_CAPES_DIR = process.env.OFFICIAL_CAPES_DIR || join(dirname(OFFICIAL_CAPES_FILE), "official-capes");
+/** So oft wird nachgesehen, ob sich ein Katalog geändert hat. */
+const CATALOG_RELOAD_MS = env("CATALOG_RELOAD_MS", 30_000);
 /** Emotes pro Spieler und Minute. */
 const EMOTES_PER_MINUTE = env("EMOTES_PER_MINUTE", 20);
 /** So lange gilt eine Emote-Anmeldung. */
@@ -177,11 +191,12 @@ const ADMINS = (process.env.ADMIN_TOKENS || "")
  * players: uuid → { name, cape: {builtin} | {id}, updatedAt }
  * capes:   capeId → { status, width, height, submittedAt, submittedBy, submittedName,
  *                     viaLauncher?, reviewedAt?, reviewedBy?, reason?, approvedAt?,
- *                     reports?, hiddenByReports? }
+ *                     reports?, hiddenByReports?, official? }
  *          viaLauncher: im Launcher eingereicht – bleibt in der Warteschlange, auch ungetragen
  *          approvedAt: Freigabe (Reihenfolge der Galerie), bleibt beim Behalten nach Meldungen
  *          reports: offene Meldungen [{ by, name, reason, note?, at }], bis ein Admin entscheidet
  *          hiddenByReports: Zeitpunkt, an dem Meldungen das Cape versteckt haben (Status pending)
+ *          official: Name im Katalog der offiziellen Capes (official-capes.json) – immer freigegeben
  */
 let db = { players: {}, capes: {} };
 
@@ -445,7 +460,7 @@ async function handleSetCape(req, res) {
   const visibleBefore = JSON.stringify(visibleCape(db.players[uuid]));
   const cape = body.cape ?? null;
   // Hut und Mini Me: Unbekanntes (neuere Clients) einfach ignorieren statt die Anfrage abzulehnen
-  const hat = typeof body.hat === "string" && HATS.has(body.hat) ? body.hat : null;
+  const hat = typeof body.hat === "string" && hatCatalog.ids.has(body.hat) ? body.hat : null;
   const minime = parseMiniMe(body.minime);
   const withHat = (player) => ({ ...player, ...(hat ? { hat } : {}), ...(minime ? { minime } : {}) });
   const now = new Date().toISOString();
@@ -512,6 +527,7 @@ async function handleReport(req, res) {
   if (!cape || (cape.status !== "approved" && !cape.hiddenByReports)) {
     throw new HttpError(404, "das Cape ist nicht (mehr) freigegeben");
   }
+  if (cape.official) throw new HttpError(409, "offizielle Capes können nicht gemeldet werden");
   cape.reports ??= [];
   if (cape.reports.some((report) => report.by === uuid)) return send(res, 200, { status: "already_reported" });
   if (!underDailyLimit(reportLog, uuid, REPORTS_PER_DAY)) throw new HttpError(429, "heute schon zu viele Capes gemeldet");
@@ -557,7 +573,8 @@ async function handleStatus(req, res) {
 }
 
 /**
- * Galerie für den Launcher: freigegebene eigene Capes, die jeder selbst tragen kann.
+ * Galerie für den Launcher: freigegebene Capes, die jeder selbst tragen kann – zuerst die
+ * offiziellen (in der Reihenfolge von official-capes.json, mit Namen), dann die eigenen der Spieler.
  * Trägt man eins davon, ist es sofort für alle sichtbar – die ID hängt nur an den Pixeln,
  * das Bild ist also schon geprüft. Namen der Einreicher stehen absichtlich nicht drin.
  */
@@ -567,16 +584,20 @@ function handleGallery(res) {
     const id = player.cape?.id;
     if (id) wearers.set(id, (wearers.get(id) ?? 0) + 1);
   }
+  const entry = (id, cape) => ({
+    id,
+    approvedAt: cape.approvedAt ?? cape.reviewedAt ?? cape.submittedAt,
+    wearers: wearers.get(id) ?? 0,
+  });
+  const official = officialCatalog.items
+    .filter((item) => db.capes[item.cape]?.status === "approved")
+    .map((item) => ({ ...entry(item.cape, db.capes[item.cape]), official: true, names: item.names }));
+  const shown = new Set(official.map((cape) => cape.id));
   const capes = Object.entries(db.capes)
-    .filter(([, cape]) => cape.status === "approved")
-    .map(([id, cape]) => ({
-      id,
-      approvedAt: cape.approvedAt ?? cape.reviewedAt ?? cape.submittedAt,
-      wearers: wearers.get(id) ?? 0,
-    }))
-    .sort((a, b) => b.approvedAt.localeCompare(a.approvedAt))
-    .slice(0, MAX_GALLERY);
-  send(res, 200, { capes });
+    .filter(([id, cape]) => cape.status === "approved" && !shown.has(id))
+    .map(([id, cape]) => entry(id, cape))
+    .sort((a, b) => b.approvedAt.localeCompare(a.approvedAt));
+  send(res, 200, { capes: [...official, ...capes].slice(0, MAX_GALLERY) });
 }
 
 function handleImage(res, id, admin) {
@@ -645,6 +666,10 @@ function adminList(status) {
 async function handleReview(req, res, admin, id, action) {
   const cape = db.capes[id];
   if (!cape) return send(res, 404, { error: "Cape nicht gefunden" });
+  // Offizielle Capes gehören zur Liste auf dem Server: sperren heißt, sie dort herauszunehmen
+  if (cape.official && action === "reject") {
+    throw new HttpError(409, "offizielles Cape – zum Entfernen aus official-capes.json nehmen");
+  }
   const body = action === "reject" ? await readJson(req, MAX_SMALL_BODY).catch(() => ({})) : {};
   const wearers = Object.entries(db.players).filter(([, player]) => player.cape?.id === id);
   const visibleBefore = new Map(wearers.map(([uuid, player]) => [uuid, JSON.stringify(visibleCape(player))]));
@@ -721,44 +746,158 @@ setInterval(() => {
   for (const res of streams.keys()) res.write(": ping\n\n");
 }, HEARTBEAT_MS).unref();
 
-// ------------------------------------------------------------------ Emotes
-
-/** Geladener Katalog: was /v1/emotes/catalog ausliefert, die erlaubten Namen und der Stand der Datei. */
-let emoteCatalog = { version: "", emotes: [], ids: new Set(), stamp: "" };
+// ------------------------------------------------------------------ Kataloge (Emotes, Hüte, offizielle Capes)
 
 /**
- * Liest emotes.json, wenn sie sich geändert hat. Ein kaputter Eintrag wird übersprungen, eine kaputte
- * Datei lässt den bisherigen Katalog stehen. Mit `announce` erfahren es alle offenen Spiele sofort.
+ * Ein Katalog aus einer JSON-Datei: was der Server ausliefert (`items`), die erlaubten Namen (`ids`)
+ * und der Stand der Datei. `load` liest die Datei nur, wenn sie sich geändert hat. Ein kaputter Eintrag
+ * wird übersprungen, eine kaputte Datei lässt den bisherigen Katalog stehen. Mit `announce` erfahren es
+ * alle offenen Spiele sofort.
+ *
+ * parse:      geprüfte Einträge und übersprungene ({ items, skipped }) aus dem JSON
+ * extraStamp: weiterer Stand neben der Datei (die Bilder der offiziellen Capes)
+ * applied:    läuft nach jedem Laden mit geändertem Inhalt
  */
-function loadEmotes(announce) {
-  let stamp;
+function fileCatalog({ kind, label, file, parse, extraStamp, applied }) {
+  const catalog = { version: "", items: [], ids: new Set(), stamp: "" };
+  catalog.load = (announce) => {
+    let stamp;
+    try {
+      const stat = statSync(file);
+      stamp = `${stat.mtimeMs}:${stat.size}${extraStamp ? extraStamp() : ""}`;
+    } catch {
+      if (catalog.stamp !== "missing") console.warn(`[salami-capes] ${label}-Katalog fehlt: ${file}`);
+      catalog.stamp = "missing";
+      return;
+    }
+    if (stamp === catalog.stamp) return;
+    catalog.stamp = stamp;
+    let parsed;
+    try {
+      parsed = parse(JSON.parse(readFileSync(file, "utf8")));
+    } catch (e) {
+      console.warn(`[salami-capes] ${label}-Katalog nicht lesbar, der alte bleibt: ${e.message}`);
+      return;
+    }
+    for (const reason of parsed.skipped) console.warn(`[salami-capes] ${label} übersprungen – ${reason}`);
+    const version = createHash("sha256").update(JSON.stringify(parsed.items)).digest("hex").slice(0, 16);
+    if (version === catalog.version) return;
+    catalog.version = version;
+    catalog.items = parsed.items;
+    catalog.ids = new Set(parsed.items.map((item) => item.id));
+    console.log(`[salami-capes] ${label}-Katalog geladen: ${parsed.items.length} Einträge (${version})`);
+    applied?.(parsed.items);
+    if (announce) {
+      const event = `data: ${JSON.stringify({ catalog: version, kind })}\n\n`;
+      for (const [res, stream] of streams) if (stream.kind === "capes") res.write(event);
+    }
+  };
+  return catalog;
+}
+
+const emoteCatalog = fileCatalog({
+  kind: "emotes",
+  label: "Emote",
+  file: EMOTES_FILE,
+  parse: (root) => {
+    const { emotes, skipped } = parseCatalog(root);
+    return { items: emotes, skipped };
+  },
+});
+
+const hatCatalog = fileCatalog({
+  kind: "hats",
+  label: "Hut",
+  file: HATS_FILE,
+  parse: (root) => {
+    const { hats, skipped } = parseHatCatalog(root);
+    return { items: hats, skipped };
+  },
+});
+
+/** Stand aller Bilder im Ordner der offiziellen Capes – ein neues oder ersetztes Bild lädt den Katalog neu. */
+function officialImagesStamp() {
   try {
-    const stat = statSync(EMOTES_FILE);
-    stamp = `${stat.mtimeMs}:${stat.size}`;
+    return readdirSync(OFFICIAL_CAPES_DIR)
+      .filter((name) => name.endsWith(".png"))
+      .sort()
+      .map((name) => {
+        const stat = statSync(join(OFFICIAL_CAPES_DIR, name));
+        return `|${name}:${stat.mtimeMs}:${stat.size}`;
+      })
+      .join("");
   } catch {
-    if (emoteCatalog.stamp !== "missing") console.warn(`[salami-capes] Emote-Katalog fehlt: ${EMOTES_FILE}`);
-    emoteCatalog.stamp = "missing";
-    return;
-  }
-  if (stamp === emoteCatalog.stamp) return;
-  emoteCatalog.stamp = stamp;
-  let parsed;
-  try {
-    parsed = parseCatalog(JSON.parse(readFileSync(EMOTES_FILE, "utf8")));
-  } catch (e) {
-    console.warn(`[salami-capes] Emote-Katalog nicht lesbar, der alte bleibt: ${e.message}`);
-    return;
-  }
-  for (const reason of parsed.skipped) console.warn(`[salami-capes] Emote übersprungen – ${reason}`);
-  const version = createHash("sha256").update(JSON.stringify(parsed.emotes)).digest("hex").slice(0, 16);
-  if (version === emoteCatalog.version) return;
-  emoteCatalog = { version, emotes: parsed.emotes, ids: new Set(parsed.emotes.map((e) => e.id)), stamp };
-  console.log(`[salami-capes] Emote-Katalog geladen: ${parsed.emotes.length} Emotes (${version})`);
-  if (announce) {
-    const event = `data: ${JSON.stringify({ catalog: version })}\n\n`;
-    for (const [res, stream] of streams) if (stream.kind === "capes") res.write(event);
+    return "|kein Ordner";
   }
 }
+
+/**
+ * Liest zu jedem Eintrag das Bild official-capes/<id>.png, prüft es wie ein eigenes Cape und legt es
+ * unter seiner Bild-ID ab. Einträge ohne gültiges Bild werden übersprungen.
+ */
+function parseOfficialCapes(root) {
+  const { capes, skipped } = parseOfficialCatalog(root);
+  const items = [];
+  for (const cape of capes) {
+    try {
+      const png = readFileSync(join(OFFICIAL_CAPES_DIR, `${cape.id}.png`));
+      if (png.length === 0 || png.length > MAX_PNG_BYTES) throw new PngError("Bild größer als 4 MiB");
+      const decoded = decodeCape(png);
+      const id = capeId(decoded.width, decoded.height, decoded.rgba);
+      if (!existsSync(imagePath(id))) writeFileSync(imagePath(id), encodeRgba(decoded.width, decoded.height, decoded.rgba));
+      items.push({ ...cape, cape: id, width: decoded.width, height: decoded.height });
+    } catch (e) {
+      skipped.push(`${cape.id}: ${e instanceof PngError ? e.message : `Bild ${cape.id}.png nicht lesbar`}`);
+    }
+  }
+  return { items, skipped };
+}
+
+/**
+ * Offizielle Capes sind freigegeben, solange sie in der Liste stehen – auch wenn dasselbe Bild vorher
+ * eingereicht, abgelehnt oder gemeldet war. Fliegt eins aus der Liste, bleibt es ein gewöhnliches
+ * freigegebenes Cape, bis ein Admin es sperrt.
+ */
+function applyOfficialCapes(items) {
+  const now = new Date().toISOString();
+  const wanted = new Map(items.map((item) => [item.cape, item]));
+  for (const [id, cape] of Object.entries(db.capes)) {
+    if (cape.official && !wanted.has(id)) delete cape.official;
+  }
+  for (const [id, item] of wanted) {
+    const existing = db.capes[id];
+    const visibleBefore = existing?.status === "approved";
+    const cape = existing ?? {
+      width: item.width,
+      height: item.height,
+      submittedAt: now,
+      submittedBy: "official",
+      submittedName: "Salami",
+    };
+    cape.status = "approved";
+    cape.official = item.id;
+    cape.approvedAt ??= now;
+    delete cape.reason;
+    delete cape.reports;
+    delete cape.hiddenByReports;
+    db.capes[id] = cape;
+    if (!visibleBefore) broadcastWearers(id);
+  }
+  scheduleSave();
+}
+
+const officialCatalog = fileCatalog({
+  kind: "capes",
+  label: "Cape",
+  file: OFFICIAL_CAPES_FILE,
+  parse: parseOfficialCapes,
+  extraStamp: officialImagesStamp,
+  applied: applyOfficialCapes,
+});
+
+const CATALOGS = [emoteCatalog, hatCatalog, officialCatalog];
+
+// ------------------------------------------------------------------ Emotes
 
 /** SHA-256(Token) → { uuid, expires } – nur im Speicher, Emotes selbst werden nie gespeichert. */
 const emoteSessions = new Map();
@@ -895,7 +1034,17 @@ async function route(req, res) {
 
   if (req.method === "GET" && path === "/v1/emotes/catalog") {
     if (rateLimited("lookup", ip, LOOKUP_RATE_PER_MINUTE)) throw new HttpError(429, "zu viele Anfragen");
-    return send(res, 200, { version: emoteCatalog.version, emotes: emoteCatalog.emotes });
+    return send(res, 200, { version: emoteCatalog.version, emotes: emoteCatalog.items });
+  }
+
+  if (req.method === "GET" && path === "/v1/hats/catalog") {
+    if (rateLimited("lookup", ip, LOOKUP_RATE_PER_MINUTE)) throw new HttpError(429, "zu viele Anfragen");
+    return send(res, 200, { version: hatCatalog.version, hats: hatCatalog.items });
+  }
+
+  if (req.method === "GET" && path === "/v1/capes/catalog") {
+    if (rateLimited("lookup", ip, LOOKUP_RATE_PER_MINUTE)) throw new HttpError(429, "zu viele Anfragen");
+    return send(res, 200, { version: officialCatalog.version, capes: officialCatalog.items });
   }
 
   if (req.method === "POST" && path === "/v1/emotes") {
@@ -915,7 +1064,7 @@ async function route(req, res) {
 }
 
 loadDb();
-loadEmotes(false);
+for (const catalog of CATALOGS) catalog.load(false);
 const friends = createFriends({
   dataDir: DATA_DIR,
   env,
@@ -947,7 +1096,9 @@ server.headersTimeout = 10_000;
 server.keepAliveTimeout = 5_000;
 
 setInterval(sweep, 30_000).unref();
-setInterval(() => loadEmotes(true), EMOTE_RELOAD_MS).unref();
+setInterval(() => {
+  for (const catalog of CATALOGS) catalog.load(true);
+}, CATALOG_RELOAD_MS).unref();
 
 server.listen(PORT, HOST, () => {
   console.log(

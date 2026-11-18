@@ -135,6 +135,51 @@ public final class CapeLibrary {
 		writeCape(source, target);
 	}
 
+	/** Wie {@link #replaceCustom(Path)}, mit dem Bild als Bytes (offizielles Cape vom Server). */
+	public static void replaceCustom(byte[] png) throws IOException, InvalidCapeException {
+		Path target = CapesModule.customCapeFile();
+		Files.createDirectories(target.getParent());
+		writeCape(png, target);
+	}
+
+	/**
+	 * Offizielles Cape vom Server zu den eigenen Capes holen – unter dem festen Namen {@code id}
+	 * ({@link OfficialCapes#ownId}), damit dasselbe Cape nicht doppelt landet. Liegt es schon dort,
+	 * passiert nichts. Liefert das eigene Cape (noch nicht ausgewählt).
+	 */
+	public static OwnCape adoptOfficial(Path dir, String id, String name, byte[] png) throws IOException, InvalidCapeException {
+		if (!CAPE_ID.matcher(id).matches()) {
+			throw new IOException("ungültige Cape-ID");
+		}
+		Path target = dir.resolve(id + ".png");
+		JsonObject store = loadForWrite(dir);
+		JsonArray capes = store.has("capes") && store.get("capes").isJsonArray() ? store.getAsJsonArray("capes") : new JsonArray();
+		boolean listed = false;
+		for (JsonElement entry : capes) {
+			if (entry.isJsonObject() && id.equals(string(entry.getAsJsonObject(), "id"))) {
+				listed = true;
+				break;
+			}
+		}
+		if (!listed || !Files.isRegularFile(target)) {
+			Files.createDirectories(dir);
+			writeCape(png, target);
+		}
+		if (!listed) {
+			JsonObject cape = new JsonObject();
+			cape.addProperty("id", id);
+			cape.addProperty("name", name.length() > MAX_NAME ? name.substring(0, MAX_NAME) : name);
+			cape.addProperty("created", Instant.now().toString());
+			capes.add(cape);
+			store.add("capes", capes);
+			if (!store.has("selected")) {
+				store.addProperty("selected", "builtin:salami");
+			}
+			save(dir, store);
+		}
+		return new OwnCape(id, name, target);
+	}
+
 	/** Bild ist kein gültiges Cape; die Meldung ist ein Übersetzungsschlüssel. */
 	public static final class InvalidCapeException extends Exception {
 		public InvalidCapeException(String key) {
@@ -151,6 +196,11 @@ public final class CapeLibrary {
 		try (InputStream in = Files.newInputStream(source)) {
 			data = in.readNBytes(MAX_FILE_BYTES + 1);
 		}
+		writeCape(data, target);
+	}
+
+	/** Prüft die Bytes eines Bildes (PNG, bis 4 MiB, Cape-Format) und schreibt es neu kodiert nach {@code target}. */
+	private static void writeCape(byte[] data, Path target) throws IOException, InvalidCapeException {
 		if (data.length > MAX_FILE_BYTES) {
 			throw new InvalidCapeException("salami.cosmetics.error.too_big");
 		}

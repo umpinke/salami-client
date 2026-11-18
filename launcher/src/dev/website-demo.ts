@@ -121,7 +121,7 @@ const capeStore = {
   }[],
 };
 
-// Galerie „Von anderen Spielern“: die echten freigegebenen Capes über den schreibgeschützten
+// Galerie: die echten freigegebenen Capes über den schreibgeschützten
 // Proxy der Website (/capes-api/, nur GET). Lokal gibt es den Proxy nicht – dort die Live-Seite.
 const CAPES_API =
   ["localhost", "127.0.0.1"].includes(location.hostname) ? "https://salami-client.umpinke.de/capes-api" : "/capes-api";

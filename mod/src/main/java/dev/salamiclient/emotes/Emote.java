@@ -3,15 +3,13 @@ package dev.salamiclient.emotes;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import net.minecraft.client.Minecraft;
+import dev.salamiclient.cosmetics.CatalogEntry;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 /**
  * Ein Emote als Daten: Schlüsselbilder für Kopf, Arme und Beine des Spielermodells. Die Liste kommt
@@ -24,10 +22,7 @@ public final class Emote {
 	public static final long MAX_LOOP_MS = 15_000L;
 	private static final float MAX_SECONDS = 15f;
 	private static final int MAX_KEYS = 32;
-	private static final int MAX_NAME = 24;
 	private static final float MAX_DEGREES = 720f;
-	private static final Pattern ID = Pattern.compile("[a-z0-9_]{1,24}");
-	private static final Pattern LANG = Pattern.compile("[a-z]{2,3}_[a-z]{2,3}");
 
 	/** Körperteile, die ein Emote bewegen kann. */
 	public enum Part {
@@ -156,36 +151,15 @@ public final class Emote {
 
 	/** Anzeigename in der Sprache des Spiels, sonst englisch. */
 	public String displayName() {
-		String language = Minecraft.getInstance().options.languageCode;
-		String name = language == null ? null : names.get(language.toLowerCase(Locale.ROOT));
-		if (name == null) {
-			name = names.get("en_us");
-		}
-		return name != null ? name : id;
+		return CatalogEntry.displayName(names, id);
 	}
 
 	// ------------------------------------------------------------------ Einlesen
 
 	/** Liest und prüft ein Emote; wirft {@link IllegalArgumentException} mit dem Grund, wenn etwas nicht stimmt. */
 	public static Emote parse(JsonObject json) {
-		String id = string(json, "id");
-		if (id == null || !ID.matcher(id).matches()) {
-			throw new IllegalArgumentException("id fehlt oder ist ungültig");
-		}
-		Map<String, String> names = new LinkedHashMap<>();
-		JsonElement rawNames = json.get("names");
-		if (rawNames != null && rawNames.isJsonObject()) {
-			for (Map.Entry<String, JsonElement> entry : rawNames.getAsJsonObject().entrySet()) {
-				String name = entry.getValue().isJsonPrimitive() ? entry.getValue().getAsString().strip() : "";
-				if (names.size() < 12 && LANG.matcher(entry.getKey()).matches() && !name.isEmpty() && name.length() <= MAX_NAME
-					&& name.chars().noneMatch(c -> c < 0x20 || c == '§')) {
-					names.put(entry.getKey(), name);
-				}
-			}
-		}
-		if (!names.containsKey("en_us")) {
-			throw new IllegalArgumentException(id + ": Name für en_us fehlt");
-		}
+		String id = CatalogEntry.id(json);
+		Map<String, String> names = CatalogEntry.names(json, id);
 		boolean loops = json.has("loop") && json.get("loop").isJsonPrimitive() && json.get("loop").getAsBoolean();
 		long durationMs = loops ? MAX_LOOP_MS : Math.round(number(json.get("duration"), 0.2f, MAX_SECONDS, id + ": duration") * 1000f);
 
@@ -210,7 +184,7 @@ public final class Emote {
 			throw new IllegalArgumentException(id + ": mindestens ein Körperteil nötig");
 		}
 		float iconTime = json.has("icon") ? number(json.get("icon"), 0f, MAX_SECONDS, id + ": icon") : defaultIconTime(tracks);
-		return new Emote(id, Map.copyOf(names), durationMs, loops, iconTime, List.copyOf(tracks));
+		return new Emote(id, names, durationMs, loops, iconTime, List.copyOf(tracks));
 	}
 
 	private static Track track(String id, Part part, JsonObject json) {

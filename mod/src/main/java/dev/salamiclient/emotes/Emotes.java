@@ -129,7 +129,6 @@ public final class Emotes {
 	}
 
 	public static void tick(Minecraft mc) {
-		EmoteCatalog.tick(mc);
 		long now = System.currentTimeMillis();
 		Playing playing = own;
 		if (playing != null) {

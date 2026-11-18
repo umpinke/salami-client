@@ -3,7 +3,7 @@ package dev.salamiclient.capes;
 import com.google.gson.JsonObject;
 import com.mojang.blaze3d.platform.NativeImage;
 import dev.salamiclient.SalamiClient;
-import dev.salamiclient.emotes.EmoteCatalog;
+import dev.salamiclient.cosmetics.Catalogs;
 import dev.salamiclient.emotes.Emotes;
 import dev.salamiclient.modules.visual.CapesModule;
 import dev.salamiclient.modules.visual.HatsModule;
@@ -268,13 +268,13 @@ public final class SharedCapes {
 					Emotes.onRemote(uuid, emote);
 				}
 			}),
-			() -> mc.execute(EmoteCatalog::refreshSoon),
+			kind -> mc.execute(() -> Catalogs.refreshSoon(kind)),
 			() -> mc.execute(() -> {
 				if (stream == opened) {
 					streamOpen = true;
 					streamRetryMs = STREAM_RETRY_MIN_MS;
-					// neue Emotes, die während einer Unterbrechung dazukamen
-					EmoteCatalog.refreshSoon();
+					// Neues (Emotes, Hüte, Capes), das während einer Unterbrechung dazukam
+					Catalogs.refreshSoon(null);
 					// Was während einer Unterbrechung passiert ist, kam nicht an: alles einmal neu fragen
 					players.replaceAll((uuid, entry) -> new Entry(entry.remote(), 0));
 				}
@@ -389,7 +389,7 @@ public final class SharedCapes {
 		}));
 	}
 
-	private static boolean register(Minecraft mc, Identifier texture, byte[] data) {
+	static boolean register(Minecraft mc, Identifier texture, byte[] data) {
 		NativeImage image = null;
 		try {
 			// Maße aus dem PNG-Kopf prüfen, bevor das Bild dekodiert wird

@@ -2,7 +2,7 @@
 // Startet server.mjs mit einem Schein-Mojang (hasJoined) und einem leeren Datenordner.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { copyFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -40,6 +40,13 @@ const dataDir = mkdtempSync(join(tmpdir(), "salami-capes-test-"));
 /** Kopie des Emote-Katalogs, damit die Tests ihn ändern können, ohne die echte Datei anzufassen. */
 const emotesFile = join(dataDir, "emotes-test.json");
 copyFileSync(fileURLToPath(new URL("./emotes.json", import.meta.url)), emotesFile);
+/** Ebenso die Hüte; die offiziellen Capes beginnen leer (Bilder im Ordner official-capes daneben). */
+const hatsFile = join(dataDir, "hats-test.json");
+copyFileSync(fileURLToPath(new URL("./hats.json", import.meta.url)), hatsFile);
+const officialFile = join(dataDir, "official-capes.json");
+const officialDir = join(dataDir, "official-capes");
+mkdirSync(officialDir);
+writeFileSync(officialFile, JSON.stringify({ capes: [] }));
 
 function listen(server) {
   return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve(server.address().port)));
@@ -65,7 +72,9 @@ async function startServer(port, mojangPort) {
       UPLOADS_PER_DAY: "3",
       REPORTS_TO_HIDE: "2",
       EMOTES_FILE: emotesFile,
-      EMOTE_RELOAD_MS: "100",
+      HATS_FILE: hatsFile,
+      OFFICIAL_CAPES_FILE: officialFile,
+      CATALOG_RELOAD_MS: "100",
     },
     stdio: ["ignore", "pipe", "inherit"],
   });
@@ -632,7 +641,7 @@ test("Emote-Katalog: wird ausgeliefert, neue Emotes kommen ohne Neustart und wer
     );
     writeFileSync(emotesFile, JSON.stringify(file));
 
-    const changed = await live.next((e) => e.catalog);
+    const changed = await live.next((e) => e.kind === "emotes");
     const after = await catalog();
     assert.equal(changed.catalog, after.version);
     assert.notEqual(after.version, before.version);
@@ -656,6 +665,162 @@ test("Emote-Katalog: wird ausgeliefert, neue Emotes kommen ohne Neustart und wer
     assert.equal((await catalog()).version, after.version);
   } finally {
     live.close();
+  }
+});
+
+test("Hut-Katalog: Hüte sind Daten, neue kommen ohne Neustart und lassen sich sofort tragen", async () => {
+  const catalog = async () => (await call("GET", "/v1/hats/catalog")).body;
+  const before = await catalog();
+  assert.match(before.version, /^[0-9a-f]{16}$/);
+  assert.deepEqual(
+    before.hats.map((h) => h.id),
+    ["santa", "crown", "top_hat", "chef", "halo", "horns", "cat_ears", "party", "beret"],
+  );
+  const santa = before.hats.find((h) => h.id === "santa");
+  assert.equal(santa.anchor, "shoulder");
+  assert.equal(santa.scale, 0.35);
+  assert.equal(santa.names.de_de, "Weihnachtsmütze");
+  const halo = before.hats.find((h) => h.id === "halo");
+  assert.equal(halo.glow, true);
+  assert.equal(halo.anchor, undefined, "head ist der Standard und steht nicht drin");
+  assert.deepEqual(halo.parts[0].boxes[0], [-4, -12, -4, 8, 0.6, 1]);
+
+  const uuid = uuidOf("Brotzeit");
+  const lookup = async () => (await call("POST", "/v1/capes/lookup", { uuids: [uuid] })).body.capes[uuid];
+  // den Hut gibt es noch nicht: wird ignoriert
+  await setCape("Brotzeit", { builtin: "board" }, { hat: "wizard" });
+  assert.deepEqual(await lookup(), { builtin: "board" });
+
+  const live = await openEvents();
+  try {
+    const box = [-1, -2, -1, 2, 2, 2];
+    const file = JSON.parse(readFileSync(hatsFile, "utf8"));
+    file.hats.push(
+      {
+        id: "wizard",
+        names: { en_us: "Wizard hat", de_de: "Zauberhut" },
+        anchor: "head",
+        scale: 1,
+        hidden_field: "fällt weg",
+        parts: [
+          { color: "#4B2A9E", boxes: [[-5, -9, -5, 10, 1, 10]] },
+          { at: [0, -9, 0], rot: [0, 0, 8], parts: [{ color: "#3a1f80", boxes: [[-2.5, -6, -2.5, 5, 6, 5]] }] },
+        ],
+      },
+      { id: "kaputt", names: { en_us: "Broken" }, parts: [{ color: "lila", boxes: [box] }] },
+      { id: "leer", names: { en_us: "Empty" }, parts: [{ at: [0, 0, 0] }] },
+      { id: "none", names: { en_us: "None" }, parts: [{ color: "#ffffff", boxes: [box] }] },
+      { id: "riesig", names: { en_us: "Huge" }, parts: [{ color: "#ffffff", boxes: Array(65).fill(box) }] },
+      { id: "crown", names: { en_us: "Crown again" }, parts: [{ color: "#ffffff", boxes: [box] }] },
+    );
+    writeFileSync(hatsFile, JSON.stringify(file));
+
+    const changed = await live.next((e) => e.kind === "hats");
+    const after = await catalog();
+    assert.equal(changed.catalog, after.version);
+    assert.equal(after.hats.length, before.hats.length + 1);
+    assert.deepEqual(after.hats.at(-1), {
+      id: "wizard",
+      names: { en_us: "Wizard hat", de_de: "Zauberhut" },
+      parts: [
+        { color: "#4b2a9e", boxes: [[-5, -9, -5, 10, 1, 10]] },
+        { at: [0, -9, 0], rot: [0, 0, 8], parts: [{ color: "#3a1f80", boxes: [[-2.5, -6, -2.5, 5, 6, 5]] }] },
+      ],
+    });
+    assert.equal(after.hats.find((h) => h.id === "crown").names.de_de, "Krone");
+
+    // der neue Hut lässt sich sofort tragen und ist für alle sichtbar
+    await setCape("Brotzeit", { builtin: "board" }, { hat: "wizard" });
+    assert.deepEqual(await lookup(), { builtin: "board", hat: "wizard" });
+    assert.deepEqual(await live.next((e) => e.uuid === uuid), { uuid, cape: { builtin: "board", hat: "wizard" } });
+
+    // kaputte Datei: der bisherige Katalog bleibt
+    writeFileSync(hatsFile, "[]");
+    await new Promise((r) => setTimeout(r, 400));
+    assert.equal((await catalog()).version, after.version);
+  } finally {
+    live.close();
+    await setCape("Brotzeit", null);
+  }
+});
+
+test("Offizielle Capes: Bild und Eintrag auf dem Server genügen, jeder kann sie sofort tragen", async () => {
+  const catalog = async () => (await call("GET", "/v1/capes/catalog")).body;
+  const gallery = async () => (await call("GET", "/v1/capes/gallery")).body.capes;
+  assert.deepEqual((await catalog()).capes, []);
+
+  const pixels = capePixels(64, 90);
+  const id = capeId(64, 32, pixels.rgba);
+  const png = encodeRgba(64, 32, pixels.rgba);
+  // dasselbe Bild war vorher eingereicht und abgelehnt: als offizielles Cape gilt es trotzdem
+  assert.equal((await submitCape("Brotzeit", png.toString("base64"))).body.status, "pending");
+  await admin("POST", `/v1/admin/capes/${id}/reject`, { reason: "erst mal nicht" });
+
+  const live = await openEvents();
+  try {
+    writeFileSync(join(officialDir, "frost.png"), png);
+    writeFileSync(join(officialDir, "schief.png"), encodeRgba(64, 64, Buffer.alloc(64 * 64 * 4, 255)));
+    writeFileSync(
+      officialFile,
+      JSON.stringify({
+        capes: [
+          { id: "frost", names: { en_us: "Frost", de_de: "Frost" }, extra: "fällt weg" },
+          { id: "ohne_bild", names: { en_us: "No image" } },
+          { id: "schief", names: { en_us: "Wrong size" } },
+          { id: "Kaputt!", names: { en_us: "Broken" } },
+        ],
+      }),
+    );
+    const changed = await live.next((e) => e.kind === "capes");
+    const now = await catalog();
+    assert.equal(changed.catalog, now.version);
+    assert.deepEqual(now.capes, [{ id: "frost", names: { en_us: "Frost", de_de: "Frost" }, cape: id, width: 64, height: 32 }]);
+
+    // Bild ist abrufbar, das Cape steht mit Namen vorn in der Galerie
+    const image = await call("GET", `/v1/capes/img/${id}.png`);
+    assert.equal(image.status, 200);
+    const decoded = decodeCape(image.body);
+    assert.equal(capeId(decoded.width, decoded.height, decoded.rgba), id);
+    const first = (await gallery())[0];
+    assert.deepEqual(
+      { id: first.id, official: first.official, names: first.names },
+      { id, official: true, names: { en_us: "Frost", de_de: "Frost" } },
+    );
+
+    // tragen: sofort freigegeben und für alle sichtbar, ohne Prüfung
+    const uuid = uuidOf("Pepper_99");
+    assert.deepEqual((await setCape("Pepper_99", { png: image.body.toString("base64") })).body, { status: "approved", id });
+    assert.deepEqual((await call("POST", "/v1/capes/lookup", { uuids: [uuid] })).body.capes[uuid], { id });
+
+    // melden und sperren geht bei offiziellen Capes nicht
+    const challenge = await call("POST", "/v1/auth/challenge", {});
+    joined.add(`Salamander|${challenge.body.serverId}`);
+    const report = { name: "Salamander", serverId: challenge.body.serverId, id, reason: "other" };
+    assert.equal((await call("POST", "/v1/capes/report", report)).status, 409);
+    assert.equal((await admin("POST", `/v1/admin/capes/${id}/reject`, { reason: "nein" })).status, 409);
+    assert.deepEqual((await call("POST", "/v1/capes/lookup", { uuids: [uuid] })).body.capes[uuid], { id });
+
+    // neues Bild unter demselben Namen: der Katalog zeigt auf das neue
+    const other = capePixels(64, 91);
+    const otherId = capeId(64, 32, other.rgba);
+    writeFileSync(join(officialDir, "frost.png"), encodeRgba(64, 32, other.rgba));
+    const replaced = await live.next((e) => e.kind === "capes");
+    assert.notEqual(replaced.catalog, now.version);
+    assert.equal((await catalog()).capes[0].cape, otherId);
+
+    // aus der Liste genommen: nicht mehr offiziell, aber weiter freigegeben, bis ein Admin sperrt
+    writeFileSync(officialFile, JSON.stringify({ capes: [] }));
+    await live.next((e) => e.kind === "capes");
+    assert.deepEqual((await catalog()).capes, []);
+    const listed = (await gallery()).find((c) => c.id === id);
+    assert.equal(listed.official, undefined);
+    assert.equal(listed.wearers, 1);
+    assert.equal((await admin("POST", `/v1/admin/capes/${id}/reject`, { reason: "jetzt doch" })).status, 200);
+    assert.equal((await admin("POST", `/v1/admin/capes/${otherId}/reject`, {})).status, 200);
+    assert.equal((await call("POST", "/v1/capes/lookup", { uuids: [uuid] })).body.capes[uuid], undefined);
+  } finally {
+    live.close();
+    await setCape("Pepper_99", null);
   }
 });
 

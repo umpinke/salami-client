@@ -121,9 +121,10 @@ tasks.processResources {
 		expand(props)
 	}
 
-	// Emote-Katalog: dieselbe Datei, die der Cape-Server ausliefert (dort kommen neue Emotes ohne Update
-	// dazu), als Notfall-Kopie in die Jar – für Starts ohne Launcher oder wenn der Server nicht erreichbar ist
-	from(rootProject.layout.projectDirectory.file("../server/capes/emotes.json")) {
+	// Emote- und Hut-Katalog: dieselben Dateien, die der Cape-Server ausliefert (dort kommt Neues ohne
+	// Update dazu), als Notfall-Kopie in die Jar – für Starts ohne Launcher oder wenn der Server nicht
+	// erreichbar ist
+	from(rootProject.layout.projectDirectory.files("../server/capes/emotes.json", "../server/capes/hats.json")) {
 		into("assets/salami")
 	}
 
