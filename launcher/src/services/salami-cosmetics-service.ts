@@ -1,12 +1,14 @@
 /**
- * Hüte und Emotes für den Shop. Beide sind Listen auf dem Cape-Server (`server/capes/hats.json`,
- * `emotes.json`) – der Launcher holt sie von dort, damit Neues ohne Update erscheint. Ist der Server
- * nicht erreichbar, gilt die Kopie, die beim Bauen in den Launcher kommt.
+ * Hüte, Buddys und Emotes für den Shop. Alle drei sind Listen auf dem Cape-Server
+ * (`server/capes/hats.json`, `buddies.json`, `emotes.json`) – der Launcher holt sie von dort, damit
+ * Neues ohne Update erscheint. Ist der Server nicht erreichbar, gilt die Kopie, die beim Bauen in den
+ * Launcher kommt.
  *
- * Geprüft wird hier noch einmal, mit denselben Grenzen wie im Spiel (`Hat.java`, `Emote.java`):
- * ein Eintrag, der nicht passt, fällt weg, der Rest bleibt.
+ * Geprüft wird hier noch einmal, mit denselben Grenzen wie im Spiel (`BoxModel.java`, `Hat.java`,
+ * `Emote.java`): ein Eintrag, der nicht passt, fällt weg, der Rest bleibt.
  */
 import { invoke } from "@tauri-apps/api/core";
+import bundledBuddies from "../../../server/capes/buddies.json";
 import bundledEmotes from "../../../server/capes/emotes.json";
 import bundledHats from "../../../server/capes/hats.json";
 
@@ -41,8 +43,18 @@ export interface CatalogHat {
   parts: HatPart[];
 }
 
+/**
+ * Ein Buddy: ein kleiner Begleiter aus Würfeln. Als Eintrag ein Hut ohne festen Platz – sein Nullpunkt
+ * liegt unten in der Mitte, wo er ist (Hand, Schulter, Kopf, läuft hinterher), wählt man im Spiel.
+ * `anchor` hat hier keine Bedeutung.
+ */
+export type CatalogBuddy = CatalogHat;
+
 export const EMOTE_PARTS = ["head", "right_arm", "left_arm", "right_leg", "left_leg"] as const;
 export type EmotePart = (typeof EMOTE_PARTS)[number];
+/** Woran eine Requisite hängen kann: die Körperteile, die ein Emote bewegt, und der Rumpf. */
+export const EMOTE_LIMBS = ["head", "body", "right_arm", "left_arm", "right_leg", "left_leg"] as const;
+export type EmoteLimb = (typeof EMOTE_LIMBS)[number];
 
 /** Schlüsselbild: Zeit in Sekunden, Drehung in Radiant. */
 export interface EmoteKey {
@@ -61,6 +73,45 @@ export interface EmoteTrack {
   keys: EmoteKey[];
 }
 
+/** Requisite: ein Modell, das von `from` bis `to` (Sekunden; `null` = bis zum Schluss) an einem Körperteil hängt. */
+export interface EmoteProp {
+  on: EmoteLimb;
+  from: number;
+  to: number | null;
+  /** Platz im Körperteil in Pixeln ab dessen Gelenk. */
+  at: Vec3;
+  /** Drehung in Grad. */
+  rot: Vec3;
+  scale: number;
+  parts: HatPart[];
+}
+
+/** Wurf: zum Zeitpunkt `t` fliegt das Modell los. Der Shop zeigt es nur in der Hand, nicht im Flug. */
+export interface EmoteThrow {
+  t: number;
+  scale: number;
+  parts: HatPart[];
+}
+
+/** Teil einer Verwandlung; mit `follow` dreht es sich um sein `at` wie dieses Körperteil. */
+export interface CostumePart extends HatPart {
+  follow: EmotePart | null;
+}
+
+/**
+ * Verwandlung: solange das Emote läuft, steht diese Figur anstelle des Spielers. Maße im Raum des
+ * Spielermodells (Nullpunkt mitten im Hals, Boden bei y 24).
+ */
+export interface EmoteCostume {
+  scale: number;
+  /** Hüpft so viele Pixel im Takt `hopCycle` (Sekunden). */
+  hop: number;
+  hopCycle: number;
+  parts: CostumePart[];
+  /** Eigene Bewegungen der Figur für die Teile mit `follow`. */
+  tracks: EmoteTrack[];
+}
+
 export interface CatalogEmote {
   id: string;
   names: Record<string, string>;
@@ -71,6 +122,10 @@ export interface CatalogEmote {
   /** Zeitpunkt (s), dessen Haltung das Vorschaubild zeigt. */
   iconTime: number;
   tracks: EmoteTrack[];
+  /** Requisiten an Körperteilen (der Schneeball in der Hand, die Glocke …). */
+  props: EmoteProp[];
+  thrown: EmoteThrow | null;
+  costume: EmoteCostume | null;
 }
 
 export interface CosmeticsCatalog<T> {
@@ -95,6 +150,10 @@ const MAX_HAT_DEGREES = 360;
 const MAX_KEYS = 32;
 const MAX_SECONDS = 15;
 const MAX_EMOTE_DEGREES = 720;
+const MAX_PROPS = 4;
+const MAX_SOUNDS = 8;
+const IMPACTS = ["none", "snow", "poof"];
+const SOUNDS = ["snowball", "snow", "bell", "pop"];
 /** So lange läuft ein endloses Emote in der Vorschau, bevor es neu beginnt. */
 const LOOP_PREVIEW_SECONDS = 15;
 
@@ -153,53 +212,65 @@ function parseList<T extends { id: string }>(root: unknown, key: string, parseOn
   return items;
 }
 
-function parseHat(json: Record<string, unknown>): CatalogHat {
+/** Zählt Teile und Würfel eines ganzen Modells mit, damit die Grenzen für alle Teile zusammen gelten. */
+interface ModelCount {
+  parts: number;
+  boxes: number;
+}
+
+/** Prüft ein Teil samt Unterteilen (`what` steht vorn in der Meldung). */
+function parsePart(what: string, raw: unknown, depth: number, count: ModelCount): HatPart {
+  if (!isObject(raw)) throw new Invalid(`${what}: Teil ist kein Objekt`);
+  if (depth > MAX_DEPTH) throw new Invalid(`${what}: Teile höchstens ${MAX_DEPTH} Ebenen tief`);
+  if (++count.parts > MAX_PARTS) throw new Invalid(`${what}: mehr als ${MAX_PARTS} Teile`);
+  const part: HatPart = {
+    color: null,
+    at: raw.at === undefined ? null : triple(raw.at, MAX_PIXELS, `${what}: at`),
+    rot: raw.rot === undefined ? null : triple(raw.rot, MAX_HAT_DEGREES, `${what}: rot`),
+    boxes: [],
+    parts: [],
+  };
+  if (raw.boxes !== undefined) {
+    if (!Array.isArray(raw.boxes)) throw new Invalid(`${what}: boxes ist keine Liste`);
+    if (raw.boxes.length > 0) {
+      if (typeof raw.color !== "string" || !COLOR.test(raw.color)) throw new Invalid(`${what}: color fehlt (#rrggbb)`);
+      part.color = raw.color;
+    }
+    for (const box of raw.boxes) {
+      if (!Array.isArray(box) || box.length !== 6) throw new Invalid(`${what}: Würfel braucht [x, y, z, Breite, Höhe, Tiefe]`);
+      if (++count.boxes > MAX_BOXES) throw new Invalid(`${what}: mehr als ${MAX_BOXES} Würfel`);
+      part.boxes.push(
+        box.map((value, i) =>
+          i < 3 ? number(value, -MAX_PIXELS, MAX_PIXELS, `${what}: Würfel-Position`) : number(value, 0.05, MAX_PIXELS, `${what}: Würfel-Größe`),
+        ) as HatBox,
+      );
+    }
+  }
+  if (raw.parts !== undefined) {
+    if (!Array.isArray(raw.parts)) throw new Invalid(`${what}: parts ist keine Liste`);
+    part.parts = raw.parts.map((child) => parsePart(what, child, depth + 1, count));
+  }
+  if (part.boxes.length === 0 && part.parts.length === 0) throw new Invalid(`${what}: Teil ohne Würfel und ohne Unterteile`);
+  return part;
+}
+
+/** Prüft ein ganzes Modell (Liste von Teilen) mit den Grenzen eines Hutes. */
+function parseParts(what: string, raw: unknown): HatPart[] {
+  if (!Array.isArray(raw) || raw.length === 0) throw new Invalid(`${what}: parts fehlt`);
+  const count: ModelCount = { parts: 0, boxes: 0 };
+  const parts = raw.map((part) => parsePart(what, part, 1, count));
+  if (count.boxes === 0) throw new Invalid(`${what}: mindestens ein Würfel nötig`);
+  return parts;
+}
+
+/** Hut oder Buddy (`kind` nur für die Meldung): dasselbe Format, beim Buddy zählt `anchor` nicht. */
+function parseHat(json: Record<string, unknown>, kind = "Hut"): CatalogHat {
   const id = parseId(json);
-  if (id === "none") throw new Invalid('id "none" ist vergeben (kein Hut)');
+  if (id === "none") throw new Invalid(`id "none" ist vergeben (kein ${kind})`);
   const names = parseNames(json, id);
   if (json.anchor !== undefined && json.anchor !== "head" && json.anchor !== "shoulder") {
     throw new Invalid(`${id}: anchor unbekannt`);
   }
-  if (!Array.isArray(json.parts) || json.parts.length === 0) throw new Invalid(`${id}: parts fehlt`);
-  const count = { parts: 0, boxes: 0 };
-
-  const parsePart = (raw: unknown, depth: number): HatPart => {
-    if (!isObject(raw)) throw new Invalid(`${id}: Teil ist kein Objekt`);
-    if (depth > MAX_DEPTH) throw new Invalid(`${id}: Teile höchstens ${MAX_DEPTH} Ebenen tief`);
-    if (++count.parts > MAX_PARTS) throw new Invalid(`${id}: mehr als ${MAX_PARTS} Teile`);
-    const part: HatPart = {
-      color: null,
-      at: raw.at === undefined ? null : triple(raw.at, MAX_PIXELS, `${id}: at`),
-      rot: raw.rot === undefined ? null : triple(raw.rot, MAX_HAT_DEGREES, `${id}: rot`),
-      boxes: [],
-      parts: [],
-    };
-    if (raw.boxes !== undefined) {
-      if (!Array.isArray(raw.boxes)) throw new Invalid(`${id}: boxes ist keine Liste`);
-      if (raw.boxes.length > 0) {
-        if (typeof raw.color !== "string" || !COLOR.test(raw.color)) throw new Invalid(`${id}: color fehlt (#rrggbb)`);
-        part.color = raw.color;
-      }
-      for (const box of raw.boxes) {
-        if (!Array.isArray(box) || box.length !== 6) throw new Invalid(`${id}: Würfel braucht [x, y, z, Breite, Höhe, Tiefe]`);
-        if (++count.boxes > MAX_BOXES) throw new Invalid(`${id}: mehr als ${MAX_BOXES} Würfel`);
-        part.boxes.push(
-          box.map((value, i) =>
-            i < 3 ? number(value, -MAX_PIXELS, MAX_PIXELS, `${id}: Würfel-Position`) : number(value, 0.05, MAX_PIXELS, `${id}: Würfel-Größe`),
-          ) as HatBox,
-        );
-      }
-    }
-    if (raw.parts !== undefined) {
-      if (!Array.isArray(raw.parts)) throw new Invalid(`${id}: parts ist keine Liste`);
-      part.parts = raw.parts.map((child) => parsePart(child, depth + 1));
-    }
-    if (part.boxes.length === 0 && part.parts.length === 0) throw new Invalid(`${id}: Teil ohne Würfel und ohne Unterteile`);
-    return part;
-  };
-
-  const parts = json.parts.map((part) => parsePart(part, 1));
-  if (count.boxes === 0) throw new Invalid(`${id}: mindestens ein Würfel nötig`);
   return {
     id,
     names,
@@ -208,7 +279,7 @@ function parseHat(json: Record<string, unknown>): CatalogHat {
     glow: json.glow === true,
     bob: json.bob === undefined ? 0 : number(json.bob, 0, 4, `${id}: bob`),
     sway: json.sway === undefined ? 0 : number(json.sway, 0, 45, `${id}: sway`),
-    parts,
+    parts: parseParts(id, json.parts),
   };
 }
 
@@ -236,32 +307,121 @@ function parseTrack(id: string, part: EmotePart, json: unknown): EmoteTrack {
   return { part, cycle, linear: json.ease === "linear", keys };
 }
 
+/** Bewegungen je Körperteil (`{"right_arm": {…}, …}`). */
+function parseTracks(id: string, raw: unknown): EmoteTrack[] {
+  if (!isObject(raw)) throw new Invalid(`${id}: tracks fehlt`);
+  return Object.entries(raw).map(([name, track]) => {
+    if (!(EMOTE_PARTS as readonly string[]).includes(name)) throw new Invalid(`${id}: Körperteil ${name} unbekannt`);
+    return parseTrack(id, name as EmotePart, track);
+  });
+}
+
+function parseProp(id: string, raw: unknown): EmoteProp {
+  const where = `${id}: props`;
+  if (!isObject(raw)) throw new Invalid(`${where}: kein Objekt`);
+  if (typeof raw.on !== "string" || !(EMOTE_LIMBS as readonly string[]).includes(raw.on)) throw new Invalid(`${where}: on unbekannt`);
+  const from = raw.from === undefined ? 0 : number(raw.from, 0, MAX_SECONDS, `${where}: from`);
+  const to = raw.to === undefined ? null : number(raw.to, 0, MAX_SECONDS, `${where}: to`);
+  if (to !== null && to <= from) throw new Invalid(`${where}: to muss nach from liegen`);
+  return {
+    on: raw.on as EmoteLimb,
+    from,
+    to,
+    at: raw.at === undefined ? [0, 0, 0] : triple(raw.at, MAX_PIXELS, `${where}: at`),
+    rot: raw.rot === undefined ? [0, 0, 0] : triple(raw.rot, MAX_HAT_DEGREES, `${where}: rot`),
+    scale: raw.scale === undefined ? 1 : number(raw.scale, 0.1, 3, `${where}: scale`),
+    parts: parseParts(where, raw.parts),
+  };
+}
+
+function parseThrow(id: string, raw: unknown): EmoteThrow {
+  const where = `${id}: throw`;
+  if (!isObject(raw)) throw new Invalid(`${where}: kein Objekt`);
+  const t = number(raw.t, 0, MAX_SECONDS, `${where}: t`);
+  // Tempo, Schwung und Fallen prüfen, auch wenn der Shop nichts fliegen lässt: sonst zeigte er ein Emote, das es im Spiel nicht gibt
+  if (raw.speed !== undefined) number(raw.speed, 0.1, 3, `${where}: speed`);
+  if (raw.up !== undefined) number(raw.up, 0, 1, `${where}: up`);
+  if (raw.gravity !== undefined) number(raw.gravity, 0, 0.2, `${where}: gravity`);
+  if (raw.spin !== undefined) number(raw.spin, 0, 90, `${where}: spin`);
+  if (raw.impact !== undefined && (typeof raw.impact !== "string" || !IMPACTS.includes(raw.impact))) {
+    throw new Invalid(`${where}: impact unbekannt`);
+  }
+  return {
+    t,
+    scale: raw.scale === undefined ? 1 : number(raw.scale, 0.1, 3, `${where}: scale`),
+    parts: parseParts(where, raw.parts),
+  };
+}
+
+/** Geräusche spielt der Shop nicht ab – geprüft werden sie trotzdem, wie im Spiel. */
+function checkSounds(id: string, raw: unknown): void {
+  if (!Array.isArray(raw) || raw.length > MAX_SOUNDS) throw new Invalid(`${id}: sounds: höchstens ${MAX_SOUNDS}`);
+  for (const entry of raw) {
+    if (!isObject(entry) || typeof entry.sound !== "string" || !SOUNDS.includes(entry.sound)) {
+      throw new Invalid(`${id}: sounds: sound unbekannt`);
+    }
+    number(entry.t, 0, MAX_SECONDS, `${id}: sounds: t`);
+  }
+}
+
+function parseCostume(id: string, raw: unknown): EmoteCostume {
+  const where = `${id}: costume`;
+  if (!isObject(raw)) throw new Invalid(`${where}: kein Objekt`);
+  if (!Array.isArray(raw.parts) || raw.parts.length === 0) throw new Invalid(`${where}: parts fehlt`);
+  const count: ModelCount = { parts: 0, boxes: 0 };
+  const parts = raw.parts.map((rawPart): CostumePart => {
+    const part = parsePart(where, rawPart, 1, count);
+    const follow = (rawPart as Record<string, unknown>).follow;
+    if (follow !== undefined && (typeof follow !== "string" || !(EMOTE_PARTS as readonly string[]).includes(follow))) {
+      throw new Invalid(`${where}: follow unbekannt`);
+    }
+    return { ...part, follow: (follow as EmotePart | undefined) ?? null };
+  });
+  if (count.boxes === 0) throw new Invalid(`${where}: mindestens ein Würfel nötig`);
+  const hop = raw.hop === undefined ? 0 : number(raw.hop, 0, 8, `${where}: hop`);
+  return {
+    scale: raw.scale === undefined ? 1 : number(raw.scale, 0.1, 3, `${where}: scale`),
+    hop,
+    hopCycle: raw.hop_cycle === undefined ? 0.5 : number(raw.hop_cycle, 0.1, MAX_SECONDS, `${where}: hop_cycle`),
+    parts,
+    tracks: raw.tracks === undefined ? [] : parseTracks(where, raw.tracks),
+  };
+}
+
 function parseEmote(json: Record<string, unknown>): CatalogEmote {
   const id = parseId(json);
   const names = parseNames(json, id);
   const loop = json.loop === true;
   const duration = loop ? LOOP_PREVIEW_SECONDS : number(json.duration, 0.2, MAX_SECONDS, `${id}: duration`);
-  if (!isObject(json.tracks)) throw new Invalid(`${id}: tracks fehlt`);
-  const tracks = Object.entries(json.tracks).map(([name, track]) => {
-    if (!(EMOTE_PARTS as readonly string[]).includes(name)) throw new Invalid(`${id}: Körperteil ${name} unbekannt`);
-    return parseTrack(id, name as EmotePart, track);
-  });
+  const tracks = parseTracks(id, json.tracks);
   if (tracks.length === 0) throw new Invalid(`${id}: mindestens ein Körperteil nötig`);
   // ohne Angabe: das zweite Schlüsselbild der ersten bewegten Spur – meist der Ausschlag der Bewegung
   const moving = tracks.find((track) => track.keys.length > 1);
   const iconTime = json.icon === undefined ? (moving ? moving.keys[1].t : 0) : number(json.icon, 0, MAX_SECONDS, `${id}: icon`);
-  return { id, names, duration, loop, iconTime, tracks };
+  // was das Emote mitbringt (ab Spielversion 1.8.5): ein Fehler darin lässt das ganze Emote weg, wie im Spiel
+  let props: EmoteProp[] = [];
+  if (json.props !== undefined) {
+    if (!Array.isArray(json.props) || json.props.length > MAX_PROPS) throw new Invalid(`${id}: props: höchstens ${MAX_PROPS}`);
+    props = json.props.map((prop) => parseProp(id, prop));
+  }
+  const thrown = json.throw === undefined ? null : parseThrow(id, json.throw);
+  if (json.sounds !== undefined) checkSounds(id, json.sounds);
+  const costume = json.costume === undefined ? null : parseCostume(id, json.costume);
+  return { id, names, duration, loop, iconTime, tracks, props, thrown, costume };
 }
 
 /** Hüte aus einem Katalog (`{"hats": […]}`); wirft, wenn die Liste fehlt. */
-export const parseHatCatalog = (root: unknown): CatalogHat[] => parseList(root, "hats", parseHat);
+export const parseHatCatalog = (root: unknown): CatalogHat[] => parseList(root, "hats", (json) => parseHat(json));
+
+/** Buddys aus einem Katalog (`{"buddies": […]}`); wirft, wenn die Liste fehlt. */
+export const parseBuddyCatalog = (root: unknown): CatalogBuddy[] => parseList(root, "buddies", (json) => parseHat(json, "Buddy"));
 
 /** Emotes aus einem Katalog (`{"emotes": […]}`); wirft, wenn die Liste fehlt. */
 export const parseEmoteCatalog = (root: unknown): CatalogEmote[] => parseList(root, "emotes", parseEmote);
 
 // ------------------------------------------------------------------ laden
 
-async function load<T>(kind: "hats" | "emotes", parse: (root: unknown) => T[], bundled: unknown): Promise<CosmeticsCatalog<T>> {
+async function load<T>(kind: "hats" | "buddies" | "emotes", parse: (root: unknown) => T[], bundled: unknown): Promise<CosmeticsCatalog<T>> {
   try {
     const items = parse(await invoke<unknown>("salami_cosmetics_catalog", { kind }));
     if (items.length > 0) return { items, live: true };
@@ -274,6 +434,9 @@ async function load<T>(kind: "hats" | "emotes", parse: (root: unknown) => T[], b
 
 /** Alle Hüte, vom Cape-Server oder (ohne Verbindung) aus dem Launcher. */
 export const getHatCatalog = () => load("hats", parseHatCatalog, bundledHats);
+
+/** Alle Buddys, vom Cape-Server oder (ohne Verbindung) aus dem Launcher. */
+export const getBuddyCatalog = () => load("buddies", parseBuddyCatalog, bundledBuddies);
 
 /** Alle Emotes, vom Cape-Server oder (ohne Verbindung) aus dem Launcher. */
 export const getEmoteCatalog = () => load("emotes", parseEmoteCatalog, bundledEmotes);

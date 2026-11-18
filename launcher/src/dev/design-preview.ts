@@ -4,6 +4,7 @@
  * ersetzt; Befehle liefern leere oder Beispiel-Daten. Nur zum Gestalten – nicht im Build.
  */
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
+import buddyCatalog from "../../../server/capes/buddies.json";
 import emoteCatalog from "../../../server/capes/emotes.json";
 import hatCatalog from "../../../server/capes/hats.json";
 
@@ -316,7 +317,7 @@ mockIPC((cmd, args) => {
       return new Promise((resolve) => setTimeout(() => resolve("reported"), 400));
     case "salami_cosmetics_catalog":
       // wie vom Cape-Server; zum Ansehen des Hinweises „Server nicht erreichbar“ hier einen Fehler werfen
-      return structuredClone(a.kind === "emotes" ? emoteCatalog : hatCatalog);
+      return structuredClone(a.kind === "emotes" ? emoteCatalog : a.kind === "buddies" ? buddyCatalog : hatCatalog);
     case "salami_capes_download_template":
       return "C:\\Users\\Du\\Downloads\\salami_cape_vorlage.png";
     case "get_profile_log_files":

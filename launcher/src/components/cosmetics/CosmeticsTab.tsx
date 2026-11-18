@@ -4,22 +4,23 @@ import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 import { SalamiCapesTab } from "../salami-capes/SalamiCapesTab";
-import { EmotesSection, HatsSection, MiniMeSection } from "./CosmeticsSections";
+import { BuddiesSection, EmotesSection, HatsSection, MiniMeSection } from "./CosmeticsSections";
 import "../salami-capes/i18n";
 
-type CosmeticsSection = "capes" | "hats" | "emotes" | "minime";
+type CosmeticsSection = "capes" | "hats" | "buddies" | "emotes" | "minime";
 
 /** Bereiche der Shop-Seite, dieselben wie im Cosmetics-Menü des Spiels. */
 const SECTIONS: { id: CosmeticsSection; icon: string; labelKey: string }[] = [
   { id: "capes", icon: "solar:hanger-2-bold", labelKey: "salami.cosmetics.tab.capes" },
   { id: "hats", icon: "solar:crown-bold", labelKey: "salami.cosmetics.tab.hats" },
+  { id: "buddies", icon: "solar:cat-bold", labelKey: "salami.cosmetics.tab.buddies" },
   { id: "emotes", icon: "solar:hand-shake-bold", labelKey: "salami.cosmetics.tab.emotes" },
   { id: "minime", icon: "solar:users-group-rounded-bold", labelKey: "salami.cosmetics.tab.minime" },
 ];
 
 /**
  * Shop (früher „Cosmetics“): Reiter oben, darunter der gewählte Bereich. Capes legt man hier an und
- * wählt sie aus; Hüte, Emotes und Mini Me zeigt der Shop zum Ansehen – gewählt werden sie im Spiel.
+ * wählt sie aus; Hüte, Buddys, Emotes und Mini Me zeigt der Shop zum Ansehen – gewählt werden sie im Spiel.
  */
 export function CosmeticsTab() {
   const { t } = useTranslation();
@@ -53,6 +54,7 @@ export function CosmeticsTab() {
       <div className="min-h-0 flex-1">
         {section === "capes" && <SalamiCapesTab />}
         {section === "hats" && <HatsSection />}
+        {section === "buddies" && <BuddiesSection />}
         {section === "emotes" && <EmotesSection />}
         {section === "minime" && <MiniMeSection />}
       </div>

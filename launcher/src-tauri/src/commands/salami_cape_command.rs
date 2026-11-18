@@ -105,7 +105,7 @@ pub async fn salami_capes_adopt(id: String, name: String) -> CommandResult<CapeV
     Ok(salami_capes::adopt_gallery_cape(&salami_capes::capes_dir(), &id, &name).await?)
 }
 
-/// Katalog der Hüte (`hats`) oder Emotes (`emotes`) vom Cape-Server, für den Shop.
+/// Katalog der Hüte (`hats`), Buddys (`buddies`) oder Emotes (`emotes`) vom Cape-Server, für den Shop.
 #[tauri::command]
 pub async fn salami_cosmetics_catalog(kind: String) -> CommandResult<serde_json::Value> {
     Ok(salami_capes::cosmetics_catalog(&kind).await?)

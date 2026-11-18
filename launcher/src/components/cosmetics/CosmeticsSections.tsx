@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
@@ -6,11 +6,13 @@ import { useActiveSkinTexture } from "../../hooks/useActiveSkinTexture";
 import { useThemeStore } from "../../store/useThemeStore";
 import { CosmeticsViewer, type CosmeticsViewerProps } from "../../lib/skin3d/CosmeticsViewer";
 import { useCosmeticSnapshot, type CosmeticSnapshotRequest } from "../../lib/skin3d/cosmetic-snapshot";
-import { MINI_ME_PLACES, type MiniMePlace } from "../../lib/skin3d/cosmetics";
+import { BUDDY_PLACES, MINI_ME_PLACES, type BuddyPlace, type MiniMePlace } from "../../lib/skin3d/cosmetics";
 import {
   cosmeticName,
+  getBuddyCatalog,
   getEmoteCatalog,
   getHatCatalog,
+  type CatalogBuddy,
   type CatalogEmote,
   type CatalogHat,
   type CosmeticsCatalog,
@@ -98,11 +100,13 @@ function Card({ label, note, active, icon, snapshot, onHover, onPick }: CardProp
 }
 
 interface LayoutProps {
-  viewer: Pick<CosmeticsViewerProps, "hat" | "emote" | "miniMe">;
+  viewer: Pick<CosmeticsViewerProps, "hat" | "buddy" | "buddyPlace" | "emote" | "miniMe">;
   /** Name und Hinweise zum gezeigten Eintrag. */
   title: string;
   details?: ReactNode;
   subtitle: string;
+  /** Steht zwischen dem Text und den Karten (die Plätze eines Buddys). */
+  above?: ReactNode;
   /** Liste aus dem Launcher statt vom Server. */
   offline?: boolean;
   loading?: boolean;
@@ -111,7 +115,7 @@ interface LayoutProps {
 }
 
 /** Links die Figur mit dem gezeigten Cosmetic, rechts alle zur Auswahl – wie auf der Cape-Seite. */
-function Layout({ viewer, title, details, subtitle, offline = false, loading = false, icon, children }: LayoutProps) {
+function Layout({ viewer, title, details, subtitle, above, offline = false, loading = false, icon, children }: LayoutProps) {
   const { t } = useTranslation();
   const skin = useActiveSkinTexture();
   return (
@@ -145,6 +149,7 @@ function Layout({ viewer, title, details, subtitle, offline = false, loading = f
             {t("salami.cosmetics.offline")}
           </p>
         )}
+        {!loading && above}
         {loading ? (
           <p className="mt-6 text-sm text-white/55">{t("salami.cosmetics.loading")}</p>
         ) : (
@@ -164,11 +169,20 @@ function useSnapshotSkin(): Pick<CosmeticSnapshotRequest, "textureUrl" | "varian
   return { textureUrl: skin.textureUrl, variant: skin.variant, size: THUMB_PIXELS };
 }
 
-/** Shop → Hüte: alle Hüte aus dem Hut-Katalog, an der eigenen Figur. */
+/**
+ * Shop → Hüte: alle Hüte aus dem Hut-Katalog, an der eigenen Figur. Buddys stehen für ältere
+ * Spielversionen auch noch als Schulter-Hut im Hut-Katalog – hier gehören sie in den Reiter Buddys.
+ */
 export function HatsSection() {
   const { t, i18n } = useTranslation();
   const catalog = useCatalog<CatalogHat>(getHatCatalog);
-  const { shown, picked, setHovered, setPicked } = useShown(catalog?.items);
+  const buddies = useCatalog<CatalogBuddy>(getBuddyCatalog);
+  const hats = useMemo(() => {
+    if (!catalog || !buddies) return undefined;
+    const isBuddy = new Set(buddies.items.map((buddy) => buddy.id));
+    return catalog.items.filter((hat) => !isBuddy.has(hat.id));
+  }, [catalog, buddies]);
+  const { shown, picked, setHovered, setPicked } = useShown(hats);
   const skin = useSnapshotSkin();
   const name = (hat: CatalogHat) => cosmeticName(hat, i18n.language);
   return (
@@ -185,10 +199,10 @@ export function HatsSection() {
       }
       subtitle={t("salami.cosmetics.hats.subtitle")}
       offline={catalog?.live === false}
-      loading={!catalog}
+      loading={!hats}
       icon="solar:crown-bold"
     >
-      {catalog?.items.map((hat) => (
+      {hats?.map((hat) => (
         <Card
           key={hat.id}
           label={name(hat)}
@@ -197,6 +211,72 @@ export function HatsSection() {
           snapshot={skin && { ...skin, hat }}
           onHover={(inside) => setHovered(inside ? hat : null)}
           onPick={() => setPicked(hat)}
+        />
+      ))}
+    </Layout>
+  );
+}
+
+/**
+ * Shop → Buddys: alle Buddys aus dem Buddy-Katalog. Die Knöpfe über den Karten wählen, an welchem Platz
+ * die Vorschau den Buddy zeigt – mitnehmen und den Platz festlegen kann man nur im Spiel.
+ */
+export function BuddiesSection() {
+  const { t, i18n } = useTranslation();
+  const accent = useThemeStore((s) => s.accentColor);
+  const catalog = useCatalog<CatalogBuddy>(getBuddyCatalog);
+  const { shown, picked, setHovered, setPicked } = useShown(catalog?.items);
+  const [place, setPlace] = useState<BuddyPlace>("shoulder");
+  const skin = useSnapshotSkin();
+  const name = (buddy: CatalogBuddy) => cosmeticName(buddy, i18n.language);
+  return (
+    <Layout
+      viewer={{ buddy: shown, buddyPlace: place }}
+      title={shown ? name(shown) : ""}
+      details={
+        shown && (
+          <>
+            {line(t(`salami.cosmetics.buddies.place.${place}_hint`))}
+            {shown.glow && line(t("salami.cosmetics.hats.glows"))}
+          </>
+        )
+      }
+      subtitle={t("salami.cosmetics.buddies.subtitle")}
+      above={
+        <div className="mt-4 flex flex-wrap items-center gap-2" role="group" aria-label={t("salami.cosmetics.buddies.places")}>
+          {BUDDY_PLACES.map((item) => {
+            const active = item === place;
+            return (
+              <button
+                key={item}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setPlace(item)}
+                className={cn(
+                  "rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors focus:outline-none",
+                  active ? "hover:brightness-110" : "bg-white/10 hover:bg-white/15",
+                )}
+                style={active ? { backgroundColor: accent.value } : undefined}
+              >
+                {t(`salami.cosmetics.buddies.place.${item}`)}
+              </button>
+            );
+          })}
+        </div>
+      }
+      offline={catalog?.live === false}
+      loading={!catalog}
+      icon="solar:cat-bold"
+    >
+      {catalog?.items.map((buddy) => (
+        <Card
+          key={buddy.id}
+          label={name(buddy)}
+          active={picked === buddy}
+          icon="solar:cat-bold"
+          snapshot={skin && { ...skin, buddy, buddyPlace: place }}
+          onHover={(inside) => setHovered(inside ? buddy : null)}
+          onPick={() => setPicked(buddy)}
         />
       ))}
     </Layout>
@@ -224,6 +304,8 @@ export function EmotesSection() {
         shown && (
           <>
             {line(shown.loop ? t("salami.cosmetics.emotes.endless_hint") : length(shown))}
+            {shown.thrown && line(t("salami.cosmetics.emotes.throws"))}
+            {shown.costume && line(t("salami.cosmetics.emotes.transforms"))}
             <p className="mt-2 text-xs leading-relaxed text-white/70">
               {t("salami.cosmetics.emotes.command")}{" "}
               <code className="rounded bg-black/40 px-1.5 py-0.5 text-white/85">/salami emote {shown.id}</code>

@@ -1,14 +1,20 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { FunctionAnimation, SkinViewer } from "skinview3d";
-import type { CatalogEmote, CatalogHat } from "../../services/salami-cosmetics-service";
+import type { CatalogBuddy, CatalogEmote, CatalogHat } from "../../services/salami-cosmetics-service";
 import {
+  attachBuddy,
+  attachEmoteExtras,
   attachHat,
   attachMiniMe,
   buildHat,
+  emoteClock,
   frameFigure,
-  playEmote,
+  poseEmote,
   poseIdle,
   viewOf,
+  type BuddyObject,
+  type BuddyPlace,
+  type EmoteExtrasObject,
   type HatObject,
   type MiniMeObject,
   type MiniMePlace,
@@ -23,7 +29,10 @@ export interface CosmeticsViewerProps {
   variant?: SkinVariant | "auto";
   /** Hut, den die Figur trägt. */
   hat?: CatalogHat | null;
-  /** Emote, das die Figur in Dauerschleife zeigt. */
+  /** Buddy, der die Figur begleitet, und wo er ist (ohne Angabe: über der Schulter). */
+  buddy?: CatalogBuddy | null;
+  buddyPlace?: BuddyPlace;
+  /** Emote, das die Figur in Dauerschleife zeigt – mit Requisiten und Verwandlung, wenn es welche hat. */
   emote?: CatalogEmote | null;
   miniMe?: MiniMePlace | null;
   className?: string;
@@ -44,17 +53,21 @@ export const cosmeticsModelOf = (textureUrl: string | null, variant: SkinVariant
 /** Was gerade an der Figur hängt – die Animation liest es in jedem Bild. */
 interface Stage {
   hat: HatObject | null;
+  buddy: BuddyObject | null;
   mini: MiniMeObject | null;
   emote: CatalogEmote | null;
+  extras: EmoteExtrasObject | null;
   emoteStart: number;
   now: number;
 }
 
-/** 3D-Figur mit Salami-Cosmetics: Hut, Emote und Mini Me wie im Spiel. Mit der Maus drehbar. */
+/** 3D-Figur mit Salami-Cosmetics: Hut, Buddy, Emote und Mini Me wie im Spiel. Mit der Maus drehbar. */
 export function CosmeticsViewer({
   textureUrl,
   variant = "auto",
   hat = null,
+  buddy = null,
+  buddyPlace = "shoulder",
   emote = null,
   miniMe = null,
   className,
@@ -63,7 +76,7 @@ export function CosmeticsViewer({
 }: CosmeticsViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const stage = useRef<Stage>({ hat: null, mini: null, emote: null, emoteStart: 0, now: 0 });
+  const stage = useRef<Stage>({ hat: null, buddy: null, mini: null, emote: null, extras: null, emoteStart: 0, now: 0 });
   const [viewer, setViewer] = useState<SkinViewer | null>(null);
   const [support] = useState(getWebGLSupport);
   const [failed, setFailed] = useState(false);
@@ -95,8 +108,13 @@ export function CosmeticsViewer({
       const current = stage.current;
       current.now = progress;
       poseIdle(player.skin, progress);
-      if (current.emote) playEmote(player.skin, current.emote, progress - current.emoteStart);
+      if (current.emote) {
+        const { t, weight } = emoteClock(current.emote, progress - current.emoteStart);
+        if (weight > 0) poseEmote(player.skin, current.emote, t, weight);
+        current.extras?.update(t, weight);
+      }
       current.hat?.animate(progress);
+      current.buddy?.animate(progress);
       current.mini?.animate(progress);
     });
     const resize = new ResizeObserver(([entry]) => {
@@ -122,7 +140,10 @@ export function CosmeticsViewer({
   }, [viewer, textureUrl, variant]);
 
   // Ausschnitt und Drehung passen zum gezeigten Cosmetic (Hut am Kopf, Mini Me neben der Figur …)
-  const view = useMemo(() => viewOf({ hat, miniMe }), [hat, miniMe]);
+  const view = useMemo(
+    () => viewOf({ hat, buddy: buddy ? buddyPlace : null, emote, miniMe }),
+    [hat, buddy, buddyPlace, emote, miniMe],
+  );
   useEffect(() => {
     if (viewer) frameFigure(viewer, view);
   }, [viewer, view.focus, view.rotation]);
@@ -139,6 +160,16 @@ export function CosmeticsViewer({
   }, [viewer, hat]);
 
   useEffect(() => {
+    if (!viewer || !buddy) return;
+    const object = attachBuddy(viewer.playerObject, buddy, buddyPlace);
+    stage.current.buddy = object;
+    return () => {
+      stage.current.buddy = null;
+      object.dispose();
+    };
+  }, [viewer, buddy, buddyPlace]);
+
+  useEffect(() => {
     if (!viewer || !miniMe) return;
     const object = attachMiniMe(viewer.playerObject, miniMe);
     object.syncSkin(viewer.playerObject);
@@ -149,11 +180,18 @@ export function CosmeticsViewer({
     };
   }, [viewer, miniMe]);
 
-  // ein anderes Emote beginnt von vorn
+  // ein anderes Emote beginnt von vorn – mit dem, was es mitbringt (Requisiten, Verwandlung)
   useEffect(() => {
     stage.current.emote = emote;
     stage.current.emoteStart = stage.current.now;
-  }, [emote]);
+    if (!viewer || !emote) return;
+    const extras = attachEmoteExtras(viewer.playerObject, emote);
+    stage.current.extras = extras;
+    return () => {
+      stage.current.extras = null;
+      extras?.dispose();
+    };
+  }, [viewer, emote]);
 
   if (!support.available || failed) return <>{unsupportedFallback}</>;
   return (

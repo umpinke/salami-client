@@ -612,11 +612,11 @@ pub async fn adopt_gallery_cape(dir: &Path, id: &str, name: &str) -> Result<Cape
 }
 
 /// Kataloge des Cape-Servers, die der Shop zeigt (`/v1/<name>/catalog`).
-pub const COSMETIC_CATALOGS: [&str; 2] = ["hats", "emotes"];
+pub const COSMETIC_CATALOGS: [&str; 3] = ["hats", "buddies", "emotes"];
 /// Größer wird kein Katalog (der Server begrenzt Anzahl und Umfang der Einträge).
 const MAX_CATALOG_BYTES: usize = 1024 * 1024;
 
-/// Katalog `hats` oder `emotes`, so wie ihn der Cape-Server ausliefert
+/// Katalog `hats`, `buddies` oder `emotes`, so wie ihn der Cape-Server ausliefert
 /// (`{"version": "…", "hats": […]}`). Die Einträge prüft das Frontend; ist der Server nicht
 /// erreichbar, zeigt es die Liste, die im Launcher steckt.
 pub async fn cosmetics_catalog(kind: &str) -> Result<serde_json::Value> {
@@ -724,6 +724,18 @@ mod tests {
         assert!(parse_catalog("hats", br#"{"hats":"crown"}"#).is_err());
         assert!(parse_catalog("hats", b"<html>404</html>").is_err());
         assert!(parse_catalog("hats", &vec![b' '; MAX_CATALOG_BYTES + 1]).is_err());
+        // Buddys haben ihre eigene Liste – ein Hut-Katalog ist keiner
+        let buddies = br#"{"version":"abc","buddies":[{"id":"tree_buddy"}]}"#;
+        assert_eq!(parse_catalog("buddies", buddies).unwrap()["buddies"][0]["id"], "tree_buddy");
+        assert!(parse_catalog("buddies", hats).is_err());
+    }
+
+    #[test]
+    fn shop_asks_only_for_known_catalogs() {
+        assert_eq!(COSMETIC_CATALOGS, ["hats", "buddies", "emotes"]);
+        // alles andere lehnt cosmetics_catalog ab, bevor es den Server fragt
+        assert!(!COSMETIC_CATALOGS.contains(&"capes"));
+        assert!(!COSMETIC_CATALOGS.contains(&"../admin"));
     }
 
     #[test]
