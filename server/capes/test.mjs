@@ -683,7 +683,10 @@ test("Hut-Katalog: Hüte sind Daten, neue kommen ohne Neustart und lassen sich s
   const halo = before.hats.find((h) => h.id === "halo");
   assert.equal(halo.glow, true);
   assert.equal(halo.anchor, undefined, "head ist der Standard und steht nicht drin");
-  assert.deepEqual(halo.parts[0].boxes[0], [-4, -12, -4, 8, 0.6, 1]);
+  // die Würfel kommen so an, wie sie in der Datei stehen (welche es sind, darf sich jederzeit ändern)
+  const haloInFile = JSON.parse(readFileSync(hatsFile, "utf8")).hats.find((h) => h.id === "halo");
+  assert.deepEqual(halo.parts, haloInFile.parts);
+  assert.equal(halo.parts[0].boxes[0].length, 6);
 
   const uuid = uuidOf("Brotzeit");
   const lookup = async () => (await call("POST", "/v1/capes/lookup", { uuids: [uuid] })).body.capes[uuid];
