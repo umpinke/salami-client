@@ -73,7 +73,9 @@ public final class SalamiCosmeticsGameTest implements FabricClientGameTest {
 		Hat santa = HatCatalog.get("santa");
 		check(santa != null && santa.anchor() == Hat.Anchor.SHOULDER && santa.scale() < 0.5f, "Hats: santa hat read wrong");
 		Hat halo = HatCatalog.get("halo");
-		check(halo != null && halo.glow() && halo.anchor() == Hat.Anchor.HEAD && halo.colors().length == 4 * 6, "Hats: halo read wrong");
+		// wie viele Würfel der Heiligenschein hat, steht in hats.json und darf sich ändern – sechs Flächen je Würfel bleiben
+		check(halo != null && halo.glow() && halo.anchor() == Hat.Anchor.HEAD
+			&& halo.colors().length >= 6 && halo.colors().length % 6 == 0, "Hats: halo read wrong");
 		for (Hat hat : all) {
 			context.runOnClient(c -> hats.choose(hat.id()));
 			check(context.computeOnClient(c -> HatsModule.hatOf(c.player.getId())) == hat, "Hats: own player does not wear " + hat.id());
