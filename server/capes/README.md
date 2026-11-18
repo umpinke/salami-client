@@ -156,8 +156,8 @@ Ein Hut ist ein kleines Modell aus farbigen Würfeln. Bild und Symbol braucht er
 
    ```json
    {
-     "id": "wizard",
-     "names": { "en_us": "Wizard hat", "de_de": "Zauberhut" },
+     "id": "witch",
+     "names": { "en_us": "Witch hat", "de_de": "Hexenhut" },
      "parts": [
        { "color": "#4b2a9e", "boxes": [[-6, -8.75, -6, 12, 0.75, 12]] },
        {
@@ -178,6 +178,8 @@ Ein Hut ist ein kleines Modell aus farbigen Würfeln. Bild und Symbol braucht er
    - `anchor`: `head` (Standard, sitzt auf dem Kopf, rutscht über einen Helm) oder `shoulder` (schwebt über der Schulter wie die Weihnachtsmütze; y = 0 ist dann die Unterkante).
    - Optional: `scale` (Größe, 0.1–3), `glow` (`true` = leuchtet im Dunkeln), `bob` (schwebt so viele Pixel auf und ab), `sway` (pendelt so viele Grad).
    - Grenzen: höchstens 64 Hüte, je Hut 64 Würfel und 32 Teile.
+
+   Statt die Zahlen von Hand zu schreiben, kann man den Hut in Blender bauen: In [`scripts/hats/hats.blend`](../../scripts/hats/hats.blend) stehen die Hüte ab dem Zauberhut als Würfel an einer Figur (1 Einheit = 1 Pixel). Jeder Hut ist eine Sammlung `hat:<id>`, die Farbe eines Würfels ist der Name seines Materials, ein Empty ist ein Drehpunkt. [`blender_hats.py`](../../scripts/hats/blender_hats.py) schreibt die Hüte der Szene in diese Datei (`write_hats_json`) – die Anleitung steht oben im Skript und in Blender im Text „Anleitung“.
 2. Datei auf den Server neben `server.mjs` legen. Der Server lädt sie von selbst (Log: `Hut-Katalog geladen: 10 Einträge`); fehlerhafte Einträge nennt er im Log und lässt sie weg, eine kaputte Datei ändert nichts.
 3. Fertig. Im Spiel steht der Hut unter Cosmetics → Hüte, andere Salami-Spieler sehen ihn, sobald ihn jemand trägt.
 

@@ -33,3 +33,7 @@ branding/out/
 # lokale Claude-Code-Einstellungen (Vorschau-Server)
 /.claude/
 launcher/dist-website-demo*
+
+# Blender (Hut-Werkstatt in scripts/hats): Sicherungskopien und Python-Zwischendateien
+*.blend1
+__pycache__/

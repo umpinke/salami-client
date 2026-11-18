@@ -672,10 +672,13 @@ test("Hut-Katalog: Hüte sind Daten, neue kommen ohne Neustart und lassen sich s
   const catalog = async () => (await call("GET", "/v1/hats/catalog")).body;
   const before = await catalog();
   assert.match(before.version, /^[0-9a-f]{16}$/);
+  // welche Hüte es gibt, steht in der Datei und darf sich jederzeit ändern – hier zählt, dass sie so ankommen
+  const inFile = JSON.parse(readFileSync(hatsFile, "utf8")).hats;
   assert.deepEqual(
     before.hats.map((h) => h.id),
-    ["santa", "crown", "top_hat", "chef", "halo", "horns", "cat_ears", "party", "beret"],
+    inFile.map((h) => h.id),
   );
+  assert.ok(before.hats.length >= 9);
   const santa = before.hats.find((h) => h.id === "santa");
   assert.equal(santa.anchor, "shoulder");
   assert.equal(santa.scale, 0.35);
@@ -683,9 +686,7 @@ test("Hut-Katalog: Hüte sind Daten, neue kommen ohne Neustart und lassen sich s
   const halo = before.hats.find((h) => h.id === "halo");
   assert.equal(halo.glow, true);
   assert.equal(halo.anchor, undefined, "head ist der Standard und steht nicht drin");
-  // die Würfel kommen so an, wie sie in der Datei stehen (welche es sind, darf sich jederzeit ändern)
-  const haloInFile = JSON.parse(readFileSync(hatsFile, "utf8")).hats.find((h) => h.id === "halo");
-  assert.deepEqual(halo.parts, haloInFile.parts);
+  assert.deepEqual(halo.parts, inFile.find((h) => h.id === "halo").parts);
   assert.equal(halo.parts[0].boxes[0].length, 6);
 
   const uuid = uuidOf("Brotzeit");
