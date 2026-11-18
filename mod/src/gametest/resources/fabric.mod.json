@@ -14,7 +14,8 @@
 			"dev.salamiclient.gametest.SalamiCustomizeGameTest",
 			"dev.salamiclient.gametest.SalamiBenchmarkGameTest",
 			"dev.salamiclient.gametest.SalamiCapesGameTest",
-			"dev.salamiclient.gametest.SalamiMinigamesGameTest"
+			"dev.salamiclient.gametest.SalamiMinigamesGameTest",
+			"dev.salamiclient.gametest.SalamiCosmeticsGameTest"
 		]
 	},
 	"depends": {

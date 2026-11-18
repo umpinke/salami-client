@@ -3,6 +3,9 @@ package dev.salamiclient.gui;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.NativeImage;
 import dev.salamiclient.SalamiClient;
+import dev.salamiclient.emotes.Emote;
+import dev.salamiclient.emotes.Emotes;
+import dev.salamiclient.modules.social.EmotesModule;
 import dev.salamiclient.capes.AnimatedCapes;
 import dev.salamiclient.capes.CapeLibrary;
 import dev.salamiclient.modules.client.GuiScaleModule;
@@ -71,7 +74,8 @@ public final class CosmeticsScreen extends Screen {
 	public enum Tab {
 		CAPES("salami.cosmetics.tab.capes"),
 		HATS("salami.cosmetics.tab.hats"),
-		MINIME("salami.cosmetics.tab.minime");
+		MINIME("salami.cosmetics.tab.minime"),
+		EMOTES("salami.cosmetics.tab.emotes");
 
 		final String key;
 
@@ -148,7 +152,20 @@ public final class CosmeticsScreen extends Screen {
 		}
 		if (tab == Tab.HATS) {
 			cards.add(new Card("hat:none", I18n.get("salami.cosmetics.hat.none"), null, 0));
-			cards.add(new Card("hat:santa", I18n.get("salami.module.hats.setting.hat.santa"), SANTA_ICON, ICON_SIZE));
+			for (HatsModule.Hat hat : HatsModule.Hat.values()) {
+				if (hat == HatsModule.Hat.NONE) {
+					continue;
+				}
+				Identifier icon = hat == HatsModule.Hat.SANTA ? SANTA_ICON
+					: Identifier.fromNamespaceAndPath(SalamiClient.MOD_ID, "textures/cosmetics/hat_" + hat.id() + "_icon.png");
+				cards.add(new Card("hat:" + hat.id(), I18n.get("salami.module.hats.setting.hat." + hat.id()), icon, ICON_SIZE));
+			}
+			return;
+		}
+		if (tab == Tab.EMOTES) {
+			for (Emote emote : Emote.values()) {
+				cards.add(new Card("emote:" + emote.id(), I18n.get(emote.translationKey()), EmoteWheelScreen.icon(emote), ICON_SIZE));
+			}
 			return;
 		}
 		cards.add(new Card("none", I18n.get("salami.cosmetics.none"), null, 0));
@@ -211,6 +228,10 @@ public final class CosmeticsScreen extends Screen {
 		if (tab == Tab.MINIME) {
 			MiniMeModule mini = MiniMeModule.instance();
 			return mini == null || !mini.isEnabled() ? "minime:none" : "minime:" + mini.place().name().toLowerCase(Locale.ROOT);
+		}
+		if (tab == Tab.EMOTES) {
+			Emote playing = Emotes.current();
+			return playing == null ? "" : "emote:" + playing.id();
 		}
 		CapesModule module = CapesModule.instance();
 		if (module == null || !module.isEnabled()) {
@@ -289,11 +310,30 @@ public final class CosmeticsScreen extends Screen {
 		if (!hats.isEnabled()) {
 			SalamiClient.get().modules().setEnabled(hats, true);
 		}
-		HatsModule.Hat hat = HatsModule.Hat.valueOf(key.substring("hat:".length()).toUpperCase(Locale.ROOT));
+		HatsModule.Hat hat = HatsModule.Hat.of(key.substring("hat:".length()));
 		hats.choose(hat);
-		setNotice(Component.translatable(hat == HatsModule.Hat.NONE ? "salami.cosmetics.hat.removed" : "salami.cosmetics.hat.equipped"), false);
+		setNotice(hat == HatsModule.Hat.NONE ? Component.translatable("salami.cosmetics.hat.removed")
+			: Component.translatable("salami.cosmetics.hat.equipped", I18n.get("salami.module.hats.setting.hat." + hat.id())), false);
 		currentReadAt = 0;
 		SalamiClient.get().config().markDirty();
+	}
+
+	/** Emote abspielen: Menü schließen, damit du es siehst. */
+	private void playEmote(String key) {
+		Emote emote = Emote.of(key.substring("emote:".length()));
+		EmotesModule module = EmotesModule.instance();
+		if (emote == null || module == null) {
+			return;
+		}
+		if (minecraft.player == null) {
+			setNotice(Component.translatable("salami.cosmetics.emote.in_world"), true);
+			return;
+		}
+		if (!module.isEnabled()) {
+			SalamiClient.get().modules().setEnabled(module, true);
+		}
+		minecraft.setScreen(null);
+		Emotes.play(emote);
 	}
 
 	/** Cape anlegen. Mit Launcher wird dessen Auswahl geändert, damit beide dasselbe zeigen. */
@@ -500,7 +540,10 @@ public final class CosmeticsScreen extends Screen {
 			GuiDraw.text(g, font, I18n.get(t.key), r[0] + 7, r[1] + 4, active ? GuiDraw.textOn(theme.accent()) : theme.headerText(), false);
 			last = r;
 		}
-		GuiDraw.text(g, font, I18n.get("salami.cosmetics.more_soon"), last[2] + 8, last[1] + 4, theme.textDim(), false);
+		String soon = I18n.get("salami.cosmetics.more_soon");
+		if (last[2] + 8 + font.width(soon) < f[2] - PAD) {
+			GuiDraw.text(g, font, soon, last[2] + 8, last[1] + 4, theme.textDim(), false);
+		}
 
 		if (tab == Tab.MINIME) {
 			renderNameRow(g, theme, mx, my);
@@ -526,6 +569,7 @@ public final class CosmeticsScreen extends Screen {
 
 		Component line = notice != null ? notice : Component.translatable(switch (tab) {
 			case HATS -> "salami.cosmetics.hat.info";
+			case EMOTES -> "salami.cosmetics.emote.info";
 			case MINIME -> "salami.cosmetics.minime.info";
 			default -> "salami.cosmetics.info";
 		});
@@ -561,13 +605,14 @@ public final class CosmeticsScreen extends Screen {
 				int size = PREVIEW_W;
 				renderFace(g, miniMeTexture(), x + (CARD_W - size) / 2, py + (PREVIEW_H - size) / 2, size);
 			}
-			case "hat:santa" -> {
-				// Symbol statt Cape-Ausschnitt, quadratisch in der Mitte der Vorschau
-				int size = PREVIEW_H - 3;
-				int ix = x + (CARD_W - size) / 2;
-				g.blit(RenderPipelines.GUI_TEXTURED, SANTA_ICON, ix, py + 2, 0f, 0f, size, size, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
-			}
 			default -> {
+				if ((card.key().startsWith("hat:") || card.key().startsWith("emote:")) && card.texture() != null) {
+					// Symbol statt Cape-Ausschnitt, quadratisch in der Mitte der Vorschau
+					int size = PREVIEW_H - 3;
+					int ix = x + (CARD_W - size) / 2;
+					g.blit(RenderPipelines.GUI_TEXTURED, card.texture(), ix, py + 2, 0f, 0f, size, size, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
+					break;
+				}
 				Identifier texture = card.texture();
 				int textureWidth = card.textureWidth();
 				if (card.builtin() != null) {
@@ -734,6 +779,8 @@ public final class CosmeticsScreen extends Screen {
 					upload();
 				} else if (key.startsWith("hat:")) {
 					chooseHat(key);
+				} else if (key.startsWith("emote:")) {
+					playEmote(key);
 				} else if (key.startsWith("minime:")) {
 					chooseMiniMe(key);
 				} else {

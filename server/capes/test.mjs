@@ -528,6 +528,11 @@ test("Hüte: Weihnachtsmütze wird mit dem Cape geteilt, auch ohne Cape", async 
     assert.deepEqual(await lookup(), { hat: "santa" });
     assert.deepEqual(await live.next(mine), { uuid, cape: { hat: "santa" } });
 
+    // die neuen Hüte (Krone, Zylinder …) gehen genauso
+    assert.equal((await setCape("Brotzeit", { builtin: "board" }, { hat: "top_hat" })).status, 200);
+    assert.deepEqual(await lookup(), { builtin: "board", hat: "top_hat" });
+    assert.deepEqual(await live.next(mine), { uuid, cape: { builtin: "board", hat: "top_hat" } });
+
     // unbekannter Hut (neuerer Client) wird ignoriert, nicht abgelehnt
     assert.equal((await setCape("Brotzeit", { builtin: "board" }, { hat: "zylinder" })).status, 200);
     assert.deepEqual(await lookup(), { builtin: "board" });
@@ -540,6 +545,52 @@ test("Hüte: Weihnachtsmütze wird mit dem Cape geteilt, auch ohne Cape", async 
   } finally {
     live.close();
   }
+});
+
+/** Wie salami-core: Challenge holen, bei „Mojang“ anmelden, Emote-Token abholen. */
+async function emoteSession(name, { join = true } = {}) {
+  const { body } = await call("POST", "/v1/auth/challenge");
+  if (join) joined.add(`${name}|${body.serverId}`);
+  return call("POST", "/v1/emotes/session", { name, serverId: body.serverId });
+}
+
+test("Emotes: nur angemeldet, nur bekannte, live an alle – ohne uuid oben", async () => {
+  const live = await openEvents();
+  try {
+    const uuid = uuidOf("Pepper_99");
+
+    // ohne Mojang-Anmeldung kein Token, ohne Token kein Emote
+    assert.equal((await emoteSession("Pepper_99", { join: false })).status, 401);
+    assert.equal((await call("POST", "/v1/emotes", { emote: "wave" })).status, 401);
+    assert.equal((await call("POST", "/v1/emotes", { emote: "wave" }, { Authorization: "Bearer falsch" })).status, 401);
+
+    const session = await emoteSession("Pepper_99");
+    assert.equal(session.status, 200);
+    assert.equal(session.body.uuid, uuid);
+    const auth = { Authorization: `Bearer ${session.body.token}` };
+
+    assert.deepEqual((await call("POST", "/v1/emotes", { emote: "wave" }, auth)).body, { ok: true });
+    // ältere Spiele lesen {uuid, cape}; das Emote steckt deshalb in einem eigenen Objekt
+    assert.deepEqual(await live.next((e) => e.emote), { emote: { uuid, id: "wave" } });
+
+    assert.equal((await call("POST", "/v1/emotes", { emote: "moonwalk" }, auth)).status, 400);
+    assert.equal((await call("POST", "/v1/emotes", {}, auth)).status, 400);
+
+    // nichts davon wird beim Spieler gespeichert
+    const stored = (await call("POST", "/v1/capes/lookup", { uuids: [uuid] })).body.capes[uuid] ?? {};
+    assert.equal("emote" in stored, false);
+  } finally {
+    live.close();
+  }
+});
+
+test("Emotes: höchstens 20 pro Minute und Spieler", async () => {
+  const session = await emoteSession("Salamander");
+  const auth = { Authorization: `Bearer ${session.body.token}` };
+  const statuses = [];
+  for (let i = 0; i < 22; i++) statuses.push((await call("POST", "/v1/emotes", { emote: "clap" }, auth)).status);
+  assert.deepEqual(statuses.slice(0, 20), Array(20).fill(200));
+  assert.equal(statuses[21], 429);
 });
 
 test("Mini Me: Name und Platz werden mit dem Cape geteilt, Ungültiges ignoriert", async () => {

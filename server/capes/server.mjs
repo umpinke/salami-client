@@ -11,7 +11,7 @@
  *   POST /v1/auth/challenge                         → {"serverId":"…"}
  *   PUT  /v1/capes/me  {"name","serverId","cape","hat"?,"minime"?} → {"status":"approved"|"pending"|"rejected", …}
  *        cape: {"builtin":"salami"} | {"png":"<base64>"} | null (kein Cape)
- *        hat: "santa" (Cosmetics → Hüte) oder fehlt/null; unbekannte Hüte werden ignoriert
+ *        hat: "santa", "crown" … (Cosmetics → Hüte, siehe HATS) oder fehlt/null; unbekannte Hüte werden ignoriert
  *        minime: {"name":"<Minecraft-Name>","place":"hand"|"shoulder"|"head"|"follow"}
  *        (Cosmetics → Mini Me) oder fehlt/null; Ungültiges wird ebenso ignoriert
  *        Anmeldung wie beim Betreten eines Minecraft-Servers: das Spiel meldet die
@@ -28,7 +28,13 @@
  *   GET  /v1/capes/events                           → Server-Sent Events, eine Zeile pro Änderung:
  *        data: {"uuid":"…","cape":{"builtin":"salami"}|{"id":"…"}|null}
  *        (Cape gewechselt oder von einem Admin freigegeben/gesperrt) – so sehen alle
- *        Mitspieler einen Wechsel sofort.
+ *        Mitspieler einen Wechsel sofort. Emotes kommen auf derselben Verbindung als
+ *        data: {"emote":{"uuid":"…","id":"wave"}} (ohne "uuid" oben, ältere Spiele überspringen sie).
+ *   POST /v1/emotes/session {"name","serverId"}      → {"token","uuid","name"}
+ *        Anmeldung wie bei PUT /v1/capes/me; das Token gilt 12 h und liegt nur im Speicher
+ *        (nach einem Neustart meldet sich das Spiel einfach neu an).
+ *   POST /v1/emotes {"emote":"wave"}                 → {"ok":true}  (Authorization: Bearer <token>)
+ *        spielt ein Emote (siehe EMOTES) für alle Mitspieler ab; nichts davon wird gespeichert.
  * Launcher:
  *   POST /v1/capes/status {"ids":[…]}               → {"status":{"<capeId>":{"status":"pending"|…,"reason"?}}}
  *   POST /v1/capes/submit {"name","serverId","png"} → {"status":"approved"|"pending"|"rejected","id","reason"?}
@@ -107,7 +113,14 @@ const REPORTS_TO_HIDE = env("REPORTS_TO_HIDE", 3);
 const REPORTS_PER_DAY = env("REPORTS_PER_DAY", 20);
 
 /** Hüte von salami-core (dort `HatsModule.Hat`); neue Namen hier nachtragen. */
-const HATS = new Set(["santa"]);
+const HATS = new Set(["santa", "crown", "top_hat", "chef", "halo", "horns", "cat_ears", "party", "beret"]);
+/** Emotes von salami-core (dort `Emote`); neue Namen hier nachtragen. */
+const EMOTES = new Set(["wave", "cheer", "clap", "dance", "facepalm", "point", "shrug", "tpose"]);
+/** Emotes pro Spieler und Minute. */
+const EMOTES_PER_MINUTE = env("EMOTES_PER_MINUTE", 20);
+/** So lange gilt eine Emote-Anmeldung. */
+const EMOTE_SESSION_MS = 12 * 3_600_000;
+const MAX_EMOTE_SESSIONS = 20_000;
 /** Plätze des Mini Me in salami-core (dort `MiniMeModule.Place`, ohne `none`). */
 const MINIME_PLACES = new Set(["hand", "shoulder", "head", "follow"]);
 /** Gültiger Minecraft-Name – nur dessen Skin zeigt das Mini Me. */
@@ -271,6 +284,7 @@ function sweep(now = Date.now()) {
     for (const [uuid, list] of log) if (!list.some((t) => now - t < 86_400_000)) log.delete(uuid);
   }
   for (const [ip, f] of adminFailures) if (now - f.since >= ADMIN_LOCK_MS) adminFailures.delete(ip);
+  for (const [hash, session] of emoteSessions) if (session.expires < now) emoteSessions.delete(hash);
   friends.sweep(now);
 }
 
@@ -699,6 +713,46 @@ setInterval(() => {
   for (const res of streams.keys()) res.write(": ping\n\n");
 }, HEARTBEAT_MS).unref();
 
+// ------------------------------------------------------------------ Emotes
+
+/** SHA-256(Token) → { uuid, expires } – nur im Speicher, Emotes selbst werden nie gespeichert. */
+const emoteSessions = new Map();
+const tokenHash = (token) => createHash("sha256").update(token).digest("hex");
+
+async function handleEmoteSession(req, res) {
+  const body = await readJson(req, MAX_SMALL_BODY);
+  const { uuid, name } = await verifyPlayer(body.name, body.serverId);
+  if (emoteSessions.size >= MAX_EMOTE_SESSIONS) sweep();
+  if (emoteSessions.size >= MAX_EMOTE_SESSIONS) throw new HttpError(503, "gerade zu viele Anmeldungen");
+  const token = randomBytes(24).toString("base64url");
+  emoteSessions.set(tokenHash(token), { uuid, expires: Date.now() + EMOTE_SESSION_MS });
+  send(res, 200, { token, uuid, name });
+}
+
+function emotePlayer(req) {
+  const auth = req.headers.authorization;
+  const token = typeof auth === "string" && auth.startsWith("Bearer ") ? auth.slice("Bearer ".length).trim() : "";
+  const session = token ? emoteSessions.get(tokenHash(token)) : undefined;
+  if (!session || session.expires < Date.now()) throw new HttpError(401, "nicht angemeldet");
+  return session.uuid;
+}
+
+async function handleEmote(req, res) {
+  const uuid = emotePlayer(req);
+  const body = await readJson(req, MAX_SMALL_BODY);
+  if (typeof body.emote !== "string" || !EMOTES.has(body.emote)) throw new HttpError(400, "unbekanntes Emote");
+  if (rateLimited("emote", uuid, EMOTES_PER_MINUTE)) throw new HttpError(429, "zu viele Emotes");
+  broadcastEmote(uuid, body.emote);
+  send(res, 200, { ok: true });
+}
+
+/** Emote an alle Cape-Verbindungen – ohne "uuid" oben, damit ältere Spiele die Zeile nicht als Cape lesen. */
+function broadcastEmote(uuid, id) {
+  if (streams.size === 0) return;
+  const event = `data: ${JSON.stringify({ emote: { uuid, id } })}\n\n`;
+  for (const [res, stream] of streams) if (stream.kind === "capes") res.write(event);
+}
+
 // ------------------------------------------------------------------ Admin-Webseite
 
 const ADMIN_FILES = {
@@ -794,8 +848,14 @@ async function route(req, res) {
     return send(res, 404, { error: "nicht gefunden" });
   }
 
+  if (req.method === "POST" && path === "/v1/emotes") {
+    if (rateLimited("emotes", ip, RATE_PER_MINUTE * 2)) throw new HttpError(429, "zu viele Anfragen");
+    return handleEmote(req, res);
+  }
+
   if (rateLimited("api", ip, RATE_PER_MINUTE)) throw new HttpError(429, "zu viele Anfragen");
   if (req.method === "POST" && path === "/v1/auth/challenge") return send(res, 200, { serverId: newChallenge() });
+  if (req.method === "POST" && path === "/v1/emotes/session") return handleEmoteSession(req, res);
   if (req.method === "PUT" && path === "/v1/capes/me") return handleSetCape(req, res);
   if (req.method === "POST" && path === "/v1/capes/submit") return handleSubmit(req, res);
   if (req.method === "POST" && path === "/v1/capes/status") return handleStatus(req, res);

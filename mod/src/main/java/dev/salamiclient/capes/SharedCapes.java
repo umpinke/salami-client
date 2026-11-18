@@ -3,6 +3,7 @@ package dev.salamiclient.capes;
 import com.google.gson.JsonObject;
 import com.mojang.blaze3d.platform.NativeImage;
 import dev.salamiclient.SalamiClient;
+import dev.salamiclient.emotes.Emotes;
 import dev.salamiclient.modules.visual.CapesModule;
 import dev.salamiclient.modules.visual.HatsModule;
 import dev.salamiclient.modules.visual.MiniMeModule;
@@ -131,6 +132,11 @@ public final class SharedCapes {
 		return server;
 	}
 
+	/** Verbindung zum Cape-Server (auch für Emotes, {@link EmoteSync}) oder {@code null}. Nur auf dem Client-Thread. */
+	static @Nullable CapeServer currentServer() {
+		return server();
+	}
+
 	/**
 	 * Cape eines anderen Spielers oder {@code null} (unbekannt, keins oder noch nicht geladen).
 	 * {@code builtin} liefert die Textur zu einem mitgelieferten Cape ({@code "salami"} …).
@@ -254,6 +260,11 @@ public final class SharedCapes {
 			(uuid, remote) -> mc.execute(() -> {
 				if (stream == opened) {
 					onEvent(mc, uuid, remote);
+				}
+			}),
+			(uuid, emote) -> mc.execute(() -> {
+				if (stream == opened) {
+					Emotes.onRemote(uuid, emote);
 				}
 			}),
 			() -> mc.execute(() -> {

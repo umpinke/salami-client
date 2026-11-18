@@ -213,13 +213,51 @@ final class CapeServer {
 			.thenApply(json -> new Published(String.valueOf(string(json, "status")), string(json, "id"), string(json, "reason")));
 	}
 
+	/** Meldet sich für Emotes an (Mojang wie beim Cape) und liefert das Token ({@code v1/emotes/session}). */
+	//? if >=26.3 {
+	/*CompletableFuture<String> emoteSession(User user, SessionService session) {
+	*///?} else
+	CompletableFuture<String> emoteSession(User user, MinecraftSessionService session) {
+		return send(post("v1/auth/challenge", new JsonObject())).thenApplyAsync(challenge -> {
+			String serverId = string(challenge, "serverId");
+			if (serverId == null) {
+				throw new IllegalStateException("Cape-Server hat keine serverId geschickt");
+			}
+			try {
+				session.joinServer(user.getProfileId(), user.getAccessToken(), serverId);
+			} catch (AuthenticationException e) {
+				throw new IllegalStateException("Anmeldung bei Mojang fehlgeschlagen: " + e.getMessage(), e);
+			}
+			JsonObject body = new JsonObject();
+			body.addProperty("name", user.getName());
+			body.addProperty("serverId", serverId);
+			return body;
+		}, executor).thenCompose(body -> send(post("v1/emotes/session", body))).thenApply(json -> {
+			String token = string(json, "token");
+			if (token == null) {
+				throw new IllegalStateException("Cape-Server hat kein Token geschickt");
+			}
+			return token;
+		});
+	}
+
+	/** Spielt ein Emote für alle Mitspieler ab ({@code v1/emotes}); 401 = Token abgelaufen. */
+	CompletableFuture<Void> emote(String token, String id) {
+		JsonObject body = new JsonObject();
+		body.addProperty("emote", id);
+		return send(request("v1/emotes").header("Authorization", "Bearer " + token).POST(json(body)).build())
+			.thenApply(json -> null);
+	}
+
 	/**
 	 * Öffnet die Live-Verbindung: jede Cape-Änderung eines Salami-Spielers kommt sofort als
 	 * (Spieler, sichtbares Cape oder {@code null}) an {@code onEvent}. {@code onOpen} meldet die
 	 * Verbindung, {@code onEnd} ihr Ende ({@code null} = mit {@link EventStream#close()} beendet).
+	 * Emotes anderer Spieler kommen auf derselben Verbindung an {@code onEmote} (Spieler, Emote-Name).
 	 * Alle Rückrufe kommen aus einem Hintergrund-Thread.
 	 */
-	void events(EventStream stream, BiConsumer<UUID, @Nullable Remote> onEvent, Runnable onOpen, Consumer<@Nullable Throwable> onEnd) {
+	void events(EventStream stream, BiConsumer<UUID, @Nullable Remote> onEvent, BiConsumer<UUID, String> onEmote,
+			Runnable onOpen, Consumer<@Nullable Throwable> onEnd) {
 		// Ohne Timeout: die Verbindung bleibt offen; tote Verbindungen erkennt SharedCapes am fehlenden Lebenszeichen
 		HttpRequest request = HttpRequest.newBuilder(base.resolve("v1/capes/events"))
 			.header("Accept", "text/event-stream")
@@ -230,12 +268,12 @@ final class CapeServer {
 				onEnd.accept(stream.closed ? null : error);
 				return;
 			}
-			executor.execute(() -> read(stream, response, onEvent, onOpen, onEnd));
+			executor.execute(() -> read(stream, response, onEvent, onEmote, onOpen, onEnd));
 		});
 	}
 
-	private static void read(EventStream stream, HttpResponse<InputStream> response,
-			BiConsumer<UUID, @Nullable Remote> onEvent, Runnable onOpen, Consumer<@Nullable Throwable> onEnd) {
+	private static void read(EventStream stream, HttpResponse<InputStream> response, BiConsumer<UUID, @Nullable Remote> onEvent,
+			BiConsumer<UUID, String> onEmote, Runnable onOpen, Consumer<@Nullable Throwable> onEnd) {
 		Throwable failure = null;
 		try (InputStream in = response.body()) {
 			stream.body = in;
@@ -250,7 +288,7 @@ final class CapeServer {
 			for (String line; (line = reader.readLine()) != null; ) {
 				stream.lastSeen = System.currentTimeMillis();
 				if (line.startsWith("data:")) {
-					event(line.substring("data:".length()).trim(), onEvent);
+					event(line.substring("data:".length()).trim(), onEvent, onEmote);
 				}
 			}
 		} catch (Exception e) {
@@ -260,9 +298,19 @@ final class CapeServer {
 		}
 	}
 
-	private static void event(String data, BiConsumer<UUID, @Nullable Remote> onEvent) {
+	private static void event(String data, BiConsumer<UUID, @Nullable Remote> onEvent, BiConsumer<UUID, String> onEmote) {
 		try {
 			JsonObject json = JsonParser.parseString(data).getAsJsonObject();
+			// Emote: {"emote":{"uuid","id"}} – bewusst ohne "uuid" oben, ältere Spiele überspringen die Zeile
+			JsonElement emote = json.get("emote");
+			if (emote != null && emote.isJsonObject()) {
+				String player = string(emote.getAsJsonObject(), "uuid");
+				String id = string(emote.getAsJsonObject(), "id");
+				if (player != null && id != null) {
+					onEmote.accept(UUID.fromString(player), id);
+				}
+				return;
+			}
 			String uuid = string(json, "uuid");
 			if (uuid == null) {
 				return;

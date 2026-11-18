@@ -9,6 +9,9 @@ import dev.salamiclient.friends.FriendsCommand;
 import dev.salamiclient.gui.CosmeticsScreen;
 import dev.salamiclient.gui.FriendsScreen;
 import dev.salamiclient.gui.SalamiMenuScreen;
+import dev.salamiclient.gui.EmoteWheelScreen;
+import dev.salamiclient.emotes.EmoteCommand;
+import dev.salamiclient.emotes.Emotes;
 import dev.salamiclient.gui.clickgui.ClickGuiScreen;
 import dev.salamiclient.gui.MinigamesScreen;
 import dev.salamiclient.gui.ModSettingsScreen;
@@ -30,6 +33,7 @@ import dev.salamiclient.modules.misc.PanicDisconnectModule;
 import dev.salamiclient.modules.misc.ChatTweaksModule;
 import dev.salamiclient.modules.misc.TabTweaksModule;
 import dev.salamiclient.modules.misc.WaypointsModule;
+import dev.salamiclient.modules.social.EmotesModule;
 import dev.salamiclient.modules.social.FriendsModule;
 import dev.salamiclient.modules.client.BorderlessFullscreenModule;
 import dev.salamiclient.gui.WaypointsScreen;
@@ -83,6 +87,7 @@ import dev.salamiclient.modules.visual.ParticlesModule;
 import dev.salamiclient.modules.visual.CapesModule;
 import dev.salamiclient.modules.visual.HatsModule;
 import dev.salamiclient.modules.visual.MiniMeModule;
+import dev.salamiclient.render.HeadHatLayer;
 import dev.salamiclient.render.MiniMeLayer;
 import dev.salamiclient.render.SantaHatLayer;
 import dev.salamiclient.render.WorldContext;
@@ -144,6 +149,7 @@ public final class SalamiClient implements ClientModInitializer {
 	private ModuleManager modules;
 	private ConfigManager config;
 	private KeyMapping clickGuiKey;
+	private KeyMapping emoteKey;
 
 	public static SalamiClient get() {
 		return instance;
@@ -258,12 +264,16 @@ public final class SalamiClient implements ClientModInitializer {
 		modules.register(new WaypointsModule());
 		// Social
 		modules.register(new FriendsModule());
+		modules.register(new EmotesModule());
 	}
 
 	private void registerKeybinds() {
 		KeyMapping.Category category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(MOD_ID, "main"));
 		clickGuiKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
 			"key.salami.clickgui", InputConstants.Type.KEYSYM, InputConstants.KEY_RSHIFT, category));
+		// Emote-Rad: halten, Richtung wählen, loslassen
+		emoteKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+			"key.salami.emotes", InputConstants.Type.KEYSYM, InputConstants.KEY_B, category));
 	}
 
 	private void registerEvents() {
@@ -295,14 +305,21 @@ public final class SalamiClient implements ClientModInitializer {
 		});
 		// Kits: ein halb angewendetes Kit nicht in die nächste Verbindung/Welt mitnehmen
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> modules.get(KitsModule.class).cancel());
-		ClientWorldEvents.AFTER_CLIENT_WORLD_CHANGE.register((client, world) -> modules.get(KitsModule.class).cancel());
+		ClientWorldEvents.AFTER_CLIENT_WORLD_CHANGE.register((client, world) -> {
+			modules.get(KitsModule.class).cancel();
+			Emotes.clear();
+		});
 		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> config.saveNow());
 		// Freunde: /salami friends und /salami msg <freund> <text>
-		ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> FriendsCommand.register(dispatcher));
+		ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
+			FriendsCommand.register(dispatcher);
+			EmoteCommand.register(dispatcher);
+		});
 		// Hüte (Cosmetics): Weihnachtsmütze auf der Schulter aller Spieler-Modelle
 		LivingEntityFeatureRendererRegistrationCallback.EVENT.register((entityType, renderer, helper, context) -> {
 			if (renderer instanceof AvatarRenderer<?> avatar) {
 				helper.register(new SantaHatLayer(avatar));
+				helper.register(new HeadHatLayer(avatar));
 				helper.register(new MiniMeLayer(avatar));
 			}
 		});
@@ -327,6 +344,12 @@ public final class SalamiClient implements ClientModInitializer {
 		while (clickGuiKey.consumeClick()) {
 			if (client.screen == null) {
 				client.setScreen(new SalamiMenuScreen(modules, config));
+			}
+		}
+		while (emoteKey.consumeClick()) {
+			EmotesModule emotes = modules.get(EmotesModule.class);
+			if (client.screen == null && client.player != null && emotes.isEnabled()) {
+				client.setScreen(new EmoteWheelScreen(emoteKey));
 			}
 		}
 		modules.tick(client);
@@ -409,6 +432,11 @@ public final class SalamiClient implements ClientModInitializer {
 
 	public KeyMapping clickGuiKey() {
 		return clickGuiKey;
+	}
+
+	/** Taste für das Emote-Rad (Standard: B). */
+	public KeyMapping emoteKey() {
+		return emoteKey;
 	}
 
 	/** Aktives Farbschema. */

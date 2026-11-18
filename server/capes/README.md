@@ -8,6 +8,7 @@ Adresse: **https://salami-client-zaehler.umpinke.de/capes** – derselbe nginx u
 
 - **Mitgelieferte Capes** (Salami, Peperoni, Schneidebrett) sehen alle Salami-Spieler sofort.
 - **Live**: Jedes laufende Spiel hält eine Verbindung zu `/v1/capes/events` (Server-Sent Events). Wechselt jemand sein Cape oder gibt ein Admin eines frei, sehen es alle Mitspieler sofort. Gesendet werden nur UUID und sichtbares Cape, alle 20 s kommt ein Lebenszeichen.
+- **Emotes** (Winken, Tanzen …): Das Spiel meldet sich einmal an (`POST /v1/emotes/session`, wie beim Cape über Mojang) und schickt Emotes mit dem Token an `POST /v1/emotes`. Der Server gibt sie sofort über `/v1/capes/events` an alle weiter und speichert nichts. Das Token liegt nur im Speicher (12 h), nach einem Neustart meldet sich das Spiel neu an. Höchstens 20 Emotes pro Spieler und Minute (`EMOTES_PER_MINUTE`).
 - **Eigene Capes** reicht der Launcher (ab 1.3.4) gleich nach dem Hinzufügen ein (`/v1/capes/submit`), ohne das getragene Cape zu ändern. Ältere Versionen schicken sie erst beim Spielen mit dem Cape (salami-core). Sie landen in der Warteschlange. Bis ein Admin sie freigibt, sieht sie nur der Spieler selbst. Lehnt ein Admin ab, bekommt der Spieler den Grund im Spiel und im Launcher angezeigt.
 - **Anmeldung** wie beim Betreten eines Minecraft-Servers: Das Spiel meldet eine zufällige `serverId` bei Mojang an, der Cape-Server fragt bei Mojang nach (`hasJoined`). Das Zugangstoken des Spielers sieht der Cape-Server nie. So kann niemand ein Cape für einen fremden Account setzen.
 - **Bilder** werden vollständig dekodiert und als schlichtes PNG neu gespeichert (keine Metadaten, nichts Kaputtes). Die Cape-ID ist ein Hash über die Pixel: dasselbe Bild muss nur einmal geprüft werden, egal wer es hochlädt.
@@ -149,6 +150,7 @@ Verstößt ein freigegebenes Cape doch dagegen und jemand meldet es: schnell pr�
 | `MAX_STREAMS_PER_IP` | `20` | Live-Verbindungen pro IP (Capes und Freunde zusammen, ein Spiel braucht meist zwei) |
 | `REPORTS_TO_HIDE` | `3` | Ab so vielen Meldungen verschiedener Spieler ist ein Cape sofort versteckt |
 | `REPORTS_PER_DAY` | `20` | Meldungen pro Spieler und Tag |
+| `EMOTES_PER_MINUTE` | `20` | Emotes pro Spieler und Minute |
 | `FRIENDS_RATE_PER_MINUTE` | `240` | Freunde- und Chat-Anfragen pro IP und Minute (die Anmeldung zählt zu `RATE_PER_MINUTE`) |
 | `FRIENDS_OFFLINE_GRACE_MS` | `10000` | So lange (ms) nach der letzten Live-Verbindung gilt ein Spieler noch als online |
 
@@ -165,11 +167,13 @@ Startet den Server mit einem nachgebauten Mojang-Dienst und prüft Anmeldung, Wa
 | Anfrage | Antwort |
 |---|---|
 | `POST /v1/auth/challenge` | `{"serverId":"…"}`, 60 s gültig, nur einmal verwendbar |
-| `PUT /v1/capes/me` mit `{"name","serverId","cape","hat"?,"minime"?}` | `{"status":"approved"\|"pending"\|"rejected","id"?,"reason"?}` – `cape`: `{"builtin":"salami"}`, `{"png":"<base64>"}` oder `null` – `hat`: `"santa"` (Weihnachtsmütze, Cosmetics → Hüte) oder weglassen; unbekannte Hüte werden ignoriert – `minime`: `{"name":"<Minecraft-Name>","place":"hand"\|"shoulder"\|"head"\|"follow"}` (Cosmetics → Mini Me) oder weglassen; Ungültiges wird ignoriert |
+| `PUT /v1/capes/me` mit `{"name","serverId","cape","hat"?,"minime"?}` | `{"status":"approved"\|"pending"\|"rejected","id"?,"reason"?}` – `cape`: `{"builtin":"salami"}`, `{"png":"<base64>"}` oder `null` – `hat`: `"santa"`, `"crown"`, `"top_hat"`, `"chef"`, `"halo"`, `"horns"`, `"cat_ears"`, `"party"`, `"beret"` (Cosmetics → Hüte) oder weglassen; unbekannte Hüte werden ignoriert – `minime`: `{"name":"<Minecraft-Name>","place":"hand"\|"shoulder"\|"head"\|"follow"}` (Cosmetics → Mini Me) oder weglassen; Ungültiges wird ignoriert |
 | `POST /v1/capes/lookup` mit `{"uuids":[…]}` (max. 200) | `{"capes":{"<uuid>":{"builtin":"salami"}\|{"id":"<capeId>"}}}` – nur sichtbare Capes. Trägt der Spieler einen Hut, steht zusätzlich `"hat":"santa"` darin (auch ohne Cape: `{"hat":"santa"}`), ebenso sein Mini Me als `"minime":{"name","place"}` |
 | `GET /v1/capes/img/<capeId>.png` | freigegebenes Cape-Bild |
 | `GET /v1/capes/gallery` | `{"capes":[{"id","approvedAt","wearers"}]}` – alle freigegebenen eigenen Capes (höchstens 500, neueste zuerst), für die Galerie im Launcher |
-| `GET /v1/capes/events` | Server-Sent Events: `data: {"uuid":"…","cape":{…}\|null}` bei jeder sichtbaren Änderung, `: ping` alle 20 s |
+| `GET /v1/capes/events` | Server-Sent Events: `data: {"uuid":"…","cape":{…}\|null}` bei jeder sichtbaren Änderung, `data: {"emote":{"uuid":"…","id":"wave"}}` bei jedem Emote (ohne `uuid` oben, damit ältere Spiele die Zeile überspringen), `: ping` alle 20 s |
+| `POST /v1/emotes/session` mit `{"name","serverId"}` | `{"token","uuid","name"}` – Anmeldung wie bei `PUT /v1/capes/me`, Token 12 h gültig, nur im Speicher |
+| `POST /v1/emotes` mit `{"emote":"wave"}` und `Authorization: Bearer <token>` | `{"ok":true}` – Emotes: `wave`, `cheer`, `clap`, `dance`, `facepalm`, `point`, `shrug`, `tpose`; unbekannte → 400, ohne gültiges Token → 401, mehr als 20 pro Minute → 429 |
 | `POST /v1/capes/status` mit `{"ids":[…]}` (max. 100) | `{"status":{"<capeId>":{"status":"pending",…}}}` – für den Launcher |
 | `POST /v1/capes/submit` mit `{"name","serverId","png"}` | `{"status":"approved"\|"pending"\|"rejected","id","reason"?}` – Launcher reicht ein eigenes Cape zur Prüfung ein, das getragene Cape bleibt |
 | `POST /v1/capes/report` mit `{"name","serverId","id","reason","note"?}` | `{"status":"reported"\|"already_reported"}` – freigegebenes Cape melden; `reason`: `logo`, `hate`, `sexual`, `person` oder `other`, `note` höchstens 200 Zeichen |

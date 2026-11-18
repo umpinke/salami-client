@@ -33,6 +33,7 @@
 		"OverlayTextureMixin",
 		"ParticleEngineMixin",
 		"PauseScreenMixin",
+		"PlayerModelMixin",
 		"PlayerTabOverlayMixin",
 		"RealmsConnectMixin",
 		"RecipeBookComponentAccessor",
