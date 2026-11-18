@@ -1,9 +1,12 @@
 package dev.salamiclient.capes;
 
+import com.google.gson.JsonObject;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.emotes.Emote;
 import net.minecraft.client.Minecraft;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Schickt eigene Emotes an den Cape-Server, der sie live an alle Mitspieler mit Salami Client
@@ -27,6 +30,12 @@ public final class EmoteSync {
 	private static @Nullable Emote pending;
 
 	private EmoteSync() {}
+
+	/** Emote-Katalog vom Server holen; {@code null} ohne Cape-Server (Start ohne Launcher). */
+	public static @Nullable CompletableFuture<JsonObject> catalog() {
+		CapeServer server = SharedCapes.currentServer();
+		return server == null ? null : server.emoteCatalog();
+	}
 
 	/** Eigenes Emote teilen – ohne Cape-Server (Start ohne Launcher) passiert nichts. */
 	public static void send(Emote emote) {

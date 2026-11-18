@@ -9,6 +9,7 @@ Adresse: **https://salami-client-zaehler.umpinke.de/capes** – derselbe nginx u
 - **Mitgelieferte Capes** (Salami, Peperoni, Schneidebrett) sehen alle Salami-Spieler sofort.
 - **Live**: Jedes laufende Spiel hält eine Verbindung zu `/v1/capes/events` (Server-Sent Events). Wechselt jemand sein Cape oder gibt ein Admin eines frei, sehen es alle Mitspieler sofort. Gesendet werden nur UUID und sichtbares Cape, alle 20 s kommt ein Lebenszeichen.
 - **Emotes** (Winken, Tanzen …): Das Spiel meldet sich einmal an (`POST /v1/emotes/session`, wie beim Cape über Mojang) und schickt Emotes mit dem Token an `POST /v1/emotes`. Der Server gibt sie sofort über `/v1/capes/events` an alle weiter und speichert nichts. Das Token liegt nur im Speicher (12 h), nach einem Neustart meldet sich das Spiel neu an. Höchstens 20 Emotes pro Spieler und Minute (`EMOTES_PER_MINUTE`).
+- **Neue Emotes ohne Update**: Welche Emotes es gibt, steht als Daten in [`emotes.json`](emotes.json) neben `server.mjs`. Das Spiel holt die Liste beim Start (`GET /v1/emotes/catalog`). Der Server sieht alle 30 s nach, ob sich die Datei geändert hat, lädt sie dann neu und meldet es allen offenen Spielen – ein neues Emote ist nach spätestens einer halben Minute bei allen, ohne Neustart und ohne Launcher-Update. Siehe [Emotes hinzufügen](#emotes-hinzufügen).
 - **Eigene Capes** reicht der Launcher (ab 1.3.4) gleich nach dem Hinzufügen ein (`/v1/capes/submit`), ohne das getragene Cape zu ändern. Ältere Versionen schicken sie erst beim Spielen mit dem Cape (salami-core). Sie landen in der Warteschlange. Bis ein Admin sie freigibt, sieht sie nur der Spieler selbst. Lehnt ein Admin ab, bekommt der Spieler den Grund im Spiel und im Launcher angezeigt.
 - **Anmeldung** wie beim Betreten eines Minecraft-Servers: Das Spiel meldet eine zufällige `serverId` bei Mojang an, der Cape-Server fragt bei Mojang nach (`hasJoined`). Das Zugangstoken des Spielers sieht der Cape-Server nie. So kann niemand ein Cape für einen fremden Account setzen.
 - **Bilder** werden vollständig dekodiert und als schlichtes PNG neu gespeichert (keine Metadaten, nichts Kaputtes). Die Cape-ID ist ein Hash über die Pixel: dasselbe Bild muss nur einmal geprüft werden, egal wer es hochlädt.
@@ -61,7 +62,7 @@ Live-Ereignisse auf `/v1/friends/events` (Token in der `Authorization`-Kopfzeile
 
    ```bash
    sudo mkdir -p /opt/salami-capes
-   sudo cp -r /tmp/salami-capes/server.mjs /tmp/salami-capes/friends.mjs /tmp/salami-capes/png.mjs /tmp/salami-capes/admin /opt/salami-capes/
+   sudo cp -r /tmp/salami-capes/server.mjs /tmp/salami-capes/friends.mjs /tmp/salami-capes/emotes.mjs /tmp/salami-capes/emotes.json /tmp/salami-capes/png.mjs /tmp/salami-capes/admin /opt/salami-capes/
    sudo cp /tmp/salami-capes/salami-capes.service /etc/systemd/system/
    ```
 
@@ -107,7 +108,7 @@ Live-Ereignisse auf `/v1/friends/events` (Token in der `Authorization`-Kopfzeile
 
 6. **Adresse in den Launcher eintragen**: `CAPE_SERVER_URL` in `launcher/src-tauri/src/branding.rs`. Der Launcher gibt sie beim Spielstart als `-Dsalami.capes.url` an salami-core weiter. Danach ein Update veröffentlichen.
 
-Logs: `journalctl -u salami-capes -f`. Nach einem Update der Dateien: `sudo systemctl restart salami-capes`. Seit Freunde und Chat gehört `friends.mjs` dazu (Schritt 2) – fehlt sie, startet der Dienst nicht. Die Daten liegen in `/var/lib/salami-capes` (`capes.json`, `friends.json` und `images/`) – diesen Ordner ins Backup aufnehmen.
+Logs: `journalctl -u salami-capes -f`. Nach einem Update der Dateien: `sudo systemctl restart salami-capes`. Seit Freunde und Chat gehört `friends.mjs` dazu, seit den Emotes auch `emotes.mjs` und `emotes.json` (Schritt 2) – fehlt `friends.mjs` oder `emotes.mjs`, startet der Dienst nicht; ohne `emotes.json` gibt es keine Emotes. Die Daten liegen in `/var/lib/salami-capes` (`capes.json`, `friends.json` und `images/`) – diesen Ordner ins Backup aufnehmen.
 
 ## Capes prüfen
 
@@ -119,6 +120,33 @@ Logs: `journalctl -u salami-capes -f`. Nach einem Update der Dateien: `sudo syst
 - Unter **„Gemeldet“** stehen alle Capes mit offenen Meldungen: Grund, wer gemeldet hat, Notiz und Datum. **Behalten** verwirft die Meldungen (ein verstecktes Cape ist danach wieder für alle sichtbar, an seinem alten Platz in der Galerie), **Sperren** nimmt das Cape zurück. Beides wird im Log festgehalten (`journalctl -u salami-capes`).
 
 Die Seite lässt sich als App aufs Handy legen (PWA: `manifest.webmanifest`, Service Worker `sw.js`, der nur die Oberfläche zwischenspeichert, nie `/v1/`). Der Admin-Schlüssel bleibt im Browser gespeichert. Die Glocke abonniert Web-Push für neue Capes. Das Backend dafür ist **nicht** Teil dieses Servers, sondern der Host-Dienst `salami-cape-mail` (nginx `/capes/push/`). Er prüft Admin-Schlüssel über `/v1/admin/me` und liest die Log-Zeile „neues Cape … wartet auf Prüfung“, also diese Zeile in `server.mjs` nicht umformulieren.
+
+## Emotes hinzufügen
+
+1. In `emotes.json` einen Eintrag ergänzen (am einfachsten ein ähnliches Emote kopieren). Aufbau:
+
+   ```json
+   {
+     "id": "salute",
+     "names": { "en_us": "Salute", "de_de": "Salutieren" },
+     "duration": 2.2,
+     "tracks": {
+       "right_arm": { "keys": [{ "t": 0, "rot": [-135, 0, 30] }] }
+     }
+   }
+   ```
+
+   - `id`: a–z, 0–9, `_`, höchstens 24 Zeichen. `names`: Anzeigename je Sprache, `en_us` ist Pflicht.
+   - `duration` in Sekunden (0.2–15) oder `"loop": true` – dann läuft das Emote, bis sich der Spieler bewegt (höchstens 15 s).
+   - `tracks`: je Körperteil (`head`, `right_arm`, `left_arm`, `right_leg`, `left_leg`) Schlüsselbilder mit Zeit `t` (Sekunden, aufsteigend) und Drehung `rot` = `[x, y, z]` in Grad. Dazwischen wird weich überblendet (`"ease": "linear"` für gleichmäßig).
+   - `cycle`: Die Schlüsselbilder wiederholen sich in diesem Takt (für Winken, Tanzen …). Ohne `cycle` laufen sie einmal und halten das letzte.
+   - `base`: `none` (Winkel gelten direkt, Standard), `current` (zur normalen Haltung addiert – beim Kopf bleibt so die Blickrichtung) oder `head` (zur Blickrichtung addiert, z. B. der zeigende Arm).
+   - `icon`: Zeitpunkt, dessen Haltung das Symbol im Menü zeigt. Das Symbol zeichnet das Spiel selbst, ein Bild ist nicht nötig.
+   - Richtungen: x negativ = Arm nach vorn/oben, z positiv hebt den hängenden rechten Arm seitlich (links: negativ), y dreht den nach vorn gestreckten Arm zur Seite.
+2. Datei auf den Server neben `server.mjs` legen. Der Server lädt sie von selbst (Log: `Emote-Katalog geladen: 15 Emotes`); fehlerhafte Einträge nennt er im Log und lässt sie weg, eine kaputte Datei ändert nichts.
+3. Fertig – höchstens 64 Emotes. Mit dem nächsten Launcher-Release steckt die Liste zusätzlich als Notfall-Kopie in der Mod (für Starts ohne Verbindung zum Server); nötig ist das Release dafür nicht.
+
+Entfernen geht genauso: Eintrag löschen, Datei hochladen.
 
 ## Cape-Regeln
 
@@ -151,6 +179,8 @@ Verstößt ein freigegebenes Cape doch dagegen und jemand meldet es: schnell pr�
 | `REPORTS_TO_HIDE` | `3` | Ab so vielen Meldungen verschiedener Spieler ist ein Cape sofort versteckt |
 | `REPORTS_PER_DAY` | `20` | Meldungen pro Spieler und Tag |
 | `EMOTES_PER_MINUTE` | `20` | Emotes pro Spieler und Minute |
+| `EMOTES_FILE` | `emotes.json` neben `server.mjs` | Emote-Katalog |
+| `EMOTE_RELOAD_MS` | `30000` | So oft (ms) wird nachgesehen, ob sich der Katalog geändert hat |
 | `FRIENDS_RATE_PER_MINUTE` | `240` | Freunde- und Chat-Anfragen pro IP und Minute (die Anmeldung zählt zu `RATE_PER_MINUTE`) |
 | `FRIENDS_OFFLINE_GRACE_MS` | `10000` | So lange (ms) nach der letzten Live-Verbindung gilt ein Spieler noch als online |
 
@@ -173,7 +203,8 @@ Startet den Server mit einem nachgebauten Mojang-Dienst und prüft Anmeldung, Wa
 | `GET /v1/capes/gallery` | `{"capes":[{"id","approvedAt","wearers"}]}` – alle freigegebenen eigenen Capes (höchstens 500, neueste zuerst), für die Galerie im Launcher |
 | `GET /v1/capes/events` | Server-Sent Events: `data: {"uuid":"…","cape":{…}\|null}` bei jeder sichtbaren Änderung, `data: {"emote":{"uuid":"…","id":"wave"}}` bei jedem Emote (ohne `uuid` oben, damit ältere Spiele die Zeile überspringen), `: ping` alle 20 s |
 | `POST /v1/emotes/session` mit `{"name","serverId"}` | `{"token","uuid","name"}` – Anmeldung wie bei `PUT /v1/capes/me`, Token 12 h gültig, nur im Speicher |
-| `POST /v1/emotes` mit `{"emote":"wave"}` und `Authorization: Bearer <token>` | `{"ok":true}` – Emotes: `wave`, `cheer`, `clap`, `dance`, `facepalm`, `point`, `shrug`, `tpose`; unbekannte → 400, ohne gültiges Token → 401, mehr als 20 pro Minute → 429 |
+| `POST /v1/emotes` mit `{"emote":"wave"}` und `Authorization: Bearer <token>` | `{"ok":true}` – erlaubt sind die Emotes aus dem Katalog; unbekannte → 400, ohne gültiges Token → 401, mehr als 20 pro Minute → 429 |
+| `GET /v1/emotes/catalog` | `{"version":"<16 Hex-Zeichen>","emotes":[…]}` – alle Emotes aus `emotes.json`, geprüft und bereinigt. Bei einer Änderung kommt auf `/v1/capes/events` zusätzlich `data: {"catalog":"<version>"}` |
 | `POST /v1/capes/status` mit `{"ids":[…]}` (max. 100) | `{"status":{"<capeId>":{"status":"pending",…}}}` – für den Launcher |
 | `POST /v1/capes/submit` mit `{"name","serverId","png"}` | `{"status":"approved"\|"pending"\|"rejected","id","reason"?}` – Launcher reicht ein eigenes Cape zur Prüfung ein, das getragene Cape bleibt |
 | `POST /v1/capes/report` mit `{"name","serverId","id","reason","note"?}` | `{"status":"reported"\|"already_reported"}` – freigegebenes Cape melden; `reason`: `logo`, `hate`, `sexual`, `person` oder `other`, `note` höchstens 200 Zeichen |

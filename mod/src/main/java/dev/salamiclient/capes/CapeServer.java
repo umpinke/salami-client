@@ -241,6 +241,11 @@ final class CapeServer {
 		});
 	}
 
+	/** Alle Emotes als Daten ({@code v1/emotes/catalog}) – so kommen neue Emotes ohne Update an. */
+	CompletableFuture<JsonObject> emoteCatalog() {
+		return send(HttpRequest.newBuilder(base.resolve("v1/emotes/catalog")).timeout(TIMEOUT).GET().build());
+	}
+
 	/** Spielt ein Emote für alle Mitspieler ab ({@code v1/emotes}); 401 = Token abgelaufen. */
 	CompletableFuture<Void> emote(String token, String id) {
 		JsonObject body = new JsonObject();
@@ -253,11 +258,12 @@ final class CapeServer {
 	 * Öffnet die Live-Verbindung: jede Cape-Änderung eines Salami-Spielers kommt sofort als
 	 * (Spieler, sichtbares Cape oder {@code null}) an {@code onEvent}. {@code onOpen} meldet die
 	 * Verbindung, {@code onEnd} ihr Ende ({@code null} = mit {@link EventStream#close()} beendet).
-	 * Emotes anderer Spieler kommen auf derselben Verbindung an {@code onEmote} (Spieler, Emote-Name).
+	 * Emotes anderer Spieler kommen auf derselben Verbindung an {@code onEmote} (Spieler, Emote-Name);
+	 * {@code onCatalog} meldet, dass sich der Emote-Katalog auf dem Server geändert hat.
 	 * Alle Rückrufe kommen aus einem Hintergrund-Thread.
 	 */
 	void events(EventStream stream, BiConsumer<UUID, @Nullable Remote> onEvent, BiConsumer<UUID, String> onEmote,
-			Runnable onOpen, Consumer<@Nullable Throwable> onEnd) {
+			Runnable onCatalog, Runnable onOpen, Consumer<@Nullable Throwable> onEnd) {
 		// Ohne Timeout: die Verbindung bleibt offen; tote Verbindungen erkennt SharedCapes am fehlenden Lebenszeichen
 		HttpRequest request = HttpRequest.newBuilder(base.resolve("v1/capes/events"))
 			.header("Accept", "text/event-stream")
@@ -268,12 +274,12 @@ final class CapeServer {
 				onEnd.accept(stream.closed ? null : error);
 				return;
 			}
-			executor.execute(() -> read(stream, response, onEvent, onEmote, onOpen, onEnd));
+			executor.execute(() -> read(stream, response, onEvent, onEmote, onCatalog, onOpen, onEnd));
 		});
 	}
 
 	private static void read(EventStream stream, HttpResponse<InputStream> response, BiConsumer<UUID, @Nullable Remote> onEvent,
-			BiConsumer<UUID, String> onEmote, Runnable onOpen, Consumer<@Nullable Throwable> onEnd) {
+			BiConsumer<UUID, String> onEmote, Runnable onCatalog, Runnable onOpen, Consumer<@Nullable Throwable> onEnd) {
 		Throwable failure = null;
 		try (InputStream in = response.body()) {
 			stream.body = in;
@@ -288,7 +294,7 @@ final class CapeServer {
 			for (String line; (line = reader.readLine()) != null; ) {
 				stream.lastSeen = System.currentTimeMillis();
 				if (line.startsWith("data:")) {
-					event(line.substring("data:".length()).trim(), onEvent, onEmote);
+					event(line.substring("data:".length()).trim(), onEvent, onEmote, onCatalog);
 				}
 			}
 		} catch (Exception e) {
@@ -298,9 +304,15 @@ final class CapeServer {
 		}
 	}
 
-	private static void event(String data, BiConsumer<UUID, @Nullable Remote> onEvent, BiConsumer<UUID, String> onEmote) {
+	private static void event(String data, BiConsumer<UUID, @Nullable Remote> onEvent, BiConsumer<UUID, String> onEmote,
+			Runnable onCatalog) {
 		try {
 			JsonObject json = JsonParser.parseString(data).getAsJsonObject();
+			// Emote-Katalog geändert: {"catalog":"<version>"}
+			if (json.has("catalog")) {
+				onCatalog.run();
+				return;
+			}
 			// Emote: {"emote":{"uuid","id"}} – bewusst ohne "uuid" oben, ältere Spiele überspringen die Zeile
 			JsonElement emote = json.get("emote");
 			if (emote != null && emote.isJsonObject()) {

@@ -1,8 +1,11 @@
 package dev.salamiclient.gametest;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.mojang.authlib.GameProfile;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.emotes.Emote;
+import dev.salamiclient.emotes.EmoteCatalog;
 import dev.salamiclient.emotes.Emotes;
 import dev.salamiclient.gui.CosmeticsScreen;
 import dev.salamiclient.gui.EmoteWheelScreen;
@@ -17,12 +20,14 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.RemotePlayer;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.UUID;
 
 /**
  * Cosmetics und Emotes: jeder Hut auf dem Kopf (Screenshot von vorn), Cosmetics-Menü mit Hüten und
- * Emotes, Emote-Rad, eigene Emotes (Haltung wird gezeichnet, Bewegen beendet sie, Kamera kommt zurück)
- * und das Emote eines anderen Spielers, wie es vom Cape-Server käme.
+ * Emotes, Emote-Rad mit Seiten, alle Emotes aus dem Katalog (Haltung wird gezeichnet, Bewegen
+ * beendet sie, Kamera kommt zurück), ein Katalog vom Server mit einem neuen Emote (kein Update
+ * nötig) und das Emote eines anderen Spielers, wie es vom Cape-Server käme.
  */
 public final class SalamiCosmeticsGameTest implements FabricClientGameTest {
 	@Override
@@ -39,6 +44,7 @@ public final class SalamiCosmeticsGameTest implements FabricClientGameTest {
 			testHats(context, world, modules);
 			testMenu(context);
 			testOwnEmotes(context, modules);
+			testServerCatalog(context);
 			testRemoteEmote(context, modules);
 		}
 	}
@@ -75,6 +81,10 @@ public final class SalamiCosmeticsGameTest implements FabricClientGameTest {
 	}
 
 	private static void testMenu(ClientGameTestContext context) {
+		// ohne Server gilt die Kopie des Katalogs aus der Jar (beim Bauen aus server/capes/emotes.json genommen)
+		List<Emote> builtin = context.computeOnClient(c -> EmoteCatalog.all());
+		check(builtin.size() >= 8 && EmoteCatalog.get("wave") != null && EmoteCatalog.get("tpose") != null,
+			"Emotes: bundled catalog missing or incomplete (" + builtin.size() + ")");
 		context.setScreen(() -> new CosmeticsScreen(null, CosmeticsScreen.Tab.HATS));
 		context.waitTicks(2);
 		context.takeScreenshot("salami-82-cosmetics-hats");
@@ -84,23 +94,30 @@ public final class SalamiCosmeticsGameTest implements FabricClientGameTest {
 		context.setScreen(() -> new EmoteWheelScreen(SalamiClient.get().emoteKey()));
 		context.waitTicks(2);
 		context.takeScreenshot("salami-84-emote-wheel");
+		if (builtin.size() > 8) {
+			// Mausrad blättert zur zweiten Seite
+			context.getInput().scroll(-1);
+			context.waitTicks(2);
+			context.takeScreenshot("salami-84b-emote-wheel-page-2");
+			context.getInput().scroll(1);
+		}
 		context.setScreen(() -> null);
 	}
 
 	private static void testOwnEmotes(ClientGameTestContext context, ModuleManager modules) {
 		EmotesModule module = modules.get(EmotesModule.class);
 		context.runOnClient(c -> modules.setEnabled(module, true));
-		for (Emote emote : Emote.values()) {
+		for (Emote emote : context.computeOnClient(c -> EmoteCatalog.all())) {
 			long before = Emotes.posedCount();
 			context.runOnClient(c -> Emotes.play(emote));
 			check(context.computeOnClient(c -> c.options.getCameraType()) == CameraType.THIRD_PERSON_FRONT,
-				"Emotes: camera did not turn to the front for " + emote);
+				"Emotes: camera did not turn to the front for " + emote.id());
 			context.waitTicks(12);
-			check(Emotes.posedCount() > before, "Emotes: " + emote + " pose was never drawn");
+			check(Emotes.posedCount() > before, "Emotes: " + emote.id() + " pose was never drawn");
 			context.takeScreenshot("salami-85-emote-" + emote.id());
 		}
 		// Bewegen beendet das Emote, die Kamera kommt zurück
-		context.runOnClient(c -> Emotes.play(Emote.DANCE));
+		context.runOnClient(c -> Emotes.play(EmoteCatalog.get("dance")));
 		context.waitTicks(2);
 		context.getInput().holdKey(options -> options.keyUp);
 		context.waitTicks(3);
@@ -108,6 +125,59 @@ public final class SalamiCosmeticsGameTest implements FabricClientGameTest {
 		check(context.computeOnClient(c -> Emotes.current()) == null, "Emotes: moving did not stop the emote");
 		context.waitTicks(10);
 		check(context.computeOnClient(c -> c.options.getCameraType()) == CameraType.FIRST_PERSON, "Emotes: camera did not come back");
+	}
+
+	/**
+	 * Katalog, wie ihn der Salami-Server liefert: ein Emote, das die Mod nicht kennt, kommt ohne Update
+	 * dazu. Kaputte Einträge fallen weg, ein leerer Katalog ändert nichts.
+	 */
+	private static void testServerCatalog(ClientGameTestContext context) {
+		int bundled = context.computeOnClient(c -> EmoteCatalog.all().size());
+		JsonObject fromServer = JsonParser.parseString("""
+			{"version":"test1","emotes":[
+			  {"id":"wave","names":{"en_us":"Wave","de_de":"Winken"},"duration":2.4,
+			   "tracks":{"right_arm":{"cycle":0.57,"keys":[{"t":0,"rot":[0,0,129]},{"t":0.285,"rot":[0,0,169]}]}}},
+			  {"id":"superhero","names":{"en_us":"Superhero","de_de":"Superheld"},"loop":true,
+			   "tracks":{"right_arm":{"keys":[{"t":0,"rot":[-170,0,-8]}]},
+			             "left_arm":{"keys":[{"t":0,"rot":[0,0,-35]}]},
+			             "head":{"base":"current","keys":[{"t":0,"rot":[-15,0,0]}]}}},
+			  {"id":"Kaputt!","names":{"en_us":"x"},"duration":1,"tracks":{"head":{"keys":[{"t":0,"rot":[0,0,0]}]}}},
+			  {"id":"zu_lang","names":{"en_us":"x"},"duration":99,"tracks":{"head":{"keys":[{"t":0,"rot":[0,0,0]}]}}},
+			  {"id":"ohne_namen","duration":1,"tracks":{"head":{"keys":[{"t":0,"rot":[0,0,0]}]}}},
+			  {"id":"falsches_teil","names":{"en_us":"x"},"duration":1,"tracks":{"tail":{"keys":[{"t":0,"rot":[0,0,0]}]}}},
+			  {"id":"wave","names":{"en_us":"Twice"},"duration":1,"tracks":{"head":{"keys":[{"t":0,"rot":[0,0,0]}]}}}
+			]}""").getAsJsonObject();
+		int revision = EmoteCatalog.revision();
+		check(context.computeOnClient(c -> EmoteCatalog.applyRemote(fromServer)), "Emotes: server catalog rejected");
+		List<Emote> now = context.computeOnClient(c -> EmoteCatalog.all());
+		check(now.size() == 2 && now.get(1).id().equals("superhero"), "Emotes: server catalog not applied: " + now.size());
+		check(EmoteCatalog.revision() != revision, "Emotes: catalog change not announced to the menus");
+		Emote hero = EmoteCatalog.get("superhero");
+		check(hero != null && hero.loops() && hero.durationMs() == Emote.MAX_LOOP_MS, "Emotes: new emote read wrong");
+
+		// das neue Emote spielt wie jedes andere, im Menü steht es mit gezeichnetem Symbol
+		long before = Emotes.posedCount();
+		context.runOnClient(c -> Emotes.play(hero));
+		context.waitTicks(12);
+		check(Emotes.posedCount() > before, "Emotes: emote from the server was never drawn");
+		context.takeScreenshot("salami-87-emote-from-server");
+		context.runOnClient(c -> Emotes.clear());
+		context.setScreen(() -> new CosmeticsScreen(null, CosmeticsScreen.Tab.EMOTES));
+		context.waitTicks(2);
+		context.takeScreenshot("salami-87b-cosmetics-server-catalog");
+		context.setScreen(() -> null);
+
+		// gleicher Stand noch einmal: nichts wird neu aufgebaut; leerer Katalog: der alte bleibt
+		int unchanged = EmoteCatalog.revision();
+		context.runOnClient(c -> EmoteCatalog.applyRemote(fromServer));
+		check(EmoteCatalog.revision() == unchanged, "Emotes: unchanged catalog rebuilt the menus");
+		JsonObject empty = JsonParser.parseString("{\"version\":\"leer\",\"emotes\":[]}").getAsJsonObject();
+		check(!context.computeOnClient(c -> EmoteCatalog.applyRemote(empty)), "Emotes: empty catalog accepted");
+		check(EmoteCatalog.get("superhero") != null, "Emotes: empty catalog wiped the emotes");
+
+		context.runOnClient(c -> EmoteCatalog.clearRemote());
+		check(context.computeOnClient(c -> EmoteCatalog.all().size()) == bundled && EmoteCatalog.get("superhero") == null,
+			"Emotes: bundled catalog not restored");
 	}
 
 	/** Emote eines anderen Spielers, wie es über die Live-Verbindung des Cape-Servers ankäme. */
@@ -119,12 +189,12 @@ public final class SalamiCosmeticsGameTest implements FabricClientGameTest {
 			hats.choose(HatsModule.Hat.PARTY);
 			c.options.setCameraType(CameraType.THIRD_PERSON_BACK);
 			Emotes.onRemote(uuid, "dance");
-			Emotes.play(Emote.CHEER);
+			Emotes.play(EmoteCatalog.get("cheer"));
 		});
 		check(Emotes.playingFor(uuid), "Emotes: remote emote not started");
 		context.waitTicks(15);
 		context.takeScreenshot("salami-86-emote-remote");
-		context.runOnClient(c -> Emotes.onRemote(uuid, "moonwalk")); // unbekannt: ignorieren, laufendes bleibt
+		context.runOnClient(c -> Emotes.onRemote(uuid, "gibt_es_nicht")); // unbekannt: ignorieren, laufendes bleibt
 		check(Emotes.playingFor(uuid), "Emotes: unknown emote stopped the running one");
 		// bewegt sich der andere Spieler, endet sein Emote
 		context.runOnClient(c -> other.snapTo(5.5, -60, 4.5, 180F, 0F));

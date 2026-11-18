@@ -3,6 +3,8 @@ package dev.salamiclient.gui;
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.emotes.Emote;
+import dev.salamiclient.emotes.EmoteCatalog;
+import dev.salamiclient.emotes.EmoteIcons;
 import dev.salamiclient.emotes.Emotes;
 import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.theme.Theme;
@@ -14,19 +16,27 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
 
 /**
  * Emote-Rad: Taste halten, Maus in die Richtung des Emotes bewegen, loslassen – oder klicken bzw.
- * 1–8 drücken. Kurz antippen lässt das Rad offen, dann wählt ein Klick.
+ * 1–8 drücken. Kurz antippen lässt das Rad offen, dann wählt ein Klick. Gibt es mehr als acht
+ * Emotes, blättert das Mausrad (oder Tab) zur nächsten Seite.
  */
 public final class EmoteWheelScreen extends Screen {
-	private static final Emote[] EMOTES = Emote.values();
+	private static final int SLOTS = 8;
 	private static final int CHIP_H = 22;
 	private static final int ICON = 16;
+	/** So weit ragt ein seitliches Feld von seinem Platz auf dem Kreis zur Mitte hin. */
+	private static final int ANCHOR = 36;
+
+	/** Zuletzt gezeigte Seite – das Rad öffnet dort wieder. */
+	private static int lastPage;
 
 	private final @Nullable KeyMapping key;
+	private int page = lastPage;
 	private int hovered = -1;
 
 	public EmoteWheelScreen(@Nullable KeyMapping key) {
@@ -34,35 +44,65 @@ public final class EmoteWheelScreen extends Screen {
 		this.key = key;
 	}
 
-	public static Identifier icon(Emote emote) {
-		return Identifier.fromNamespaceAndPath(SalamiClient.MOD_ID, "textures/emotes/" + emote.id() + ".png");
-	}
-
 	@Override
 	public boolean isPauseScreen() {
 		return false;
+	}
+
+	private static int pages() {
+		return Math.max(1, (EmoteCatalog.all().size() + SLOTS - 1) / SLOTS);
+	}
+
+	/** Emote im Feld {@code slot} der aktuellen Seite oder {@code null} (leeres Feld auf der letzten Seite). */
+	private @Nullable Emote emoteAt(int slot) {
+		List<Emote> all = EmoteCatalog.all();
+		int index = page * SLOTS + slot;
+		return slot >= 0 && index < all.size() ? all.get(index) : null;
+	}
+
+	private void turnPage(int direction) {
+		page = Math.floorMod(page + direction, pages());
+		lastPage = page;
 	}
 
 	private int radius() {
 		return Math.max(50, Math.min(92, Math.min(width, height) / 2 - 30));
 	}
 
-	/** Mitte des Felds Nr. {@code i}: im Uhrzeigersinn, oben beginnend. */
-	private int[] chipCenter(int i) {
-		double angle = -Math.PI / 2 + i * (2 * Math.PI / EMOTES.length);
+	/**
+	 * Linke obere Ecke des Felds Nr. {@code i} (im Uhrzeigersinn, oben beginnend) bei Feldbreite
+	 * {@code w}. Felder rechts der Mitte wachsen mit langen Namen nach rechts, linke nach links –
+	 * so bleibt die Mitte frei und nichts überlappt.
+	 */
+	private int[] chipPos(int i, int w) {
+		double angle = -Math.PI / 2 + i * (2 * Math.PI / SLOTS);
+		double cos = Math.cos(angle);
 		int r = radius();
-		return new int[] {width / 2 + (int) Math.round(Math.cos(angle) * r), height / 2 + (int) Math.round(Math.sin(angle) * r * 0.8)};
+		int cx = width / 2 + (int) Math.round(cos * r);
+		int cy = height / 2 + (int) Math.round(Math.sin(angle) * r * 0.8);
+		int x;
+		if (Math.abs(cos) < 0.1) {
+			x = cx - w / 2;
+		} else if (cos > 0) {
+			x = cx - ANCHOR;
+		} else {
+			x = cx + ANCHOR - w;
+		}
+		return new int[] {Math.max(2, Math.min(width - w - 2, x)), cy - CHIP_H / 2};
 	}
 
 	private int chipWidth() {
 		int widest = 0;
-		for (Emote emote : EMOTES) {
-			widest = Math.max(widest, font.width(I18n.get(emote.translationKey())));
+		for (int slot = 0; slot < SLOTS; slot++) {
+			Emote emote = emoteAt(slot);
+			if (emote != null) {
+				widest = Math.max(widest, font.width(emote.displayName()));
+			}
 		}
-		return widest + ICON + 14;
+		return widest + ICON + 24;
 	}
 
-	/** Feld unter der Maus: nach Richtung von der Mitte aus, mit totem Bereich in der Mitte. */
+	/** Feld unter der Maus: nach Richtung von der Mitte aus, mit totem Bereich in der Mitte; -1 = keins. */
 	private int sectorAt(double mx, double my) {
 		double dx = mx - width / 2.0;
 		double dy = (my - height / 2.0) / 0.8;
@@ -70,8 +110,9 @@ public final class EmoteWheelScreen extends Screen {
 			return -1;
 		}
 		double angle = Math.atan2(dy, dx) + Math.PI / 2;
-		double step = 2 * Math.PI / EMOTES.length;
-		return Math.floorMod((int) Math.round(angle / step), EMOTES.length);
+		double step = 2 * Math.PI / SLOTS;
+		int sector = Math.floorMod((int) Math.round(angle / step), SLOTS);
+		return emoteAt(sector) == null ? -1 : sector;
 	}
 
 	@Override
@@ -91,33 +132,52 @@ public final class EmoteWheelScreen extends Screen {
 		super.render(g, mouseX, mouseY, partialTick);
 	//?}
 		Theme theme = SalamiClient.get().theme();
+		if (page >= pages()) {
+			page = 0; // der Katalog ist kleiner geworden
+		}
 		hovered = sectorAt(mouseX, mouseY);
 		int w = chipWidth();
-		for (int i = 0; i < EMOTES.length; i++) {
-			int[] c = chipCenter(i);
-			int x = c[0] - w / 2;
-			int y = c[1] - CHIP_H / 2;
+		for (int i = 0; i < SLOTS; i++) {
+			Emote emote = emoteAt(i);
+			if (emote == null) {
+				continue;
+			}
+			int[] pos = chipPos(i, w);
+			int x = pos[0];
+			int y = pos[1];
 			boolean on = i == hovered;
 			GuiDraw.rounded(g, x, y, w, CHIP_H, 6, on ? theme.accent() : 0xE0121216);
 			GuiDraw.roundedOutline(g, x, y, w, CHIP_H, 6, on ? 0x40FFFFFF : 0x26FFFFFF);
-			g.blit(RenderPipelines.GUI_TEXTURED, icon(EMOTES[i]), x + 5, y + 3, 0f, 0f, ICON, ICON, 32, 32, 32, 32);
 			int text = on ? GuiDraw.textOn(theme.accent()) : 0xFFE6E6EC;
-			GuiDraw.text(g, font, I18n.get(EMOTES[i].translationKey()), x + ICON + 9, y + 7, text, false);
+			g.blit(RenderPipelines.GUI_TEXTURED, EmoteIcons.texture(emote), x + 5, y + 3, 0f, 0f, ICON, ICON,
+				EmoteIcons.SIZE, EmoteIcons.SIZE, EmoteIcons.SIZE, EmoteIcons.SIZE, text);
+			GuiDraw.text(g, font, emote.displayName(), x + ICON + 9, y + 7, text, false);
 			GuiDraw.text(g, font, String.valueOf(i + 1), x + w - 9, y + 2, GuiDraw.fade(text, 0.5F), false);
 		}
-		// Mitte: gewähltes Emote oder Hinweis
-		String middle = hovered >= 0 ? I18n.get(EMOTES[hovered].translationKey()) : I18n.get("salami.emotes.wheel");
+		// Mitte: gewähltes Emote oder Hinweis, darunter die Seite
+		Emote chosen = emoteAt(hovered);
+		String middle = chosen != null ? chosen.displayName() : I18n.get("salami.emotes.wheel");
 		int mw = font.width(middle) + 16;
 		GuiDraw.rounded(g, (width - mw) / 2, height / 2 - 9, mw, 18, 6, 0xE8121216);
-		GuiDraw.centeredText(g, font, middle, width / 2, height / 2 - 4, hovered >= 0 ? theme.accent() : 0xFFB8B8C0);
-		String hint = I18n.get("salami.emotes.wheel.hint");
+		GuiDraw.centeredText(g, font, middle, width / 2, height / 2 - 4, chosen != null ? theme.accent() : 0xFFB8B8C0);
+		int pages = pages();
+		if (pages > 1) {
+			// ein Punkt pro Seite
+			int dotsWidth = pages * 7 - 3;
+			int dx = (width - dotsWidth) / 2;
+			for (int i = 0; i < pages; i++) {
+				GuiDraw.rounded(g, dx + i * 7, height / 2 + 13, 4, 4, 2, i == page ? theme.accent() : 0x60FFFFFF);
+			}
+		}
+		String hint = I18n.get(pages > 1 ? "salami.emotes.wheel.hint_pages" : "salami.emotes.wheel.hint");
 		GuiDraw.centeredText(g, font, hint, width / 2, height - 14, 0xFF9A9AA4);
 	}
 
-	private void play(int index) {
+	private void play(int slot) {
+		Emote emote = emoteAt(slot);
 		onClose();
-		if (index >= 0 && index < EMOTES.length) {
-			Emotes.play(EMOTES[index]);
+		if (emote != null) {
+			Emotes.play(emote);
 		}
 	}
 
@@ -138,10 +198,25 @@ public final class EmoteWheelScreen extends Screen {
 	}
 
 	@Override
+	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+		if (scrollY != 0 && pages() > 1) {
+			turnPage(scrollY < 0 ? 1 : -1);
+			return true;
+		}
+		return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+	}
+
+	@Override
 	public boolean keyPressed(KeyEvent event) {
 		int k = event.key();
-		if (k >= InputConstants.KEY_1 && k < InputConstants.KEY_1 + EMOTES.length) {
-			play(k - InputConstants.KEY_1);
+		if (k >= InputConstants.KEY_1 && k < InputConstants.KEY_1 + SLOTS) {
+			if (emoteAt(k - InputConstants.KEY_1) != null) {
+				play(k - InputConstants.KEY_1);
+			}
+			return true;
+		}
+		if (k == InputConstants.KEY_TAB && pages() > 1) {
+			turnPage(1);
 			return true;
 		}
 		return super.keyPressed(event);

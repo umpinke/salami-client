@@ -2,7 +2,7 @@
 // Startet server.mjs mit einem Schein-Mojang (hasJoined) und einem leeren Datenordner.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { copyFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -37,6 +37,9 @@ const mojang = createServer((req, res) => {
 let base;
 let child;
 const dataDir = mkdtempSync(join(tmpdir(), "salami-capes-test-"));
+/** Kopie des Emote-Katalogs, damit die Tests ihn ändern können, ohne die echte Datei anzufassen. */
+const emotesFile = join(dataDir, "emotes-test.json");
+copyFileSync(fileURLToPath(new URL("./emotes.json", import.meta.url)), emotesFile);
 
 function listen(server) {
   return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve(server.address().port)));
@@ -61,6 +64,8 @@ async function startServer(port, mojangPort) {
       RATE_PER_MINUTE: "1000",
       UPLOADS_PER_DAY: "3",
       REPORTS_TO_HIDE: "2",
+      EMOTES_FILE: emotesFile,
+      EMOTE_RELOAD_MS: "100",
     },
     stdio: ["ignore", "pipe", "inherit"],
   });
@@ -573,7 +578,7 @@ test("Emotes: nur angemeldet, nur bekannte, live an alle – ohne uuid oben", as
     // ältere Spiele lesen {uuid, cape}; das Emote steckt deshalb in einem eigenen Objekt
     assert.deepEqual(await live.next((e) => e.emote), { emote: { uuid, id: "wave" } });
 
-    assert.equal((await call("POST", "/v1/emotes", { emote: "moonwalk" }, auth)).status, 400);
+    assert.equal((await call("POST", "/v1/emotes", { emote: "gibt_es_nicht" }, auth)).status, 400);
     assert.equal((await call("POST", "/v1/emotes", {}, auth)).status, 400);
 
     // nichts davon wird beim Spieler gespeichert
@@ -591,6 +596,67 @@ test("Emotes: höchstens 20 pro Minute und Spieler", async () => {
   for (let i = 0; i < 22; i++) statuses.push((await call("POST", "/v1/emotes", { emote: "clap" }, auth)).status);
   assert.deepEqual(statuses.slice(0, 20), Array(20).fill(200));
   assert.equal(statuses[21], 429);
+});
+
+test("Emote-Katalog: wird ausgeliefert, neue Emotes kommen ohne Neustart und werden live gemeldet", async () => {
+  const catalog = async () => (await call("GET", "/v1/emotes/catalog")).body;
+  const before = await catalog();
+  const ids = before.emotes.map((e) => e.id);
+  for (const id of ["wave", "cheer", "clap", "dance", "facepalm", "point", "shrug", "tpose", "salute"]) {
+    assert.ok(ids.includes(id), `${id} fehlt im Katalog`);
+  }
+  assert.match(before.version, /^[0-9a-f]{16}$/);
+  const wave = before.emotes.find((e) => e.id === "wave");
+  assert.equal(wave.names.de_de, "Winken");
+  assert.deepEqual(wave.tracks.right_arm.keys[0], { t: 0, rot: [0, 0, 129] });
+
+  const session = await emoteSession("Brotzeit");
+  const auth = { Authorization: `Bearer ${session.body.token}` };
+  assert.equal((await call("POST", "/v1/emotes", { emote: "moonwalk" }, auth)).status, 400);
+
+  const live = await openEvents();
+  try {
+    // neues Emote in die Datei: ein gültiges, ein kaputtes (fällt weg, die anderen bleiben), eine doppelte id
+    const file = JSON.parse(readFileSync(emotesFile, "utf8"));
+    file.emotes.push(
+      {
+        id: "moonwalk",
+        names: { en_us: "Moonwalk", de_de: "Moonwalk" },
+        loop: true,
+        hidden_field: "fällt weg",
+        tracks: { right_leg: { cycle: 0.8, keys: [{ t: 0, rot: [-20, 0, 0] }, { t: 0.4, rot: [20, 0, 0] }] } },
+      },
+      { id: "Kaputt!", names: { en_us: "x" }, duration: 1, tracks: { head: { keys: [{ t: 0, rot: [0, 0, 0] }] } } },
+      { id: "spin", names: { en_us: "Spin" }, duration: 99, tracks: { head: { keys: [{ t: 0, rot: [0, 0, 0] }] } } },
+      { id: "wave", names: { en_us: "Wave again" }, duration: 1, tracks: { head: { keys: [{ t: 0, rot: [0, 0, 0] }] } } },
+    );
+    writeFileSync(emotesFile, JSON.stringify(file));
+
+    const changed = await live.next((e) => e.catalog);
+    const after = await catalog();
+    assert.equal(changed.catalog, after.version);
+    assert.notEqual(after.version, before.version);
+    assert.equal(after.emotes.length, before.emotes.length + 1);
+    const moonwalk = after.emotes.find((e) => e.id === "moonwalk");
+    assert.deepEqual(moonwalk, {
+      id: "moonwalk",
+      names: { en_us: "Moonwalk", de_de: "Moonwalk" },
+      loop: true,
+      tracks: { right_leg: { cycle: 0.8, keys: [{ t: 0, rot: [-20, 0, 0] }, { t: 0.4, rot: [20, 0, 0] }] } },
+    });
+    assert.equal(after.emotes.find((e) => e.id === "wave").names.de_de, "Winken");
+
+    // das neue Emote lässt sich sofort abspielen
+    assert.equal((await call("POST", "/v1/emotes", { emote: "moonwalk" }, auth)).status, 200);
+    assert.deepEqual(await live.next((e) => e.emote), { emote: { uuid: uuidOf("Brotzeit"), id: "moonwalk" } });
+
+    // kaputte Datei: der bisherige Katalog bleibt
+    writeFileSync(emotesFile, "{ das ist kein JSON");
+    await new Promise((r) => setTimeout(r, 400));
+    assert.equal((await catalog()).version, after.version);
+  } finally {
+    live.close();
+  }
 });
 
 test("Mini Me: Name und Platz werden mit dem Cape geteilt, Ungültiges ignoriert", async () => {

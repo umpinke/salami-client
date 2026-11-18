@@ -34,7 +34,11 @@
  *        Anmeldung wie bei PUT /v1/capes/me; das Token gilt 12 h und liegt nur im Speicher
  *        (nach einem Neustart meldet sich das Spiel einfach neu an).
  *   POST /v1/emotes {"emote":"wave"}                 → {"ok":true}  (Authorization: Bearer <token>)
- *        spielt ein Emote (siehe EMOTES) für alle Mitspieler ab; nichts davon wird gespeichert.
+ *        spielt ein Emote aus dem Katalog für alle Mitspieler ab; nichts davon wird gespeichert.
+ *   GET  /v1/emotes/catalog                          → {"version":"…","emotes":[…]}
+ *        alle Emotes als Daten (emotes.json, Format in emotes.mjs). Das Spiel lädt sie beim Start.
+ *        Ändert sich die Datei, lädt der Server sie von selbst neu und meldet es auf
+ *        /v1/capes/events als data: {"catalog":"<version>"} – neue Emotes brauchen kein Update.
  * Launcher:
  *   POST /v1/capes/status {"ids":[…]}               → {"status":{"<capeId>":{"status":"pending"|…,"reason"?}}}
  *   POST /v1/capes/submit {"name","serverId","png"} → {"status":"approved"|"pending"|"rejected","id","reason"?}
@@ -72,9 +76,11 @@
  * Node 18+, keine Abhängigkeiten. Einstellungen per Umgebungsvariable (siehe README.md).
  */
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync, existsSync } from "node:fs";
 import { createServer } from "node:http";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { parseCatalog } from "./emotes.mjs";
 import { createFriends } from "./friends.mjs";
 import { capeId, decodeCape, encodeRgba, PngError } from "./png.mjs";
 
@@ -114,8 +120,10 @@ const REPORTS_PER_DAY = env("REPORTS_PER_DAY", 20);
 
 /** Hüte von salami-core (dort `HatsModule.Hat`); neue Namen hier nachtragen. */
 const HATS = new Set(["santa", "crown", "top_hat", "chef", "halo", "horns", "cat_ears", "party", "beret"]);
-/** Emotes von salami-core (dort `Emote`); neue Namen hier nachtragen. */
-const EMOTES = new Set(["wave", "cheer", "clap", "dance", "facepalm", "point", "shrug", "tpose"]);
+/** Emote-Katalog (Format: emotes.mjs). Neue Emotes dort eintragen – der Server lädt die Datei von selbst neu. */
+const EMOTES_FILE = process.env.EMOTES_FILE || fileURLToPath(new URL("./emotes.json", import.meta.url));
+/** So oft wird nachgesehen, ob sich die Datei geändert hat. */
+const EMOTE_RELOAD_MS = env("EMOTE_RELOAD_MS", 30_000);
 /** Emotes pro Spieler und Minute. */
 const EMOTES_PER_MINUTE = env("EMOTES_PER_MINUTE", 20);
 /** So lange gilt eine Emote-Anmeldung. */
@@ -715,6 +723,43 @@ setInterval(() => {
 
 // ------------------------------------------------------------------ Emotes
 
+/** Geladener Katalog: was /v1/emotes/catalog ausliefert, die erlaubten Namen und der Stand der Datei. */
+let emoteCatalog = { version: "", emotes: [], ids: new Set(), stamp: "" };
+
+/**
+ * Liest emotes.json, wenn sie sich geändert hat. Ein kaputter Eintrag wird übersprungen, eine kaputte
+ * Datei lässt den bisherigen Katalog stehen. Mit `announce` erfahren es alle offenen Spiele sofort.
+ */
+function loadEmotes(announce) {
+  let stamp;
+  try {
+    const stat = statSync(EMOTES_FILE);
+    stamp = `${stat.mtimeMs}:${stat.size}`;
+  } catch {
+    if (emoteCatalog.stamp !== "missing") console.warn(`[salami-capes] Emote-Katalog fehlt: ${EMOTES_FILE}`);
+    emoteCatalog.stamp = "missing";
+    return;
+  }
+  if (stamp === emoteCatalog.stamp) return;
+  emoteCatalog.stamp = stamp;
+  let parsed;
+  try {
+    parsed = parseCatalog(JSON.parse(readFileSync(EMOTES_FILE, "utf8")));
+  } catch (e) {
+    console.warn(`[salami-capes] Emote-Katalog nicht lesbar, der alte bleibt: ${e.message}`);
+    return;
+  }
+  for (const reason of parsed.skipped) console.warn(`[salami-capes] Emote übersprungen – ${reason}`);
+  const version = createHash("sha256").update(JSON.stringify(parsed.emotes)).digest("hex").slice(0, 16);
+  if (version === emoteCatalog.version) return;
+  emoteCatalog = { version, emotes: parsed.emotes, ids: new Set(parsed.emotes.map((e) => e.id)), stamp };
+  console.log(`[salami-capes] Emote-Katalog geladen: ${parsed.emotes.length} Emotes (${version})`);
+  if (announce) {
+    const event = `data: ${JSON.stringify({ catalog: version })}\n\n`;
+    for (const [res, stream] of streams) if (stream.kind === "capes") res.write(event);
+  }
+}
+
 /** SHA-256(Token) → { uuid, expires } – nur im Speicher, Emotes selbst werden nie gespeichert. */
 const emoteSessions = new Map();
 const tokenHash = (token) => createHash("sha256").update(token).digest("hex");
@@ -740,7 +785,7 @@ function emotePlayer(req) {
 async function handleEmote(req, res) {
   const uuid = emotePlayer(req);
   const body = await readJson(req, MAX_SMALL_BODY);
-  if (typeof body.emote !== "string" || !EMOTES.has(body.emote)) throw new HttpError(400, "unbekanntes Emote");
+  if (typeof body.emote !== "string" || !emoteCatalog.ids.has(body.emote)) throw new HttpError(400, "unbekanntes Emote");
   if (rateLimited("emote", uuid, EMOTES_PER_MINUTE)) throw new HttpError(429, "zu viele Emotes");
   broadcastEmote(uuid, body.emote);
   send(res, 200, { ok: true });
@@ -848,6 +893,11 @@ async function route(req, res) {
     return send(res, 404, { error: "nicht gefunden" });
   }
 
+  if (req.method === "GET" && path === "/v1/emotes/catalog") {
+    if (rateLimited("lookup", ip, LOOKUP_RATE_PER_MINUTE)) throw new HttpError(429, "zu viele Anfragen");
+    return send(res, 200, { version: emoteCatalog.version, emotes: emoteCatalog.emotes });
+  }
+
   if (req.method === "POST" && path === "/v1/emotes") {
     if (rateLimited("emotes", ip, RATE_PER_MINUTE * 2)) throw new HttpError(429, "zu viele Anfragen");
     return handleEmote(req, res);
@@ -865,6 +915,7 @@ async function route(req, res) {
 }
 
 loadDb();
+loadEmotes(false);
 const friends = createFriends({
   dataDir: DATA_DIR,
   env,
@@ -896,6 +947,7 @@ server.headersTimeout = 10_000;
 server.keepAliveTimeout = 5_000;
 
 setInterval(sweep, 30_000).unref();
+setInterval(() => loadEmotes(true), EMOTE_RELOAD_MS).unref();
 
 server.listen(PORT, HOST, () => {
   console.log(

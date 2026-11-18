@@ -121,6 +121,12 @@ tasks.processResources {
 		expand(props)
 	}
 
+	// Emote-Katalog: dieselbe Datei, die der Cape-Server ausliefert (dort kommen neue Emotes ohne Update
+	// dazu), als Notfall-Kopie in die Jar – für Starts ohne Launcher oder wenn der Server nicht erreichbar ist
+	from(rootProject.layout.projectDirectory.file("../server/capes/emotes.json")) {
+		into("assets/salami")
+	}
+
 	// Ab 26.3 werden Shader zu SPIR-V übersetzt (Vulkan): Ein- und Ausgaben brauchen feste Plätze
 	val spirvShaders = sc.current.parsed >= "26.3"
 	inputs.property("spirvShaders", spirvShaders)

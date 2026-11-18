@@ -3,6 +3,7 @@ package dev.salamiclient.capes;
 import com.google.gson.JsonObject;
 import com.mojang.blaze3d.platform.NativeImage;
 import dev.salamiclient.SalamiClient;
+import dev.salamiclient.emotes.EmoteCatalog;
 import dev.salamiclient.emotes.Emotes;
 import dev.salamiclient.modules.visual.CapesModule;
 import dev.salamiclient.modules.visual.HatsModule;
@@ -267,10 +268,13 @@ public final class SharedCapes {
 					Emotes.onRemote(uuid, emote);
 				}
 			}),
+			() -> mc.execute(EmoteCatalog::refreshSoon),
 			() -> mc.execute(() -> {
 				if (stream == opened) {
 					streamOpen = true;
 					streamRetryMs = STREAM_RETRY_MIN_MS;
+					// neue Emotes, die während einer Unterbrechung dazukamen
+					EmoteCatalog.refreshSoon();
 					// Was während einer Unterbrechung passiert ist, kam nicht an: alles einmal neu fragen
 					players.replaceAll((uuid, entry) -> new Entry(entry.remote(), 0));
 				}

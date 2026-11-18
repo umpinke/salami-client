@@ -4,6 +4,8 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.NativeImage;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.emotes.Emote;
+import dev.salamiclient.emotes.EmoteCatalog;
+import dev.salamiclient.emotes.EmoteIcons;
 import dev.salamiclient.emotes.Emotes;
 import dev.salamiclient.modules.social.EmotesModule;
 import dev.salamiclient.capes.AnimatedCapes;
@@ -105,6 +107,8 @@ public final class CosmeticsScreen extends Screen {
 	private boolean noticeError;
 	/** Angelegtes Cape ({@link #current()}), höchstens einmal pro Sekunde neu gelesen – es steht in einer Datei. */
 	private String currentKey = "none";
+	/** Stand des Emote-Katalogs, mit dem die Kacheln gebaut wurden. */
+	private int emoteRevision;
 	private long currentReadAt;
 
 	public CosmeticsScreen(@Nullable Screen parent) {
@@ -163,8 +167,10 @@ public final class CosmeticsScreen extends Screen {
 			return;
 		}
 		if (tab == Tab.EMOTES) {
-			for (Emote emote : Emote.values()) {
-				cards.add(new Card("emote:" + emote.id(), I18n.get(emote.translationKey()), EmoteWheelScreen.icon(emote), ICON_SIZE));
+			// Symbole zeichnet EmoteIcons aus der Haltung – die Liste kommt vom Server und kann wachsen
+			emoteRevision = EmoteCatalog.revision();
+			for (Emote emote : EmoteCatalog.all()) {
+				cards.add(new Card("emote:" + emote.id(), emote.displayName(), null, 0));
 			}
 			return;
 		}
@@ -320,7 +326,7 @@ public final class CosmeticsScreen extends Screen {
 
 	/** Emote abspielen: Menü schließen, damit du es siehst. */
 	private void playEmote(String key) {
-		Emote emote = Emote.of(key.substring("emote:".length()));
+		Emote emote = EmoteCatalog.get(key.substring("emote:".length()));
 		EmotesModule module = EmotesModule.instance();
 		if (emote == null || module == null) {
 			return;
@@ -548,6 +554,9 @@ public final class CosmeticsScreen extends Screen {
 		if (tab == Tab.MINIME) {
 			renderNameRow(g, theme, mx, my);
 		}
+		if (tab == Tab.EMOTES && emoteRevision != EmoteCatalog.revision()) {
+			reload(); // neue Emotes vom Server, während das Menü offen ist
+		}
 		int[] c = content();
 		long now = System.currentTimeMillis();
 		if (now - currentReadAt > 1_000L) {
@@ -606,7 +615,16 @@ public final class CosmeticsScreen extends Screen {
 				renderFace(g, miniMeTexture(), x + (CARD_W - size) / 2, py + (PREVIEW_H - size) / 2, size);
 			}
 			default -> {
-				if ((card.key().startsWith("hat:") || card.key().startsWith("emote:")) && card.texture() != null) {
+				Emote emote = card.key().startsWith("emote:") ? EmoteCatalog.get(card.key().substring("emote:".length())) : null;
+				if (emote != null) {
+					// Strichfigur in der Haltung des Emotes
+					int size = PREVIEW_H - 3;
+					int ix = x + (CARD_W - size) / 2;
+					g.blit(RenderPipelines.GUI_TEXTURED, EmoteIcons.texture(emote), ix, py + 2, 0f, 0f, size, size,
+						EmoteIcons.SIZE, EmoteIcons.SIZE, EmoteIcons.SIZE, EmoteIcons.SIZE);
+					break;
+				}
+				if (card.key().startsWith("hat:") && card.texture() != null) {
 					// Symbol statt Cape-Ausschnitt, quadratisch in der Mitte der Vorschau
 					int size = PREVIEW_H - 3;
 					int ix = x + (CARD_W - size) / 2;

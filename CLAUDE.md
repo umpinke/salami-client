@@ -1,5 +1,12 @@
 # Salami Client – Hinweise für Claude
 
+## Neue Emotes: kein Release
+
+Emotes sind Daten in `server/capes/emotes.json` (Aufbau: `server/capes/README.md`, „Emotes hinzufügen“). Für ein
+neues Emote nur diese Datei ändern, committen und der „salami“-Session zum Hochladen auf den Server geben – der
+Cape-Server lädt sie von selbst neu und alle Spiele bekommen das Emote ohne Launcher-Update. Der Nutzer will
+ausdrücklich kein Update pro Emote. Die Mod bündelt dieselbe Datei beim Bauen nur als Notfall-Kopie.
+
 ## Versionsnummern bei Releases
 
 Jedes Release (alles, was ins Auto-Update geht) erhöht die Launcher-Version um genau **0.0.1** gegenüber

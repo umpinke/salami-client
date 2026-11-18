@@ -106,9 +106,14 @@ public final class Emotes {
 	/** Emote eines anderen Spielers kam über den Cape-Server. */
 	public static void onRemote(UUID player, String id) {
 		Minecraft mc = Minecraft.getInstance();
-		Emote emote = Emote.of(id);
+		Emote emote = EmoteCatalog.get(id);
 		EmotesModule module = EmotesModule.instance();
-		if (emote == null || module == null || !module.isEnabled() || !module.showsOthers()
+		if (emote == null) {
+			// vielleicht ein ganz neues Emote: Katalog neu laden, beim nächsten Mal ist es da
+			EmoteCatalog.refreshSoon();
+			return;
+		}
+		if (module == null || !module.isEnabled() || !module.showsOthers()
 			|| (mc.player != null && mc.player.getUUID().equals(player))) {
 			return;
 		}
@@ -124,6 +129,7 @@ public final class Emotes {
 	}
 
 	public static void tick(Minecraft mc) {
+		EmoteCatalog.tick(mc);
 		long now = System.currentTimeMillis();
 		Playing playing = own;
 		if (playing != null) {
