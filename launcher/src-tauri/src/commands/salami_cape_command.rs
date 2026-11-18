@@ -105,6 +105,12 @@ pub async fn salami_capes_adopt(id: String, name: String) -> CommandResult<CapeV
     Ok(salami_capes::adopt_gallery_cape(&salami_capes::capes_dir(), &id, &name).await?)
 }
 
+/// Katalog der Hüte (`hats`) oder Emotes (`emotes`) vom Cape-Server, für den Shop.
+#[tauri::command]
+pub async fn salami_cosmetics_catalog(kind: String) -> CommandResult<serde_json::Value> {
+    Ok(salami_capes::cosmetics_catalog(&kind).await?)
+}
+
 /// Galerie-Cape melden, das gegen die Cape-Regeln verstößt (`reason`: siehe
 /// [`salami_capes::REPORT_REASONS`]). Braucht einen angemeldeten Account – jede Meldung gehört
 /// zu einem echten Spieler. → `reported` oder `already_reported`

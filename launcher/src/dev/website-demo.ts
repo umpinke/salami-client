@@ -10,6 +10,8 @@
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
 import capeTemplateUrl from "../../src-tauri/assets/salami_cape_template.png";
+import emoteCatalog from "../../../server/capes/emotes.json";
+import hatCatalog from "../../../server/capes/hats.json";
 
 const now = new Date().toISOString();
 const params = new URLSearchParams(location.search);
@@ -334,6 +336,17 @@ mockIPC(
       }
       case "salami_capes_report":
         return "reported";
+      case "salami_cosmetics_catalog": {
+        // live vom Cape-Server, sobald der Proxy der Website die Kataloge durchlässt – sonst der Stand vom Bauen
+        const kind = a.kind === "emotes" ? "emotes" : "hats";
+        try {
+          const r = await fetch(`${CAPES_API}/v1/${kind}/catalog`);
+          if (r.ok) return await r.json();
+        } catch {
+          // Stand vom Bauen
+        }
+        return structuredClone(kind === "emotes" ? emoteCatalog : hatCatalog);
+      }
       case "salami_capes_download_template":
         return "Downloads/salami_cape_template.png";
 

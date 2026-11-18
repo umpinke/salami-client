@@ -12,6 +12,9 @@
 //! Pixeln, das Bild ist also schon geprüft und sofort für alle sichtbar. Verstößt eins gegen
 //! die Cape-Regeln, kann man es melden ([`report_cape`]); ab einigen Meldungen versteckt der
 //! Cape-Server es, bis ein Admin entscheidet.
+//!
+//! Hüte und Emotes sind Listen auf dem Cape-Server ([`cosmetics_catalog`]). Der Shop zeigt sie,
+//! damit Neues dort ohne Launcher-Update erscheint.
 
 use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
@@ -608,6 +611,51 @@ pub async fn adopt_gallery_cape(dir: &Path, id: &str, name: &str) -> Result<Cape
     save_cape(dir, None, name, &png)
 }
 
+/// Kataloge des Cape-Servers, die der Shop zeigt (`/v1/<name>/catalog`).
+pub const COSMETIC_CATALOGS: [&str; 2] = ["hats", "emotes"];
+/// Größer wird kein Katalog (der Server begrenzt Anzahl und Umfang der Einträge).
+const MAX_CATALOG_BYTES: usize = 1024 * 1024;
+
+/// Katalog `hats` oder `emotes`, so wie ihn der Cape-Server ausliefert
+/// (`{"version": "…", "hats": […]}`). Die Einträge prüft das Frontend; ist der Server nicht
+/// erreichbar, zeigt es die Liste, die im Launcher steckt.
+pub async fn cosmetics_catalog(kind: &str) -> Result<serde_json::Value> {
+    if !COSMETIC_CATALOGS.contains(&kind) {
+        return Err(AppError::Other(format!("Unbekannter Katalog: {kind}")));
+    }
+    let base = server_url().ok_or_else(|| AppError::Other("Kein Cape-Server eingerichtet".into()))?;
+    let response = HTTP_CLIENT
+        .get(format!("{base}/v1/{kind}/catalog"))
+        .timeout(Duration::from_secs(10))
+        .send()
+        .await
+        .map_err(cape_server_down)?;
+    if !response.status().is_success() {
+        return Err(AppError::Other(format!("Cape-Server antwortet mit {}", response.status())));
+    }
+    if response.content_length().is_some_and(|len| len > MAX_CATALOG_BYTES as u64) {
+        return Err(AppError::Other("Katalog vom Cape-Server ist zu groß".into()));
+    }
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| AppError::Other(format!("Katalog vom Cape-Server unvollständig: {e}")))?;
+    parse_catalog(kind, &bytes)
+}
+
+/// Liest einen Katalog und prüft, dass die Liste `kind` darin steht.
+fn parse_catalog(kind: &str, bytes: &[u8]) -> Result<serde_json::Value> {
+    if bytes.len() > MAX_CATALOG_BYTES {
+        return Err(AppError::Other("Katalog vom Cape-Server ist zu groß".into()));
+    }
+    let catalog: serde_json::Value = serde_json::from_slice(bytes)
+        .map_err(|e| AppError::Other(format!("Katalog vom Cape-Server unlesbar: {e}")))?;
+    if !catalog.get(kind).is_some_and(serde_json::Value::is_array) {
+        return Err(AppError::Other(format!("Katalog vom Cape-Server ohne Liste „{kind}“")));
+    }
+    Ok(catalog)
+}
+
 /// Wert für `-Dsalami.cape`: `none`, `builtin:<name>` oder der Pfad zur PNG-Datei.
 pub fn launch_arg(dir: &Path) -> String {
     let store = CapeStore::load(dir);
@@ -665,6 +713,17 @@ mod tests {
         assert_ne!(share_id(&png(128, 64)).unwrap(), a);
         // gleiche Rechnung wie server/capes/png.mjs (capeId) für 64x32 einfarbig rgba(178,58,58,255)
         assert_eq!(a, "866fdf3660b57ee457c5fa997f35d0cc495c72eaa03d02427b05f85a8779364d");
+    }
+
+    #[test]
+    fn catalog_needs_its_list() {
+        let hats = br#"{"version":"abc","hats":[{"id":"crown"}]}"#;
+        assert_eq!(parse_catalog("hats", hats).unwrap()["hats"][0]["id"], "crown");
+        // die Liste der anderen Sorte, keine Liste, kein JSON
+        assert!(parse_catalog("emotes", hats).is_err());
+        assert!(parse_catalog("hats", br#"{"hats":"crown"}"#).is_err());
+        assert!(parse_catalog("hats", b"<html>404</html>").is_err());
+        assert!(parse_catalog("hats", &vec![b' '; MAX_CATALOG_BYTES + 1]).is_err());
     }
 
     #[test]

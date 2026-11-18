@@ -99,6 +99,7 @@ use commands::salami_cape_command::{
     salami_capes_adopt, salami_capes_delete, salami_capes_download_template, salami_capes_gallery,
     salami_capes_gallery_image, salami_capes_import, salami_capes_overview, salami_capes_rename,
     salami_capes_report, salami_capes_review_status, salami_capes_save, salami_capes_select,
+    salami_cosmetics_catalog,
 };
 
 // Salami-App fürs Handy (Kopplung, Geräte, Daten löschen)
@@ -740,6 +741,7 @@ async fn main() {
             salami_capes_gallery_image,
             salami_capes_adopt,
             salami_capes_report,
+            salami_cosmetics_catalog,
             salami_friends_state,
             salami_friends_set_enabled,
             salami_friends_reconnect,

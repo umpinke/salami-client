@@ -14,6 +14,11 @@ Spiele bekommen es ohne Launcher-Update. Der Nutzer will ausdrücklich kein Upda
 `emotes.json` und `hats.json` beim Bauen nur als Notfall-Kopie. Neue Arten von Cosmetics genauso bauen (Katalog
 auf dem Server, `RemoteCatalog` in der Mod), nicht fest in den Code.
 
+Der Shop im Launcher (Reiter Hüte, Emotes, Mini Me) zeigt dieselben Kataloge an der eigenen Figur: geholt über
+`salami_cosmetics_catalog`, geprüft in `launcher/src/services/salami-cosmetics-service.ts`, gezeichnet in
+`launcher/src/lib/skin3d/cosmetics.ts`. Auch er hat die beiden Dateien als Notfall-Kopie. Kommt ein neues Feld
+ins Hut- oder Emote-Format, muss es an drei Stellen gelesen werden: Server, Mod und Launcher.
+
 ## Versionsnummern bei Releases
 
 Jedes Release (alles, was ins Auto-Update geht) erhöht die Launcher-Version um genau **0.0.1** gegenüber

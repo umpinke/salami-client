@@ -4,16 +4,23 @@ import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 import { SalamiCapesTab } from "../salami-capes/SalamiCapesTab";
+import { EmotesSection, HatsSection, MiniMeSection } from "./CosmeticsSections";
 import "../salami-capes/i18n";
 
-type CosmeticsSection = "capes";
+type CosmeticsSection = "capes" | "hats" | "emotes" | "minime";
 
-/** Bereiche der Shop-Seite – vorerst nur Capes, weitere kommen als eigener Reiter dazu. */
+/** Bereiche der Shop-Seite, dieselben wie im Cosmetics-Menü des Spiels. */
 const SECTIONS: { id: CosmeticsSection; icon: string; labelKey: string }[] = [
   { id: "capes", icon: "solar:hanger-2-bold", labelKey: "salami.cosmetics.tab.capes" },
+  { id: "hats", icon: "solar:crown-bold", labelKey: "salami.cosmetics.tab.hats" },
+  { id: "emotes", icon: "solar:hand-shake-bold", labelKey: "salami.cosmetics.tab.emotes" },
+  { id: "minime", icon: "solar:users-group-rounded-bold", labelKey: "salami.cosmetics.tab.minime" },
 ];
 
-/** Shop (früher „Cosmetics“): Reiter oben, darunter der gewählte Bereich (Capes anlegen, hochladen, zeichnen). */
+/**
+ * Shop (früher „Cosmetics“): Reiter oben, darunter der gewählte Bereich. Capes legt man hier an und
+ * wählt sie aus; Hüte, Emotes und Mini Me zeigt der Shop zum Ansehen – gewählt werden sie im Spiel.
+ */
 export function CosmeticsTab() {
   const { t } = useTranslation();
   const accent = useThemeStore((s) => s.accentColor);
@@ -42,9 +49,13 @@ export function CosmeticsTab() {
             </button>
           );
         })}
-        <span className="ml-2 text-xs text-white/45">{t("salami.cosmetics.more_soon")}</span>
       </div>
-      <div className="min-h-0 flex-1">{section === "capes" && <SalamiCapesTab />}</div>
+      <div className="min-h-0 flex-1">
+        {section === "capes" && <SalamiCapesTab />}
+        {section === "hats" && <HatsSection />}
+        {section === "emotes" && <EmotesSection />}
+        {section === "minime" && <MiniMeSection />}
+      </div>
     </div>
   );
 }
