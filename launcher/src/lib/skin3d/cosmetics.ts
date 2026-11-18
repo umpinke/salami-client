@@ -7,7 +7,7 @@
  * nach oben und das Gesicht bei +z – eine halbe Drehung um x. Drehungen um x bleiben dabei gleich,
  * Drehungen um y und z kehren sich um.
  */
-import { BoxGeometry, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, type Material, type Object3D } from "three";
+import { BoxGeometry, Group, Mesh, MeshStandardMaterial, type Material, type Object3D } from "three";
 import { SkinObject, type PlayerObject, type SkinViewer } from "skinview3d";
 import {
   sampleTrack,
@@ -43,8 +43,9 @@ export function buildHat(hat: CatalogHat): HatObject {
   const materialOf = (color: string): Material => {
     let material = materials.get(color);
     if (!material) {
-      // leuchtende Hüte (Heiligenschein) sind im Spiel immer voll hell
-      material = hat.glow ? new MeshBasicMaterial({ color }) : new MeshStandardMaterial({ color });
+      // auch leuchtende Hüte (Heiligenschein): im Spiel sind sie nur im Dunkeln heller als andere, ihre
+      // Flächen sind schattiert wie bei jedem Modell – ganz ohne Licht wäre ein dicker Ring ein flacher Fleck
+      material = new MeshStandardMaterial({ color });
       materials.set(color, material);
     }
     return material;
