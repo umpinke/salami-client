@@ -33,11 +33,9 @@ import dev.salamiclient.modules.misc.ConfirmDisconnectModule;
 import dev.salamiclient.modules.misc.PanicDisconnectModule;
 import dev.salamiclient.modules.misc.ChatTweaksModule;
 import dev.salamiclient.modules.misc.TabTweaksModule;
-import dev.salamiclient.modules.misc.WaypointsModule;
 import dev.salamiclient.modules.social.EmotesModule;
 import dev.salamiclient.modules.social.FriendsModule;
 import dev.salamiclient.modules.client.BorderlessFullscreenModule;
-import dev.salamiclient.gui.WaypointsScreen;
 import dev.salamiclient.modules.visual.FreeLookModule;
 import dev.salamiclient.modules.visual.FovChangerModule;
 import dev.salamiclient.modules.visual.NoFogModule;
@@ -252,7 +250,7 @@ public final class SalamiClient implements ClientModInitializer {
 		// Misc
 		modules.register(new KitsModule());
 		modules.register(new ToggleSprintModule());
-		// Mods (Batch C): Chat, Verbindung, Wegpunkte
+		// Mods (Batch C): Chat, Verbindung
 		modules.register(new AutoTextModule());
 		modules.register(new StreamerModeModule());
 		modules.register(new NoAdvancementModule());
@@ -261,7 +259,6 @@ public final class SalamiClient implements ClientModInitializer {
 		modules.register(new PanicDisconnectModule());
 		modules.register(new ChatTweaksModule());
 		modules.register(new TabTweaksModule());
-		modules.register(new WaypointsModule());
 		// Social
 		modules.register(new FriendsModule());
 		modules.register(new EmotesModule());
@@ -369,7 +366,6 @@ public final class SalamiClient implements ClientModInitializer {
 			// Mods-Menü: Tippen geht immer in die Suche
 			|| screen instanceof ModsScreen
 			|| (screen instanceof ModSettingsScreen settings && settings.wasCapturingKey())
-			|| (screen instanceof WaypointsScreen waypoints && waypoints.isEditing())
 			|| (screen instanceof FriendsScreen friends && friends.isTyping())
 			|| (screen instanceof CosmeticsScreen cosmetics && cosmetics.isTyping())
 			// Minispiele: während eines Spiels gehören alle Tasten dem Spiel

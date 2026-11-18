@@ -42,7 +42,7 @@ Neue Minecraft-Version: Eintrag in `settings.gradle.kts` und `stonecutter.proper
 
 Im Spiel:
 
-- **Rechte Umschalttaste** öffnet das Salami-Menü (änderbar unter *Optionen → Steuerung → Salami Client*): Mods, Kacheln für HUD, Configs, Wegpunkte und Panels, darunter **Freunde** (Chat) und **Cosmetics** (Capes anlegen und hochladen).
+- **Rechte Umschalttaste** öffnet das Salami-Menü (änderbar unter *Optionen → Steuerung → Salami Client*): Mods, Kacheln für HUD, Configs und Panels, darunter **Freunde** (Chat) und **Cosmetics** (Capes anlegen und hochladen).
 
 ### Launcher bauen
 
@@ -179,7 +179,7 @@ node --test "src/features/mod-downloader/*.test.ts"
 
 - Module (`module/Module`) haben typisierte Settings (`setting/*`) und werden als JSON gespeichert (`config/salami/config.json`, verzögert und atomar).
 - Nur **aktive** Module bekommen Tick- und HUD-Aufrufe. Ein fehlerhaftes Modul wird abgeschaltet statt das Spiel abstürzen zu lassen.
-- Module mit eigenem Menü (`Module#hasScreen`, z. B. Freunde, Capes, Waypoints) bekommen in der Panel-Ansicht einen „Öffnen“-Knopf.
+- Module mit eigenem Menü (`Module#hasScreen`, z. B. Freunde, Capes, Hüte) bekommen in der Panel-Ansicht einen „Öffnen“-Knopf.
 - **Freunde** (`friends/Friends`, `FriendsApi`, `FriendsCommand`): Anmeldung wie bei den Capes über Mojang (`hasJoined`), danach ein eigenes Sitzungs-Token; Live-Verbindung per Server-Sent Events für Nachrichten, Anfragen und Online-Status. Server: `server/capes/friends.mjs`.
 - **Cosmetics** (`gui/CosmeticsScreen`, `capes/CapeLibrary`): liest und schreibt die Cape-Auswahl des Launchers (`capes.json` im Ordner aus `-Dsalami.capes.dir`), ohne Launcher `config/salami/cape.png`.
 - **Salami-Modus**:

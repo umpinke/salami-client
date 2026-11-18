@@ -1910,7 +1910,7 @@
   "syncPacks.kinds.mods": "Mods",
   "syncPacks.presets.saves": "Tes mondes. Tous les profils liés jouent les mêmes sauvegardes.",
   "syncPacks.presets.config": "Fichiers de configuration des mods, pour que les mêmes mods se comportent pareil partout.",
-  "syncPacks.presets.noriskclient": "Le dossier Salami Client avec tes waypoints et tes réglages de modules.",
+  "syncPacks.presets.noriskclient": "Le dossier Salami Client avec tes réglages de modules.",
   "syncPacks.presets.screenshots": "Un dossier de captures partagé au lieu d'un par profil.",
   "syncPacks.presets.shaderpacks": "Packs de shaders, installés une seule fois pour tous les profils.",
   "syncPacks.presets.resourcepacks": "Packs de ressources, partagés entre tous les profils liés.",

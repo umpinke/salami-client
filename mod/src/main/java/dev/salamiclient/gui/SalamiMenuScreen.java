@@ -8,7 +8,6 @@ import dev.salamiclient.gui.clickgui.ClickGuiScreen;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.ModuleManager;
 import dev.salamiclient.modules.client.GuiScaleModule;
-import dev.salamiclient.modules.misc.WaypointsModule;
 import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.theme.Theme;
 import net.minecraft.client.gui.GuiGraphics;
@@ -26,7 +25,7 @@ import java.util.List;
 /**
  * Salami-Menü (Rechte Umschalttaste): Einstieg ins Spielmenü. Links ein Akzentstrich, daneben
  * Logo und Schriftzug, darunter der große Knopf zu den Mods, eine Reihe Kacheln für HUD,
- * Configs, Wegpunkte und die Panel-Ansicht und eine zweite für Freunde, Cosmetics und Minispiele.
+ * Configs und die Panel-Ansicht und eine zweite für Freunde, Cosmetics und Minispiele.
  *
  * <p>Rechnet wie die übrigen Salami-Menüs in skalierten Koordinaten (Modul „Oberfläche“);
  * Zeichnen und Klicken nutzen dieselben Rechtecke.
@@ -47,7 +46,6 @@ public final class SalamiMenuScreen extends Screen {
 	private enum Tile {
 		HUD("salami.menu.hud", false),
 		CONFIGS("salami.clickgui.configs", false),
-		WAYPOINTS("salami.menu.waypoints", false),
 		PANELS("salami.menu.panels", false),
 		FRIENDS("salami.menu.friends", true),
 		COSMETICS("salami.menu.cosmetics", true),
@@ -120,10 +118,6 @@ public final class SalamiMenuScreen extends Screen {
 			}
 		}
 		return list;
-	}
-
-	private WaypointsModule waypoints() {
-		return modules.get(WaypointsModule.class);
 	}
 
 	private int[] tileRect(int index, int count, boolean social) {
@@ -270,14 +264,6 @@ public final class SalamiMenuScreen extends Screen {
 					g.fill(knob, ly - 1, knob + 2, ly + 2, color);
 				}
 			}
-			case WAYPOINTS -> {
-				// Raute mit Punkt
-				for (int i = 0; i < 6; i++) {
-					g.fill(x + 5 - i, y + i, x + 7 + i, y + i + 1, color);
-					g.fill(x + 5 - i, y + 11 - i, x + 7 + i, y + 12 - i, color);
-				}
-				g.fill(x + 5, y + 5, x + 7, y + 7, 0xFF120F10);
-			}
 			case PANELS -> {
 				// zwei Panels nebeneinander
 				GuiDraw.outline(g, x, y, 5, 12, color);
@@ -323,12 +309,6 @@ public final class SalamiMenuScreen extends Screen {
 		switch (tile) {
 			case HUD -> minecraft.setScreen(new HudEditorScreen(this));
 			case CONFIGS -> minecraft.setScreen(new ConfigsScreen(this));
-			case WAYPOINTS -> {
-				WaypointsModule module = waypoints();
-				if (module != null) {
-					minecraft.setScreen(new WaypointsScreen(module, this));
-				}
-			}
 			case PANELS -> minecraft.setScreen(new ClickGuiScreen(modules, config));
 			case FRIENDS -> minecraft.setScreen(new FriendsScreen(this));
 			case COSMETICS -> minecraft.setScreen(new CosmeticsScreen(this));

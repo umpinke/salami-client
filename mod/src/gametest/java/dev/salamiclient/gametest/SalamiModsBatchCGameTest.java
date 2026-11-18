@@ -2,7 +2,6 @@ package dev.salamiclient.gametest;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.SalamiClient;
-import dev.salamiclient.gui.WaypointsScreen;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.ModuleManager;
 import dev.salamiclient.modules.hud.ClockModule;
@@ -19,7 +18,6 @@ import dev.salamiclient.modules.misc.ConfirmDisconnectModule;
 import dev.salamiclient.modules.misc.NoAdvancementModule;
 import dev.salamiclient.modules.misc.StreamerModeModule;
 import dev.salamiclient.modules.misc.TabTweaksModule;
-import dev.salamiclient.modules.misc.WaypointsModule;
 import dev.salamiclient.setting.Setting;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -37,7 +35,7 @@ import net.minecraft.network.chat.Component;
 
 import java.util.List;
 
-/** Tests der Mods aus Batch C (HUD-Infos, Chat, Verbindung, Wegpunkte). */
+/** Tests der Mods aus Batch C (HUD-Infos, Chat, Verbindung). */
 public final class SalamiModsBatchCGameTest implements FabricClientGameTest {
 	private static final int FEET_Y = -60;
 
@@ -58,7 +56,6 @@ public final class SalamiModsBatchCGameTest implements FabricClientGameTest {
 
 			testHudInfos(context, modules);
 			testChat(context, server, modules);
-			testWaypoints(context, modules);
 			testConnectionScreens(context, modules);
 		}
 	}
@@ -135,32 +132,6 @@ public final class SalamiModsBatchCGameTest implements FabricClientGameTest {
 			context.runOnClient(c -> modules.setEnabled(modules.get(type), false));
 		}
 		set(autoText, "key_1", -1);
-	}
-
-	// ------------------------------------------------------------------ Wegpunkte
-
-	private static void testWaypoints(ClientGameTestContext context, ModuleManager modules) {
-		WaypointsModule waypoints = modules.get(WaypointsModule.class);
-		context.runOnClient(c -> modules.setEnabled(waypoints, true));
-		int before = context.computeOnClient(c -> waypoints.store().current().size());
-		context.getInput().holdKeyFor(InputConstants.KEY_B, 3);
-		context.waitTicks(3);
-		check(context.computeOnClient(c -> waypoints.store().current().size()) == before + 1, "Waypoints: key B did not add a waypoint");
-		context.runOnClient(c -> c.player.setPos(c.player.getX(), c.player.getY(), c.player.getZ() - 12));
-		context.waitTicks(5);
-		context.takeScreenshot("salami-42-waypoint-world");
-		context.setScreen(() -> new WaypointsScreen(waypoints, null));
-		context.waitTicks(2);
-		context.takeScreenshot("salami-43-waypoints-screen");
-		context.setScreen(() -> null);
-		context.runOnClient(c -> {
-			var list = waypoints.store().current();
-			while (list.size() > before) {
-				waypoints.store().remove(list.get(list.size() - 1));
-			}
-		});
-		check(context.computeOnClient(c -> waypoints.isEnabled()), "Waypoints crashed and was disabled");
-		context.runOnClient(c -> modules.setEnabled(waypoints, false));
 	}
 
 	// ------------------------------------------------------------------ Verbindung

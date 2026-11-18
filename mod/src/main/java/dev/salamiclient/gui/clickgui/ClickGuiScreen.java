@@ -46,7 +46,7 @@ import java.util.Set;
  *
  * <ul>
  *   <li>Linksklick auf Modul: an/aus · Rechtsklick: Einstellungen auf-/zuklappen</li>
- *   <li>„Öffnen“ in der Modulzeile: eigenes Menü des Moduls (Freunde, Cosmetics, Wegpunkte)</li>
+ *   <li>„Öffnen“ in der Modulzeile: eigenes Menü des Moduls (Freunde, Cosmetics)</li>
  *   <li>Kopfzeile ziehen: Panel verschieben · Rechtsklick: Panel einklappen</li>
  *   <li>Einstellungen: Linksklick ändert, Rechtsklick ändert rückwärts bzw. setzt zurück</li>
  * </ul>
