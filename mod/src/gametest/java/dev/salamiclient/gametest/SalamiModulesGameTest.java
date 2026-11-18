@@ -16,6 +16,7 @@ import dev.salamiclient.modules.client.GuiScaleModule;
 import dev.salamiclient.modules.visual.CapesModule;
 import dev.salamiclient.modules.visual.HatsModule;
 import dev.salamiclient.modules.visual.MiniMeModule;
+import dev.salamiclient.minime.MiniMeFollowers;
 import dev.salamiclient.minime.MiniMeSkins;
 import dev.salamiclient.modules.visual.InfoHudModule;
 import dev.salamiclient.modules.visual.LiveTrackerModule;
@@ -33,6 +34,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.RemotePlayer;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.phys.Vec3;
 import org.apache.commons.lang3.function.FailableFunction;
 
 import java.io.IOException;
@@ -75,7 +77,7 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 			testParticles(context, server, modules);
 			testCapes(context, server, modules);
 			testHats(context, modules);
-			testMiniMe(context, modules);
+			testMiniMe(context, server, modules);
 			testSharedCapes(context, modules);
 			testLauncherLiveCapes(context);
 			testGuiScale(context, modules);
@@ -588,8 +590,11 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 	// ------------------------------------------------------------------ Mini Me
 
 	/** Mini Me mit dem Skin eines Namens: läuft hinterher, sitzt auf Kopf und Schulter, hängt an der Hand. */
-	private static void testMiniMe(ClientGameTestContext context, ModuleManager modules) {
+	private static void testMiniMe(ClientGameTestContext context, TestServerContext server, ModuleManager modules) {
 		MiniMeModule mini = modules.get(MiniMeModule.class);
+		float[] before = context.computeOnClient(c -> new float[] {(float) c.player.getX(), (float) c.player.getY(), (float) c.player.getZ(), c.player.getYRot()});
+		server.runCommand("tp @p 120.5 " + FEET_Y + " 0.5 180 0");
+		context.waitTicks(5);
 		context.runOnClient(c -> {
 			mini.setName("Notch");
 			mini.setPlace(MiniMeModule.Place.FOLLOW);
@@ -607,7 +612,7 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 		MiniMeModule.Wish own = MiniMeModule.own();
 		check(own != null && own.name().equals("Notch") && own.place() == MiniMeModule.Place.FOLLOW, "Mini Me: own wish missing");
 		check(context.computeOnClient(c -> MiniMeModule.of(c.player)) != null, "Mini Me: own player has no Mini Me");
-		// von hinten: das Mini Me läuft schräg hinter dem Spieler
+		// von hinten: das Mini Me steht schräg hinter dem Spieler
 		context.runOnClient(c -> {
 			c.options.setCameraType(CameraType.THIRD_PERSON_BACK);
 			c.gui.getChat().clearMessages(false); // Chat und Meldungen verdecken sonst das Mini Me
@@ -615,6 +620,9 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 		});
 		context.waitTicks(20);
 		context.takeScreenshot("salami-10e-minime-follow");
+		testMiniMeFollow(context, server);
+		server.runCommand(String.format(java.util.Locale.ROOT, "tp @p %.3f %.3f %.3f %.1f 0", before[0], before[1], before[2], before[3]));
+		context.waitTicks(5);
 		context.runOnClient(c -> c.options.setCameraType(CameraType.THIRD_PERSON_FRONT));
 
 		String[] shots = {"head", "shoulder", "hand"};
@@ -637,6 +645,72 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 		context.runOnClient(c -> mini.setPlace(MiniMeModule.Place.NONE));
 		check(MiniMeModule.own() == null, "Mini Me: still shared after putting it away");
 		context.runOnClient(c -> modules.setEnabled(mini, false));
+	}
+
+	/**
+	 * „Folgt dir“ wie ein Haustier: steht auf dem Boden, bleibt stehen, wenn man sich nur
+	 * umschaut, läuft hinterher, springt auf einen Block, geht nicht durch eine Wand (taucht
+	 * dann beim Spieler auf) und schwebt nicht hoch, wenn der Spieler auf einer Säule steht.
+	 */
+	private static void testMiniMeFollow(ClientGameTestContext context, TestServerContext server) {
+		UUID me = context.computeOnClient(c -> c.player.getUUID());
+		Vec3 standing = followerOf(context, me);
+		check(Math.abs(standing.y - FEET_Y) < 0.01, "Mini Me: floats at y=" + standing.y + " instead of standing on the grass");
+
+		// nur umschauen: Kopf und Körper drehen sich, das Mini Me bleibt, wo es ist
+		for (int i = 0; i < 20; i++) {
+			context.runOnClient(c -> c.player.setYRot(c.player.getYRot() + 18f));
+			context.waitTick();
+		}
+		context.waitTicks(10);
+		Vec3 afterLook = followerOf(context, me);
+		check(afterLook.distanceTo(standing) < 0.05, "Mini Me: moved from " + standing + " to " + afterLook + " while the player only looked around");
+
+		// weggehen: läuft hinterher und bleibt in der Nähe stehen
+		server.runCommand("tp @p 120.5 " + FEET_Y + " 8.5 0 0");
+		context.waitTicks(60);
+		Vec3 followed = followerOf(context, me);
+		check(flatDistance(context, followed) < 3.1 && Math.abs(followed.y - FEET_Y) < 0.01, "Mini Me: did not follow, at " + followed);
+
+		// ein Block hohe Mauer: drüberspringen
+		server.runCommand("fill 110 " + FEET_Y + " 12 130 " + FEET_Y + " 12 minecraft:stone");
+		server.runCommand("tp @p 120.5 " + FEET_Y + " 15.5 0 0");
+		context.waitTicks(80);
+		Vec3 jumped = followerOf(context, me);
+		check(jumped.z > 13 && flatDistance(context, jumped) < 3.1 && Math.abs(jumped.y - FEET_Y) < 0.01, "Mini Me: did not jump over the low wall, at " + jumped);
+
+		// hohe Mauer: läuft nicht hindurch, taucht nach einer Weile beim Spieler auf
+		server.runCommand("fill 110 " + FEET_Y + " 18 130 " + (FEET_Y + 3) + " 18 minecraft:stone");
+		server.runCommand("tp @p 120.5 " + FEET_Y + " 21.5 0 0");
+		for (int i = 0; i < 50; i++) {
+			context.waitTick();
+			Vec3 at = followerOf(context, me);
+			check(at.z < 17.8 + 0.01, "Mini Me: walked into the wall, at " + at);
+		}
+		context.waitTicks(80);
+		Vec3 behindWall = followerOf(context, me);
+		check(behindWall.z > 19 && flatDistance(context, behindWall) < 3.1, "Mini Me: stuck behind the wall, at " + behindWall);
+
+		// Spieler auf einer Säule: das Mini Me bleibt unten auf dem Boden stehen
+		server.runCommand("fill 120 " + FEET_Y + " 26 120 " + (FEET_Y + 2) + " 26 minecraft:stone");
+		server.runCommand("tp @p 120.5 " + (FEET_Y + 3) + " 26.5 90 55"); // schaut zur Seite und runter, die Kamera sieht das Mini Me unten
+		context.waitTicks(60);
+		Vec3 below = followerOf(context, me);
+		check(Math.abs(below.y - FEET_Y) < 0.01 && flatDistance(context, below) < 3.1, "Mini Me: not on the ground below the pillar, at " + below);
+		context.takeScreenshot("salami-10g-minime-below-pillar");
+
+		server.runCommand("fill 110 " + FEET_Y + " 12 130 " + (FEET_Y + 3) + " 26 minecraft:air");
+	}
+
+	private static Vec3 followerOf(ClientGameTestContext context, UUID player) {
+		Vec3 at = context.computeOnClient(c -> MiniMeFollowers.positionOf(player));
+		check(at != null, "Mini Me: no follower for the player");
+		return at;
+	}
+
+	/** Waagerechter Abstand zwischen Spieler und Punkt. */
+	private static double flatDistance(ClientGameTestContext context, Vec3 at) {
+		return context.computeOnClient(c -> Math.hypot(c.player.getX() - at.x, c.player.getZ() - at.z));
 	}
 
 	// ------------------------------------------------------------------ Live Tracker
