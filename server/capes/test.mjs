@@ -681,7 +681,8 @@ test("Hut-Katalog: Hüte sind Daten, neue kommen ohne Neustart und lassen sich s
   assert.ok(before.hats.length >= 9);
   const santa = before.hats.find((h) => h.id === "santa");
   assert.equal(santa.anchor, "shoulder");
-  assert.equal(santa.scale, 0.35);
+  // Optionen wie bob und sway kommen an, wie sie in der Datei stehen
+  assert.deepEqual(santa, inFile.find((h) => h.id === "santa"));
   assert.equal(santa.names.de_de, "Weihnachtsmütze");
   const halo = before.hats.find((h) => h.id === "halo");
   assert.equal(halo.glow, true);

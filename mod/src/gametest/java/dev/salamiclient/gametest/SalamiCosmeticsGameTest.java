@@ -71,7 +71,7 @@ public final class SalamiCosmeticsGameTest implements FabricClientGameTest {
 		check(all.size() >= 9 && HatCatalog.get("crown") != null && HatCatalog.get("beret") != null,
 			"Hats: bundled catalog missing or incomplete (" + all.size() + ")");
 		Hat santa = HatCatalog.get("santa");
-		check(santa != null && santa.anchor() == Hat.Anchor.SHOULDER && santa.scale() < 0.5f, "Hats: santa hat read wrong");
+		check(santa != null && santa.anchor() == Hat.Anchor.SHOULDER && santa.colors().length >= 6, "Hats: santa hat read wrong");
 		Hat halo = HatCatalog.get("halo");
 		// wie viele Würfel der Heiligenschein hat, steht in hats.json und darf sich ändern – sechs Flächen je Würfel bleiben
 		check(halo != null && halo.glow() && halo.anchor() == Hat.Anchor.HEAD
