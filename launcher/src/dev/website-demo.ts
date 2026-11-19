@@ -13,6 +13,8 @@ import capeTemplateUrl from "../../src-tauri/assets/salami_cape_template.png";
 import buddyCatalog from "../../../server/capes/buddies.json";
 import emoteCatalog from "../../../server/capes/emotes.json";
 import hatCatalog from "../../../server/capes/hats.json";
+// Nur die Versionsnummer, damit die Demo dieselbe Version zeigt wie der Launcher, aus dem sie gebaut ist
+import { version as launcherVersion } from "../../src-tauri/tauri.conf.json";
 
 const now = new Date().toISOString();
 const params = new URLSearchParams(location.search);
@@ -406,7 +408,7 @@ mockIPC(
       // Sonstiges
       case "get_app_version":
       case "get_launcher_version":
-        return "1.7.0";
+        return launcherVersion;
       case "is_flatpak":
       case "check_update_available_command":
         return false;
