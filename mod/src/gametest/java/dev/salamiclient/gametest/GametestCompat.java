@@ -45,6 +45,26 @@ final class GametestCompat {
 		//?}
 	}
 
+	/**
+	 * Ab 26.3 kommen getippte Zeichen über SDL nur an, solange die Texteingabe des Fensters eingeschaltet ist.
+	 * Die Test-Eingabe ({@code typeChars}) ruft {@code charTyped} direkt auf und merkt davon nichts – darum prüfen
+	 * die Tests das hier.
+	 */
+	//? if >=26.3 {
+	/*static final boolean TEXT_INPUT_GATED = true;
+	*///?} else {
+	static final boolean TEXT_INPUT_GATED = false;
+	//?}
+
+	/** Ob das Fenster gerade getippte Zeichen annimmt; vor 26.3 immer {@code true}. */
+	static boolean acceptsTypedText(Minecraft client) {
+		//? if >=26.3 {
+		/*return org.lwjgl.sdl.SDLKeyboard.SDL_TextInputActive(client.getWindow().handle());
+		*///?} else {
+		return true;
+		//?}
+	}
+
 	/** Anzahl aller Partikel; ab 26.2 liefert Minecraft „Art Anzahl … T Summe“ statt nur der Zahl. */
 	static int particleCount(Minecraft client) {
 		String counts = client.particleEngine.countParticles().trim();

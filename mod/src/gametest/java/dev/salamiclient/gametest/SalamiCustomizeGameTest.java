@@ -322,6 +322,8 @@ public final class SalamiCustomizeGameTest implements FabricClientGameTest {
 			picker.mouseClicked(c.font, b[2] - 20, b[1] + 6 + 72 + 6 + 4, InputConstants.MOUSE_BUTTON_LEFT); // Hex-Feld
 		});
 		check(picker.isEditingText(), "hex field not editable");
+		context.waitTick();
+		check(context.computeOnClient(GametestCompat::acceptsTypedText), "hex field: window does not accept typed text");
 		context.runOnClient(c -> {
 			for (int i = 0; i < 9; i++) {
 				picker.keyPressed(InputConstants.KEY_BACKSPACE);
@@ -331,6 +333,10 @@ public final class SalamiCustomizeGameTest implements FabricClientGameTest {
 		});
 		check(text.get() == 0xFF3366CC, "hex input not applied: " + Integer.toHexString(text.get()));
 		check(context.computeOnClient(c -> ((ModSettingsScreen) c.screen).wasCapturingKey()) == false, "still capturing keys after Enter");
+		if (GametestCompat.TEXT_INPUT_GATED) {
+			context.waitTick();
+			check(!context.computeOnClient(GametestCompat::acceptsTypedText), "hex field: text input still on after Enter");
+		}
 
 		// Regenbogen läuft durch die Farbtöne
 		context.runOnClient(c -> text.setChroma(true));

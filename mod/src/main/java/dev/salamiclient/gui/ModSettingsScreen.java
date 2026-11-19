@@ -210,6 +210,7 @@ public final class ModSettingsScreen extends Screen {
 	public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
 		super.render(g, mouseX, mouseY, partialTick);
 	//?}
+		TextInput.sync(this, (picker != null && picker.isEditingText()) || editingText != null);
 		Theme theme = SalamiClient.get().theme();
 		int mx = (int) (mouseX / uiScale);
 		int my = (int) (mouseY / uiScale);

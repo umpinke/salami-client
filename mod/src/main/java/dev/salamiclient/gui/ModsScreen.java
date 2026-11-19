@@ -285,6 +285,8 @@ public final class ModsScreen extends Screen {
 	public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
 		super.render(g, mouseX, mouseY, partialTick);
 	//?}
+		// Tippen geht hier immer in die Suche
+		TextInput.sync(this, true);
 		Theme theme = SalamiClient.get().theme();
 		int mx = (int) (mouseX / uiScale);
 		int my = (int) (mouseY / uiScale);

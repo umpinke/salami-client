@@ -90,10 +90,15 @@ public final class SalamiClientGameTest implements FabricClientGameTest {
 			context.waitTicks(3);
 			check(context.computeOnClient(c -> c.screen instanceof FriendsScreen friends && friends.isTyping()),
 				"Friends screen did not open with a focused input");
+			check(context.computeOnClient(GametestCompat::acceptsTypedText), "Friends: window does not accept typed text");
 			context.takeScreenshot("salami-04b-friends");
 			context.setScreen(() -> new CosmeticsScreen(null));
 			context.waitTicks(20); // gemalte Capes brauchen ein paar Ticks für die Vorschau
 			context.takeScreenshot("salami-04c-cosmetics");
+			if (GametestCompat.TEXT_INPUT_GATED) {
+				// Ohne Namensfeld im Fokus bleibt die Texteingabe aus
+				check(!context.computeOnClient(GametestCompat::acceptsTypedText), "Cosmetics: text input on without a field");
+			}
 			context.setScreen(() -> null);
 
 			try {

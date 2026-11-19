@@ -12,6 +12,7 @@ import dev.salamiclient.gui.HudEditorScreen;
 import dev.salamiclient.gui.MinigamesScreen;
 import dev.salamiclient.gui.ModsScreen;
 import dev.salamiclient.gui.SettingText;
+import dev.salamiclient.gui.TextInput;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.modules.client.GuiScaleModule;
@@ -141,6 +142,7 @@ public final class ClickGuiScreen extends Screen {
 	public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
 		super.render(graphics, mouseX, mouseY, partialTick);
 	//?}
+		TextInput.sync(this, picker != null && picker.isEditingText());
 		Theme theme = SalamiClient.get().theme();
 		int mx = (int) (mouseX / uiScale);
 		int my = (int) (mouseY / uiScale);

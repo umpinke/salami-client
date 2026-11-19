@@ -68,6 +68,8 @@ public final class SalamiModsGameTest implements FabricClientGameTest {
 		context.setScreen(() -> new ModsScreen(modules, null));
 		context.waitTicks(3);
 		context.takeScreenshot("salami-20-mods-menu");
+		// Die Suche nimmt immer Zeichen an – ab 26.3 muss dafür die Texteingabe des Fensters an sein
+		check(context.computeOnClient(GametestCompat::acceptsTypedText), "Mods search: window does not accept typed text");
 
 		context.getInput().typeChars("zoom");
 		context.waitTick();
