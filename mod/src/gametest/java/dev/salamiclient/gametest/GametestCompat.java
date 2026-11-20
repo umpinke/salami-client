@@ -3,6 +3,8 @@ package dev.salamiclient.gametest;
 import dev.salamiclient.SalamiClient;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.client.Minecraft;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.LivingEntity;
 
 import java.util.Locale;
 
@@ -62,6 +64,15 @@ final class GametestCompat {
 		/*return org.lwjgl.sdl.SDLKeyboard.SDL_TextInputActive(client.getWindow().handle());
 		*///?} else {
 		return true;
+		//?}
+	}
+
+	/** Mit einer Hand ausholen, wie bei einem Schlag; ab 26.3 gehört zum Schwung, wie er aussieht. */
+	static void swing(LivingEntity entity, InteractionHand hand) {
+		//? if >=26.3 {
+		/*entity.swing(hand, net.minecraft.world.item.component.SwingAnimation.DEFAULT, false);
+		*///?} else {
+		entity.swing(hand);
 		//?}
 	}
 

@@ -117,7 +117,7 @@ export interface CatalogEmote {
   names: Record<string, string>;
   /** Länge in Sekunden; bei endlosen Emotes die Zeit, nach der die Vorschau neu beginnt. */
   duration: number;
-  /** Läuft im Spiel, bis sich der Spieler bewegt. */
+  /** Läuft im Spiel, bis der Spieler schlägt. */
   loop: boolean;
   /** Zeitpunkt (s), dessen Haltung das Vorschaubild zeigt. */
   iconTime: number;

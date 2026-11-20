@@ -137,7 +137,7 @@ Die Seite lässt sich als App aufs Handy legen (PWA: `manifest.webmanifest`, Ser
    ```
 
    - `id`: a–z, 0–9, `_`, höchstens 24 Zeichen. `names`: Anzeigename je Sprache, `en_us` ist Pflicht.
-   - `duration` in Sekunden (0.2–15) oder `"loop": true` – dann läuft das Emote, bis sich der Spieler bewegt (höchstens 15 s).
+   - `duration` in Sekunden (0.2–15) oder `"loop": true` – dann läuft das Emote, bis der Spieler schlägt (höchstens 15 s).
    - `tracks`: je Körperteil (`head`, `right_arm`, `left_arm`, `right_leg`, `left_leg`) Schlüsselbilder mit Zeit `t` (Sekunden, aufsteigend) und Drehung `rot` = `[x, y, z]` in Grad. Dazwischen wird weich überblendet (`"ease": "linear"` für gleichmäßig).
    - `cycle`: Die Schlüsselbilder wiederholen sich in diesem Takt (für Winken, Tanzen …). Ohne `cycle` laufen sie einmal und halten das letzte.
    - `base`: `none` (Winkel gelten direkt, Standard), `current` (zur normalen Haltung addiert – beim Kopf bleibt so die Blickrichtung) oder `head` (zur Blickrichtung addiert, z. B. der zeigende Arm).

@@ -9,12 +9,11 @@ import net.minecraft.client.model.player.PlayerModel;
 *///?}
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.Options;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
@@ -26,11 +25,13 @@ import java.util.UUID;
  * Laufende Emotes: dein eigenes und die anderer Salami-Spieler (live über den Cape-Server).
  *
  * <ul>
- *   <li>Dein Emote endet nach seiner Dauer, sobald du dich bewegst, springst, schleichst, schlägst
- *       oder etwas benutzt – endlose (Tanzen, T-Pose) spätestens nach 15 Sekunden.</li>
+ *   <li>Dein Emote endet nach seiner Dauer oder sobald du schlägst – endlose (Tanzen, T-Pose)
+ *       spätestens nach 15 Sekunden. Laufen, Springen, Schleichen und Benutzen beenden es nicht: die
+ *       Haltung liegt über der normalen Bewegung, Beine ohne eigene Spur laufen einfach weiter.</li>
  *   <li>Aus der Ich-Sicht schaltet die Kamera für das Emote nach vorn und danach zurück
  *       (abschaltbar im Modul „Emotes“).</li>
- *   <li>Emotes anderer enden nach ihrer Dauer oder sobald sich der Spieler bewegt.</li>
+ *   <li>Emotes anderer enden nach ihrer Dauer oder sobald der Spieler mit der Haupthand ausholt –
+ *       so sieht ein Schlag von außen aus (einen eigenen „Stopp“ schickt der Cape-Server nicht).</li>
  * </ul>
  *
  * Gezeichnet wird über {@code PlayerModelMixin} → {@link #pose}. Was ein Emote sonst mitbringt –
@@ -41,15 +42,16 @@ public final class Emotes {
 	/** Weiches Ein- und Ausblenden. */
 	private static final float BLEND_IN_S = 0.18f;
 	private static final long BLEND_OUT_MS = 220L;
-	/** So weit (Blöcke, waagerecht) darf sich ein anderer Spieler bewegen, ohne dass sein Emote endet. */
-	private static final double REMOTE_MOVE = 0.3;
 
 	/** Ein laufendes Emote; {@code stopAt} = Beginn des Ausblendens oder -1. */
 	private static final class Playing {
 		final Emote emote;
 		final long startAt;
 		long stopAt = -1;
-		@Nullable Vec3 origin;
+		/** Arm eines anderen Spielers beim letzten Tick: schon einmal angesehen, holte aus, wie weit. */
+		boolean watched;
+		boolean swinging;
+		float swingProgress;
 		/** Schon geworfen, schon abgespielte Geräusche (ein Bit je Eintrag), schon verwandelt und zurück. */
 		boolean thrown;
 		int soundsPlayed;
@@ -215,7 +217,7 @@ public final class Emotes {
 			if (mc.player == null || mc.player.isRemoved() || playing.finished(now)) {
 				own = null;
 			} else {
-				if (playing.stopAt < 0 && (movementInput(mc.options) || mc.player.hurtTime > 0)) {
+				if (playing.stopAt < 0 && mc.options.keyAttack.isDown()) {
 					playing.stop(now);
 				}
 				effects(mc, mc.player, playing, now);
@@ -233,13 +235,8 @@ public final class Emotes {
 				it.remove();
 				continue;
 			}
-			if (player != null && other.stopAt < 0) {
-				Vec3 position = player.position();
-				if (other.origin == null) {
-					other.origin = position;
-				} else if (position.subtract(other.origin).horizontalDistance() > REMOTE_MOVE) {
-					other.stop(now);
-				}
+			if (player != null && other.stopAt < 0 && swung(other, player)) {
+				other.stop(now);
 			}
 			if (player != null) {
 				effects(mc, player, other, now);
@@ -247,9 +244,26 @@ public final class Emotes {
 		}
 	}
 
-	private static boolean movementInput(Options options) {
-		return options.keyUp.isDown() || options.keyDown.isDown() || options.keyLeft.isDown() || options.keyRight.isDown()
-			|| options.keyJump.isDown() || options.keyShift.isDown() || options.keyAttack.isDown() || options.keyUse.isDown();
+	/**
+	 * Hat dieser Spieler seit dem letzten Tick neu mit der Haupthand ausgeholt? Ein Schwung, der beim
+	 * Start des Emotes schon lief, zählt nicht – sonst endete ein Emote direkt nach einem Schlag sofort.
+	 */
+	private static boolean swung(Playing playing, Player player) {
+		// ab 26.3 hält Minecraft den Schwung in einem eigenen Zustand statt in offenen Feldern
+		//? if >=26.3 {
+		/*var swing = player.getCurrentSwing();
+		boolean swinging = swing != null && swing.hand() == InteractionHand.MAIN_HAND;
+		float progress = player.getSwingAnimation(1f);
+		*///?} else {
+		boolean swinging = player.swinging && player.swingingArm == InteractionHand.MAIN_HAND;
+		float progress = player.swingTime;
+		//?}
+		// neu: vorher kein Schwung, oder er springt zurück (noch im alten Schwung wieder ausgeholt)
+		boolean started = playing.watched && swinging && (!playing.swinging || progress < playing.swingProgress);
+		playing.watched = true;
+		playing.swinging = swinging;
+		playing.swingProgress = progress;
+		return started;
 	}
 
 	private static void restoreCamera(Minecraft mc) {

@@ -8,7 +8,7 @@
  *     "id": "wave",                                   a–z, 0–9, _ (höchstens 24 Zeichen)
  *     "names": { "en_us": "Wave", "de_de": "Winken" }, Anzeigename je Sprache (en_us ist der Rückfall)
  *     "duration": 2.4,                                Sekunden (0.2–15) – oder "loop": true: läuft, bis
- *                                                     sich der Spieler bewegt (höchstens 15 s)
+ *                                                     der Spieler schlägt (höchstens 15 s)
  *     "icon": 0.3,                                    optional: Zeitpunkt für das Symbol im Menü
  *     "tracks": {                                     je Körperteil: head, right_arm, left_arm, right_leg, left_leg
  *       "right_arm": {

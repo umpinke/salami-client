@@ -567,7 +567,7 @@
 	"salami.module.friends": "Freunde",
 	"salami.module.friends.desc": "Salami-Spieler als Freunde hinzufügen und mit ihnen schreiben. Solange an, bist du für deine Freunde online und bekommst ihre Nachrichten.",
 	"salami.module.emotes": "Emotes",
-	"salami.module.emotes.desc": "Winken, jubeln, klatschen, tanzen … B halten öffnet das Emote-Rad. Andere Salami-Spieler sehen deine Emotes live und du ihre. Bewegen beendet ein Emote. Neue Emotes kommen von selbst dazu, ohne Update.",
+	"salami.module.emotes.desc": "Winken, jubeln, klatschen, tanzen … B halten öffnet das Emote-Rad. Andere Salami-Spieler sehen deine Emotes live und du ihre. Du kannst dabei laufen, erst ein Schlag beendet ein Emote. Neue Emotes kommen von selbst dazu, ohne Update.",
 	"salami.module.emotes.setting.camera": "Kamera nach vorn",
 	"salami.module.emotes.setting.camera.desc": "Aus der Ich-Sicht dreht die Kamera für ein Emote nach vorn, damit du dich siehst, und danach zurück.",
 	"salami.module.emotes.setting.share": "Meine Emotes anderen zeigen",

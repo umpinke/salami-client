@@ -28,6 +28,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContex
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.RemotePlayer;
+import net.minecraft.world.InteractionHand;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -39,10 +40,10 @@ import java.util.UUID;
 /**
  * Cosmetics und Emotes: jeder Hut aus dem Katalog (Screenshot von vorn), jeder Buddy an jedem Platz
  * (Hand, Schulter, Kopf, läuft hinterher), Cosmetics-Menü mit Hüten, Buddys und Emotes, Emote-Rad mit
- * Seiten, alle Emotes aus dem Katalog (Haltung wird gezeichnet, Bewegen beendet sie, Kamera kommt
- * zurück), was Emotes mitbringen (der Schneeball fliegt los, die Verwandlung zum Rentier), Kataloge
- * vom Server mit einem neuen Emote, einem neuen Hut und einem offiziellen Cape (kein Update nötig)
- * und das Emote eines anderen Spielers, wie es vom Cape-Server käme.
+ * Seiten, alle Emotes aus dem Katalog (Haltung wird gezeichnet, Laufen beendet sie nicht, erst ein
+ * Schlag, Kamera kommt zurück), was Emotes mitbringen (der Schneeball fliegt los, die Verwandlung zum
+ * Rentier), Kataloge vom Server mit einem neuen Emote, einem neuen Hut und einem offiziellen Cape
+ * (kein Update nötig) und das Emote eines anderen Spielers, wie es vom Cape-Server käme.
  */
 public final class SalamiCosmeticsGameTest implements FabricClientGameTest {
 	@Override
@@ -59,7 +60,7 @@ public final class SalamiCosmeticsGameTest implements FabricClientGameTest {
 			testHats(context, world, modules);
 			testBuddies(context, world, modules);
 			testMenu(context);
-			testOwnEmotes(context, modules);
+			testOwnEmotes(context, world, modules);
 			testEmoteExtras(context, world);
 			testServerCatalog(context);
 			testHatCatalog(context, modules);
@@ -456,7 +457,7 @@ public final class SalamiCosmeticsGameTest implements FabricClientGameTest {
 		context.setScreen(() -> null);
 	}
 
-	private static void testOwnEmotes(ClientGameTestContext context, ModuleManager modules) {
+	private static void testOwnEmotes(ClientGameTestContext context, TestSingleplayerContext world, ModuleManager modules) {
 		EmotesModule module = modules.get(EmotesModule.class);
 		context.runOnClient(c -> modules.setEnabled(module, true));
 		for (Emote emote : context.computeOnClient(c -> EmoteCatalog.all())) {
@@ -470,15 +471,31 @@ public final class SalamiCosmeticsGameTest implements FabricClientGameTest {
 				"Emotes: " + emote.id() + " pose was never drawn");
 			context.takeScreenshot("salami-85-emote-" + emote.id());
 		}
-		// Bewegen beendet das Emote, die Kamera kommt zurück
-		context.runOnClient(c -> Emotes.play(EmoteCatalog.get("dance")));
+		// Laufen, Springen und Schleichen beenden das Emote nicht: die Beine laufen unter der T-Pose weiter
+		context.runOnClient(c -> Emotes.play(EmoteCatalog.get("tpose")));
 		context.waitTicks(2);
 		context.getInput().holdKey(options -> options.keyUp);
+		context.waitTicks(8);
+		check(context.computeOnClient(c -> Emotes.current()) != null, "Emotes: walking stopped the emote");
+		check(context.computeOnClient(c -> c.player.getDeltaMovement().horizontalDistance()) > 0.05, "Emotes: the player is not walking");
+		context.takeScreenshot("salami-85b-emote-walking");
+		context.getInput().holdKey(options -> options.keyJump);
 		context.waitTicks(3);
+		context.getInput().releaseKey(options -> options.keyJump);
 		context.getInput().releaseKey(options -> options.keyUp);
-		check(context.computeOnClient(c -> Emotes.current()) == null, "Emotes: moving did not stop the emote");
+		context.getInput().holdKey(options -> options.keyShift);
+		context.waitTicks(3);
+		context.getInput().releaseKey(options -> options.keyShift);
+		check(context.computeOnClient(c -> Emotes.current()) != null, "Emotes: jumping or sneaking stopped the emote");
+		// erst ein Schlag beendet es, die Kamera kommt zurück
+		context.getInput().holdKey(options -> options.keyAttack);
+		context.waitTicks(3);
+		context.getInput().releaseKey(options -> options.keyAttack);
+		check(context.computeOnClient(c -> Emotes.current()) == null, "Emotes: hitting did not stop the emote");
 		context.waitTicks(10);
 		check(context.computeOnClient(c -> c.options.getCameraType()) == CameraType.FIRST_PERSON, "Emotes: camera did not come back");
+		world.getServer().runCommand("tp @p 0.5 -60 0.5 0 0");
+		context.waitTicks(5);
 	}
 
 	/**
@@ -542,6 +559,8 @@ public final class SalamiCosmeticsGameTest implements FabricClientGameTest {
 		context.runOnClient(c -> {
 			hats.choose("party");
 			c.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+			// er hat gerade zugeschlagen: ein Schwung, der schon läuft, beendet das neue Emote nicht
+			GametestCompat.swing(other, InteractionHand.MAIN_HAND);
 			Emotes.onRemote(uuid, "dance");
 			Emotes.play(EmoteCatalog.get("cheer"));
 		});
@@ -550,10 +569,16 @@ public final class SalamiCosmeticsGameTest implements FabricClientGameTest {
 		context.takeScreenshot("salami-86-emote-remote");
 		context.runOnClient(c -> Emotes.onRemote(uuid, "gibt_es_nicht")); // unbekannt: ignorieren, laufendes bleibt
 		check(Emotes.playingFor(uuid), "Emotes: unknown emote stopped the running one");
-		// bewegt sich der andere Spieler, endet sein Emote
+		// läuft der andere Spieler, läuft sein Emote weiter – erst wenn er zuschlägt, endet es
 		context.runOnClient(c -> other.snapTo(5.5, -60, 4.5, 180F, 0F));
 		context.waitTicks(2);
-		check(!Emotes.playingFor(uuid), "Emotes: remote emote did not stop when the player moved");
+		check(Emotes.playingFor(uuid), "Emotes: remote emote stopped when the player moved");
+		context.runOnClient(c -> GametestCompat.swing(other, InteractionHand.OFF_HAND));
+		context.waitTicks(8);
+		check(Emotes.playingFor(uuid), "Emotes: remote emote stopped on an off-hand swing");
+		context.runOnClient(c -> GametestCompat.swing(other, InteractionHand.MAIN_HAND));
+		context.waitTicks(3);
+		check(!Emotes.playingFor(uuid), "Emotes: remote emote did not stop when the player hit");
 		// der andere wirft einen Schneeball und wird zum Rentier – so, wie es jeder Mitspieler sieht
 		long launched = EmoteEffects.launchedCount();
 		context.runOnClient(c -> {

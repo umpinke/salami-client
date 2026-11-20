@@ -567,7 +567,7 @@
 	"salami.module.friends": "Friends",
 	"salami.module.friends.desc": "Add Salami players as friends and chat with them. While on, your friends see you online and you get their messages.",
 	"salami.module.emotes": "Emotes",
-	"salami.module.emotes.desc": "Wave, cheer, clap, dance … Hold B for the emote wheel. Other Salami players see your emotes live and you see theirs. Moving ends an emote. New emotes arrive on their own, without an update.",
+	"salami.module.emotes.desc": "Wave, cheer, clap, dance … Hold B for the emote wheel. Other Salami players see your emotes live and you see theirs. You can walk around with one, only hitting ends an emote. New emotes arrive on their own, without an update.",
 	"salami.module.emotes.setting.camera": "Camera to the front",
 	"salami.module.emotes.setting.camera.desc": "In first person the camera turns to the front for an emote, so you see yourself, and back afterwards.",
 	"salami.module.emotes.setting.share": "Show my emotes to others",

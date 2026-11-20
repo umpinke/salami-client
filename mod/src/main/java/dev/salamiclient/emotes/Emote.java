@@ -225,7 +225,7 @@ public final class Emote {
 		return durationMs;
 	}
 
-	/** Läuft, bis sich der Spieler bewegt. */
+	/** Läuft, bis der Spieler schlägt. */
 	public boolean loops() {
 		return loops;
 	}
