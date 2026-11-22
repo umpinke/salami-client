@@ -8,6 +8,7 @@
 //   node scripts/release.mjs --dry-run                        (nur bauen + latest.json schreiben)
 //   node scripts/release.mjs --beta --notes "..."             (Beta, Version z. B. 1.1.0-beta.1)
 //   node scripts/release.mjs --setup-ci                       (CurseForge-Key einmalig als GitHub-Secret)
+//   node scripts/release.mjs --check-signing                  (nur Updater-Schlüssel + Passwort prüfen)
 //   node scripts/release.mjs ... --allow-version-jump         (nur auf ausdrückliche Ansage des Nutzers)
 //
 // Versionsnummer: immer letzte veröffentlichte Version + 0.0.1 (1.8.1 → 1.8.2, Betas 1.8.2-beta.N).
@@ -30,12 +31,22 @@
 // CurseForge-API-Key in %USERPROFILE%\.salami-client\curseforge.key (oder SALAMI_CURSEFORGE_API_KEY)
 // und für macOS/Linux als GitHub-Secret SALAMI_CURSEFORGE_API_KEY (--setup-ci).
 // Der Launcher liest .../releases/latest/download/latest.json (branding.rs: UPDATE_BASE_URL).
+//
+// Signieren ist ein eigener Schritt am Ende (release-signing.mjs): Der Build läuft ohne den
+// Updater-Schlüssel, erst danach signiert `tauri signer sign` alle Update-Dateien (Windows und die
+// heruntergeladenen von macOS/Linux). Hat der Schlüssel ein Passwort, fragt das Skript dort verdeckt
+// danach (oder nimmt TAURI_SIGNING_PRIVATE_KEY_PASSWORD aus der eigenen Shell); ohne Passwort fragt
+// es nicht.
 import { spawnSync } from "node:child_process";
-import { createHash, createPublicKey, verify } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkSigning, signUpdateFiles, takeSigningVars, verifyUpdateSignature } from "./release-signing.mjs";
+
+// Updater-Schlüssel und Passwort aus der eigenen Shell: sofort aus der Umgebung nehmen, damit sie kein
+// Kindprozess erbt (Build, git, gh …) – nur der Signierschritt bekommt sie.
+const signingFromShell = takeSigningVars();
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const tauriDir = join(root, "src-tauri");
@@ -86,6 +97,24 @@ if (flag("--setup-ci")) {
   process.exit(0);
 }
 
+if (flag("--check-signing")) {
+  // Nur prüfen (z. B. nach dem Setzen eines Passworts): Schlüssel + Passwort signieren eine Probedatei,
+  // die Signatur muss zu plugins.updater.pubkey passen – also zu dem, was installierte Launcher annehmen
+  const { pubkey } = JSON.parse(readFileSync(join(tauriDir, "tauri.conf.json"), "utf8")).plugins.updater;
+  try {
+    await checkSigning({
+      cli: join(root, "node_modules", "@tauri-apps", "cli", "tauri.js"),
+      keyFile: join(secretsDir, "updater.key"),
+      fromShell: signingFromShell,
+      pubkey,
+    });
+  } catch (e) {
+    fail(e.message);
+  }
+  console.log("Updater-Schlüssel und Passwort passen: Probedatei signiert und gegen plugins.updater.pubkey geprüft.");
+  process.exit(0);
+}
+
 const tauriConf = JSON.parse(readFileSync(join(tauriDir, "tauri.conf.json"), "utf8"));
 const version = tauriConf.version;
 const tag = `v${version}`;
@@ -123,33 +152,6 @@ function compareVersions(a, b) {
     return p < q ? -1 : 1;
   }
   return 0;
-}
-
-/**
- * Prüft eine Updater-Signatur (minisign, wie `tauri signer sign` sie schreibt) gegen den
- * öffentlichen Schlüssel aus tauri.conf.json – genau das, was installierte Launcher vor einem
- * Update tun. So geht nie ein Release raus, das sie ablehnen würden.
- */
-function verifyUpdateSignature(file, signature, pubkey) {
-  const decode = (b64) => Buffer.from(b64, "base64").toString("utf8").trim().split(/\r?\n/);
-  const keyBytes = Buffer.from(decode(pubkey)[1] ?? "", "base64");
-  const [, sigLine = "", trustedLine = "", globalLine = ""] = decode(signature);
-  const sigBytes = Buffer.from(sigLine, "base64");
-  if (keyBytes.length !== 42 || sigBytes.length !== 74) return false;
-  if (!sigBytes.subarray(2, 10).equals(keyBytes.subarray(2, 10))) return false;
-  const key = createPublicKey({
-    key: Buffer.concat([Buffer.from("302a300506032b6570032100", "hex"), keyBytes.subarray(10)]),
-    format: "der",
-    type: "spki",
-  });
-  const data = readFileSync(file);
-  // „ED“ = vorab gehasht (BLAKE2b-512), „Ed“ = Datei direkt signiert
-  const message = sigBytes.subarray(0, 2).toString() === "ED" ? createHash("blake2b512").update(data).digest() : data;
-  const trusted = Buffer.from(trustedLine.replace(/^trusted comment: /, ""));
-  return (
-    verify(null, message, key, sigBytes.subarray(10)) &&
-    verify(null, Buffer.concat([sigBytes.subarray(10), trusted]), key, Buffer.from(globalLine, "base64"))
-  );
 }
 
 /** Pakete aus dem Workflow; `platform` = Eintrag in latest.json für die Update-Datei. */
@@ -287,38 +289,34 @@ if (crossPlatform) {
   ciRunId = await startCiRun(repo, commit);
 }
 
-const signingEnv = { ...process.env };
-if (!signingEnv.TAURI_SIGNING_PRIVATE_KEY) {
-  const keyFile = join(secretsDir, "updater.key");
-  if (!existsSync(keyFile)) {
-    console.error(`Signaturschlüssel fehlt: ${keyFile}`);
-    process.exit(1);
-  }
-  signingEnv.TAURI_SIGNING_PRIVATE_KEY = readFileSync(keyFile, "utf8").trim();
+// Der Schlüssel wird erst beim Signieren gelesen – hier nur früh prüfen, dass es ihn gibt
+const updaterKeyFile = join(secretsDir, "updater.key");
+if (!signingFromShell.TAURI_SIGNING_PRIVATE_KEY && !existsSync(updaterKeyFile)) {
+  console.error(`Signaturschlüssel fehlt: ${updaterKeyFile}`);
+  process.exit(1);
 }
-signingEnv.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ??= "";
+const tauriCli = join(root, "node_modules", "@tauri-apps", "cli", "tauri.js");
 
 if (!flag("--skip-build")) {
   // build.rs baut den CurseForge-Key ein – ohne ihn wäre CurseForge im Release aus
-  if (!signingEnv.SALAMI_CURSEFORGE_API_KEY && !readSecret(curseforgeKeyFile)) {
+  if (!process.env.SALAMI_CURSEFORGE_API_KEY && !readSecret(curseforgeKeyFile)) {
     console.error(`CurseForge-API-Key fehlt: ${curseforgeKeyFile} (oder SALAMI_CURSEFORGE_API_KEY)`);
     process.exit(1);
   }
+  // Ohne Updater-Schlüssel bauen (release-local.json: createUpdaterArtifacts aus, wie die macOS/Linux-Builds);
+  // signiert wird unten in einem eigenen Schritt
   run("npx", [
     "yarn@1.22.22", "tauri", "build",
     "--config", "src-tauri/tauri.release-local.json",
     "--config", "src-tauri/tauri.release-windows.json",
-    "--config", "src-tauri/tauri.release-signed.json",
-  ], { env: signingEnv });
+  ]);
 }
 
 const bundleDir = join(tauriDir, "target", "release", "bundle", "nsis");
 const built = join(bundleDir, `Salami Client_${version}_x64-setup.exe`);
-for (const file of [built, `${built}.sig`]) {
-  if (!existsSync(file)) {
-    console.error(`Nicht gefunden: ${file}`);
-    process.exit(1);
-  }
+if (!existsSync(built)) {
+  console.error(`Nicht gefunden: ${built}`);
+  process.exit(1);
 }
 
 // GitHub ersetzt Leerzeichen in Dateinamen – daher ohne Leerzeichen hochladen
@@ -329,8 +327,9 @@ const asset = join(outDir, assetName);
 copyFileSync(built, asset);
 const releaseUrl = (name) => `https://github.com/${repo ?? "OWNER/salami-client"}/releases/download/${tag}/${name}`;
 
-// Eintrag in latest.json → [Datei, Signatur]
-const updates = { "windows-x86_64": [asset, readFileSync(`${built}.sig`, "utf8").trim()] };
+// Update-Dateien je Eintrag in latest.json: [hochgeladene Datei, signierte Datei]. Windows signiert die
+// Datei im Bundle-Ordner (wie früher tauri build, gleicher Name im Signatur-Kommentar).
+const toSign = { "windows-x86_64": [asset, built] };
 const assets = [asset];
 
 if (ciRunId) {
@@ -338,25 +337,34 @@ if (ciRunId) {
   const ciDir = join(outDir, "ci");
   rmSync(ciDir, { recursive: true, force: true });
   run("gh", ["run", "download", String(ciRunId), "--repo", repo, "--dir", ciDir]);
-  // Wie tauri build: Signatur über TAURI_PRIVATE_KEY (Name bei `tauri signer sign`), leeres Passwort
-  const signerEnv = {
-    ...signingEnv,
-    TAURI_PRIVATE_KEY: signingEnv.TAURI_SIGNING_PRIVATE_KEY,
-    TAURI_PRIVATE_KEY_PASSWORD: signingEnv.TAURI_SIGNING_PRIVATE_KEY_PASSWORD,
-  };
   for (const { name, platform } of ciAssets) {
     const suffix = name.slice(`Salami-Client_${version}_`.length).split(".")[0];
     const file = join(ciDir, `launcher-${suffix}`, name);
     if (!existsSync(file)) fail(`Nicht im macOS/Linux-Build: ${name} (stimmt die Version im gepushten Commit?)`);
-    if (platform) {
-      run("npx", ["yarn@1.22.22", "tauri", "signer", "sign", file], { env: signerEnv });
-      updates[platform] = [file, readFileSync(`${file}.sig`, "utf8").trim()];
-    }
+    if (platform) toSign[platform] = [file, file];
     assets.push(file);
   }
 }
 
 const pubkey = tauriConf.plugins.updater.pubkey;
+
+// Eigener Signierschritt: nur `tauri signer sign` bekommt Schlüssel und Passwort
+console.log(`Signiere ${Object.keys(toSign).join(", ")} …`);
+try {
+  await signUpdateFiles({
+    files: Object.values(toSign).map(([, signed]) => signed),
+    cli: tauriCli,
+    keyFile: updaterKeyFile,
+    fromShell: signingFromShell,
+    pubkey,
+  });
+} catch (e) {
+  fail(e.message);
+}
+// Eintrag in latest.json → [Datei, Signatur]
+const updates = Object.fromEntries(
+  Object.entries(toSign).map(([platform, [file, signed]]) => [platform, [file, readFileSync(`${signed}.sig`, "utf8").trim()]]),
+);
 for (const [platform, [file, signature]] of Object.entries(updates)) {
   if (!verifyUpdateSignature(file, signature, pubkey)) {
     fail(`Signatur passt nicht zum Updater-Schlüssel in tauri.conf.json: ${platform} (${file})`);

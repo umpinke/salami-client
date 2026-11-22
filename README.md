@@ -114,18 +114,22 @@ und installiert neuere Versionen selbst – samt mitgelieferter `salami-core`-Mo
    ```
 
    Das Skript startet zuerst den macOS/Linux-Build auf GitHub. Danach baut es den
-   Windows-Installer signiert (`tauri.release-signed.json`) und wartet auf GitHub. Dann signiert
-   es die Mac- und Linux-Updatedateien lokal und prüft alle Signaturen gegen
-   `plugins.updater.pubkey`. Zum Schluss schreibt es `latest.json` für alle Systeme und legt mit
-   `gh` das GitHub-Release `v<version>` mit allen Installern an. Der Release-Commit muss dafür
-   committet und gepusht sein. Mit `--windows-only` geht es wie früher nur um Windows.
+   Windows-Installer – ohne den Updater-Schlüssel – und wartet auf GitHub. Dann signiert es in
+   einem eigenen Schritt (`scripts/release-signing.mjs`) die Windows-, Mac- und Linux-Updatedateien
+   lokal mit `tauri signer sign` und prüft alle Signaturen gegen `plugins.updater.pubkey`. Nur
+   dieser Schritt bekommt Schlüssel und Passwort. Hat der Schlüssel ein Passwort, fragt das Skript
+   hier verdeckt danach (oder nimmt `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` aus der eigenen Shell).
+   Zum Schluss schreibt es `latest.json` für alle Systeme und legt mit `gh` das GitHub-Release
+   `v<version>` mit allen Installern an. Der Release-Commit muss dafür committet und gepusht sein.
+   Mit `--windows-only` geht es wie früher nur um Windows.
 
    Einmalig vorher: den CurseForge-Key als GitHub-Secret hinterlegen (`node scripts/release.mjs --setup-ci`).
 
 Der Signaturschlüssel liegt in `%USERPROFILE%\.salami-client\updater.key` (nicht im Repo, auch
 nicht bei GitHub – die Mac- und Linux-Pakete signiert `release.mjs` lokal).
 **Sichern!** Ohne ihn können installierte Launcher keine Updates mehr annehmen. Der passende
-öffentliche Schlüssel steht in `tauri.conf.json` unter `plugins.updater.pubkey`.
+öffentliche Schlüssel steht in `tauri.conf.json` unter `plugins.updater.pubkey`. Er sollte ein
+Passwort haben; `release.mjs` fragt beim Signieren danach (ohne Passwort fragt es nicht).
 
 ### CurseForge-API-Key
 
