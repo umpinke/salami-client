@@ -60,10 +60,10 @@ public final class HatLayer extends RenderLayer<AvatarRenderState, PlayerModel> 
 				return;
 			}
 			mirror = !leftFree;
-			getParentModel().body.translateAndRotate(poseStack);
+			ModelAnchor.to(poseStack, getParentModel(), getParentModel().body);
 			poseStack.translate((leftFree ? 1f : -1f) * SHOULDER_X / 16f, (-SHOULDER_FLOAT - bob) / 16f, 0f);
 		} else {
-			getParentModel().head.translateAndRotate(poseStack);
+			ModelAnchor.to(poseStack, getParentModel(), getParentModel().head);
 			if (!state.headEquipment.isEmpty()) {
 				// über den Helm (der steht einen Pixel über)
 				poseStack.translate(0f, -1.1f / 16f, 0f);

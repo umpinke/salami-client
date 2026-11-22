@@ -65,7 +65,7 @@ public final class BuddyLayer extends RenderLayer<AvatarRenderState, PlayerModel
 				mirror = !leftFree;
 				// sanftes Schweben: etwa alle drei Sekunden auf und ab, langsam ein wenig pendeln
 				float bob = (float) Math.sin(state.ageInTicks * 0.1f) * buddy.bob();
-				parent.body.translateAndRotate(poseStack);
+				ModelAnchor.to(poseStack, parent, parent.body);
 				poseStack.translate((leftFree ? 1f : -1f) * HatLayer.SHOULDER_X / 16f, (-HatLayer.SHOULDER_FLOAT - bob) / 16f, 0f);
 				float sway = (float) Math.sin(state.ageInTicks * 0.07f) * buddy.sway();
 				if (sway != 0f) {
@@ -73,7 +73,7 @@ public final class BuddyLayer extends RenderLayer<AvatarRenderState, PlayerModel
 				}
 			}
 			case HEAD -> {
-				parent.head.translateAndRotate(poseStack);
+				ModelAnchor.to(poseStack, parent, parent.head);
 				float top = -8f;
 				Hat hat = HatsModule.hatOf(state.id);
 				if (hat != null && hat.anchor() == Hat.Anchor.HEAD) {
@@ -88,7 +88,7 @@ public final class BuddyLayer extends RenderLayer<AvatarRenderState, PlayerModel
 				// unter dem Handende (10 Pixel unter der Schulter), baumelt leicht hin und her
 				MiniMeModule.Wish mini = MiniMeModule.of(player);
 				boolean left = mini == null || mini.place() != MiniMeModule.Place.HAND;
-				(left ? parent.leftArm : parent.rightArm).translateAndRotate(poseStack);
+				ModelAnchor.to(poseStack, parent, left ? parent.leftArm : parent.rightArm);
 				poseStack.translate((left ? 1f : -1f) / 16f, 10.3f / 16f, 0f);
 				poseStack.mulPose(new Quaternionf().rotationZ((float) Math.sin(state.ageInTicks * 0.1f) * 0.12f));
 				// der Nullpunkt des Buddys ist unten: um seine Höhe nach unten, dann hängt er an seinem Scheitel

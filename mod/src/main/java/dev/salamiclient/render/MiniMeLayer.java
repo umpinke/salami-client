@@ -61,7 +61,7 @@ public final class MiniMeLayer extends RenderLayer<AvatarRenderState, PlayerMode
 		switch (wish.place()) {
 			case HAND -> {
 				// linke Hand (dort ist meist nichts): Handende 10 Pixel unter der Schulter
-				parent.leftArm.translateAndRotate(poseStack);
+				ModelAnchor.to(poseStack, parent, parent.leftArm);
 				poseStack.translate(1f / 16f, 10.5f / 16f, 0f);
 				poseStack.scale(SCALE, SCALE, SCALE);
 				float[] hand = MiniMeModel.hangingHand(slim);
@@ -70,7 +70,7 @@ public final class MiniMeLayer extends RenderLayer<AvatarRenderState, PlayerMode
 			}
 			case SHOULDER -> {
 				// rechte Schulter (links schwebt ggf. die Weihnachtsmütze), Hüfte auf der Schulter
-				parent.body.translateAndRotate(poseStack);
+				ModelAnchor.to(poseStack, parent, parent.body);
 				poseStack.translate(-6.8f / 16f, -0.2f / 16f, 0f);
 				poseStack.scale(SCALE, SCALE, SCALE);
 				poseStack.translate(0f, -12f / 16f, 0f);
@@ -78,7 +78,7 @@ public final class MiniMeLayer extends RenderLayer<AvatarRenderState, PlayerMode
 			}
 			case HEAD -> {
 				// oben auf dem Kopf, dreht sich mit dem Kopf
-				parent.head.translateAndRotate(poseStack);
+				ModelAnchor.to(poseStack, parent, parent.head);
 				poseStack.translate(0f, -8.6f / 16f, 0f);
 				poseStack.scale(SCALE, SCALE, SCALE);
 				poseStack.translate(0f, -12f / 16f, 0f);
