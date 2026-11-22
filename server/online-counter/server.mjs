@@ -9,6 +9,8 @@
  *
  *   POST /v1/heartbeat  {"id":"<uuid>"}  → {"online":42}
  *   POST /v1/leave      {"id":"<uuid>"}  → {"online":41}
+ *        nur mit Content-Type application/json und ohne Origin (der Launcher), sonst 415 –
+ *        damit keine Webseite ihre Besucher per fetch(…, {mode: "no-cors"}) mitzählen lassen kann
  *   GET  /v1/online                      → {"online":41}   (CORS offen, z. B. für die Website)
  *   GET  /health                         → ok
  *
@@ -105,15 +107,26 @@ function rateLimited(ip, now = Date.now()) {
   return r.count > RATE_PER_MINUTE;
 }
 
-function send(res, status, body) {
+/** cors: nur GET /v1/online ist für fremde Webseiten (z. B. die Website) lesbar. */
+function send(res, status, body, { cors = false } = {}) {
   const json = JSON.stringify(body);
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
-    "Access-Control-Allow-Origin": "*",
+    ...(cors ? { "Access-Control-Allow-Origin": "*" } : {}),
     "Content-Length": Buffer.byteLength(json),
   });
   res.end(json);
+}
+
+/**
+ * Lebenszeichen kommen nur vom Launcher: JSON und ohne Origin. Eine fremde Webseite kann ohne Preflight
+ * nur text/plain & Co. schicken (fetch mit mode "no-cors"), den Preflight für JSON erlaubt dieser Server
+ * nicht – und Browser schicken bei POST immer einen Origin mit. So kann keine Webseite ihre Besucher mitzählen.
+ */
+function fromLauncher(req) {
+  const type = String(req.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase();
+  return type === "application/json" && req.headers.origin === undefined;
 }
 
 function readId(req) {
@@ -159,10 +172,14 @@ const server = createServer(async (req, res) => {
   }
 
   if (req.method === "GET" && path === "/v1/online") {
-    return send(res, 200, { online: sessions.size });
+    return send(res, 200, { online: sessions.size }, { cors: true });
   }
 
   if (req.method === "POST" && (path === "/v1/heartbeat" || path === "/v1/leave")) {
+    if (!fromLauncher(req)) {
+      req.resume();
+      return send(res, 415, { error: "application/json required" });
+    }
     const ip = clientIp(req);
     if (rateLimited(ip)) return send(res, 429, { error: "too many requests" });
     const id = await readId(req);

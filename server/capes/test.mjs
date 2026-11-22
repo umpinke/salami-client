@@ -276,6 +276,8 @@ test("png: lehnt Nicht-Capes und Müll ab", () => {
 test("Anmeldung: ohne Mojang-Join und mit verbrauchter serverId abgelehnt", async () => {
   assert.equal((await setCape("Salamander", { builtin: "salami" }, { join: false })).status, 401);
   const { body } = await call("POST", "/v1/auth/challenge");
+  // Präfix, das kein echter Minecraft-Server-Hash hat: nur so etwas unterschreiben die Clients bei Mojang
+  assert.match(body.serverId, /^salami-[0-9a-f]{32}$/);
   joined.add(`Salamander|${body.serverId}`);
   assert.equal((await call("PUT", "/v1/capes/me", { name: "Salamander", serverId: body.serverId, cape: null })).status, 200);
   joined.add(`Salamander|${body.serverId}`);

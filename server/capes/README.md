@@ -17,7 +17,7 @@ Adresse: **https://salami-client-zaehler.umpinke.de/capes** – derselbe nginx u
 - **Ungeprüfte Capes, die niemand mehr trägt**, verschwinden automatisch aus der Warteschlange – außer sie wurden im Launcher eingereicht (Prüfseite: „niemand (im Launcher eingereicht)“).
 - Gespeichert wird pro Spieler: UUID, Name, gewähltes Cape. Mitspieler-Abfragen (welche UUIDs auf deinem Server sind) werden nicht protokolliert.
 - **Melden**: Ein freigegebenes Cape, das gegen die Cape-Regeln verstößt, kann jeder Salami-Spieler im Launcher in der „Galerie“ melden (`/v1/capes/report`, angemeldet wie beim Einreichen, eine Meldung pro Spieler und Cape; offizielle Capes lassen sich nicht melden). Ab 3 Meldungen verschiedener Spieler ist das Cape sofort für alle versteckt und wartet wieder auf Prüfung. Auf der Prüf-Webseite steht es unter „Gemeldet“.
-- Grenzen: 10 neue Capes pro Spieler und Tag, höchstens 500 Capes in der Warteschlange, Anfragen pro IP begrenzt, nach 10 falschen Admin-Schlüsseln ist die IP 10 Minuten gesperrt.
+- Grenzen: 10 neue Capes pro Spieler und Tag, höchstens 500 Capes in der Warteschlange, Anfragen pro IP begrenzt (IPv6 pro /64-Netz), nach 10 falschen Admin-Schlüsseln ist die IP 10 Minuten gesperrt. Große Anfragen (Cape-Bilder) liest der Server erst nach der Anmeldung bzw. nur auf wenigen Plätzen und höchstens 30 s lang; der Dienst hat ein Speicherlimit (`MemoryMax` in `salami-capes.service`) und stürzt bei voller Platte nicht ab.
 
 Benötigt **Node.js 18 oder neuer**. Es gibt keine Abhängigkeiten und kein `npm install`.
 
@@ -26,11 +26,11 @@ Benötigt **Node.js 18 oder neuer**. Es gibt keine Abhängigkeiten und kein `npm
 Salami-Spieler können sich gegenseitig als Freunde hinzufügen, sehen, wer von ihren Freunden gerade spielt, und sich kurze Nachrichten schreiben – im Spiel (salami-core) und im Launcher (Reiter „Freunde“, dort auch mit Bildern und Clips). Der Code steckt in `friends.mjs`, die Daten in `friends.json` im Datenordner.
 
 - **Anmeldung** wie bei den Capes: Challenge holen, bei Mojang anmelden (`joinServer`), dann `POST /v1/friends/session`. Der Server gibt ein zufälliges Token zurück, 30 Tage gültig. Pro Spieler gelten höchstens 5 Tokens (Spiel, Launcher, zweiter PC …), beim sechsten fällt das älteste weg. Gespeichert wird nur der SHA-256 des Tokens: ein Neustart meldet niemanden ab, und wer `friends.json` liest, kann sich damit nicht anmelden. Alle anderen Anfragen schicken `Authorization: Bearer <token>`. Fehlt es oder ist es abgelaufen, kommt `401 {"error":"nicht angemeldet"}` und der Client meldet sich einfach neu an.
-- **Freundesanfragen** gehen per Minecraft-Name (Groß-/Kleinschreibung egal), aber nur an Spieler, die sich schon einmal mit dem Salami Client angemeldet haben. Fragen sich zwei gegenseitig an, sind sie sofort befreundet. Ablehnen und Zurückziehen ist dieselbe Anfrage (`deny`). Offene Anfragen verfallen nach 30 Tagen.
+- **Freundesanfragen** gehen per Minecraft-Name (Groß-/Kleinschreibung egal), aber nur an Spieler, die sich schon einmal mit dem Salami Client angemeldet haben. Fragen sich zwei gegenseitig an, sind sie sofort befreundet. Ablehnen und Zurückziehen ist dieselbe Anfrage (`deny`). Offene Anfragen verfallen nach 30 Tagen. Jede neue Anfrage klingelt beim anderen, deshalb: denselben Spieler erst 10 Minuten nach der letzten neuen Anfrage wieder anfragen (sonst `429`), höchstens 30 neue Anfragen pro Stunde (`FRIENDS_REQUEST_COOLDOWN_MS`, `FRIENDS_REQUESTS_PER_HOUR`). Eine noch offene Anfrage zu wiederholen zählt nicht.
 - **Online** ist, wer mindestens eine Live-Verbindung (`/v1/friends/events`) offen hat. Der Launcher verbindet sich mit `?client=launcher`, das Spiel ohne Angabe. Freunde sehen dazu `status`: `"game"` (im Spiel, hat Vorrang) oder `"launcher"`, offline `null`. Ändert sich das (Spiel startet, während der Launcher offen ist), kommt ein weiteres `presence`-Ereignis. Bricht die letzte ab, wartet der Server 10 s, bevor die Freunde „offline“ sehen – kurzes Neuverbinden flackert also nicht.
 - **Nachrichten** gibt es nur zwischen Freunden, 1–256 Zeichen. Steuerzeichen und `§` (Minecraft-Farbcodes) werden entfernt, Leerzeichen am Anfang und Ende abgeschnitten. Jede Nachricht kommt sofort beim Empfänger an und auch auf allen Verbindungen des Absenders (zweiter Client). Ungelesene zählt der Server pro Freund mit, Abrufen des Verlaufs oder `read` setzt den Zähler zurück.
 - **Bilder und Clips** (`POST /v1/friends/media?to=<uuid>&name=<Dateiname>`, Körper = die Datei, `Content-Type` = ihr Typ): PNG, JPEG, WebP bis 10 MB, MP4 und WebM bis 50 MB, nur an Freunde. Der Server prüft Typ und die ersten Bytes, schreibt die Datei nach `friends-media/` im Datenordner und legt eine Nachricht mit `media: { id, kind: "image"|"clip", mime, size, name }` an. Ihr `text` ist `[Bild] <Name>` bzw. `[Clip] <Name>` – das zeigen Clients, die keine Anhänge kennen. Abholen mit `GET /v1/friends/media/<id>` (Token nötig): nur die beiden, zwischen denen die Datei verschickt wurde, alle anderen bekommen 404. Die Datei verschwindet zusammen mit ihrer Nachricht (30 Tage, mehr als 100 Nachrichten, Freundschaft beendet). Jeder Spieler hat 500 MB für seine verschickten Dateien; ist das voll, laufen seine ältesten ab – die Nachricht bleibt und trägt `media.expired: true`. Höchstens 10 Dateien in 10 Minuten pro Spieler, alle Dateien zusammen höchstens 20 GB (danach `507`). Einstellbar: `FRIENDS_IMAGE_MB`, `FRIENDS_CLIP_MB`, `FRIENDS_MEDIA_QUOTA_MB`, `FRIENDS_MEDIA_TOTAL_MB`.
-- **Grenzen**: 100 Freunde pro Spieler, 50 eigene offene Anfragen, 100 offene Anfragen an denselben Spieler, 8 Nachrichten in 10 Sekunden, 5 Live-Verbindungen pro Spieler, 240 Anfragen pro IP und Minute. Die Anmeldung zählt wie die Cape-Anmeldung zu `RATE_PER_MINUTE`, die Live-Verbindungen zusätzlich zu `MAX_STREAMS` und `MAX_STREAMS_PER_IP`.
+- **Grenzen**: 100 Freunde pro Spieler, 50 eigene offene Anfragen, 100 offene Anfragen an denselben Spieler, 8 Nachrichten in 10 Sekunden, 5 Live-Verbindungen pro Spieler, 240 Anfragen pro IP und Minute. Die Anmeldung zählt wie die Cape-Anmeldung zu `RATE_PER_MINUTE`, die Live-Verbindungen zusätzlich zu `MAX_STREAMS` und `MAX_STREAMS_PER_IP`. Bilder und Clips: höchstens 2 Uploads gleichzeitig pro Spieler und 32 insgesamt (sonst `503`); kommt 30 s lang kein Byte, bricht der Server den Upload ab (`FRIENDS_MAX_UPLOADS_PER_PLAYER`, `FRIENDS_MAX_UPLOADS`, `FRIENDS_UPLOAD_IDLE_MS`).
 - **Datenschutz**:
   - Nachrichten liegen **im Klartext** auf dem Server (`friends.json`), höchstens 30 Tage lang und höchstens die letzten 100 pro Gespräch. Beendet einer die Freundschaft, ist das Gespräch für beide weg.
   - Es gibt keine Admin-API und keine Webseite, um Nachrichten zu lesen, und sie landen nicht im Log. Wer Zugriff auf den Server selbst hat, könnte die Datei aber öffnen.
@@ -96,6 +96,8 @@ Live-Ereignisse auf `/v1/friends/events` (Token in der `Authorization`-Kopfzeile
        client_max_body_size 55m;
        # Uploads direkt durchreichen statt erst auf die Platte zu puffern
        proxy_request_buffering off;
+       # hängende Uploads nicht ewig offen halten (Zeit zwischen zwei Paketen, nicht für die ganze Datei)
+       client_body_timeout 30s;
        # Live-Verbindung (/v1/capes/events): nicht puffern, lange offen lassen
        proxy_buffering off;
        proxy_read_timeout 1h;
@@ -108,7 +110,7 @@ Live-Ereignisse auf `/v1/friends/events` (Token in der `Authorization`-Kopfzeile
 
 6. **Adresse in den Launcher eintragen**: `CAPE_SERVER_URL` in `launcher/src-tauri/src/branding.rs`. Der Launcher gibt sie beim Spielstart als `-Dsalami.capes.url` an salami-core weiter. Danach ein Update veröffentlichen.
 
-Logs: `journalctl -u salami-capes -f`. Nach einem Update der Dateien: `sudo systemctl restart salami-capes`. Zum Dienst gehören alle `.mjs`-Dateien aus `server/capes` (`server.mjs`, `friends.mjs`, `png.mjs`, `catalog.mjs`, `emotes.mjs`, `hats.mjs`, `buddies.mjs`, `official.mjs`) – fehlt eine, startet er nicht. Dazu kommen die Kataloge `emotes.json`, `hats.json`, `buddies.json`, `official-capes.json` und der Ordner `official-capes/` (Schritt 2); ohne einen Katalog gibt es die Emotes, Hüte, Buddys oder offiziellen Capes einfach nicht. Die Daten liegen in `/var/lib/salami-capes` (`capes.json`, `friends.json` und `images/`) – diesen Ordner ins Backup aufnehmen.
+Logs: `journalctl -u salami-capes -f`. Nach einem Update der Dateien: `sudo systemctl restart salami-capes`. Zum Dienst gehören alle `.mjs`-Dateien aus `server/capes` (`server.mjs`, `friends.mjs`, `limits.mjs`, `png.mjs`, `catalog.mjs`, `emotes.mjs`, `hats.mjs`, `buddies.mjs`, `official.mjs`) – fehlt eine, startet er nicht. Dazu kommen die Kataloge `emotes.json`, `hats.json`, `buddies.json`, `official-capes.json` und der Ordner `official-capes/` (Schritt 2); ohne einen Katalog gibt es die Emotes, Hüte, Buddys oder offiziellen Capes einfach nicht. Die Daten liegen in `/var/lib/salami-capes` (`capes.json`, `friends.json` und `images/`) – diesen Ordner ins Backup aufnehmen.
 
 ## Capes prüfen
 
@@ -272,7 +274,17 @@ Verstößt ein freigegebenes Cape doch dagegen und jemand meldet es: schnell pr�
 | `UPLOADS_PER_DAY` | `10` | Neue eigene Capes pro Spieler und Tag |
 | `MAX_PENDING` | `500` | Höchstens so viele Capes in der Warteschlange |
 | `MAX_STREAMS` | `5000` | Höchstens so viele Live-Verbindungen insgesamt (Capes und Freunde zusammen) |
-| `MAX_STREAMS_PER_IP` | `20` | Live-Verbindungen pro IP (Capes und Freunde zusammen, ein Spiel braucht meist zwei) |
+| `MAX_ANON_STREAMS` | 60 % von `MAX_STREAMS` | Davon höchstens so viele ohne Anmeldung (`/v1/capes/events`) – der Rest bleibt den Freunde-Verbindungen |
+| `MAX_STREAMS_PER_IP` | `20` | Live-Verbindungen pro IP (Capes und Freunde zusammen, ein Spiel braucht meist zwei). Wie alle Grenzen „pro IP“ zählt IPv6 pro /64-Netz |
+| `MAX_CHALLENGES` | `50000` | Höchstens so viele offene Anmelde-Challenges (60 s gültig) |
+| `MAX_CHALLENGES_PER_IP` | `20` | Offene Challenges pro IP, danach `429` |
+| `MAX_EMOTE_SESSIONS` | `20000` | Emote-Anmeldungen im Speicher; ist er voll, fällt die älteste weg |
+| `MAX_EMOTE_SESSIONS_PER_PLAYER` | `5` | Emote-Anmeldungen pro Spieler, bei der nächsten fällt seine älteste weg |
+| `MAX_BIG_BODIES` | `16` | Gleichzeitige große Anfragen (Cape-Bilder) mit Anmeldung per Kopfzeilen, eine je Spieler |
+| `MAX_ANON_BIG_BODIES` | `4` | Gleichzeitige große Anfragen ohne Anmelde-Kopfzeilen (ältere Clients), danach `503` |
+| `MAX_ANON_BIG_BODIES_PER_IP` | `1` | Davon pro IP |
+| `BODY_TIMEOUT_MS` | `30000` | So lange darf der Körper einer Anfrage brauchen, danach wird die Verbindung getrennt |
+| `SAVE_RETRY_MS` | `30000` | Schlägt das Speichern fehl (z. B. Platte voll), läuft der Server weiter und versucht es nach dieser Zeit nochmal |
 | `REPORTS_TO_HIDE` | `3` | Ab so vielen Meldungen verschiedener Spieler ist ein Cape sofort versteckt |
 | `REPORTS_PER_DAY` | `20` | Meldungen pro Spieler und Tag |
 | `EMOTES_PER_MINUTE` | `20` | Emotes pro Spieler und Minute |
@@ -284,6 +296,11 @@ Verstößt ein freigegebenes Cape doch dagegen und jemand meldet es: schnell pr�
 | `CATALOG_RELOAD_MS` | `30000` | So oft (ms) wird nachgesehen, ob sich ein Katalog geändert hat |
 | `FRIENDS_RATE_PER_MINUTE` | `240` | Freunde- und Chat-Anfragen pro IP und Minute (die Anmeldung zählt zu `RATE_PER_MINUTE`) |
 | `FRIENDS_OFFLINE_GRACE_MS` | `10000` | So lange (ms) nach der letzten Live-Verbindung gilt ein Spieler noch als online |
+| `FRIENDS_REQUEST_COOLDOWN_MS` | `600000` | So lange (ms) nach einer neuen Freundesanfrage darf derselbe Spieler denselben nicht neu anfragen |
+| `FRIENDS_REQUESTS_PER_HOUR` | `30` | Neue Freundesanfragen pro Spieler und Stunde |
+| `FRIENDS_MAX_UPLOADS` | `32` | Gleichzeitige Uploads von Bildern und Clips insgesamt |
+| `FRIENDS_MAX_UPLOADS_PER_PLAYER` | `2` | Davon pro Spieler |
+| `FRIENDS_UPLOAD_IDLE_MS` | `30000` | Kommt so lange kein Byte eines Uploads, wird er abgebrochen |
 
 ## Testen
 
@@ -291,14 +308,14 @@ Verstößt ein freigegebenes Cape doch dagegen und jemand meldet es: schnell pr�
 node --test server/capes/*test.mjs
 ```
 
-Startet den Server mit einem nachgebauten Mojang-Dienst und prüft Anmeldung, Warteschlange, Freigabe, Galerie, Meldungen, PNG-Prüfung und Admin-Sperre (`test.mjs`) sowie Freunde, Nachrichten und Live-Ereignisse (`friends.test.mjs`). Einen Ordner (`node --test server/capes/`) nimmt Node 22+ nicht mehr an, daher das Muster.
+Startet den Server mit einem nachgebauten Mojang-Dienst und prüft Anmeldung, Warteschlange, Freigabe, Galerie, Meldungen, PNG-Prüfung und Admin-Sperre (`test.mjs`) sowie Freunde, Nachrichten und Live-Ereignisse (`friends.test.mjs`). `limits.test.mjs` startet für jeden Test einen eigenen Server mit kleinen Grenzen und prüft den Schutz gegen Überlastung: Challenges pro IP und /64, große Anfragen (Kopfzeilen-Anmeldung, Plätze, Zeitlimit), Emote-Anmeldungen pro Spieler, Platz für Freunde-Verbindungen, Sperrfrist für Freundesanfragen, hängende Uploads, Speichern bei voller Platte und den Online-Zähler. Einen Ordner (`node --test server/capes/`) nimmt Node 22+ nicht mehr an, daher das Muster.
 
 ## API
 
 | Anfrage | Antwort |
 |---|---|
-| `POST /v1/auth/challenge` | `{"serverId":"…"}`, 60 s gültig, nur einmal verwendbar |
-| `PUT /v1/capes/me` mit `{"name","serverId","cape","hat"?,"minime"?,"buddy"?}` | `{"status":"approved"\|"pending"\|"rejected","id"?,"reason"?}` – `cape`: `{"builtin":"salami"}`, `{"png":"<base64>"}` oder `null` – `hat`: ein Hut aus dem Katalog (`"santa"`, `"crown"` …, Cosmetics → Hüte) oder weglassen; unbekannte Hüte werden ignoriert – `minime`: `{"name":"<Minecraft-Name>","place":"hand"\|"shoulder"\|"head"\|"follow"}` (Cosmetics → Mini Me) oder weglassen; Ungültiges wird ignoriert – `buddy`: `{"id":"tree_buddy","place":"hand"\|"shoulder"\|"head"\|"follow"}` (Cosmetics → Buddys, ein Buddy aus dem Katalog) oder weglassen; Unbekanntes wird ignoriert |
+| `POST /v1/auth/challenge` | `{"serverId":"salami-<32 Hex-Zeichen>"}`, 60 s gültig, nur einmal verwendbar, höchstens 20 offene pro IP (`429`). Das Präfix `salami-` hat kein echter Minecraft-Server-Hash: Launcher und Spiel melden nur solche serverIds bei Mojang an (`^salami-[0-9a-f]{32,64}$`), damit ein übernommener Server sie nie die Anmeldung für einen fremden Minecraft-Server unterschreiben lässt. Clients ab dieser Version lehnen andere serverIds ab |
+| `PUT /v1/capes/me` mit `{"name","serverId","cape","hat"?,"minime"?,"buddy"?}` | `{"status":"approved"\|"pending"\|"rejected","id"?,"reason"?}` – neuere Clients schicken `name` und `serverId` zusätzlich als Kopfzeilen `X-Salami-Name` und `X-Salami-Server-Id`: dann prüft der Server die Anmeldung, bevor er das Bild liest (ohne diese Kopfzeilen gibt es für große Anfragen nur wenige Plätze, sonst `503`; der Körper muss in 30 s da sein) – `cape`: `{"builtin":"salami"}`, `{"png":"<base64>"}` oder `null` – `hat`: ein Hut aus dem Katalog (`"santa"`, `"crown"` …, Cosmetics → Hüte) oder weglassen; unbekannte Hüte werden ignoriert – `minime`: `{"name":"<Minecraft-Name>","place":"hand"\|"shoulder"\|"head"\|"follow"}` (Cosmetics → Mini Me) oder weglassen; Ungültiges wird ignoriert – `buddy`: `{"id":"tree_buddy","place":"hand"\|"shoulder"\|"head"\|"follow"}` (Cosmetics → Buddys, ein Buddy aus dem Katalog) oder weglassen; Unbekanntes wird ignoriert |
 | `POST /v1/capes/lookup` mit `{"uuids":[…]}` (max. 200) | `{"capes":{"<uuid>":{"builtin":"salami"}\|{"id":"<capeId>"}}}` – nur sichtbare Capes. Trägt der Spieler einen Hut, steht zusätzlich `"hat":"santa"` darin (auch ohne Cape: `{"hat":"santa"}`), ebenso sein Mini Me als `"minime":{"name","place"}` und sein Buddy als `"buddy":{"id","place"}` |
 | `GET /v1/capes/img/<capeId>.png` | freigegebenes Cape-Bild |
 | `GET /v1/capes/gallery` | `{"capes":[{"id","approvedAt","wearers","official"?,"names"?}]}` – alle freigegebenen Capes (höchstens 500): zuerst die offiziellen (`"official":true` und `names`), dann die eigenen der Spieler, neueste zuerst – für die Galerie im Launcher |
@@ -306,11 +323,11 @@ Startet den Server mit einem nachgebauten Mojang-Dienst und prüft Anmeldung, Wa
 | `GET /v1/hats/catalog` | `{"version":"<16 Hex-Zeichen>","hats":[…]}` – alle Hüte aus `hats.json`, geprüft und bereinigt |
 | `GET /v1/buddies/catalog` | `{"version":"<16 Hex-Zeichen>","buddies":[…]}` – alle Buddys aus `buddies.json`, geprüft und bereinigt |
 | `GET /v1/capes/events` | Server-Sent Events: `data: {"uuid":"…","cape":{…}\|null}` bei jeder sichtbaren Änderung, `data: {"emote":{"uuid":"…","id":"wave"}}` bei jedem Emote (ohne `uuid` oben, damit ältere Spiele die Zeile überspringen), `: ping` alle 20 s |
-| `POST /v1/emotes/session` mit `{"name","serverId"}` | `{"token","uuid","name"}` – Anmeldung wie bei `PUT /v1/capes/me`, Token 12 h gültig, nur im Speicher |
+| `POST /v1/emotes/session` mit `{"name","serverId"}` | `{"token","uuid","name"}` – Anmeldung wie bei `PUT /v1/capes/me`, Token 12 h gültig, nur im Speicher; höchstens 5 pro Spieler, bei der nächsten Anmeldung fällt seine älteste weg |
 | `POST /v1/emotes` mit `{"emote":"wave"}` und `Authorization: Bearer <token>` | `{"ok":true}` – erlaubt sind die Emotes aus dem Katalog; unbekannte → 400, ohne gültiges Token → 401, mehr als 20 pro Minute → 429 |
 | `GET /v1/emotes/catalog` | `{"version":"<16 Hex-Zeichen>","emotes":[…]}` – alle Emotes aus `emotes.json`, geprüft und bereinigt. Ändert sich einer der vier Kataloge, kommt auf `/v1/capes/events` zusätzlich `data: {"catalog":"<version>","kind":"emotes"\|"hats"\|"buddies"\|"capes"}` |
 | `POST /v1/capes/status` mit `{"ids":[…]}` (max. 100) | `{"status":{"<capeId>":{"status":"pending",…}}}` – für den Launcher |
-| `POST /v1/capes/submit` mit `{"name","serverId","png"}` | `{"status":"approved"\|"pending"\|"rejected","id","reason"?}` – Launcher reicht ein eigenes Cape zur Prüfung ein, das getragene Cape bleibt |
+| `POST /v1/capes/submit` mit `{"name","serverId","png"}` | `{"status":"approved"\|"pending"\|"rejected","id","reason"?}` – Launcher reicht ein eigenes Cape zur Prüfung ein, das getragene Cape bleibt. Anmeldung zusätzlich als Kopfzeilen wie bei `PUT /v1/capes/me` |
 | `POST /v1/capes/report` mit `{"name","serverId","id","reason","note"?}` | `{"status":"reported"\|"already_reported"}` – freigegebenes Cape melden; `reason`: `logo`, `hate`, `sexual`, `person` oder `other`, `note` höchstens 200 Zeichen |
 | `GET /admin/` | Prüf-Webseite |
 | `GET /v1/admin/capes?status=pending` | Liste für Admins (`Authorization: Bearer <schlüssel>`), `status`: `pending`, `approved`, `rejected` oder `reported` |
@@ -323,7 +340,7 @@ Freunde und Chat: alle Antworten JSON, Fehler als `{"error":"…"}` (für Spiele
 |---|---|
 | `POST /v1/friends/session` mit `{"name","serverId"}` | `{"token","uuid","name"}` – Anmeldung wie bei `PUT /v1/capes/me` (400/401/503 wie dort), Token 30 Tage gültig |
 | `GET /v1/friends` | `{"me":{"uuid","name"},"friends":[{"uuid","name","online","since"}],"incoming":[{"uuid","name","at"}],"outgoing":[{"uuid","name","at"}],"unread":{"<uuid>":3}}` – Freunde online zuerst, dann nach Namen; Anfragen neueste zuerst; `unread` nur Freunde mit mindestens einer ungelesenen Nachricht |
-| `POST /v1/friends/request` mit `{"name"}` | `{"status":"requested","uuid","name"}`, oder `{"status":"friends","uuid","name"}`, wenn der andere mich schon angefragt hatte. Nochmal anfragen: wieder `requested`. 400 Name ungültig oder man selbst, 404 `"<name> nutzt den Salami Client nicht oder war noch nie online"`, 409 schon befreundet oder Freundesliste voll, 429 zu viele offene Anfragen |
+| `POST /v1/friends/request` mit `{"name"}` | `{"status":"requested","uuid","name"}`, oder `{"status":"friends","uuid","name"}`, wenn der andere mich schon angefragt hatte. Nochmal anfragen: wieder `requested`. 400 Name ungültig oder man selbst, 404 `"<name> nutzt den Salami Client nicht oder war noch nie online"`, 409 schon befreundet oder Freundesliste voll, 429 zu viele offene Anfragen, denselben Spieler vor weniger als 10 Minuten neu angefragt oder mehr als 30 neue Anfragen in einer Stunde |
 | `POST /v1/friends/accept` mit `{"uuid"}` | `{"status":"friends","uuid","name"}` – 404 ohne offene Anfrage von `uuid` (schon befreundet: auch 200), 409 Freundesliste voll |
 | `POST /v1/friends/deny` mit `{"uuid"}` | `{"status":"none"}` – Anfrage von `uuid` ablehnen oder eigene an `uuid` zurückziehen, auch wenn es keine (mehr) gibt. Sind beide schon befreundet, ändert `deny` nichts und antwortet `{"status":"friends","uuid","name"}` – beenden geht nur mit `remove` |
 | `POST /v1/friends/remove` mit `{"uuid"}` | `{"status":"none"}` – Freundschaft beenden, Gespräch und Ungelesen-Zähler für beide weg (auch offene Anfragen) |

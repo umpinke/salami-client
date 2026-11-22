@@ -30,6 +30,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { Slots } from "./limits.mjs";
 
 const DAY_MS = 86_400_000;
 /** So lange gilt ein Token, danach meldet sich der Client neu an. */
@@ -138,6 +139,17 @@ export function createFriends({ dataDir, env, verifyPlayer, HttpError, send, rea
   const MEDIA_QUOTA_BYTES = Math.max(env("FRIENDS_MEDIA_QUOTA_MB", 500) * MB, MAX_CLIP_BYTES);
   /** Obergrenze für alle Bilder und Clips zusammen. */
   const MEDIA_TOTAL_BYTES = env("FRIENDS_MEDIA_TOTAL_MB", 20_000) * MB;
+  /** Gleichzeitige Uploads von Bildern und Clips: insgesamt und pro Spieler. */
+  const MAX_MEDIA_UPLOADS = env("FRIENDS_MAX_UPLOADS", 32);
+  const MAX_MEDIA_UPLOADS_PER_PLAYER = env("FRIENDS_MAX_UPLOADS_PER_PLAYER", 2);
+  /** Kommt so lange kein einziges Byte der Datei, wird der Upload abgebrochen. */
+  const UPLOAD_IDLE_MS = env("FRIENDS_UPLOAD_IDLE_MS", 30_000);
+  /** Nach dem Ablehnen oder Zurückziehen darf man denselben Spieler erst nach dieser Zeit wieder anfragen. */
+  const REQUEST_COOLDOWN_MS = env("FRIENDS_REQUEST_COOLDOWN_MS", 10 * 60_000);
+  /** Neue Freundesanfragen pro Spieler und Stunde (an verschiedene Spieler). */
+  const REQUESTS_PER_HOUR = env("FRIENDS_REQUESTS_PER_HOUR", 30);
+  /** Speichern fehlgeschlagen (z. B. Platte voll): so lange bis zum nächsten Versuch. */
+  const SAVE_RETRY_MS = env("SAVE_RETRY_MS", 30_000);
 
   // ---------------------------------------------------------------- Speicher
 
@@ -160,8 +172,17 @@ export function createFriends({ dataDir, env, verifyPlayer, HttpError, send, rea
     clearTimeout(saveTimer);
     saveTimer = null;
     const tmp = `${FILE}.tmp`;
-    writeFileSync(tmp, JSON.stringify(data));
-    renameSync(tmp, FILE);
+    try {
+      writeFileSync(tmp, JSON.stringify(data));
+      renameSync(tmp, FILE);
+    } catch (e) {
+      // z. B. Platte voll: nicht abstürzen, die Daten bleiben im Speicher, später nochmal versuchen
+      console.error(`[salami-capes] friends.json nicht gespeichert (${e.code ?? e.message}), neuer Versuch in ${SAVE_RETRY_MS / 1000} s`);
+      try {
+        rmSync(tmp, { force: true });
+      } catch {}
+      saveTimer = setTimeout(saveNow, SAVE_RETRY_MS);
+    }
   }
   function scheduleSave() {
     if (!saveTimer) saveTimer = setTimeout(saveNow, 500);
@@ -386,6 +407,12 @@ export function createFriends({ dataDir, env, verifyPlayer, HttpError, send, rea
     return { status: "friends", uuid: other, name: nameOf(other) };
   }
 
+  /** "<von>><an>" → Zeitpunkt der letzten neuen Anfrage (für REQUEST_COOLDOWN_MS) */
+  const lastRequest = new Map();
+  /** uuid → Zeitpunkte der eigenen neuen Anfragen in der letzten Stunde */
+  const requestLog = new Map();
+  const REQUEST_WINDOW_MS = 3_600_000;
+
   async function handleRequest(req, res, me) {
     const body = await readJson(req, maxBody);
     const name = typeof body.name === "string" ? body.name.trim() : "";
@@ -410,7 +437,19 @@ export function createFriends({ dataDir, env, verifyPlayer, HttpError, send, rea
     if (outgoing >= MAX_OUTGOING) throw new HttpError(429, "zu viele offene Freundesanfragen");
     if (incoming >= MAX_INCOMING) throw new HttpError(429, `${nameOf(other)} hat zu viele offene Freundesanfragen`);
 
-    data.requests.push({ from: me.uuid, to: other, at: new Date().toISOString() });
+    // Jede neue Anfrage klingelt beim anderen: anfragen, zurückziehen, wieder anfragen … darf nicht zum Spam werden
+    const now = Date.now();
+    const pair = `${me.uuid}>${other}`;
+    if (now - (lastRequest.get(pair) ?? -Infinity) < REQUEST_COOLDOWN_MS) {
+      throw new HttpError(429, `du hast ${nameOf(other)} gerade erst angefragt, bitte später nochmal`);
+    }
+    const recent = (requestLog.get(me.uuid) ?? []).filter((t) => now - t < REQUEST_WINDOW_MS);
+    requestLog.set(me.uuid, recent);
+    if (recent.length >= REQUESTS_PER_HOUR) throw new HttpError(429, "zu viele Freundesanfragen, bitte später nochmal");
+    recent.push(now);
+    lastRequest.set(pair, now);
+
+    data.requests.push({ from: me.uuid, to: other, at: new Date(now).toISOString() });
     scheduleSave();
     emit(other, { type: "request", uuid: me.uuid, name: me.name });
     send(res, 200, requested);
@@ -575,15 +614,27 @@ export function createFriends({ dataDir, env, verifyPlayer, HttpError, send, rea
       let size = 0;
       let head = Buffer.alloc(0);
       let settled = false;
+      // Hängende Uploads (kein Byte mehr seit UPLOAD_IDLE_MS) belegen sonst Platz und Verbindung
+      let idle = null;
+      const stillAlive = () => {
+        clearTimeout(idle);
+        idle = setTimeout(() => {
+          fail(new HttpError(408, "Upload hängt, abgebrochen"));
+          req.destroy();
+        }, UPLOAD_IDLE_MS);
+      };
       const fail = (error) => {
         if (settled) return;
         settled = true;
+        clearTimeout(idle);
         out.once("close", () => rmSync(file, { force: true }));
         out.destroy();
         reject(error);
       };
+      stillAlive();
       req.on("data", (chunk) => {
         if (settled) return;
+        stillAlive();
         size += chunk.length;
         if (size > limit) {
           fail(new HttpError(413, "Datei ist zu groß"));
@@ -598,7 +649,9 @@ export function createFriends({ dataDir, env, verifyPlayer, HttpError, send, rea
       });
       req.on("end", () => {
         if (settled) return;
+        clearTimeout(idle);
         out.end(() => {
+          if (settled) return;
           settled = true;
           resolve({ size, head });
         });
@@ -613,6 +666,9 @@ export function createFriends({ dataDir, env, verifyPlayer, HttpError, send, rea
 
   /** uuid → Zeitpunkte der letzten Uploads (für 10 in 10 min) */
   const uploaded = new Map();
+  /** Laufende Uploads (gleichzeitig) und die Bytes, die sie angekündigt haben */
+  const uploadSlots = new Slots(MAX_MEDIA_UPLOADS, MAX_MEDIA_UPLOADS_PER_PLAYER);
+  let pendingBytes = 0;
 
   /** POST /v1/friends/media?to=<uuid>&name=<Dateiname>, Körper = die Datei, Content-Type = ihr Typ */
   async function handleUpload(req, res, me, url) {
@@ -621,6 +677,8 @@ export function createFriends({ dataDir, env, verifyPlayer, HttpError, send, rea
     let type;
     let mime;
     let limit;
+    let declared;
+    let release;
     try {
       other = uuidParam(url.searchParams.get("to"), "to");
       if (!areFriends(me.uuid, other)) throw new HttpError(403, "ihr seid keine Freunde");
@@ -628,16 +686,21 @@ export function createFriends({ dataDir, env, verifyPlayer, HttpError, send, rea
       type = Object.hasOwn(MEDIA_TYPES, mime) ? MEDIA_TYPES[mime] : null;
       if (!type) throw new HttpError(415, "nur PNG, JPEG, WebP, MP4 und WebM");
       limit = type.kind === "image" ? MAX_IMAGE_BYTES : MAX_CLIP_BYTES;
-      const declared = Number(req.headers["content-length"]);
+      declared = Number(req.headers["content-length"]);
       if (!Number.isInteger(declared) || declared <= 0) throw new HttpError(411, "Content-Length fehlt");
       if (declared > limit) {
         throw new HttpError(413, `${type.kind === "image" ? "Bild" : "Clip"} ist zu groß (höchstens ${Math.floor(limit / MB)} MB)`);
       }
-      if (mediaBytes + declared > MEDIA_TOTAL_BYTES) throw new HttpError(507, "der Speicher für Bilder und Clips ist voll");
+      // auch die Uploads mitzählen, die gerade noch laufen
+      if (mediaBytes + pendingBytes + declared > MEDIA_TOTAL_BYTES) {
+        throw new HttpError(507, "der Speicher für Bilder und Clips ist voll");
+      }
       const now = Date.now();
       const recent = (uploaded.get(me.uuid) ?? []).filter((t) => now - t < MEDIA_WINDOW_MS);
       uploaded.set(me.uuid, recent);
       if (recent.length >= MEDIA_BURST) throw new HttpError(429, "zu viele Bilder und Clips, kurz warten");
+      release = uploadSlots.acquire(me.uuid);
+      if (!release) throw new HttpError(503, "gerade zu viele Uploads, bitte gleich nochmal versuchen");
       recent.push(now);
     } catch (e) {
       req.resume();
@@ -646,7 +709,15 @@ export function createFriends({ dataDir, env, verifyPlayer, HttpError, send, rea
 
     const id = randomBytes(16).toString("hex");
     const part = join(MEDIA_DIR, `${id}.part`);
-    const { size, head } = await receive(req, part, limit);
+    pendingBytes += declared;
+    let received;
+    try {
+      received = await receive(req, part, limit);
+    } finally {
+      pendingBytes -= declared;
+      release();
+    }
+    const { size, head } = received;
     const reject = (status, message) => {
       rmSync(part, { force: true });
       return new HttpError(status, message);
@@ -732,6 +803,8 @@ export function createFriends({ dataDir, env, verifyPlayer, HttpError, send, rea
     }
     for (const [uuid, times] of sent) if (!times.some((t) => now - t < MESSAGE_WINDOW_MS)) sent.delete(uuid);
     for (const [uuid, times] of uploaded) if (!times.some((t) => now - t < MEDIA_WINDOW_MS)) uploaded.delete(uuid);
+    for (const [pair, at] of lastRequest) if (now - at >= REQUEST_COOLDOWN_MS) lastRequest.delete(pair);
+    for (const [uuid, times] of requestLog) if (!times.some((t) => now - t < REQUEST_WINDOW_MS)) requestLog.delete(uuid);
     if (changed) scheduleSave();
   }
   sweep(); // nach längerer Pause gleich aufräumen
