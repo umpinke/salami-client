@@ -67,6 +67,10 @@ public final class ModsScreen extends Screen {
 	private String query = "";
 	private double scroll;
 	private float uiScale = 1f;
+	/** Menü-Taste gedrückt, Suche leer: beim Loslassen schließen (außer es wurde dazwischen getippt). */
+	private boolean closeOnRelease;
+	/** Das nächste Zeichen stammt von der Menü-Taste selbst (siehe keyPressed). */
+	private boolean menuKeyChar;
 
 	/** Eine Karte zeigt entweder ein Salami-Modul oder eine mitgelieferte Mod. */
 	private record Card(Module module, ExternalMods.Entry external, int x, int y, int index) {}
@@ -85,7 +89,7 @@ public final class ModsScreen extends Screen {
 
 	@Override
 	public boolean isPauseScreen() {
-		return false;
+		return SalamiMenuScreen.pausesGame();
 	}
 
 	@Override
@@ -212,7 +216,8 @@ public final class ModsScreen extends Screen {
 		if (I18n.get(module.translationKey()).toLowerCase(Locale.ROOT).contains(q) || module.id().contains(q)) {
 			return true;
 		}
-		return Language.getInstance().has(module.descriptionKey()) && I18n.get(module.descriptionKey()).toLowerCase(Locale.ROOT).contains(q);
+		Component description = module.description();
+		return description != null && description.getString().toLowerCase(Locale.ROOT).contains(q);
 	}
 
 	private int columns() {
@@ -274,6 +279,13 @@ public final class ModsScreen extends Screen {
 	/*public void extractBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
 	*///?} else
 	public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+		if (minecraft.level == null) {
+			// ohne Welt (Titelbildschirm, Mod Menu): Panorama dahinter wie in Minecrafts eigenen Menüs
+			//? if >=26.1 {
+			/*super.extractBackground(graphics, mouseX, mouseY, partialTick);
+			*///?} else
+			super.renderBackground(graphics, mouseX, mouseY, partialTick);
+		}
 		graphics.fill(0, 0, width, height, 0xA60A0809);
 	}
 
@@ -363,7 +375,7 @@ public final class ModsScreen extends Screen {
 			}
 			String count = tabCount(key);
 			int countX = r[2] - 6 - font.width(count);
-			String label = font.plainSubstrByWidth(tabLabel(key), countX - r[0] - PAD - 8);
+			String label = GuiDraw.ellipsize(font, tabLabel(key), countX - r[0] - PAD - 4);
 			GuiDraw.text(g, font, label, r[0] + PAD - 1 + (selected ? 2 : 0), r[1] + 4, selected ? theme.headerText() : theme.text(), false);
 			GuiDraw.text(g, font, count, countX, r[1] + 4, selected ? theme.accent() : theme.textDim(), false);
 		}
@@ -376,7 +388,7 @@ public final class ModsScreen extends Screen {
 			if (hovered) {
 				g.fill(r[0], r[1], r[2], r[3], theme.hover());
 			}
-			String label = font.plainSubstrByWidth(I18n.get(action.key), SIDEBAR - PAD * 2 - 6);
+			String label = GuiDraw.ellipsize(font, I18n.get(action.key), SIDEBAR - PAD - 14);
 			GuiDraw.text(g, font, label, r[0] + PAD - 1, r[1] + 4, hovered ? theme.headerText() : theme.textDim(), false);
 			GuiDraw.text(g, font, ">", r[2] - 10, r[1] + 4, hovered ? theme.accent() : theme.outline(), false);
 		}
@@ -410,11 +422,11 @@ public final class ModsScreen extends Screen {
 		GuiDraw.roundedOutline(g, x, y, CARD_W, CARD_H, 4, on ? GuiDraw.fade(theme.accent(), 0.85F) : hovered ? 0x40FFFFFF : theme.outline());
 	}
 
-	private void renderDescription(GuiGraphics g, Theme theme, String key, int x, int y) {
-		if (!Language.getInstance().has(key)) {
+	private void renderDescription(GuiGraphics g, Theme theme, Component description, int x, int y) {
+		if (description == null) {
 			return;
 		}
-		List<FormattedCharSequence> lines = font.split(Component.translatable(key), (int) ((CARD_W - 12) / 0.75f));
+		List<FormattedCharSequence> lines = font.split(description, (int) ((CARD_W - 12) / 0.75f));
 		g.pose().pushMatrix();
 		g.pose().translate(x + 6, y + 19);
 		g.pose().scale(0.75f, 0.75f);
@@ -435,9 +447,9 @@ public final class ModsScreen extends Screen {
 		boolean on = module.isEnabled();
 		renderCardBase(g, theme, card, hovered, on);
 
-		String name = font.plainSubstrByWidth(I18n.get(module.translationKey()), CARD_W - 28);
+		String name = GuiDraw.ellipsize(font, I18n.get(module.translationKey()), CARD_W - 12);
 		GuiDraw.text(g, font, name, x + 6, y + 7, on ? theme.headerText() : theme.text(), false);
-		renderDescription(g, theme, module.descriptionKey(), x, y);
+		renderDescription(g, theme, module.description(), x, y);
 
 		// An/Aus-Schalter
 		int px = x + 6;
@@ -463,8 +475,8 @@ public final class ModsScreen extends Screen {
 		int x = card.x();
 		int y = card.y();
 		renderCardBase(g, theme, card, hovered, false);
-		GuiDraw.text(g, font, font.plainSubstrByWidth(I18n.get(entry.nameKey()), CARD_W - 28), x + 6, y + 7, theme.text(), false);
-		renderDescription(g, theme, entry.descriptionKey(), x, y);
+		GuiDraw.text(g, font, GuiDraw.ellipsize(font, I18n.get(entry.nameKey()), CARD_W - 12), x + 6, y + 7, theme.text(), false);
+		renderDescription(g, theme, Language.getInstance().has(entry.descriptionKey()) ? Component.translatable(entry.descriptionKey()) : null, x, y);
 		String open = I18n.get("salami.mods.open_settings");
 		GuiDraw.text(g, font, open, x + 6, y + CARD_H - 13, hovered ? theme.accent() : theme.textDim(), false);
 	}
@@ -476,11 +488,17 @@ public final class ModsScreen extends Screen {
 		if (hasSettings(card.module()) && inside(gear(card), mx, my)) {
 			return Component.translatable("salami.mods.settings");
 		}
-		String key = card.module().descriptionKey();
-		if (Language.getInstance().has(key) && font.split(Component.translatable(key), (int) ((CARD_W - 12) / 0.75f)).size() > 3) {
-			return Component.translatable(key);
+		String name = I18n.get(card.module().translationKey());
+		boolean nameCut = font.width(name) > CARD_W - 12;
+		Component description = card.module().description();
+		boolean descriptionCut = description != null && font.split(description, (int) ((CARD_W - 12) / 0.75f)).size() > 3;
+		if (nameCut && description != null) {
+			return Component.literal(name + "\n").append(description);
 		}
-		return null;
+		if (nameCut) {
+			return Component.literal(name);
+		}
+		return descriptionCut ? description : null;
 	}
 
 	private void renderScrollbar(GuiGraphics g, Theme theme, int[] c) {
@@ -503,7 +521,7 @@ public final class ModsScreen extends Screen {
 			case HUD -> minecraft.setScreen(new HudEditorScreen(this));
 			case CONFIGS -> minecraft.setScreen(new ConfigsScreen(this));
 			// Panel-Ansicht: zurück zu ihr, wenn das Menü von dort geöffnet wurde
-			case PANELS -> minecraft.setScreen(parent instanceof ClickGuiScreen ? parent : new ClickGuiScreen(modules, SalamiClient.get().config()));
+			case PANELS -> minecraft.setScreen(parent instanceof ClickGuiScreen ? parent : new ClickGuiScreen(modules, SalamiClient.get().config(), this));
 		}
 	}
 
@@ -582,12 +600,16 @@ public final class ModsScreen extends Screen {
 	@Override
 	public boolean keyPressed(KeyEvent event) {
 		int key = event.key();
-		// Die Menü-Taste (Rechte Umschalttaste) schließt das Menü wieder
+		// Die Menü-Taste (Standard Rechte Umschalttaste) schließt das Menü – aber Tippen geht vor: mit
+		// Text in der Suche gar nicht (Umschalt für Großbuchstaben), sonst erst beim Loslassen und nur,
+		// wenn dazwischen kein Zeichen getippt wurde
 		if (SalamiClient.get().clickGuiKey().matches(event)) {
-			lastTab = tab;
-			minecraft.setScreen(null);
+			closeOnRelease = query.isEmpty();
+			// liegt die Menü-Taste auf einem Buchstaben, kommt gleich ihr Zeichen – das gehört nicht in die Suche
+			menuKeyChar = closeOnRelease;
 			return true;
 		}
+		menuKeyChar = false;
 		if (key == InputConstants.KEY_BACKSPACE && !query.isEmpty()) {
 			query = query.substring(0, query.length() - 1);
 			scroll = 0;
@@ -601,7 +623,23 @@ public final class ModsScreen extends Screen {
 	}
 
 	@Override
+	public boolean keyReleased(KeyEvent event) {
+		if (closeOnRelease && SalamiClient.get().clickGuiKey().matches(event)) {
+			closeOnRelease = false;
+			lastTab = tab;
+			SalamiMenuScreen.closeAll(minecraft);
+			return true;
+		}
+		return super.keyReleased(event);
+	}
+
+	@Override
 	public boolean charTyped(CharacterEvent event) {
+		if (menuKeyChar) {
+			menuKeyChar = false;
+			return true;
+		}
+		closeOnRelease = false;
 		if (event.isAllowedChatCharacter() && query.length() < 32) {
 			query += event.codepointAsString();
 			scroll = 0;

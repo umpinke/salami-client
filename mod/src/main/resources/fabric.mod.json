@@ -9,7 +9,8 @@
 	"icon": "assets/salami/icon.png",
 	"environment": "client",
 	"entrypoints": {
-		"client": ["dev.salamiclient.SalamiClient"]
+		"client": ["dev.salamiclient.SalamiClient"],
+		"modmenu": ["dev.salamiclient.gui.ModMenuIntegration"]
 	},
 	"mixins": ["salami.mixins.json"],
 	"depends": {

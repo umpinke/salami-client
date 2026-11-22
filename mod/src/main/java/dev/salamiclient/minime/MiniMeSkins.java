@@ -31,17 +31,23 @@ import java.util.regex.Pattern;
  * Skins für Mini Mes: Minecraft-Name → Skin-Textur. Fragt Mojang (Name → UUID → Profil mit
  * Textur-Adresse), lädt das Bild von textures.minecraft.net und registriert es als Textur.
  * Ergebnisse bleiben im Speicher; nicht gefundene Namen werden erst nach ein paar Minuten
- * erneut gefragt. Alle Aufrufe im Render- bzw. Client-Thread.
+ * erneut gefragt, nach Netzwerkfehlern (Mojang nicht erreichbar, überlastet) schon nach einer halben
+ * Minute. Alle Aufrufe im Render- bzw. Client-Thread.
  */
 public final class MiniMeSkins {
 	/** Geladener Skin: Textur und ob das schmale Armmodell („Alex“) gilt. */
 	public record Skin(Identifier texture, boolean slim) {}
 
-	public enum State { LOADING, READY, NOT_FOUND }
+	/**
+	 * Ladezustand: {@code NOT_FOUND} = Mojang kennt den Namen nicht (oder es gibt keinen brauchbaren Skin),
+	 * {@code UNREACHABLE} = Mojang war nicht erreichbar oder hat mit einem Fehler geantwortet.
+	 */
+	public enum State { LOADING, READY, NOT_FOUND, UNREACHABLE }
 
 	public static final Pattern NAME = Pattern.compile("[A-Za-z0-9_]{1,16}");
 	private static final Duration TIMEOUT = Duration.ofSeconds(10);
 	private static final long RETRY_MS = 5 * 60_000L;
+	private static final long RETRY_UNREACHABLE_MS = 30_000L;
 	private static final int MAX_SKIN_BYTES = 1024 * 1024;
 	private static final int MAX_CACHED = 64;
 
@@ -83,7 +89,9 @@ public final class MiniMeSkins {
 		String key = name.toLowerCase(Locale.ROOT);
 		Entry entry = CACHE.get(key);
 		long now = System.currentTimeMillis();
-		if (entry != null && !(entry.state == State.NOT_FOUND && now - entry.failedAt > RETRY_MS)) {
+		boolean retry = entry != null && (entry.state == State.NOT_FOUND && now - entry.failedAt > RETRY_MS
+			|| entry.state == State.UNREACHABLE && now - entry.failedAt > RETRY_UNREACHABLE_MS);
+		if (entry != null && !retry) {
 			return entry;
 		}
 		if (CACHE.size() >= MAX_CACHED) {
@@ -148,18 +156,25 @@ public final class MiniMeSkins {
 			try (InputStream in = response.body()) {
 				data = in.readNBytes(MAX_SKIN_BYTES + 1);
 			}
-			if (response.statusCode() != 200 || data.length > MAX_SKIN_BYTES) {
+			if (response.statusCode() != 200) {
+				throw new IOException("Skin-Server antwortet mit HTTP " + response.statusCode());
+			}
+			if (data.length > MAX_SKIN_BYTES) {
 				fail(entry);
 				return;
 			}
 			boolean slimModel = slim;
 			Minecraft.getInstance().execute(() -> register(key, entry, data, slimModel));
-		} catch (IOException | RuntimeException e) {
+		} catch (IOException e) {
+			// Netzwerk oder Mojang gestört – nicht „gibt es nicht“ melden, bald erneut versuchen
+			SalamiClient.LOG.info("Mini-Me-Skin für {} nicht geladen (Mojang nicht erreichbar): {}", key, e.toString());
+			fail(entry, State.UNREACHABLE);
+		} catch (RuntimeException e) {
 			SalamiClient.LOG.debug("Mini-Me-Skin für {} nicht geladen: {}", key, e.toString());
 			fail(entry);
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
-			fail(entry);
+			fail(entry, State.UNREACHABLE);
 		}
 	}
 
@@ -259,15 +274,27 @@ public final class MiniMeSkins {
 	}
 
 	private static void fail(Entry entry) {
-		entry.failedAt = System.currentTimeMillis();
-		entry.state = State.NOT_FOUND;
+		fail(entry, State.NOT_FOUND);
 	}
 
+	private static void fail(Entry entry, State state) {
+		entry.failedAt = System.currentTimeMillis();
+		entry.state = state;
+	}
+
+	/**
+	 * JSON von Mojang; {@code null}, wenn es den Namen/das Profil nicht gibt (204, 404).
+	 *
+	 * @throws IOException bei Netzwerkfehlern und anderen Antworten (z. B. 429 zu viele Anfragen, 5xx)
+	 */
 	private static @Nullable JsonObject json(String url) throws IOException, InterruptedException {
 		HttpResponse<String> response = HTTP.send(HttpRequest.newBuilder(URI.create(url)).timeout(TIMEOUT).GET().build(),
 			HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-		if (response.statusCode() != 200) {
+		if (response.statusCode() == 204 || response.statusCode() == 404) {
 			return null;
+		}
+		if (response.statusCode() != 200) {
+			throw new IOException("Mojang antwortet mit HTTP " + response.statusCode());
 		}
 		JsonElement parsed = JsonParser.parseString(response.body());
 		return parsed.isJsonObject() ? parsed.getAsJsonObject() : null;

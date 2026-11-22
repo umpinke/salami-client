@@ -51,23 +51,24 @@ public final class InfoHudModule extends HudModule {
 		lines.clear();
 		LocalPlayer player = mc().player;
 		if (fps.isOn()) {
-			add("FPS", String.valueOf(mc().getFps()));
+			add(label("fps"), String.valueOf(mc().getFps()));
 		}
 		if (ping.isOn() && mc().getConnection() != null) {
 			PlayerInfo info = mc().getConnection().getPlayerInfo(player.getUUID());
-			add("Ping", info == null ? "-" : info.getLatency() + " ms");
+			add(label("ping"), info == null ? "-" : info.getLatency() + " ms");
 		}
 		if (coords.isOn() && !StreamerModeModule.hidesCoords()) {
-			add("XYZ", player.getBlockX() + " " + player.getBlockY() + " " + player.getBlockZ());
+			add(label("coords"), player.getBlockX() + " " + player.getBlockY() + " " + player.getBlockZ());
 		}
 		if (direction.isOn()) {
-			add("Dir", player.getDirection().getName());
+			// Himmelsrichtung samt Achse wie bei F3 („Norden (−Z)“)
+			add(label("direction"), I18n.get("salami.module.info_hud.direction." + player.getDirection().getName()));
 		}
 		if (biome.isOn() && mc().level != null) {
 			String name = mc().level.getBiome(player.blockPosition()).unwrapKey()
 				.map(InfoHudModule::biomeName)
 				.orElse("-");
-			add("Biome", name);
+			add(label("biome"), name);
 		}
 		// Bezeichnungen in einer Spalte, Werte dahinter
 		labelColumn = 0;
@@ -89,6 +90,11 @@ public final class InfoHudModule extends HudModule {
 		String id = (start >= 0 ? text.substring(start + 3) : text).replace("]", "").trim();
 		String translationKey = "biome." + id.replace(':', '.');
 		return Language.getInstance().has(translationKey) ? I18n.get(translationKey) : id.substring(id.indexOf(':') + 1).replace('_', ' ');
+	}
+
+	/** Bezeichnung einer Zeile aus der Sprachdatei ({@code salami.module.info_hud.label.<id>}). */
+	private static String label(String id) {
+		return I18n.get("salami.module.info_hud.label." + id);
 	}
 
 	private void add(String name, String value) {

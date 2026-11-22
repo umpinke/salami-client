@@ -59,6 +59,15 @@ public final class GuiDraw {
 		g.drawString(font, text, x, y, color, shadow);
 	}
 
+	/** Text, der höchstens {@code maxWidth} breit ist; zu lange Texte enden mit „…“. */
+	public static String ellipsize(Font font, String text, int maxWidth) {
+		if (font.width(text) <= maxWidth) {
+			return text;
+		}
+		String dots = "…";
+		return font.plainSubstrByWidth(text, Math.max(0, maxWidth - font.width(dots))).stripTrailing() + dots;
+	}
+
 	public static void centeredText(GuiGraphics g, Font font, String text, int x, int y, int color) {
 		//? if >=26.1 {
 		/*g.centeredText(font, text, x, y, color);

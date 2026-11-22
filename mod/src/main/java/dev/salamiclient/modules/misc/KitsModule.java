@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
+import dev.salamiclient.setting.ActionSetting;
 import dev.salamiclient.setting.BoolSetting;
 import dev.salamiclient.setting.KeybindSetting;
 import dev.salamiclient.setting.ModeSetting;
@@ -15,6 +16,7 @@ import dev.salamiclient.util.Keys;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.inventory.ClickType;
@@ -50,7 +52,9 @@ public final class KitsModule extends Module {
 	private final KeybindSetting applyKey = add(new KeybindSetting("apply_key", InputConstants.KEY_K));
 	private final BoolSetting onlyInventory = add(new BoolSetting("only_inventory", true));
 	private final NumberSetting delay = add(new NumberSetting("delay", 1, 0, 5, 1));
-	private final BoolSetting saveCurrent = add(new BoolSetting("save_current", false));
+	/** Knopf „Inventar speichern“ (früher ein Schalter, der sich selbst zurückstellte; der alte Config-Wert wird ignoriert). */
+	private final ActionSetting saveCurrent = add(new ActionSetting("save_current", this::saveCurrentInventory)
+		.button("salami.module.kits.setting.save_current.button"));
 	private final StringListSetting custom1 = add(new StringListSetting("custom_1", List.of()));
 	private final StringListSetting custom2 = add(new StringListSetting("custom_2", List.of()));
 	private final StringListSetting custom3 = add(new StringListSetting("custom_3", List.of()));
@@ -65,12 +69,14 @@ public final class KitsModule extends Module {
 		custom1.hide();
 		custom2.hide();
 		custom3.hide();
-		saveCurrent.onChange(on -> {
-			if (on) {
-				saveCurrentInventory();
-				saveCurrent.set(false);
-			}
-		});
+		// Speere gibt es erst ab 1.21.11
+		//? if <1.21.11
+		/*kit.without(Kit.SPEAR);*/
+	}
+
+	@Override
+	public Component description() {
+		return description(applyKey.label());
 	}
 
 	@Override

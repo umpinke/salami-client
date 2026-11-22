@@ -5,7 +5,27 @@ plugins {
 
 // Läuft einmal pro Minecraft-Version (versions/<version>/), Werte aus stonecutter.properties.toml.
 val minecraft = sc.current.version
-version = "${sc.properties.get<String>("mod.version")}+$minecraft"
+version = "${salamiVersion()}+$minecraft"
+
+/**
+ * Version von salami-core = Version des Launchers, mit dem die Jar ausgeliefert wird:
+ * `-PsalamiVersion=1.8.6` (so baut launcher/scripts/bundle-salami-core.mjs), sonst aus
+ * launcher/src-tauri/tauri.conf.json, sonst mod.version aus stonecutter.properties.toml.
+ */
+fun salamiVersion(): String {
+	providers.gradleProperty("salamiVersion").orNull?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+	val tauriConf = rootProject.layout.projectDirectory.file("../launcher/src-tauri/tauri.conf.json")
+	if (tauriConf.asFile.isFile) {
+		// über providers gelesen, damit der Konfigurationscache Änderungen an der Datei bemerkt
+		val json = providers.fileContents(tauriConf).asText.get()
+		@Suppress("UNCHECKED_CAST")
+		val launcherVersion = (groovy.json.JsonSlurper().parseText(json) as Map<String, Any?>)["version"] as? String
+		if (!launcherVersion.isNullOrBlank()) {
+			return launcherVersion
+		}
+	}
+	return sc.properties.get<String>("mod.version")
+}
 group = sc.properties.get<String>("mod.group")
 
 base {
@@ -22,6 +42,11 @@ dependencies {
 	// mod… geht auch ab 26.1; loom-back-compat macht daraus implementation
 	modImplementation("net.fabricmc:fabric-loader:${sc.properties.get<String>("deps.fabric_loader")}")
 	modImplementation("net.fabricmc.fabric-api:fabric-api:${sc.properties.get<String>("deps.fabric_api")}")
+	// Mod Menu nur zum Kompilieren: der Eintrag „modmenu“ in fabric.mod.json wird nur geladen, wenn
+	// Mod Menu installiert ist. Dieselbe Version wie im Salami-Pack (packs/salami-packs.json).
+	val modMenu = packModCoordinate(minecraft, "modmenu")
+		?: error("packs/salami-packs.json hat kein Mod Menu für Minecraft $minecraft")
+	modCompileOnly(modMenu) { isTransitive = false }
 }
 
 // Kompatibilitätstest: alle Modrinth-Mods des Salami-Packs (Sodium, Lithium …) mitladen.
@@ -55,6 +80,15 @@ fun packModCoordinates(minecraft: String, testSkips: Set<String>): List<String> 
 	// Eingrenzen bei Problemen: -PpackModsSkip=badoptimizations,scalablelux
 	val skipped = providers.gradleProperty("packModsSkip").orNull?.split(",")?.map { it.trim() }.orEmpty()
 	val skip = setOf("fabric-api", "dynamic-fps") + skipped + testSkips
+	return packModEntries(minecraft).filter { (id, _) -> id !in skip }.map { it.second }
+}
+
+/** Maven-Koordinate einer Mod des Salami-Packs für diese Minecraft-Version, oder `null`. */
+fun packModCoordinate(minecraft: String, modId: String): String? =
+	packModEntries(minecraft).firstOrNull { it.first == modId }?.second
+
+/** Alle Modrinth-Mods des Salami-Packs für eine Minecraft-Version: (id, Maven-Koordinate). */
+fun packModEntries(minecraft: String): List<Pair<String, String>> {
 	// über providers gelesen, damit der Konfigurationscache Änderungen an der Datei bemerkt
 	val json = providers.fileContents(rootProject.layout.projectDirectory.file("../packs/salami-packs.json")).asText.get()
 	@Suppress("UNCHECKED_CAST")
@@ -63,8 +97,8 @@ fun packModCoordinates(minecraft: String, testSkips: Set<String>): List<String> 
 	return mods.mapNotNull { mod ->
 		val source = mod["source"] as Map<String, Any?>
 		val target = ((mod["compatibility"] as Map<String, Any?>)[minecraft] as Map<String, Any?>?)?.get("fabric") as Map<String, Any?>?
-		if (source["type"] != "modrinth" || mod["id"] in skip || target == null) null
-		else "maven.modrinth:${source["projectId"]}:${target["identifier"]}"
+		if (source["type"] != "modrinth" || target == null) null
+		else mod["id"].toString() to "maven.modrinth:${source["projectId"]}:${target["identifier"]}"
 	}
 }
 

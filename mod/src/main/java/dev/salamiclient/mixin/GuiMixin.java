@@ -1,13 +1,18 @@
 package dev.salamiclient.mixin;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.mojang.blaze3d.pipeline.RenderPipeline;
 import dev.salamiclient.modules.hud.PotionStatusModule;
 import dev.salamiclient.modules.hud.ScoreboardModule;
 import dev.salamiclient.modules.hud.TitlesModule;
+import dev.salamiclient.modules.visual.CrosshairModule;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.numbers.NumberFormat;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.scores.Objective;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -16,7 +21,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Vanilla-HUD anpassen: Effektsymbole (Potion Status), Scoreboard, Titel und Actionbar.
+ * Vanilla-HUD anpassen: Fadenkreuz, Effektsymbole (Potion Status), Scoreboard, Titel und Actionbar.
  * Jede Skalierung merkt sich, ob sie die Matrix verschoben hat, und stellt sie am Ende zurück.
  */
 @Mixin(Gui.class)
@@ -27,6 +32,24 @@ public abstract class GuiMixin {
 	private boolean salami$titleScaled;
 	@Unique
 	private boolean salami$actionBarMoved;
+
+	// ------------------------------------------------------------------ Fadenkreuz
+
+	/**
+	 * Eigenes Fadenkreuz: nur das Kreuz-Bild wird ersetzt. Ob überhaupt ein Fadenkreuz erscheint
+	 * (Ich-Sicht, Zuschauer nur über Wesen und Blöcken mit Menü), das F3-Fadenkreuz und die
+	 * Angriffsanzeige darunter bleiben bei Minecraft.
+	 */
+	@WrapOperation(method = "renderCrosshair",
+		at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/GuiGraphics;blitSprite(Lcom/mojang/blaze3d/pipeline/RenderPipeline;Lnet/minecraft/resources/Identifier;IIII)V"))
+	private void salami$customCrosshair(GuiGraphics graphics, RenderPipeline pipeline, Identifier sprite, int x, int y, int width, int height,
+		Operation<Void> original) {
+		if (!CrosshairModule.replaceVanilla(graphics, sprite)) {
+			original.call(graphics, pipeline, sprite, x, y, width, height);
+		}
+	}
+
+	// ------------------------------------------------------------------ Effekte
 
 	@Inject(method = "renderEffects", at = @At("HEAD"), cancellable = true)
 	private void salami$hideVanillaEffects(GuiGraphics graphics, DeltaTracker delta, CallbackInfo ci) {

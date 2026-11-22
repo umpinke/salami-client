@@ -75,6 +75,13 @@ final class FriendsApi {
 		}
 	}
 
+	/** Mojang hat die Anmeldung abgelehnt (Sitzung abgelaufen, Konto ohne Multiplayer …). */
+	static final class MojangLoginException extends IllegalStateException {
+		MojangLoginException(Throwable cause) {
+			super("Anmeldung bei Mojang fehlgeschlagen: " + cause.getMessage(), cause);
+		}
+	}
+
 	/** Live-Verbindung ({@code v1/friends/events}); {@link #close()} beendet sie, auch während sie liest. */
 	static final class EventStream implements AutoCloseable {
 		private volatile @Nullable InputStream body;
@@ -149,7 +156,7 @@ final class FriendsApi {
 			try {
 				session.joinServer(user.getProfileId(), user.getAccessToken(), serverId);
 			} catch (AuthenticationException e) {
-				throw new IllegalStateException("Anmeldung bei Mojang fehlgeschlagen: " + e.getMessage(), e);
+				throw new MojangLoginException(e);
 			}
 			JsonObject body = new JsonObject();
 			body.addProperty("name", user.getName());

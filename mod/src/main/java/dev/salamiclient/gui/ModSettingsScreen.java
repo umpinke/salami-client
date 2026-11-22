@@ -22,7 +22,6 @@ import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.resources.language.I18n;
-import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 
@@ -52,6 +51,8 @@ public final class ModSettingsScreen extends Screen {
 	private String editBuffer = "";
 	/** Offener Farbwähler oder {@code null}. */
 	private ColorPicker picker;
+	/** Beim nächsten Zeichnen zu dieser Einstellung scrollen ({@link #editText}). */
+	private Setting<?> scrollTo;
 
 	/** Zeile: eine Einstellung oder ({@code setting == null}) die Überschrift vor den Darstellungs-Einstellungen. */
 	private record Row(Setting<?> setting, int y) {
@@ -74,7 +75,7 @@ public final class ModSettingsScreen extends Screen {
 
 	@Override
 	public boolean isPauseScreen() {
-		return false;
+		return SalamiMenuScreen.pausesGame();
 	}
 
 	@Override
@@ -103,6 +104,13 @@ public final class ModSettingsScreen extends Screen {
 	/** Offener Farbwähler oder {@code null}. */
 	public ColorPicker colorPicker() {
 		return picker;
+	}
+
+	/** Text-Einstellung gleich bearbeiten (aus der Panel-Ansicht); scrollt beim ersten Zeichnen zu ihr. */
+	public void editText(TextSetting text) {
+		editingText = text;
+		editBuffer = text.get();
+		scrollTo = text;
 	}
 
 	private void commitText() {
@@ -136,11 +144,12 @@ public final class ModSettingsScreen extends Screen {
 	}
 
 	private List<FormattedCharSequence> description() {
-		if (!Language.getInstance().has(module.descriptionKey())) {
+		Component text = module.description();
+		if (text == null) {
 			return List.of();
 		}
 		int[] f = frame();
-		return font.split(Component.translatable(module.descriptionKey()), f[2] - f[0] - 2 * PAD);
+		return font.split(text, f[2] - f[0] - 2 * PAD);
 	}
 
 	private int[] content() {
@@ -172,6 +181,16 @@ public final class ModSettingsScreen extends Screen {
 		return rows;
 	}
 
+	private void scrollToSetting(Setting<?> setting) {
+		int[] c = content();
+		for (Row row : rows()) {
+			if (row.setting() == setting && row.y() + ROW > c[3]) {
+				scroll += row.y() + ROW - c[3];
+				clampScroll();
+			}
+		}
+	}
+
 	private int contentHeight() {
 		List<Row> rows = rows();
 		return rows.isEmpty() ? 0 : rows.get(rows.size() - 1).y() + ROW - rows.get(0).y();
@@ -199,6 +218,13 @@ public final class ModSettingsScreen extends Screen {
 	/*public void extractBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
 	*///?} else
 	public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+		if (minecraft.level == null) {
+			// ohne Welt (Titelbildschirm, Mod Menu): Panorama dahinter wie in Minecrafts eigenen Menüs
+			//? if >=26.1 {
+			/*super.extractBackground(graphics, mouseX, mouseY, partialTick);
+			*///?} else
+			super.renderBackground(graphics, mouseX, mouseY, partialTick);
+		}
 		graphics.fill(0, 0, width, height, 0xAA000000);
 	}
 
@@ -211,6 +237,10 @@ public final class ModSettingsScreen extends Screen {
 		super.render(g, mouseX, mouseY, partialTick);
 	//?}
 		TextInput.sync(this, (picker != null && picker.isEditingText()) || editingText != null);
+		if (scrollTo != null) {
+			scrollToSetting(scrollTo);
+			scrollTo = null;
+		}
 		Theme theme = SalamiClient.get().theme();
 		int mx = (int) (mouseX / uiScale);
 		int my = (int) (mouseY / uiScale);
@@ -315,10 +345,10 @@ public final class ModSettingsScreen extends Screen {
 		} else if (setting instanceof StringListSetting list) {
 			String value = I18n.get("salami.clickgui.entries", list.get().size());
 			GuiDraw.text(g, font, value, r[2] - font.width(value), textY, theme.textDim(), false);
-		} else if (setting instanceof ActionSetting) {
+		} else if (setting instanceof ActionSetting action) {
 			boolean hovered = inside(r, mx, my);
 			GuiDraw.rounded(g, r[0], r[1], r[2] - r[0], r[3] - r[1], 3, hovered ? theme.accent() : theme.header());
-			String label = I18n.get("salami.mods.open");
+			String label = I18n.get(action.buttonKey());
 			GuiDraw.text(g, font, label, r[0] + (r[2] - r[0] - font.width(label)) / 2, textY, hovered ? 0xFF000000 : theme.headerText(), false);
 		} else if (setting instanceof TextSetting text) {
 			boolean editing = editingText == text;
@@ -491,6 +521,11 @@ public final class ModSettingsScreen extends Screen {
 
 	@Override
 	public boolean keyPressed(KeyEvent event) {
+		// Menü-Taste schließt alles – nicht, während eine Taste belegt oder Text getippt wird
+		boolean typing = listeningKeybind != null || editingText != null || (picker != null && picker.isEditingText());
+		if (SalamiMenuScreen.closeOnMenuKey(minecraft, event, typing)) {
+			return true;
+		}
 		if (picker != null) {
 			capturedLastKey = picker.isEditingText();
 			if (picker.keyPressed(event.key())) {

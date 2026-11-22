@@ -87,7 +87,7 @@ public final class FriendsScreen extends Screen {
 
 	@Override
 	public boolean isPauseScreen() {
-		return false;
+		return SalamiMenuScreen.pausesGame();
 	}
 
 	@Override
@@ -250,6 +250,13 @@ public final class FriendsScreen extends Screen {
 	/*public void extractBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
 	*///?} else
 	public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+		if (minecraft.level == null) {
+			// ohne Welt (Titelbildschirm, Mod Menu): Panorama dahinter wie in Minecrafts eigenen Menüs
+			//? if >=26.1 {
+			/*super.extractBackground(graphics, mouseX, mouseY, partialTick);
+			*///?} else
+			super.renderBackground(graphics, mouseX, mouseY, partialTick);
+		}
 		graphics.fill(0, 0, width, height, 0xAA000000);
 	}
 
@@ -670,6 +677,9 @@ public final class FriendsScreen extends Screen {
 
 	@Override
 	public boolean keyPressed(KeyEvent event) {
+		if (SalamiMenuScreen.closeOnMenuKey(minecraft, event, isTyping())) {
+			return true;
+		}
 		if (event.key() == InputConstants.KEY_ESCAPE) {
 			return super.keyPressed(event);
 		}

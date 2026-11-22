@@ -33,6 +33,7 @@ import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.core.ClientAsset;
+import net.minecraft.client.KeyMapping;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.FormattedCharSequence;
@@ -141,7 +142,7 @@ public final class CosmeticsScreen extends Screen {
 
 	@Override
 	public boolean isPauseScreen() {
-		return false;
+		return SalamiMenuScreen.pausesGame();
 	}
 
 	@Override
@@ -313,7 +314,7 @@ public final class CosmeticsScreen extends Screen {
 		}
 		mini.setPlace(place);
 		setNotice(Component.translatable(place == MiniMeModule.Place.NONE ? "salami.cosmetics.minime.removed" : "salami.cosmetics.minime.placed",
-			I18n.get("salami.module.minime.setting.place." + place.name().toLowerCase(Locale.ROOT))), false);
+			I18n.get("salami.module.minime.setting.place." + place.name().toLowerCase(Locale.ROOT)), perspectiveKey()), false);
 		currentReadAt = 0;
 		SalamiClient.get().config().markDirty();
 	}
@@ -354,7 +355,7 @@ public final class CosmeticsScreen extends Screen {
 		Hat buddy = BuddyCatalog.get(key.substring("buddy:".length()));
 		buddies.choose(buddy == null ? null : buddy.id());
 		setNotice(buddy == null ? Component.translatable("salami.cosmetics.buddy.removed")
-			: Component.translatable("salami.cosmetics.buddy.equipped", buddy.displayName(), placeLabel(buddies.place())), false);
+			: Component.translatable("salami.cosmetics.buddy.equipped", buddy.displayName(), placeLabel(buddies.place()), perspectiveKey()), false);
 		currentReadAt = 0;
 		SalamiClient.get().config().markDirty();
 	}
@@ -368,7 +369,7 @@ public final class CosmeticsScreen extends Screen {
 		buddies.setPlace(place);
 		Hat buddy = buddies.selected();
 		setNotice(buddy == null ? Component.translatable("salami.cosmetics.buddy.place_set", placeLabel(place))
-			: Component.translatable("salami.cosmetics.buddy.equipped", buddy.displayName(), placeLabel(place)), false);
+			: Component.translatable("salami.cosmetics.buddy.equipped", buddy.displayName(), placeLabel(place), perspectiveKey()), false);
 		SalamiClient.get().config().markDirty();
 	}
 
@@ -388,7 +389,7 @@ public final class CosmeticsScreen extends Screen {
 		Hat hat = HatCatalog.get(key.substring("hat:".length()));
 		hats.choose(hat == null ? null : hat.id());
 		setNotice(hat == null ? Component.translatable("salami.cosmetics.hat.removed")
-			: Component.translatable("salami.cosmetics.hat.equipped", hat.displayName()), false);
+			: Component.translatable("salami.cosmetics.hat.equipped", hat.displayName(), perspectiveKey()), false);
 		currentReadAt = 0;
 		SalamiClient.get().config().markDirty();
 	}
@@ -631,6 +632,13 @@ public final class CosmeticsScreen extends Screen {
 	/*public void extractBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
 	*///?} else
 	public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+		if (minecraft.level == null) {
+			// ohne Welt (Titelbildschirm, Mod Menu): Panorama dahinter wie in Minecrafts eigenen Menüs
+			//? if >=26.1 {
+			/*super.extractBackground(graphics, mouseX, mouseY, partialTick);
+			*///?} else
+			super.renderBackground(graphics, mouseX, mouseY, partialTick);
+		}
 		graphics.fill(0, 0, width, height, 0xAA000000);
 	}
 
@@ -662,8 +670,7 @@ public final class CosmeticsScreen extends Screen {
 		GuiDraw.roundRect(g, back[0] + 1, back[1] + 1, back[2] - back[0] - 2, back[3] - back[1] - 2, backHover ? theme.header() : theme.panel() | 0xFF000000);
 		GuiDraw.text(g, font, I18n.get("salami.mods.back"), back[0] + 6, back[1] + 3, theme.headerText(), false);
 
-		// Reiter: Capes, Hüte, Mini Me
-		int[] last = null;
+		// Reiter: Capes, Hüte, Buddys, Mini Me, Emotes
 		for (Tab t : Tab.values()) {
 			int[] r = tabRect(t);
 			boolean active = t == tab;
@@ -673,11 +680,6 @@ public final class CosmeticsScreen extends Screen {
 				GuiDraw.roundRect(g, r[0] + 1, r[1] + 1, r[2] - r[0] - 2, r[3] - r[1] - 2, hovered ? theme.header() : theme.panel() | 0xFF000000);
 			}
 			GuiDraw.text(g, font, I18n.get(t.key), r[0] + 7, r[1] + 4, active ? GuiDraw.textOn(theme.accent()) : theme.headerText(), false);
-			last = r;
-		}
-		String soon = I18n.get("salami.cosmetics.more_soon");
-		if (last[2] + 8 + font.width(soon) < f[2] - PAD) {
-			GuiDraw.text(g, font, soon, last[2] + 8, last[1] + 4, theme.textDim(), false);
 		}
 
 		if (tab == Tab.MINIME) {
@@ -717,12 +719,24 @@ public final class CosmeticsScreen extends Screen {
 			case EMOTES -> "salami.cosmetics.emote.info";
 			case MINIME -> "salami.cosmetics.minime.info";
 			default -> "salami.cosmetics.info";
-		});
+		}, emoteKey());
 		List<FormattedCharSequence> lines = font.split(line, f[2] - f[0] - 2 * PAD);
 		for (int i = 0; i < Math.min(2, lines.size()); i++) {
 			GuiDraw.text(g, font, lines.get(i), f[0] + PAD, f[3] - PAD - 18 + i * 10, notice != null && noticeError ? theme.warning() : theme.textDim(), false);
 		}
 		g.pose().popMatrix();
+	}
+
+	/** Tatsächlich belegte Taste für das Emote-Rad (für Hinweistexte). */
+	private static Component emoteKey() {
+		KeyMapping key = SalamiClient.get().emoteKey();
+		return key.isUnbound() ? Component.translatable("salami.setting.unbound") : key.getTranslatedKeyMessage();
+	}
+
+	/** Tatsächlich belegte Taste zum Wechseln der Ansicht (Standard F5). */
+	private Component perspectiveKey() {
+		KeyMapping key = minecraft.options.keyTogglePerspective;
+		return key.isUnbound() ? Component.translatable("salami.setting.unbound") : key.getTranslatedKeyMessage();
 	}
 
 	private void renderCard(GuiGraphics g, Theme theme, Card card, int x, int y, boolean hovered, boolean equipped) {
@@ -879,8 +893,10 @@ public final class CosmeticsScreen extends Screen {
 				case LOADING -> "salami.cosmetics.minime.loading";
 				case READY -> "salami.cosmetics.minime.ready";
 				case NOT_FOUND -> "salami.cosmetics.minime.not_found";
+				case UNREACHABLE -> "salami.cosmetics.minime.unreachable";
 			};
-			int color = MiniMeSkins.state(name) == MiniMeSkins.State.NOT_FOUND ? theme.warning() : theme.textDim();
+			MiniMeSkins.State state = MiniMeSkins.state(name);
+			int color = state == MiniMeSkins.State.NOT_FOUND || state == MiniMeSkins.State.UNREACHABLE ? theme.warning() : theme.textDim();
 			GuiDraw.text(g, font, I18n.get(key, name), b[2] + 8, b[1] + 4, color, false);
 		}
 	}
@@ -1003,6 +1019,9 @@ public final class CosmeticsScreen extends Screen {
 
 	@Override
 	public boolean keyPressed(KeyEvent event) {
+		if (SalamiMenuScreen.closeOnMenuKey(minecraft, event, isTyping())) {
+			return true;
+		}
 		if (isTyping()) {
 			switch (event.key()) {
 				case InputConstants.KEY_RETURN, InputConstants.KEY_NUMPADENTER -> {

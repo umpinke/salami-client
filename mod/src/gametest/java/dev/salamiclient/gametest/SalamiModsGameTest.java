@@ -75,6 +75,19 @@ public final class SalamiModsGameTest implements FabricClientGameTest {
 		context.waitTick();
 		context.takeScreenshot("salami-21-mods-search");
 
+		// Tippen geht vor: die Menü-Taste (Umschalt) schließt nicht, solange etwas in der Suche steht …
+		context.getInput().pressKey(SalamiClient.get().clickGuiKey());
+		context.waitTick();
+		check(context.computeOnClient(c -> c.screen instanceof ModsScreen), "menu key closed the Mods menu while typing in the search");
+		// … bei leerer Suche schon (beim Loslassen)
+		for (int i = 0; i < 4; i++) {
+			context.getInput().pressKey(InputConstants.KEY_BACKSPACE);
+		}
+		context.waitTick();
+		context.getInput().pressKey(SalamiClient.get().clickGuiKey());
+		context.waitTick();
+		check(context.computeOnClient(c -> !(c.screen instanceof ModsScreen)), "menu key did not close the Mods menu with an empty search");
+
 		Module zoom = modules.get(ZoomModule.class);
 		context.setScreen(() -> new ModSettingsScreen(modules, zoom, null));
 		context.waitTicks(2);

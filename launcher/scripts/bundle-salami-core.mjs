@@ -21,7 +21,13 @@ rmSync(outDir, { recursive: true, force: true });
 // Voller Pfad: cmd sucht nicht immer im aktuellen Ordner (NoDefaultCurrentDirectoryInExePath).
 // .bat-Dateien lassen sich nur über die Shell starten, daher dort selbst quoten.
 // "launcherBundle" ohne Projektpfad läuft in allen Versionen.
-const args = ["launcherBundle", "--console=plain"];
+// Die Jars tragen die Launcher-Version (Watermark „Version“, Mod Menu), nicht die Platzhalter-Version der Mod.
+const launcherVersion = JSON.parse(readFileSync(join(root, "src-tauri", "tauri.conf.json"), "utf8")).version;
+if (!/^[0-9A-Za-z.+-]+$/.test(launcherVersion ?? "")) {
+  console.error(`Launcher-Version in src-tauri/tauri.conf.json ist ungültig: ${launcherVersion}`);
+  process.exit(1);
+}
+const args = ["launcherBundle", `-PsalamiVersion=${launcherVersion}`, "--console=plain"];
 const options = { cwd: modDir, stdio: "inherit" };
 const result = windows
   ? spawnSync(`"${join(modDir, "gradlew.bat")}" ${args.join(" ")}`, { ...options, shell: true })

@@ -1,5 +1,6 @@
 package dev.salamiclient.modules.social;
 
+import dev.salamiclient.SalamiClient;
 import dev.salamiclient.emotes.EmoteEffects;
 import dev.salamiclient.emotes.Emotes;
 import dev.salamiclient.gui.CosmeticsScreen;
@@ -8,6 +9,8 @@ import dev.salamiclient.module.Module;
 import dev.salamiclient.module.WorldRenderListener;
 import dev.salamiclient.render.WorldContext;
 import dev.salamiclient.setting.BoolSetting;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -27,6 +30,12 @@ public final class EmotesModule extends Module implements WorldRenderListener {
 	public EmotesModule() {
 		super("emotes", Category.SOCIAL, true);
 		instance = this;
+	}
+
+	@Override
+	public Component description() {
+		KeyMapping key = SalamiClient.get().emoteKey();
+		return description(key.isUnbound() ? Component.translatable("salami.setting.unbound") : key.getTranslatedKeyMessage());
 	}
 
 	public static @Nullable EmotesModule instance() {

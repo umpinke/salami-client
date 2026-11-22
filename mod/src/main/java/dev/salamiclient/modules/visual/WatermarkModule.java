@@ -42,7 +42,7 @@ public final class WatermarkModule extends HudModule {
 	private void updateText() {
 		StringBuilder text = new StringBuilder();
 		if (showVersion.isOn()) {
-			text.append(SalamiClient.version());
+			text.append(SalamiClient.shortVersion());
 		}
 		if (tagline.isOn() && SalamiClient.get().theme().isSalami()) {
 			text.append("  ").append(I18n.get("salami.theme.tagline"));

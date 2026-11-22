@@ -4,6 +4,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonPrimitive;
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.util.Keys;
+import net.minecraft.network.chat.Component;
 
 /** Tastencode wie in {@link InputConstants} (bis 26.2 GLFW, ab 26.3 SDL-Scancode); {@link #NONE} = keine Taste. */
 public final class KeybindSetting extends Setting<Integer> {
@@ -27,6 +28,11 @@ public final class KeybindSetting extends Setting<Integer> {
 			return "-";
 		}
 		return InputConstants.Type.KEYSYM.getOrCreate(get()).getDisplayName().getString();
+	}
+
+	/** Tastenname für Texte („Zoom-Taste (C) halten …“); ohne Taste „nicht belegt“. */
+	public Component label() {
+		return isBound() ? Component.literal(keyName()) : Component.translatable("salami.setting.unbound");
 	}
 
 	/** Nur gültige Tastencodes (siehe {@link Keys#isValid}); alles andere = keine Taste. */

@@ -6,6 +6,8 @@ import dev.salamiclient.setting.Setting;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.locale.Language;
+import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -133,5 +135,18 @@ public abstract class Module {
 
 	public final String descriptionKey() {
 		return translationKey() + ".desc";
+	}
+
+	/**
+	 * Beschreibung für Tooltips und das Mods-Menü oder {@code null}. Module, deren Text eine Taste nennt,
+	 * überschreiben das und setzen die tatsächlich belegte Taste ein.
+	 */
+	public Component description() {
+		return Language.getInstance().has(descriptionKey()) ? Component.translatable(descriptionKey()) : null;
+	}
+
+	/** Beschreibung mit Argumenten (z. B. dem Namen einer Taste) oder {@code null}. */
+	protected final Component description(Object... args) {
+		return Language.getInstance().has(descriptionKey()) ? Component.translatable(descriptionKey(), args) : null;
 	}
 }

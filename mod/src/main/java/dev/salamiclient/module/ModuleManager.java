@@ -136,7 +136,12 @@ public final class ModuleManager {
 
 	public void renderHud(GuiGraphics graphics, DeltaTracker delta) {
 		long start = System.nanoTime();
+		// Während der F3-Anzeige keine Salami-HUD-Elemente darüber (Anzeigen an Spielern bleiben)
+		boolean debugScreen = Minecraft.getInstance().getDebugOverlay().showDebugScreen();
 		for (Module module : active) {
+			if (debugScreen && module instanceof HudModule) {
+				continue;
+			}
 			long moduleStart = profile != null ? System.nanoTime() : 0L;
 			try {
 				module.onHud(graphics, delta);

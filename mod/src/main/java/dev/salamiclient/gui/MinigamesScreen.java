@@ -999,6 +999,10 @@ public final class MinigamesScreen extends Screen {
 
 	@Override
 	public boolean keyPressed(KeyEvent event) {
+		// Menü-Taste schließt alles – nur nicht mitten im Spiel (dort ist Umschalt eine Spieltaste)
+		if (SalamiMenuScreen.closeOnMenuKey(minecraft, event, view == View.GAME && game != null && !game.isOver())) {
+			return true;
+		}
 		int key = event.key();
 		if (key == InputConstants.KEY_M) {
 			toggleMute();

@@ -71,7 +71,7 @@ public final class Friends {
 	private static @Nullable FriendsApi api;
 
 	private static Status status = Status.OFF;
-	private static @Nullable String error;
+	private static @Nullable Component error;
 	private static @Nullable String token;
 	private static boolean loggingIn;
 	private static long loginRetryAt;
@@ -107,7 +107,8 @@ public final class Friends {
 	}
 
 	/** Fehlertext vom Server oder von Mojang (bei {@link Status#ERROR}). */
-	public static @Nullable String error() {
+	/** Grund der Störung, für Spieler lesbar (Details stehen im Log). */
+	public static @Nullable Component error() {
 		return error;
 	}
 
@@ -243,8 +244,8 @@ public final class Friends {
 			}
 			Throwable cause = FriendsApi.unwrap(failure);
 			status = Status.ERROR;
-			error = cause.getMessage();
-			SalamiClient.LOG.warn("Anmeldung für Freunde fehlgeschlagen: {}", cause.getMessage());
+			error = describe(cause);
+			SalamiClient.LOG.warn("Anmeldung für Freunde fehlgeschlagen: {}", cause.toString());
 			loginRetryAt = System.currentTimeMillis() + loginRetryMs;
 			loginRetryMs = Math.min(loginRetryMs * 2, LOGIN_RETRY_MAX_MS);
 		}));
@@ -300,9 +301,35 @@ public final class Friends {
 					return;
 				}
 				status = Status.ERROR;
-				error = cause.getMessage();
-				SalamiClient.LOG.debug("Freunde-Live-Verbindung getrennt: {}", cause.getMessage());
+				error = describe(cause);
+				SalamiClient.LOG.debug("Freunde-Live-Verbindung getrennt: {}", cause.toString());
 			}));
+	}
+
+	/**
+	 * Lesbare Fehlermeldung statt Java-Ausnahmetext. Meldungen des Salami-Servers sind schon für Spieler
+	 * gedacht (deutsch) und bleiben; Netzwerkfehler werden übersetzt. Die technische Ursache steht im Log.
+	 */
+	static Component describe(Throwable cause) {
+		SalamiClient.LOG.debug("Freunde: {}", cause.toString());
+		if (cause instanceof FriendsApi.ServerException server) {
+			String message = server.getMessage();
+			if (message != null && !message.isBlank() && !message.startsWith("HTTP ")) {
+				return Component.literal(message);
+			}
+			return Component.translatable("salami.friends.error.server", server.status);
+		}
+		if (cause instanceof FriendsApi.MojangLoginException) {
+			return Component.translatable("salami.friends.error.mojang");
+		}
+		if (cause instanceof java.net.http.HttpTimeoutException) {
+			return Component.translatable("salami.friends.error.timeout");
+		}
+		if (cause instanceof java.io.IOException || cause instanceof java.nio.channels.UnresolvedAddressException) {
+			return Component.translatable("salami.friends.error.unreachable");
+		}
+		SalamiClient.LOG.warn("Freunde: unerwarteter Fehler", cause);
+		return Component.translatable("salami.friends.error.unknown");
 	}
 
 	/** Modul aus oder Adresse geändert: Verbindung schließen, Daten vergessen. */
@@ -443,7 +470,7 @@ public final class Friends {
 				refresh(mc);
 				String name = FriendsApi.string(event, "name");
 				if (name != null) {
-					Chat.info("salami.friends.chat.request", name);
+					Chat.info("salami.friends.chat.request", name, SalamiClient.menuKeyName());
 					ping(mc, module);
 				}
 			}
@@ -537,7 +564,7 @@ public final class Friends {
 			if (failure != null) {
 				Throwable cause = FriendsApi.unwrap(failure);
 				if (!unauthorized(cause)) {
-					setNotice(Component.literal(cause.getMessage()), true);
+					setNotice(describe(cause), true);
 				}
 				return;
 			}
@@ -621,7 +648,7 @@ public final class Friends {
 			if (failure != null) {
 				Throwable cause = FriendsApi.unwrap(failure);
 				if (!unauthorized(cause)) {
-					setNotice(Component.literal(cause.getMessage()), true);
+					setNotice(describe(cause), true);
 				}
 				onSent.accept(false);
 				return;
@@ -643,7 +670,7 @@ public final class Friends {
 			if (failure != null) {
 				Throwable cause = FriendsApi.unwrap(failure);
 				if (!unauthorized(cause)) {
-					setNotice(Component.literal(cause.getMessage()), true);
+					setNotice(describe(cause), true);
 				}
 				return;
 			}

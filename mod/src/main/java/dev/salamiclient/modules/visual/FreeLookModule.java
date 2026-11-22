@@ -8,6 +8,7 @@ import dev.salamiclient.setting.KeybindSetting;
 import dev.salamiclient.util.Keys;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 
 /**
@@ -30,6 +31,11 @@ public final class FreeLookModule extends Module {
 	public FreeLookModule() {
 		super("free_look", Category.VISUAL);
 		instance = this;
+	}
+
+	@Override
+	public Component description() {
+		return description(lookKey.label());
 	}
 
 	@Override

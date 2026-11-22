@@ -47,6 +47,7 @@ stonecutter parameters {
 			replace("\"renderEffects\"", "\"extractEffects\"")
 			replace("\"renderTitle\"", "\"extractTitle\"")
 			replace("\"renderOverlayMessage\"", "\"extractOverlayMessage\"")
+			replace("\"renderCrosshair\"", "\"extractCrosshair\"")
 			replace("\"renderPingIcon\"", "\"extractPingIcon\"")
 			replace("\"renderTransparentBackground\"", "\"extractTransparentBackground\"")
 			replace("\"renderBlurredBackground\"", "\"extractBlurredBackground\"")

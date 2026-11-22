@@ -48,6 +48,8 @@ public final class HudEditorScreen extends Screen {
 	private final Screen parent;
 	private HudModule selected;
 	private HudModule dragging;
+	/** Menü-Taste gedrückt, ohne dass seitdem etwas anderes passiert ist (siehe keyPressed). */
+	private boolean closeOnRelease;
 	private int dragOffsetX;
 	private int dragOffsetY;
 	private HudModule resizing;
@@ -57,6 +59,8 @@ public final class HudEditorScreen extends Screen {
 	private int guideX = Integer.MIN_VALUE;
 	private int guideY = Integer.MIN_VALUE;
 	private double listScroll;
+	/** Zuletzt gewählte Höhe der Leiste ({@link #toolbarTop}); {@code MIN_VALUE} = noch keine. */
+	private int toolbarTop = Integer.MIN_VALUE;
 
 	private enum Tool {
 		SMALLER,
@@ -76,7 +80,7 @@ public final class HudEditorScreen extends Screen {
 
 	@Override
 	public boolean isPauseScreen() {
-		return false;
+		return SalamiMenuScreen.pausesGame();
 	}
 
 	/** Liste aller HUD-Elemente auf- oder zuklappen (Knopf „Elemente“; auch für Tests). */
@@ -148,25 +152,59 @@ public final class HudEditorScreen extends Screen {
 		};
 	}
 
-	/** Knöpfe der Leiste: {x0, y0, x1, y1} in Bildschirmkoordinaten, Reihenfolge wie {@link Tool}. */
+	/**
+	 * Knöpfe der Leiste: {x0, y0, x1, y1} in Bildschirmkoordinaten, Reihenfolge wie {@link Tool}. Passt
+	 * die Leiste nicht in die Fensterbreite, bricht sie in weitere Reihen um (die Größen-Knöpfe bleiben
+	 * zusammen); jede Reihe ist mittig.
+	 */
 	private int[][] toolbar() {
+		return toolbar(toolbarTop());
+	}
+
+	private int[][] toolbar(int top) {
 		Tool[] tools = Tool.values();
 		int[] widths = new int[tools.length];
-		int total = 0;
 		for (int i = 0; i < tools.length; i++) {
 			boolean narrow = tools[i] == Tool.SMALLER || tools[i] == Tool.BIGGER;
 			widths[i] = narrow ? BAR_H : font.width(toolLabel(tools[i])) + 12;
-			total += widths[i] + (i == 0 ? 0 : gapAfter(tools[i - 1]));
 		}
-		int x = Math.max(4, (width - total) / 2);
-		int y = toolbarY();
-		int[][] rects = new int[tools.length][];
+		// Reihen bilden: {erster Knopf, Breite}
+		int maxWidth = Math.max(BAR_H * 4, width - 16 - 8);
+		List<int[]> rows = new ArrayList<>();
+		int start = 0;
+		int rowWidth = 0;
 		for (int i = 0; i < tools.length; i++) {
-			if (i > 0) {
-				x += gapAfter(tools[i - 1]);
+			// „-“, „HUD 100 %“ und „+“ gehören zusammen
+			if (i > 0 && (tools[i] == Tool.SIZE || tools[i] == Tool.BIGGER)) {
+				rowWidth += gapAfter(tools[i - 1]) + widths[i];
+				continue;
 			}
-			rects[i] = new int[] {x, y, x + widths[i], y + BAR_H};
-			x += widths[i];
+			int unit = widths[i];
+			if (tools[i] == Tool.SMALLER) {
+				unit += gapAfter(Tool.SMALLER) + widths[i + 1] + gapAfter(Tool.SIZE) + widths[i + 2];
+			}
+			if (i > start && rowWidth + 4 + unit > maxWidth) {
+				rows.add(new int[] {start, rowWidth});
+				start = i;
+				rowWidth = 0;
+			}
+			rowWidth += (i > start ? gapAfter(tools[i - 1]) : 0) + widths[i];
+		}
+		rows.add(new int[] {start, rowWidth});
+
+		int[][] rects = new int[tools.length][];
+		for (int r = 0; r < rows.size(); r++) {
+			int from = rows.get(r)[0];
+			int to = r + 1 < rows.size() ? rows.get(r + 1)[0] : tools.length;
+			int x = Math.max(8, (width - rows.get(r)[1]) / 2);
+			int y = top + r * (BAR_H + 4);
+			for (int i = from; i < to; i++) {
+				if (i > from) {
+					x += gapAfter(tools[i - 1]);
+				}
+				rects[i] = new int[] {x, y, x + widths[i], y + BAR_H};
+				x += widths[i];
+			}
 		}
 		return rects;
 	}
@@ -176,14 +214,69 @@ public final class HudEditorScreen extends Screen {
 		return tool == Tool.SMALLER || tool == Tool.SIZE ? 1 : 4;
 	}
 
-	/** Leiste knapp unter dem Fadenkreuz – dort liegen kaum HUD-Elemente. */
-	private int toolbarY() {
-		return height / 2 + 14;
+	/** Rahmen um alle Knöpfe {x0, y0, x1, y1}. */
+	private static int[] frameOf(int[][] rects) {
+		int[] frame = {Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE};
+		for (int[] r : rects) {
+			frame[0] = Math.min(frame[0], r[0] - 4);
+			frame[1] = Math.min(frame[1], r[1] - 4);
+			frame[2] = Math.max(frame[2], r[2] + 4);
+			frame[3] = Math.max(frame[3], r[3] + 4);
+		}
+		return frame;
 	}
 
 	private int[] toolbarFrame() {
-		int[][] rects = toolbar();
-		return new int[] {rects[0][0] - 4, rects[0][1] - 4, rects[rects.length - 1][2] + 4, rects[0][3] + 4};
+		return frameOf(toolbar());
+	}
+
+	/** Oberkante der Knöpfe; bleibt stehen, solange ein Element gezogen oder vergrößert wird. */
+	private int toolbarTop() {
+		if (toolbarTop == Integer.MIN_VALUE || (dragging == null && resizing == null)) {
+			toolbarTop = chooseToolbarTop();
+		}
+		return toolbarTop;
+	}
+
+	/**
+	 * Platz für die Leiste, der keine eingeschalteten HUD-Elemente verdeckt: knapp unter dem Fadenkreuz,
+	 * knapp darüber, oben oder unten über dem Hinweis – der erste freie Platz, sonst der mit der kleinsten
+	 * Überdeckung.
+	 */
+	private int chooseToolbarTop() {
+		int[] probe = frameOf(toolbar(0));
+		int rowsHeight = probe[3] - probe[1] - 8; // Höhe der Knopfreihen ohne Rahmen
+		int[] candidates = {
+			height / 2 + 14,
+			height / 2 - 14 - rowsHeight,
+			8,
+			height - hintHeight() - 10 - rowsHeight,
+		};
+		int best = candidates[0];
+		long bestOverlap = Long.MAX_VALUE;
+		for (int top : candidates) {
+			int[] frame = frameOf(toolbar(top));
+			if (frame[1] < 0 || frame[3] > height) {
+				continue;
+			}
+			long overlap = 0;
+			for (HudModule hud : elements()) {
+				Box b = box(hud);
+				int w = Math.min(frame[2], b.x() + b.w() + 2) - Math.max(frame[0], b.x() - 2);
+				int h = Math.min(frame[3], b.y() + b.h() + 2) - Math.max(frame[1], b.y() - 2);
+				if (w > 0 && h > 0) {
+					overlap += (long) w * h;
+				}
+			}
+			if (overlap == 0) {
+				return top;
+			}
+			if (overlap < bestOverlap) {
+				bestOverlap = overlap;
+				best = top;
+			}
+		}
+		return best;
 	}
 
 	// ------------------------------------------------------------------ Elementliste
@@ -253,6 +346,13 @@ public final class HudEditorScreen extends Screen {
 	/*public void extractBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
 	*///?} else
 	public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+		if (minecraft.level == null) {
+			// ohne Welt (Titelbildschirm, Mod Menu): Panorama dahinter wie in Minecrafts eigenen Menüs
+			//? if >=26.1 {
+			/*super.extractBackground(graphics, mouseX, mouseY, partialTick);
+			*///?} else
+			super.renderBackground(graphics, mouseX, mouseY, partialTick);
+		}
 		graphics.fill(0, 0, width, height, 0x38000000);
 	}
 
@@ -405,6 +505,7 @@ public final class HudEditorScreen extends Screen {
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+		closeOnRelease = false; // Umschalt war ein Modifikator, kein Schließen
 		double x = event.x();
 		double y = event.y();
 		int button = event.button();
@@ -527,6 +628,7 @@ public final class HudEditorScreen extends Screen {
 
 	@Override
 	public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
+		closeOnRelease = false; // Umschalt war ein Modifikator, kein Schließen
 		if (resizing != null) {
 			Box b = box(resizing);
 			double wanted = Math.max(8, event.x() - b.x());
@@ -606,6 +708,7 @@ public final class HudEditorScreen extends Screen {
 
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+		closeOnRelease = false; // Umschalt war ein Modifikator, kein Schließen
 		if (scrollY == 0) {
 			return false;
 		}
@@ -630,7 +733,24 @@ public final class HudEditorScreen extends Screen {
 	}
 
 	@Override
+	public boolean keyReleased(KeyEvent event) {
+		if (closeOnRelease && SalamiClient.get().clickGuiKey().matches(event)) {
+			closeOnRelease = false;
+			SalamiMenuScreen.closeAll(minecraft);
+			return true;
+		}
+		return super.keyReleased(event);
+	}
+
+	@Override
 	public boolean keyPressed(KeyEvent event) {
+		// Die Menü-Taste (Standard Rechte Umschalttaste) ist hier auch Umschalt fürs Ziehen ohne Einrasten
+		// und für größere Schritte: schließen erst beim Loslassen und nur, wenn dazwischen nichts passiert ist
+		if (SalamiClient.get().clickGuiKey().matches(event)) {
+			closeOnRelease = dragging == null && resizing == null;
+			return true;
+		}
+		closeOnRelease = false;
 		int key = event.key();
 		if (selected != null && selected.isEnabled()) {
 			int step = minecraft.hasShiftDown() ? 10 : 1;

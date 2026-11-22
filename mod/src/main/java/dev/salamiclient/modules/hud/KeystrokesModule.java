@@ -9,6 +9,7 @@ import dev.salamiclient.setting.NumberSetting;
 import dev.salamiclient.util.ClickTracker;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.KeyMapping;
+import net.minecraft.client.resources.language.I18n;
 import net.minecraft.client.gui.GuiGraphics;
 
 /**
@@ -199,14 +200,14 @@ public final class KeystrokesModule extends HudModule {
 		return true;
 	}
 
-	/** „W“, „LMB“, „RMB“ – lange Namen (z. B. „Linke Maustaste“) werden gekürzt. */
+	/** „W“, „LMT“, „RMT“ (Sprachdatei) – lange Namen (z. B. „Linke Maustaste“) werden gekürzt. */
 	private String shortName(KeyMapping mapping) {
 		var options = mc().options;
 		if (mapping == options.keyAttack && mapping.isDefault()) {
-			return "LMB";
+			return I18n.get("salami.module.keystrokes.lmb");
 		}
 		if (mapping == options.keyUse && mapping.isDefault()) {
-			return "RMB";
+			return I18n.get("salami.module.keystrokes.rmb");
 		}
 		String name = mapping.getTranslatedKeyMessage().getString();
 		return name.length() > 4 ? name.substring(0, 4) : name;

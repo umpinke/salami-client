@@ -8,6 +8,7 @@ import dev.salamiclient.setting.KeybindSetting;
 import dev.salamiclient.setting.NumberSetting;
 import dev.salamiclient.util.Keys;
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 
 /**
  * Zoom: Taste gedrückt halten (Standard C) zoomt heran, das Mausrad ändert dabei die Stärke.
@@ -33,6 +34,11 @@ public final class ZoomModule extends Module {
 	public ZoomModule() {
 		super("zoom", Category.VISUAL);
 		instance = this;
+	}
+
+	@Override
+	public Component description() {
+		return description(zoomKey.label());
 	}
 
 	@Override

@@ -65,6 +65,14 @@ final class GametestCompat {
 		//?}
 	}
 
+	/** Ob gerade ein Ladebildschirm (z. B. nach einem Sprachwechsel) über allem liegt. */
+	static boolean hasOverlay(Minecraft client) {
+		//? if >=26.2 {
+		/*return client.gui.overlay() != null;
+		*///?} else
+		return client.getOverlay() != null;
+	}
+
 	/** Anzahl aller Partikel; ab 26.2 liefert Minecraft „Art Anzahl … T Summe“ statt nur der Zahl. */
 	static int particleCount(Minecraft client) {
 		String counts = client.particleEngine.countParticles().trim();

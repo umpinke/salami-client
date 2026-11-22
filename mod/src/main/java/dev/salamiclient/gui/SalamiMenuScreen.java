@@ -10,7 +10,9 @@ import dev.salamiclient.module.ModuleManager;
 import dev.salamiclient.modules.client.GuiScaleModule;
 import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.theme.Theme;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -23,7 +25,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Salami-Menü (Rechte Umschalttaste): Einstieg ins Spielmenü. Links ein Akzentstrich, daneben
+ * Salami-Menü (Menü-Taste, Standard Rechte Umschalttaste; außerdem Knöpfe im Titelbildschirm und
+ * Pausemenü und der Eintrag in Mod Menu): Einstieg ins Spielmenü. Links ein Akzentstrich, daneben
  * Logo und Schriftzug, darunter der große Knopf zu den Mods, eine Reihe Kacheln für HUD,
  * Configs und die Panel-Ansicht und eine zweite für Freunde, Cosmetics und Minispiele.
  *
@@ -60,14 +63,64 @@ public final class SalamiMenuScreen extends Screen {
 		}
 	}
 
+	/**
+	 * Bildschirm, aus dem das Salami-Menü zuletzt geöffnet wurde (Titelbildschirm, Pausemenü, Mod Menu;
+	 * {@code null} = im Spiel über die Taste). Dorthin führt {@link #closeAll}.
+	 */
+	private static Screen origin;
+
 	private final ModuleManager modules;
 	private final ConfigManager config;
+	private final Screen parent;
 	private float uiScale = 1f;
 
+	/** Im Spiel über die Menü-Taste: schließen führt zurück ins Spiel. */
 	public SalamiMenuScreen(ModuleManager modules, ConfigManager config) {
+		this(modules, config, null);
+	}
+
+	/** Aus einem anderen Bildschirm (Titelbildschirm, Pausemenü, Mod Menu): schließen führt dorthin zurück. */
+	public SalamiMenuScreen(ModuleManager modules, ConfigManager config, Screen parent) {
 		super(Component.translatable("salami.clickgui.title"));
 		this.modules = modules;
 		this.config = config;
+		this.parent = parent;
+		origin = parent;
+	}
+
+	/** Öffnet das Salami-Menü über {@code parent} (Knöpfe im Titelbildschirm und Pausemenü, Mod Menu). */
+	public static SalamiMenuScreen over(Screen parent) {
+		SalamiClient salami = SalamiClient.get();
+		return new SalamiMenuScreen(salami.modules(), salami.config(), parent);
+	}
+
+	/**
+	 * Schließt alle Salami-Menüs auf einmal (Menü-Taste): zurück zu dem Bildschirm, aus dem das Menü
+	 * geöffnet wurde – ins Spiel, ins Pausemenü oder zum Titelbildschirm.
+	 */
+	public static void closeAll(Minecraft minecraft) {
+		Screen target = origin;
+		// Pausemenü nur in einer Welt, sonst (z. B. Titelbildschirm) nur ohne Welt
+		boolean inWorld = minecraft.level != null;
+		if (target instanceof PauseScreen ? !inWorld : inWorld) {
+			target = null;
+		}
+		minecraft.setScreen(target);
+	}
+
+	/**
+	 * Menü-Taste in einem Salami-Bildschirm (Mods, Panel-Ansicht, HUD-Editor, Configs …): schließt immer
+	 * alle Salami-Menüs auf einmal ({@link #closeAll}) – außer {@code typing}, dann gehört die Taste dem
+	 * Textfeld bzw. Spiel. Esc geht dagegen eine Ebene zurück.
+	 *
+	 * @return {@code true}, wenn die Taste verbraucht wurde
+	 */
+	public static boolean closeOnMenuKey(Minecraft minecraft, KeyEvent event, boolean typing) {
+		if (typing || !SalamiClient.get().clickGuiKey().matches(event)) {
+			return false;
+		}
+		closeAll(minecraft);
+		return true;
 	}
 
 	@Override
@@ -76,8 +129,22 @@ public final class SalamiMenuScreen extends Screen {
 	}
 
 	@Override
+	public void onClose() {
+		minecraft.setScreen(parent);
+	}
+
+	@Override
 	public boolean isPauseScreen() {
-		return false;
+		return pausesGame();
+	}
+
+	/**
+	 * Aus dem Pausemenü geöffnet: dann bleibt eine Einzelspielerwelt in allen Salami-Menüs angehalten
+	 * (sonst liefe sie weiter, während man Einstellungen durchsieht). Mit der Taste im Spiel geöffnet
+	 * läuft das Spiel wie bisher weiter.
+	 */
+	public static boolean pausesGame() {
+		return origin instanceof PauseScreen;
 	}
 
 	// ------------------------------------------------------------------ Layout
@@ -142,6 +209,13 @@ public final class SalamiMenuScreen extends Screen {
 	/*public void extractBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
 	*///?} else
 	public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+		if (minecraft.level == null) {
+			// ohne Welt (Titelbildschirm, Mod Menu): Panorama dahinter wie in Minecrafts eigenen Menüs
+			//? if >=26.1 {
+			/*super.extractBackground(graphics, mouseX, mouseY, partialTick);
+			*///?} else
+			super.renderBackground(graphics, mouseX, mouseY, partialTick);
+		}
 		graphics.fill(0, 0, width, height, 0xB00A0809);
 	}
 
@@ -309,7 +383,8 @@ public final class SalamiMenuScreen extends Screen {
 		switch (tile) {
 			case HUD -> minecraft.setScreen(new HudEditorScreen(this));
 			case CONFIGS -> minecraft.setScreen(new ConfigsScreen(this));
-			case PANELS -> minecraft.setScreen(new ClickGuiScreen(modules, config));
+			// Panel-Ansicht nur als Unteransicht: Esc führt hierher zurück
+			case PANELS -> minecraft.setScreen(new ClickGuiScreen(modules, config, this));
 			case FRIENDS -> minecraft.setScreen(new FriendsScreen(this));
 			case COSMETICS -> minecraft.setScreen(new CosmeticsScreen(this));
 			case MINIGAMES -> MinigamesScreen.open(this);
@@ -340,9 +415,8 @@ public final class SalamiMenuScreen extends Screen {
 
 	@Override
 	public boolean keyPressed(KeyEvent event) {
-		// Die Menü-Taste schließt das Menü wieder
-		if (SalamiClient.get().clickGuiKey().matches(event)) {
-			onClose();
+		// Die Menü-Taste schließt das Menü wieder (wie in allen Salami-Bildschirmen)
+		if (closeOnMenuKey(minecraft, event, false)) {
 			return true;
 		}
 		if (event.key() == InputConstants.KEY_RETURN || event.key() == InputConstants.KEY_NUMPADENTER) {

@@ -3,6 +3,7 @@ package dev.salamiclient.modules.client;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 
 /**
  * Borderless Fullscreen: F11 macht ein randloses Fenster in Bildschirmgröße statt echtem Vollbild –
@@ -14,6 +15,12 @@ public final class BorderlessFullscreenModule extends Module {
 	public BorderlessFullscreenModule() {
 		super("borderless_fullscreen", Category.CLIENT);
 		instance = this;
+	}
+
+	/** Nennt die tatsächlich belegte Vollbild-Taste (Standard F11). */
+	@Override
+	public Component description() {
+		return description(mc().options.keyFullscreen.getTranslatedKeyMessage());
 	}
 
 	/** Für {@code WindowMixin}. */

@@ -9,11 +9,15 @@ import dev.salamiclient.setting.ModeSetting;
 import dev.salamiclient.setting.NumberSetting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.resources.Identifier;
 
 /**
  * Custom Crosshair: ersetzt das Vanilla-Fadenkreuz (Kreuz, Punkt, Kreis oder
  * Salamischeibe), mit Farbe, Größe, Abstand und Dicke.
- * Eingehängt über {@code HudElementRegistry.replaceElement(CROSSHAIR)}.
+ *
+ * <p>Ersetzt wird nur das Kreuz-Bild in Minecrafts eigenem Fadenkreuz ({@code GuiMixin}): Ich-Sicht,
+ * die Zuschauer-Regel, das F3-Fadenkreuz und die Angriffsanzeige („Fadenkreuz“ in den Optionen)
+ * bleiben, wie Minecraft sie macht.
  */
 public final class CrosshairModule extends Module {
 	public enum Style { CROSS, DOT, CIRCLE, SALAMI }
@@ -27,8 +31,27 @@ public final class CrosshairModule extends Module {
 	private final BoolSetting centerDot = add(new BoolSetting("center_dot", false));
 	private final BoolSetting outline = add(new BoolSetting("outline", true));
 
+	/** Minecrafts Fadenkreuz-Bild ({@code hud/crosshair}). */
+	private static final Identifier VANILLA_SPRITE = Identifier.withDefaultNamespace("hud/crosshair");
+
 	public CrosshairModule() {
 		super("crosshair", Category.VISUAL);
+	}
+
+	/**
+	 * Aus dem Vanilla-Fadenkreuz: Ist {@code sprite} das Kreuz und das Modul an, zeichnet es das eigene
+	 * Fadenkreuz und liefert {@code true} (Minecraft zeichnet das Kreuz dann nicht).
+	 */
+	public static boolean replaceVanilla(GuiGraphics graphics, Identifier sprite) {
+		if (!VANILLA_SPRITE.equals(sprite) || SalamiClient.get() == null) {
+			return false;
+		}
+		CrosshairModule module = SalamiClient.get().modules().get(CrosshairModule.class);
+		if (!module.isEnabled()) {
+			return false;
+		}
+		module.render(graphics);
+		return true;
 	}
 
 	public void render(GuiGraphics g) {

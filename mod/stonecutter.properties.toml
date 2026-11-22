@@ -1,5 +1,6 @@
 # Eigenschaften der Mod und pro Minecraft-Version (https://stonecutter.kikugie.dev/wiki/config/properties)
 mod.archives_name = "salami-core"
+# Nur noch Rückfall: gebaut wird mit der Launcher-Version (launcher/src-tauri/tauri.conf.json, siehe build.gradle.kts)
 mod.version = "0.1.0"
 mod.group = "dev.salamiclient"
 

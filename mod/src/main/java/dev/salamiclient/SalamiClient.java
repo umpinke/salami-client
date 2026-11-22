@@ -9,6 +9,7 @@ import dev.salamiclient.friends.Friends;
 import dev.salamiclient.friends.FriendsCommand;
 import dev.salamiclient.gui.CosmeticsScreen;
 import dev.salamiclient.gui.FriendsScreen;
+import dev.salamiclient.gui.MenuButtons;
 import dev.salamiclient.gui.SalamiMenuScreen;
 import dev.salamiclient.gui.EmoteWheelScreen;
 import dev.salamiclient.emotes.EmoteCommand;
@@ -95,6 +96,7 @@ import dev.salamiclient.render.WorldContext;
 import dev.salamiclient.render.WorldLines;
 import dev.salamiclient.modules.visual.WatermarkModule;
 import dev.salamiclient.theme.Theme;
+import dev.salamiclient.util.Chat;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
@@ -104,7 +106,6 @@ import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.LivingEntityFeatureRendererRegistrationCallback;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
-import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 //? if >=26.1 {
 /*import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
@@ -113,6 +114,7 @@ import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
 //?}
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.Minecraft;
@@ -124,6 +126,7 @@ import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractSignEditScreen;
 import net.minecraft.client.gui.screens.recipebook.RecipeBookComponent;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -151,6 +154,9 @@ public final class SalamiClient implements ClientModInitializer {
 	private ConfigManager config;
 	private KeyMapping clickGuiKey;
 	private KeyMapping emoteKey;
+	/** Merker in {@code config.gui()}: der Hinweis auf das Salami-Menü kam schon einmal. */
+	private static final String MENU_HINT_SHOWN = "menu_hint_shown";
+	private boolean menuHintChecked;
 
 	public static SalamiClient get() {
 		return instance;
@@ -158,7 +164,7 @@ public final class SalamiClient implements ClientModInitializer {
 
 	private static String version;
 
-	/** Version von salami-core (einmal gelesen – die Watermark fragt jeden Tick). */
+	/** Version von salami-core samt Minecraft-Version, z. B. „1.8.6+1.21.11“ (einmal gelesen – die Watermark fragt jeden Tick). */
 	public static String version() {
 		if (version == null) {
 			version = FabricLoader.getInstance().getModContainer(MOD_ID)
@@ -166,6 +172,13 @@ public final class SalamiClient implements ClientModInitializer {
 				.orElse("dev");
 		}
 		return version;
+	}
+
+	/** Version ohne Minecraft-Teil, z. B. „1.8.6“ – dieselbe Nummer wie der Launcher. */
+	public static String shortVersion() {
+		String full = version();
+		int plus = full.indexOf('+');
+		return plus > 0 ? full.substring(0, plus) : full;
 	}
 
 	@Override
@@ -280,18 +293,9 @@ public final class SalamiClient implements ClientModInitializer {
 	private void registerEvents() {
 		ClientTickEvents.END_CLIENT_TICK.register(this::onTick);
 		HudElementRegistry.addLast(Identifier.fromNamespaceAndPath(MOD_ID, "modules"), modules::renderHud);
-		// Custom Crosshair ersetzt das Vanilla-Fadenkreuz nur, solange das Modul aktiv ist
-		HudElementRegistry.replaceElement(VanillaHudElements.CROSSHAIR, vanilla -> (graphics, delta) -> {
-			CrosshairModule crosshair = modules.get(CrosshairModule.class);
-			if (crosshair.isEnabled() && Minecraft.getInstance().options.getCameraType().isFirstPerson()) {
-				crosshair.render(graphics);
-			} else {
-				//? if >=26.1 {
-				/*vanilla.extractRenderState(graphics, delta);
-				*///?} else
-				vanilla.render(graphics, delta);
-			}
-		});
+		// (Das eigene Fadenkreuz ersetzt nur das Kreuz-Bild in Minecrafts Fadenkreuz, siehe GuiMixin.)
+		// Salami-Knopf im Titelbildschirm und im Pausemenü
+		MenuButtons.register();
 		//? if >=26.1 {
 		/*LevelRenderEvents.BEFORE_BLOCK_OUTLINE.register((context, state) -> modules.get(BlockOutlineModule.class).render(worldContext(context), state));
 		LevelRenderEvents.END_MAIN.register(context -> modules.renderWorld(worldContext(context)));
@@ -348,6 +352,10 @@ public final class SalamiClient implements ClientModInitializer {
 				client.setScreen(new SalamiMenuScreen(modules, config));
 			}
 		}
+		if (!menuHintChecked && client.player != null && client.level != null) {
+			menuHintChecked = true;
+			showMenuHintOnce();
+		}
 		while (emoteKey.consumeClick()) {
 			EmotesModule emotes = modules.get(EmotesModule.class);
 			if (client.screen == null && client.player != null && emotes.isEnabled()) {
@@ -360,6 +368,23 @@ public final class SalamiClient implements ClientModInitializer {
 		Friends.tick(client);
 		AnimatedCapes.tick();
 		config.tick();
+	}
+
+	/**
+	 * Beim ersten Betreten einer Welt überhaupt: ein Hinweis im Chat, wie das Salami-Menü aufgeht –
+	 * mit der tatsächlich belegten Taste. Danach nie wieder (Merker in der Config).
+	 */
+	private void showMenuHintOnce() {
+		if (config.gui().has(MENU_HINT_SHOWN)) {
+			return;
+		}
+		config.gui().addProperty(MENU_HINT_SHOWN, true);
+		config.markDirty();
+		if (clickGuiKey.isUnbound()) {
+			Chat.info("salami.menu.first_hint.unbound");
+		} else {
+			Chat.info("salami.menu.first_hint", clickGuiKey.getTranslatedKeyMessage().copy().withStyle(ChatFormatting.WHITE));
+		}
 	}
 
 	/** In Textfeldern (Chat, Schilder, Suche) oder beim Tastenbelegen gehört die Taste dem Feld. */
@@ -434,6 +459,15 @@ public final class SalamiClient implements ClientModInitializer {
 
 	public KeyMapping clickGuiKey() {
 		return clickGuiKey;
+	}
+
+	/**
+	 * Name der Taste für das Salami-Menü, wie sie gerade belegt ist (für Hinweistexte); ohne Taste der
+	 * Weg über den Salami-Knopf im Pausemenü.
+	 */
+	public static Component menuKeyName() {
+		KeyMapping key = instance == null ? null : instance.clickGuiKey;
+		return key == null || key.isUnbound() ? Component.translatable("salami.menu.key_unbound") : key.getTranslatedKeyMessage();
 	}
 
 	/** Taste für das Emote-Rad (Standard: B). */
