@@ -9,13 +9,14 @@ import com.mojang.authlib.exceptions.AuthenticationException;
 /*import com.mojang.authlib.minecraft.SessionService;
 *///?} else
 import com.mojang.authlib.minecraft.MinecraftSessionService;
+import dev.salamiclient.util.AuthChallenge;
+import dev.salamiclient.util.ChatSafe;
+import dev.salamiclient.util.LimitedBody;
 import net.minecraft.client.User;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.http.HttpClient;
@@ -40,7 +41,8 @@ import java.util.function.Consumer;
  *
  * <p>Anmeldung wie beim Betreten eines Minecraft-Servers: der Cape-Server gibt eine
  * zufällige serverId aus, das Spiel meldet sie bei Mojang an ({@code joinServer}), der
- * Cape-Server fragt bei Mojang nach. Das Zugangstoken geht nur an Mojang.
+ * Cape-Server fragt bei Mojang nach. Das Zugangstoken geht nur an Mojang. Unterschrieben wird nur eine serverId
+ * im Salami-Format ({@link AuthChallenge}), nie der Hash eines echten Minecraft-Servers.
  */
 final class CapeServer {
 	static final String URL_PROPERTY = "salami.capes.url";
@@ -48,6 +50,12 @@ final class CapeServer {
 	static final int MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 	private static final Duration TIMEOUT = Duration.ofSeconds(15);
 	private static final Gson GSON = new Gson();
+	/** Größte JSON-Antwort (Kataloge, Lookups); alles darüber ist kaputt oder böswillig. */
+	private static final int MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
+	/** Längste Zeile auf der Live-Verbindung. */
+	private static final int MAX_EVENT_LINE_BYTES = 64 * 1024;
+	/** Längste Fehlermeldung des Servers, die das Spiel anzeigt. */
+	private static final int MAX_ERROR = 200;
 
 	/** Antwort auf {@code lookup}: mitgeliefertes Cape ({@code builtin}) oder freigegebenes eigenes ({@code id}). */
 	record Remote(@Nullable String builtin, @Nullable String id, @Nullable String hat,
@@ -191,10 +199,8 @@ final class CapeServer {
 	*///?} else
 	CompletableFuture<Published> publish(User user, MinecraftSessionService session, CapeShare share, @Nullable String hat, @Nullable JsonObject miniMe, @Nullable JsonObject buddy) {
 		return send(post("v1/auth/challenge", new JsonObject())).thenApplyAsync(challenge -> {
-			String serverId = string(challenge, "serverId");
-			if (serverId == null) {
-				throw new IllegalStateException("Cape-Server hat keine serverId geschickt");
-			}
+			// Nur eine serverId im Salami-Format unterschreiben, nie den Hash eines echten Minecraft-Servers
+			String serverId = AuthChallenge.require(string(challenge, "serverId"));
 			try {
 				session.joinServer(user.getProfileId(), user.getAccessToken(), serverId);
 			} catch (AuthenticationException e) {
@@ -215,8 +221,14 @@ final class CapeServer {
 				body.add("buddy", buddy);
 			}
 			return body;
-		}, executor).thenCompose(body -> send(request("v1/capes/me").PUT(json(body)).build()))
-			.thenApply(json -> new Published(String.valueOf(string(json, "status")), string(json, "id"), string(json, "reason")));
+		}, executor).thenCompose(body -> send(request("v1/capes/me")
+				// Anmeldung zusätzlich als Kopfzeilen: neuere Cape-Server prüfen sie, bevor sie das (große) Bild lesen
+				.header("X-Salami-Name", body.get("name").getAsString())
+				.header("X-Salami-Server-Id", body.get("serverId").getAsString())
+				.PUT(json(body))
+				.build()))
+			// Der Ablehnungsgrund landet im Chat: ohne Formatierung und Steuerzeichen
+			.thenApply(json -> new Published(String.valueOf(string(json, "status")), string(json, "id"), reason(string(json, "reason"))));
 	}
 
 	/** Meldet sich für Emotes an (Mojang wie beim Cape) und liefert das Token ({@code v1/emotes/session}). */
@@ -225,10 +237,7 @@ final class CapeServer {
 	*///?} else
 	CompletableFuture<String> emoteSession(User user, MinecraftSessionService session) {
 		return send(post("v1/auth/challenge", new JsonObject())).thenApplyAsync(challenge -> {
-			String serverId = string(challenge, "serverId");
-			if (serverId == null) {
-				throw new IllegalStateException("Cape-Server hat keine serverId geschickt");
-			}
+			String serverId = AuthChallenge.require(string(challenge, "serverId"));
 			try {
 				session.joinServer(user.getProfileId(), user.getAccessToken(), serverId);
 			} catch (AuthenticationException e) {
@@ -301,7 +310,7 @@ final class CapeServer {
 				throw new ServerException(response.statusCode(), "Live-Verbindung abgelehnt");
 			}
 			onOpen.run();
-			BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+			LimitedBody.LineReader reader = new LimitedBody.LineReader(in, MAX_EVENT_LINE_BYTES);
 			for (String line; (line = reader.readLine()) != null; ) {
 				stream.lastSeen = System.currentTimeMillis();
 				if (line.startsWith("data:")) {
@@ -363,7 +372,7 @@ final class CapeServer {
 	}
 
 	private CompletableFuture<JsonObject> send(HttpRequest request) {
-		return http.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)).thenApply(response -> {
+		return http.sendAsync(request, LimitedBody.utf8(MAX_RESPONSE_BYTES)).thenApply(response -> {
 			JsonObject json;
 			try {
 				JsonElement parsed = JsonParser.parseString(response.body());
@@ -372,12 +381,18 @@ final class CapeServer {
 				json = new JsonObject();
 			}
 			if (response.statusCode() / 100 != 2) {
-				String error = string(json, "error");
+				// Die Meldung kann im Chat landen („Cape konnte nicht geteilt werden: …“): ohne Formatierung und Steuerzeichen
+				String error = ChatSafe.clean(string(json, "error"), MAX_ERROR);
 				throw new java.util.concurrent.CompletionException(
-					new ServerException(response.statusCode(), error != null ? error : "HTTP " + response.statusCode()));
+					new ServerException(response.statusCode(), !error.isEmpty() ? error : "HTTP " + response.statusCode()));
 			}
 			return json;
 		});
+	}
+
+	private static @Nullable String reason(@Nullable String raw) {
+		String cleaned = ChatSafe.clean(raw, MAX_ERROR);
+		return cleaned.isEmpty() ? null : cleaned;
 	}
 
 	private static @Nullable String string(JsonObject json, String key) {

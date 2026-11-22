@@ -4,7 +4,9 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.modules.social.FriendsModule;
+import dev.salamiclient.util.AuthChallenge;
 import dev.salamiclient.util.Chat;
+import dev.salamiclient.util.UserInput;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
@@ -76,6 +78,8 @@ public final class Friends {
 	private static boolean loggingIn;
 	private static long loginRetryAt;
 	private static long loginRetryMs = LOGIN_RETRY_MIN_MS;
+	/** Zeitpunkt der letzten erfolgreichen Anmeldung (0 = noch keine). */
+	private static long lastLoginAt;
 	private static FriendsApi.@Nullable EventStream stream;
 	private static long streamRetryAt;
 	private static long streamRetryMs = STREAM_RETRY_MIN_MS;
@@ -192,6 +196,8 @@ public final class Friends {
 
 	/** Jeden Client-Tick: anmelden, Live-Verbindung halten. */
 	public static void tick(Minecraft mc) {
+		// Zwischen zwei Ticks ist keine Chat-Eingabe offen (Schutz, falls eine mit einer Ausnahme abgebrochen ist)
+		UserInput.reset();
 		if (openPending) {
 			openPending = false;
 			mc.setScreen(new dev.salamiclient.gui.FriendsScreen(null));
@@ -238,7 +244,9 @@ public final class Friends {
 			}
 			if (failure == null) {
 				token = result;
-				loginRetryMs = LOGIN_RETRY_MIN_MS;
+				lastLoginAt = System.currentTimeMillis();
+				// loginRetryMs erst zurücksetzen, wenn die Live-Verbindung steht – sonst könnte ein Server, der
+				// jedes neue Token gleich wieder mit 401 ablehnt, das Spiel in einer Schleife bei Mojang anmelden lassen
 				streamRetryAt = 0;
 				return;
 			}
@@ -277,6 +285,7 @@ public final class Friends {
 					status = Status.ONLINE;
 					error = null;
 					streamRetryMs = STREAM_RETRY_MIN_MS;
+					loginRetryMs = LOGIN_RETRY_MIN_MS;
 					// Was während einer Unterbrechung passiert ist, kam nicht an: alles neu holen
 					conversations.keySet().removeIf(uuid -> !uuid.equals(viewing));
 					if (viewing != null) {
@@ -322,6 +331,11 @@ public final class Friends {
 		if (cause instanceof FriendsApi.MojangLoginException) {
 			return Component.translatable("salami.friends.error.mojang");
 		}
+		if (cause instanceof AuthChallenge.RefusedException) {
+			// Server schickt keine serverId im Salami-Format: nichts bei Mojang angemeldet (Grund steht im Log)
+			return Component.translatableWithFallback("salami.friends.error.challenge",
+				"The Salami server sent an invalid login request – not signed in");
+		}
 		if (cause instanceof java.net.http.HttpTimeoutException) {
 			return Component.translatable("salami.friends.error.timeout");
 		}
@@ -351,9 +365,14 @@ public final class Friends {
 		revision++;
 	}
 
-	/** 401: Sitzung abgelaufen (z. B. Server-Neustart ohne Daten) – neu anmelden. */
+	/**
+	 * 401: Sitzung abgelaufen (z. B. Server-Neustart ohne Daten) – neu anmelden. Kam die letzte Anmeldung eben erst,
+	 * wartet die nächste mit wachsender Pause (jede Anmeldung geht auch an Mojang).
+	 */
 	private static boolean unauthorized(Throwable cause) {
 		if (cause instanceof FriendsApi.ServerException server && server.status == 401) {
+			loginRetryAt = Math.max(loginRetryAt, lastLoginAt + loginRetryMs);
+			loginRetryMs = Math.min(loginRetryMs * 2, LOGIN_RETRY_MAX_MS);
 			token = null;
 			if (stream != null) {
 				FriendsApi.EventStream closing = stream;
@@ -462,13 +481,13 @@ public final class Friends {
 				}
 				unread.merge(partner, 1, Integer::sum);
 				revision++;
-				String name = FriendsApi.string(event, "name");
+				String name = FriendsApi.name(event, "name");
 				Friend friend = friend(partner);
 				announceMessage(mc, module, name != null ? name : friend != null ? friend.name() : "?", message.text());
 			}
 			case "request" -> {
 				refresh(mc);
-				String name = FriendsApi.string(event, "name");
+				String name = FriendsApi.name(event, "name");
 				if (name != null) {
 					Chat.info("salami.friends.chat.request", name, SalamiClient.menuKeyName());
 					ping(mc, module);
@@ -476,7 +495,7 @@ public final class Friends {
 			}
 			case "friends" -> {
 				refresh(mc);
-				String name = FriendsApi.string(event, "name");
+				String name = FriendsApi.name(event, "name");
 				if (name != null) {
 					Chat.info("salami.friends.chat.accepted", name);
 				}
@@ -518,7 +537,7 @@ public final class Friends {
 		if (module == null || !module.showMessages()) {
 			return;
 		}
-		// Text kommt vom Server bereits ohne §-Formatierung; als Literal, nie als Übersetzung
+		// Name und Text sind schon bereinigt (FriendsApi/ChatSafe: ohne §, Steuer- und Bidi-Zeichen); als Literal, nie als Übersetzung
 		MutableComponent line = Component.literal("✉ ").withStyle(ChatFormatting.GOLD)
 			.append(Component.literal(name).withStyle(ChatFormatting.YELLOW))
 			.append(Component.literal(": ").withStyle(ChatFormatting.DARK_GRAY))

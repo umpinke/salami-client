@@ -8,6 +8,7 @@
 		"AvatarRendererMixin",
 		"CameraMixin",
 		"ChatComponentMixin",
+		"ChatScreenMixin",
 		"ClientLevelDataMixin",
 		"ClientLevelMixin",
 		"ClientPacketListenerMixin",

@@ -11,13 +11,14 @@ import com.mojang.authlib.exceptions.AuthenticationException;
 *///?} else
 import com.mojang.authlib.minecraft.MinecraftSessionService;
 import dev.salamiclient.SalamiClient;
+import dev.salamiclient.util.AuthChallenge;
+import dev.salamiclient.util.ChatSafe;
+import dev.salamiclient.util.LimitedBody;
 import net.minecraft.client.User;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
@@ -52,6 +53,14 @@ final class FriendsApi {
 	static final String URL_PROPERTY = "salami.capes.url";
 	private static final Duration TIMEOUT = Duration.ofSeconds(15);
 	private static final Gson GSON = new Gson();
+	/** Größte Antwort (Freundesliste, 100 Nachrichten …); alles darüber ist kaputt oder böswillig. */
+	private static final int MAX_RESPONSE_BYTES = 1024 * 1024;
+	/** Längste Zeile auf der Live-Verbindung. */
+	private static final int MAX_EVENT_LINE_BYTES = 64 * 1024;
+	/** Längster angezeigter Nachrichtentext (der Server erlaubt 256 Zeichen). */
+	private static final int MAX_TEXT = 512;
+	/** Längste angezeigte Fehlermeldung des Servers. */
+	private static final int MAX_ERROR = 200;
 
 	record Friend(UUID uuid, String name, boolean online) {}
 
@@ -149,10 +158,8 @@ final class FriendsApi {
 	*///?} else
 	CompletableFuture<String> login(User user, MinecraftSessionService session) {
 		return send(post("v1/auth/challenge", new JsonObject(), null)).thenApplyAsync(challenge -> {
-			String serverId = string(challenge, "serverId");
-			if (serverId == null) {
-				throw new IllegalStateException("Server hat keine serverId geschickt");
-			}
+			// Nur eine serverId im Salami-Format unterschreiben, nie den Hash eines echten Minecraft-Servers
+			String serverId = AuthChallenge.require(string(challenge, "serverId"));
 			try {
 				session.joinServer(user.getProfileId(), user.getAccessToken(), serverId);
 			} catch (AuthenticationException e) {
@@ -198,7 +205,8 @@ final class FriendsApi {
 					}
 				}
 			}
-			return new Overview(myUuid, myName != null ? myName : "", friends, requests(json, "incoming"), requests(json, "outgoing"), unread);
+			String cleanName = ChatSafe.name(myName);
+			return new Overview(myUuid, cleanName != null ? cleanName : "", friends, requests(json, "incoming"), requests(json, "outgoing"), unread);
 		});
 	}
 
@@ -290,7 +298,7 @@ final class FriendsApi {
 				throw new ServerException(response.statusCode(), "Live-Verbindung abgelehnt");
 			}
 			onOpen.run();
-			BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+			LimitedBody.LineReader reader = new LimitedBody.LineReader(in, MAX_EVENT_LINE_BYTES);
 			for (String line; (line = reader.readLine()) != null; ) {
 				stream.lastSeen = System.currentTimeMillis();
 				if (line.startsWith("data:")) {
@@ -328,12 +336,13 @@ final class FriendsApi {
 		} catch (RuntimeException e) {
 			at = System.currentTimeMillis();
 		}
-		return new Message(id, from, to, text, at);
+		// Ohne §-Formatierung, Steuer- und Bidi-Zeichen – der Text landet im Chat und im Freunde-Menü
+		return new Message(id, from, to, ChatSafe.clean(text, MAX_TEXT), at);
 	}
 
 	private static Result result(JsonObject json) {
 		String status = string(json, "status");
-		return new Result(status != null ? status : "none", uuid(json, "uuid"), string(json, "name"));
+		return new Result(status != null ? status : "none", uuid(json, "uuid"), name(json, "name"));
 	}
 
 	private static List<Request> requests(JsonObject json, String key) {
@@ -361,8 +370,13 @@ final class FriendsApi {
 	}
 
 	private static String nameOr(JsonObject json, UUID uuid) {
-		String name = string(json, "name");
-		return name != null && !name.isBlank() ? name : uuid.toString().substring(0, 8);
+		String name = name(json, "name");
+		return name != null ? name : uuid.toString().substring(0, 8);
+	}
+
+	/** Spielername aus dem JSON, bereinigt für Chat und Menü ({@link ChatSafe}); {@code null}, wenn er fehlt. */
+	static @Nullable String name(JsonObject json, String key) {
+		return ChatSafe.name(string(json, key));
 	}
 
 	static @Nullable String string(JsonObject json, String key) {
@@ -405,7 +419,7 @@ final class FriendsApi {
 	}
 
 	private CompletableFuture<JsonObject> send(HttpRequest request) {
-		return http.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)).thenApply(response -> {
+		return http.sendAsync(request, LimitedBody.utf8(MAX_RESPONSE_BYTES)).thenApply(response -> {
 			JsonObject json;
 			try {
 				JsonElement parsed = JsonParser.parseString(response.body());
@@ -414,9 +428,10 @@ final class FriendsApi {
 				json = new JsonObject();
 			}
 			if (response.statusCode() / 100 != 2) {
-				String error = string(json, "error");
+				// Die Meldung zeigt das Spiel im Menü und im Chat: ohne Formatierung und Steuerzeichen
+				String error = ChatSafe.clean(string(json, "error"), MAX_ERROR);
 				throw new CompletionException(
-					new ServerException(response.statusCode(), error != null ? error : "HTTP " + response.statusCode()));
+					new ServerException(response.statusCode(), !error.isEmpty() ? error : "HTTP " + response.statusCode()));
 			}
 			return json;
 		});

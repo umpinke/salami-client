@@ -30,6 +30,14 @@ public final class EmoteSync {
 
 	/** Eigenes Emote teilen – ohne Cape-Server (Start ohne Launcher) passiert nichts. */
 	public static void send(Emote emote) {
+		send(emote, true);
+	}
+
+	/**
+	 * {@code retry}: bei 401 einmal neu anmelden. Nach so einer Neuanmeldung nicht noch einmal – sonst könnte ein
+	 * Server, der jedes Token ablehnt, das Spiel endlos bei Mojang anmelden lassen.
+	 */
+	private static void send(Emote emote, boolean retry) {
 		Minecraft mc = Minecraft.getInstance();
 		CapeServer server = SharedCapes.currentServer();
 		long now = System.currentTimeMillis();
@@ -54,12 +62,12 @@ public final class EmoteSync {
 				Emote next = pending;
 				pending = null;
 				if (next != null) {
-					post(server, next, true);
+					post(server, next, retry);
 				}
 			}));
 			return;
 		}
-		post(server, emote, true);
+		post(server, emote, retry);
 	}
 
 	private static void post(CapeServer server, Emote emote, boolean retry) {
@@ -75,10 +83,10 @@ public final class EmoteSync {
 			}
 			Throwable cause = CapeServer.unwrap(error);
 			if (cause instanceof CapeServer.ServerException server401 && server401.status == 401 && retry) {
-				// Token abgelaufen oder Server neu gestartet: einmal neu anmelden
+				// Token abgelaufen oder Server neu gestartet: einmal neu anmelden (danach ohne weiteren Versuch)
 				token = null;
 				lastSentAt = 0;
-				send(emote);
+				send(emote, false);
 				return;
 			}
 			fail(error);

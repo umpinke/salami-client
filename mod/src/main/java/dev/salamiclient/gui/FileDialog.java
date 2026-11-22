@@ -76,9 +76,9 @@ public final class FileDialog {
 			Path path = null;
 			try (MemoryStack stack = MemoryStack.stackPush()) {
 				PointerBuffer filter = stack.mallocPointer(1);
-				filter.put(stack.UTF8("*." + extension)).flip();
-				String chosen = TinyFileDialogs.tinyfd_openFileDialog(title, suggested != null ? suggested.toString() : null,
-					filter, filterName, false);
+				filter.put(stack.UTF8("*." + shellSafe(extension))).flip();
+				String chosen = TinyFileDialogs.tinyfd_openFileDialog(shellSafe(title), safeSuggestion(suggested),
+					filter, shellSafe(filterName), false);
 				if (chosen != null) {
 					path = Path.of(chosen);
 				}
@@ -94,6 +94,42 @@ public final class FileDialog {
 		}, "Salami file dialog");
 		thread.setDaemon(true);
 		thread.start();
+	}
+
+	/**
+	 * tinyfd baut auf Linux (zenity/kdialog) eine Shell-Befehlszeile aus Titel und Filternamen und prüft
+	 * dabei nur Anführungszeichen – Backticks oder {@code $(…)} würden ausgeführt (CVE-2023-47104, in der
+	 * mit 1.21.10/1.21.11 ausgelieferten tinyfd-Version noch offen). Die Texte kommen aus den Sprachdateien,
+	 * die ein Server-Ressourcenpaket überschreiben kann. Deshalb bleiben nur Buchstaben, Ziffern und
+	 * harmlose Satzzeichen übrig.
+	 */
+	static String shellSafe(String text) {
+		if (text == null) {
+			return "";
+		}
+		StringBuilder safe = new StringBuilder(text.length());
+		for (int i = 0; i < text.length(); i++) {
+			char c = text.charAt(i);
+			safe.append(Character.isLetterOrDigit(c) || " .,:()-_+".indexOf(c) >= 0 ? c : ' ');
+		}
+		return safe.toString().trim();
+	}
+
+	/** Vorgeschlagener Pfad nur, wenn er auf Linux/macOS keine Shell-Sonderzeichen enthält. */
+	private static @Nullable String safeSuggestion(@Nullable Path suggested) {
+		if (suggested == null) {
+			return null;
+		}
+		String path = suggested.toString();
+		boolean windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).startsWith("windows");
+		if (!windows) {
+			for (int i = 0; i < path.length(); i++) {
+				if ("`$\\\"'!;&|<>".indexOf(path.charAt(i)) >= 0 || Character.isISOControl(path.charAt(i))) {
+					return null;
+				}
+			}
+		}
+		return path;
 	}
 	//?}
 }

@@ -9,6 +9,7 @@ import com.google.gson.JsonParser;
 import dev.salamiclient.SalamiClient;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.ModuleManager;
+import dev.salamiclient.modules.misc.AutoTextModule;
 import dev.salamiclient.setting.Setting;
 
 import java.io.IOException;
@@ -17,6 +18,7 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Set;
 
 /**
  * Speichert Modulzustände, Einstellungen und GUI-Zustand als JSON unter
@@ -35,6 +37,12 @@ public final class ConfigManager {
 	/** Größere Dateien sind kaputt oder manipuliert – sie werden gar nicht erst gelesen. */
 	private static final long MAX_FILE_BYTES = 1024 * 1024;
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
+	/**
+	 * Module, die ein Import nie übernimmt: AutoText sendet Chat-Nachrichten und Befehle im Namen des Spielers,
+	 * eine fremde Config könnte damit z. B. eine Lauftaste mit „/pay …“ belegen. Sie behalten beim Import ihre
+	 * bisherigen Einstellungen und ihren Zustand.
+	 */
+	private static final Set<String> NOT_IMPORTED = Set.of(AutoTextModule.ID);
 
 	private final Path file;
 	private final ModuleManager modules;
@@ -49,7 +57,7 @@ public final class ConfigManager {
 
 	public void load() {
 		JsonObject root = readRoot();
-		applyModules(root);
+		applyModules(root, Set.of());
 		JsonObject savedGui = object(root, "gui", "gui");
 		if (savedGui != null) {
 			gui = savedGui;
@@ -58,12 +66,18 @@ public final class ConfigManager {
 		SalamiClient.LOG.info("Config loaded ({} modules)", modules.all().size());
 	}
 
-	/** Übernimmt Modulzustände und Einstellungen aus {@code root}; was dort fehlt, bleibt unverändert. */
-	private void applyModules(JsonObject root) {
+	/**
+	 * Übernimmt Modulzustände und Einstellungen aus {@code root}; was dort fehlt, bleibt unverändert.
+	 * Module in {@code skip} bleiben ganz, wie sie sind.
+	 */
+	private void applyModules(JsonObject root, Set<String> skip) {
 		// Typen prüfen statt blind getAsJsonObject()/getAsBoolean(): ein falscher Typ wird
 		// übersprungen (Standardwert), statt den Start abstürzen zu lassen.
 		JsonObject moduleStates = object(root, "modules", "modules");
 		for (Module module : modules.all()) {
+			if (skip.contains(module.id())) {
+				continue;
+			}
 			JsonObject state = object(moduleStates, module.id(), "modules." + module.id());
 			JsonObject settings = object(state, "settings", module.id() + ".settings");
 			if (settings != null) {
@@ -101,7 +115,8 @@ public final class ConfigManager {
 
 	/**
 	 * Übernimmt eine exportierte Config: erst alles auf Standard, dann die Werte aus der
-	 * Datei. Die Panel-Positionen der ClickGUI bleiben. Speichern übernimmt der Aufrufer.
+	 * Datei. Die Panel-Positionen der ClickGUI bleiben, ebenso AutoText ({@link #NOT_IMPORTED}):
+	 * dessen Einträge aus der Datei werden verworfen. Speichern übernimmt der Aufrufer.
 	 *
 	 * @throws IOException wenn die Datei unlesbar, zu groß oder keine Salami-Config ist
 	 *                     (dann bleibt die aktuelle Config unverändert)
@@ -116,14 +131,22 @@ public final class ConfigManager {
 		} catch (JsonParseException e) {
 			throw new IOException("Not valid JSON", e);
 		}
-		if (!parsed.isJsonObject() || !(parsed.getAsJsonObject().get("modules") instanceof JsonObject)) {
+		if (!parsed.isJsonObject() || !(parsed.getAsJsonObject().get("modules") instanceof JsonObject moduleStates)) {
 			throw new IOException("Not a Salami config");
 		}
-		for (Module module : modules.all()) {
-			module.settings().forEach(Setting::resetAll);
+		for (String id : NOT_IMPORTED) {
+			if (moduleStates.has(id)) {
+				SalamiClient.LOG.warn("Config import: ignoring the settings of module '{}' from the file (it sends chat messages and commands) – your own settings stay", id);
+			}
 		}
-		applyModules(parsed.getAsJsonObject());
-		SalamiClient.LOG.info("Config imported from {}", source);
+		for (Module module : modules.all()) {
+			if (!NOT_IMPORTED.contains(module.id())) {
+				module.settings().forEach(Setting::resetAll);
+			}
+		}
+		applyModules(parsed.getAsJsonObject(), NOT_IMPORTED);
+		// Nur der Dateiname: der volle Pfad enthält meist den Benutzernamen des Rechners
+		SalamiClient.LOG.info("Config imported from {}", source.getFileName());
 	}
 
 	/**
@@ -138,7 +161,7 @@ public final class ConfigManager {
 		try {
 			long size = Files.size(file);
 			if (size > MAX_FILE_BYTES) {
-				SalamiClient.LOG.warn("Config {} is too large ({} bytes, max {}) – using defaults (backup kept)", file, size, MAX_FILE_BYTES);
+				SalamiClient.LOG.warn("Config {} is too large ({} bytes, max {}) – using defaults (backup kept)", shown(file), size, MAX_FILE_BYTES);
 				backupBrokenFile();
 				return null;
 			}
@@ -146,12 +169,22 @@ public final class ConfigManager {
 			if (parsed.isJsonObject()) {
 				return parsed.getAsJsonObject();
 			}
-			SalamiClient.LOG.error("Config {} is not a JSON object – using defaults (backup kept)", file);
+			SalamiClient.LOG.error("Config {} is not a JSON object – using defaults (backup kept)", shown(file));
 		} catch (Exception e) {
-			SalamiClient.LOG.error("Config {} is unreadable – using defaults (backup kept)", file, e);
+			SalamiClient.LOG.error("Config {} is unreadable – using defaults (backup kept)", shown(file), e);
 		}
 		backupBrokenFile();
 		return null;
+	}
+
+	/** Pfad fürs Log ohne Benutzerordner ({@code ~\…}) – der enthält den Benutzernamen des Rechners. */
+	private static String shown(Path path) {
+		String text = path.toAbsolutePath().normalize().toString();
+		String home = System.getProperty("user.home");
+		if (home != null && !home.isEmpty() && text.regionMatches(true, 0, home, 0, home.length())) {
+			return "~" + text.substring(home.length());
+		}
+		return text;
 	}
 
 	/** {@code parent.key} als Objekt; fehlt es oder hat es einen anderen Typ: {@code null}. */
@@ -198,7 +231,7 @@ public final class ConfigManager {
 			}
 			dirtySince = -1;
 		} catch (IOException e) {
-			SalamiClient.LOG.error("Could not save config {}", file, e);
+			SalamiClient.LOG.error("Could not save config {}", shown(file), e);
 		}
 	}
 
@@ -232,7 +265,7 @@ public final class ConfigManager {
 			Files.move(file, file.resolveSibling("config.broken.json"), StandardCopyOption.REPLACE_EXISTING);
 		} catch (IOException e) {
 			// Backup ist best effort
-			SalamiClient.LOG.warn("Could not back up broken config {}", file, e);
+			SalamiClient.LOG.warn("Could not back up broken config {}", shown(file), e);
 		}
 	}
 }
