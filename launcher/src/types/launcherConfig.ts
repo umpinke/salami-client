@@ -139,6 +139,8 @@ export interface LauncherConfig {
   log_level: LogLevel;
   /** Salami-Modus, wird als -Dsalami.theme an salami-core übergeben. */
   salami_theme?: boolean;
+  /** Look der Menüs im Spiel (wie im Launcher gewählt), geht als -Dsalami.look an salami-core. */
+  salami_look?: string | null;
   /** Spielzeit und Screenshots mit der Salami-App fürs Handy synchronisieren (Standard: an). */
   salami_app_sync?: boolean;
   /** Clips zur Salami-App hochladen; wirkt nur zusammen mit salami_app_sync (Standard: an). */

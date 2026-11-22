@@ -8,6 +8,8 @@ import { WerkbankSearchCard } from "./WerkbankSearchCard";
 import "./texts";
 import "./look.css";
 import "./inner.css";
+import "./logs.css";
+import "./dialogs.css";
 
 /**
  * Look „Pixel-Werkbank“: Minecraft pur – gefaste Pixel-Rahmen wie im Inventar, die Pixel-Schrift

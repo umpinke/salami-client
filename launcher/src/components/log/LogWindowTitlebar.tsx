@@ -26,15 +26,15 @@ export function LogWindowTitlebar({ title }: LogWindowTitlebarProps) {
 
   return (
     <div
-      className="flex items-center justify-between h-11 pl-4 pr-1 select-none border-b border-white/[0.08]"
+      className="look-log-titlebar flex items-center justify-between h-11 pl-4 pr-1 select-none border-b border-white/[0.08]"
       data-tauri-drag-region
     >
       {/* Links: Wortmarke und Fenstertitel */}
       <div className="flex items-baseline gap-2.5 flex-1 min-w-0 pointer-events-none">
         <img src="/salami-logo-64.png" alt="" className="w-5 h-5 rounded-full self-center" />
-        <span className="font-minecraft text-xl lowercase leading-none text-white">salami</span>
+        <span className="look-log-brand font-minecraft text-xl leading-none text-white">Salami</span>
         <span className="font-minecraft text-xl leading-none text-white/20">/</span>
-        <span className="font-minecraft text-xl lowercase leading-none text-white/55 truncate">{displayTitle}</span>
+        <span className="look-log-title font-minecraft text-xl leading-none text-white/55 truncate">{displayTitle}</span>
       </div>
 
       {/* Right: Window Controls */}

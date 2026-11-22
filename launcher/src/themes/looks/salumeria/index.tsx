@@ -8,6 +8,8 @@ import { SalumeriaSearchCard } from "./SalumeriaSearchCard";
 import "./texts";
 import "./look.css";
 import "./inner.css";
+import "./logs.css";
+import "./dialogs.css";
 
 /**
  * Look „Salumeria": elegantes Feinkost-Etikett wie das Logo – fast schwarzer Grund, Creme,

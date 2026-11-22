@@ -64,7 +64,9 @@ export function StatusMessage({
     <div
       ref={messageRef}
       className={cn(
-        "flex items-start p-4 mb-6 border",
+        // Ansatzpunkt für die Looks: look-status + look-status--success | error | warning | info
+        "look-status flex items-start p-4 mb-6 border",
+        `look-status--${type}`,
         radiusClass,
         styles.bg,
         styles.border,

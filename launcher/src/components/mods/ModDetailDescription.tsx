@@ -22,7 +22,7 @@ export function ModDetailDescription({ body, source }: ModDetailDescriptionProps
 
   if (!body || body.trim().length === 0) {
     return (
-      <div className="look-card p-5" style={PLAIN_CARD}>
+      <div className="look-card look-mod-section look-mod-description p-5" style={PLAIN_CARD}>
         <SectionHeading className="mb-2">{t('mod_detail.description')}</SectionHeading>
         <EmptyState icon="solar:document-text-bold" message={t('mod_detail.no_description')} compact fullHeight={false} />
       </div>
@@ -30,7 +30,7 @@ export function ModDetailDescription({ body, source }: ModDetailDescriptionProps
   }
 
   return (
-    <div className="look-card p-5" style={PLAIN_CARD}>
+    <div className="look-card look-mod-section look-mod-description p-5" style={PLAIN_CARD}>
       <SectionHeading className="mb-4">{t('mod_detail.description')}</SectionHeading>
 
       <div>

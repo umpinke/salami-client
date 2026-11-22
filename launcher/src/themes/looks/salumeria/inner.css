@@ -1466,3 +1466,167 @@
     transition: none !important;
   }
 }
+
+/* ═════════════════════════════════════════════════════════ Mod-Detailseite */
+
+/* Kopf: ein Etikett im Doppelrahmen, das Kopfband bleibt das feine Rautengitter */
+:root[data-look="salumeria"] .look-mod-header {
+  background-color: var(--sal-ink-2) !important;
+  border: 1px solid var(--sal-rule-strong) !important;
+  box-shadow: inset 0 0 0 4px var(--sal-ink-2), inset 0 0 0 5px var(--sal-rule), 0 30px 60px -30px #000 !important;
+}
+
+:root[data-look="salumeria"] .look-mod-header button.text-3xl {
+  font-size: 40px;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+}
+
+:root[data-look="salumeria"] .look-mod-header p.text-sm.text-white\/55 {
+  font-family: var(--sal-serif);
+  font-style: italic;
+  font-size: 16px;
+}
+
+/* das Projektbild im feinen Rahmen statt mit Creme-Kante */
+:root[data-look="salumeria"] .look-mod-header .-mt-10 {
+  border-width: 1px !important;
+  border-color: var(--sal-rule-strong) !important;
+  box-shadow: 0 0 0 4px var(--sal-ink-2), 0 0 0 5px var(--sal-rule) !important;
+}
+
+/* Beschreibung: auf der Karte (Papier) – dieselben Farbtausche wie .sal-carta--paper */
+:root[data-look="salumeria"] .look-mod-description {
+  position: relative;
+  --sal-cream: #1a1210;
+  --sal-cream-rgb: var(--sal-carta-ink-rgb);
+  --sal-rule: rgba(26, 18, 16, 0.2);
+  --sal-rule-soft: rgba(26, 18, 16, 0.1);
+  --sal-rule-strong: rgba(26, 18, 16, 0.42);
+  --sal-muted: #6a4a3e;
+  color-scheme: light;
+  color: var(--sal-paper-ink);
+  padding: 26px 30px !important;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(255, 255, 255, 0.4), transparent 70%),
+    repeating-linear-gradient(0deg, rgba(26, 18, 16, 0.018) 0 1px, transparent 1px 3px),
+    var(--sal-carta-paper) !important;
+  border: 0 !important;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 28px 60px -28px #000 !important;
+}
+
+:root[data-look="salumeria"] .look-mod-description::before,
+:root[data-look="salumeria"] .look-mod-description::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+:root[data-look="salumeria"] .look-mod-description::before {
+  inset: 5px;
+  border: 1px solid rgba(26, 18, 16, 0.3);
+}
+
+:root[data-look="salumeria"] .look-mod-description::after {
+  inset: 8px;
+  border: 1px solid rgba(26, 18, 16, 0.1);
+}
+
+/* Texte von CurseForge (HTML) setzen ihre Farben je Element – auf dem Papier in Tinte */
+:root[data-look="salumeria"] .look-mod-description .prose :is(p, li, ul, ol, em, blockquote, td, th, span, div) {
+  color: rgba(26, 18, 16, 0.86) !important;
+}
+
+:root[data-look="salumeria"] .look-mod-description .prose :is(h1, h2, h3, h4, h5, h6) {
+  color: var(--sal-paper-ink) !important;
+  font-family: var(--sal-serif) !important;
+}
+
+:root[data-look="salumeria"] .look-mod-description .prose :is(strong, b) {
+  color: var(--sal-paper-ink) !important;
+}
+
+:root[data-look="salumeria"] .look-mod-description .prose :is(h1, h2, h3) {
+  font-size: 1.45em !important;
+  font-weight: 600 !important;
+}
+
+:root[data-look="salumeria"] .look-mod-description .prose a {
+  color: var(--sal-red-on-paper) !important;
+}
+
+:root[data-look="salumeria"] .look-mod-description .prose :is(code, pre, th) {
+  background-color: rgba(26, 18, 16, 0.06) !important;
+}
+
+:root[data-look="salumeria"] .look-mod-description .prose :is(hr, td, th, blockquote) {
+  border-color: rgba(26, 18, 16, 0.22) !important;
+}
+
+/* Seitenkästen: fein gerahmt auf dem dunklen Grund */
+:root[data-look="salumeria"] .look-mod-side,
+:root[data-look="salumeria"] .look-mod-versions {
+  background-color: transparent !important;
+  border: 1px solid var(--sal-rule) !important;
+  box-shadow: inset 0 0 0 3px var(--sal-ink), inset 0 0 0 4px var(--sal-rule-soft) !important;
+}
+
+/* Galerie: Bilder im cremefarbenen Passepartout */
+:root[data-look="salumeria"] .look-mod-shot {
+  padding: 6px;
+  background: var(--sal-paper) !important;
+  border: 0 !important;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 18px 30px -18px #000 !important;
+  transform: none !important;
+}
+
+:root[data-look="salumeria"] .look-mod-shot img {
+  box-shadow: 0 0 0 1px rgba(26, 18, 16, 0.35);
+}
+
+:root[data-look="salumeria"] .look-mod-shot > .absolute.inset-0 {
+  inset: 6px;
+}
+
+:root[data-look="salumeria"] .look-mod-shot p {
+  font-family: var(--sal-serif) !important;
+  font-style: italic;
+  font-size: 14px !important;
+}
+
+/* Versionen: Zeilen der Karte mit feiner Linie statt Kästen */
+:root[data-look="salumeria"] .look-mod-detail .look-version-row {
+  background-color: transparent !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--sal-rule) !important;
+}
+
+:root[data-look="salumeria"] .look-mod-detail .look-version-row:hover {
+  background-color: rgba(var(--sal-cream-rgb), 0.035) !important;
+}
+
+/* ═════════════════════════════════════════════════════════ Profile (Übersicht) */
+
+/* Kacheln: ein Etikett im Doppelrahmen, der Name groß in der Serife */
+:root[data-look="salumeria"] .look-profile-card[data-layout="grid"] {
+  background-color: var(--sal-ink-2) !important;
+  box-shadow: inset 0 0 0 4px var(--sal-ink-2), inset 0 0 0 5px var(--sal-rule-soft) !important;
+}
+
+:root[data-look="salumeria"] .look-profile-card[data-layout="grid"]:hover {
+  box-shadow: inset 0 0 0 4px var(--sal-ink-2), inset 0 0 0 5px var(--sal-rule) !important;
+}
+
+:root[data-look="salumeria"] .look-profile-card .font-minecraft.text-xl {
+  font-size: 25px;
+  font-weight: 500;
+}
+
+/* Zeilen: feine Linie, Name kursiv */
+:root[data-look="salumeria"] .look-profile-card:not([data-layout="grid"]) {
+  background-color: transparent !important;
+}
+
+:root[data-look="salumeria"] .look-profile-card:not([data-layout="grid"]) .font-minecraft.truncate:first-child {
+  font-style: italic;
+}

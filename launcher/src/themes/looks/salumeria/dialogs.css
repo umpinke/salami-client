@@ -1,0 +1,380 @@
+/*
+ * Look „Salumeria“ – Dialoge, Nebenfenster und kleine Teile: Auswahl-Kacheln (look-option),
+ * Hinweise (look-status), Meldungen (look-toast), Kurzhinweise (look-tooltip), das Update-Fenster
+ * (look-updater). Alles nur unter :root[data-look="salumeria"]. Siehe ../CONTRACT.md
+ */
+
+/* ═════════════════════════ Auswahl-Kacheln ═════════════════════════ */
+
+/* wie eine Zeile der Karte: ohne Fläche, feine Creme-Linie; gewählt = cremefarbenes Etikett */
+:root[data-look="salumeria"] .look-option:not(.look-option--image) {
+  background-color: transparent !important;
+  border: 1px solid var(--sal-rule) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  color: var(--sal-cream);
+  transition: background-color 150ms, border-color 150ms;
+}
+
+:root[data-look="salumeria"] .look-option:not(.look-option--image):hover {
+  background-color: rgba(var(--sal-cream-rgb), 0.045) !important;
+  border-color: var(--sal-rule-strong) !important;
+  transform: none !important;
+}
+
+:root[data-look="salumeria"] .look-option:not(.look-option--image):is([data-selected], .look-option--selected) {
+  background-color: var(--sal-paper) !important;
+  border-color: var(--sal-paper) !important;
+  box-shadow: inset 0 0 0 2px var(--sal-paper), inset 0 0 0 3px rgba(15, 11, 10, 0.22) !important;
+}
+
+:root[data-look="salumeria"] .look-option:not(.look-option--image):is([data-selected], .look-option--selected),
+:root[data-look="salumeria"] .look-option:not(.look-option--image):is([data-selected], .look-option--selected) * {
+  color: var(--sal-paper-ink) !important;
+}
+
+:root[data-look="salumeria"] .look-option:is(.look-option--disabled, [aria-disabled="true"], :disabled) {
+  opacity: 0.4;
+}
+
+/* Kennzeilen der Kacheln (Release, Snapshot …) kursiv in der Serife */
+:root[data-look="salumeria"] .look-option p {
+  font-family: var(--sal-serif) !important;
+  font-style: italic;
+  font-size: 14px !important;
+}
+
+/* der Hauptweg: doppelt gerahmt wie das Etikett der Profilseite, das Symbol als Raute */
+:root[data-look="salumeria"] .look-option.look-option--main {
+  border-color: var(--sal-rule-strong) !important;
+  box-shadow: inset 0 0 0 4px var(--sal-ink-2), inset 0 0 0 5px var(--sal-rule) !important;
+  background-color: var(--sal-ink-2) !important;
+}
+
+:root[data-look="salumeria"] .look-option.look-option--main:hover {
+  border-color: var(--sal-cream) !important;
+  background-color: var(--sal-ink-3) !important;
+  box-shadow: inset 0 0 0 4px var(--sal-ink-3), inset 0 0 0 5px var(--sal-rule-strong) !important;
+}
+
+:root[data-look="salumeria"] .look-option--main > div:first-child {
+  width: 46px !important;
+  height: 46px !important;
+  margin: 0 6px;
+  transform: rotate(45deg);
+  border-radius: 0 !important;
+  box-shadow: inset 0 0 0 3px var(--accent), inset 0 0 0 4px var(--sal-on-accent-line) !important;
+}
+
+:root[data-look="salumeria"] .look-option--main > div:first-child > svg {
+  transform: rotate(-45deg);
+  color: var(--sal-on-accent) !important;
+}
+
+:root[data-look="salumeria"] .look-option--main .text-xl {
+  font-size: 26px !important;
+  font-weight: 500;
+}
+
+:root[data-look="salumeria"] .look-option--main .text-sm {
+  font-family: var(--sal-serif) !important;
+  font-style: italic;
+  font-size: 15.5px !important;
+}
+
+:root[data-look="salumeria"] .look-option--main > svg:last-child {
+  color: var(--sal-cream) !important;
+}
+
+/* Bild-Kacheln (Loader): feiner Doppelrahmen, gewählt in Creme */
+:root[data-look="salumeria"] .look-option--image {
+  border: 1px solid var(--sal-rule-strong) !important;
+  border-radius: 0 !important;
+  box-shadow: inset 0 0 0 3px rgba(15, 11, 10, 0.75), inset 0 0 0 4px var(--sal-rule);
+}
+
+:root[data-look="salumeria"] .look-option--image[data-selected] {
+  border-color: var(--sal-cream) !important;
+  box-shadow: inset 0 0 0 3px rgba(15, 11, 10, 0.75), inset 0 0 0 4px var(--sal-cream);
+}
+
+:root[data-look="salumeria"] .look-option--image h4 {
+  font-family: var(--sal-serif) !important;
+  font-size: 24px !important;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  font-variant-caps: small-caps;
+}
+
+/* ═════════════════════════ Hinweise: feiner Kasten, Rand in der Farbe der Lage ═════════════════════════ */
+
+/* steht der Hinweis allein im Dialog (Bestätigen, Löschen), bleibt darunter keine Lücke */
+:root[data-look="salumeria"] .look-modal .look-status:last-child {
+  margin-bottom: 0;
+}
+
+:root[data-look="salumeria"] .look-status {
+  --sal-status: var(--sal-rule-strong);
+  background-color: rgba(var(--sal-cream-rgb), 0.03) !important;
+  border: 1px solid var(--sal-rule) !important;
+  border-left: 2px solid var(--sal-status) !important;
+  border-radius: 0 !important;
+  color: var(--sal-cream) !important;
+}
+
+:root[data-look="salumeria"] .look-status > svg { color: var(--sal-status); }
+:root[data-look="salumeria"] .look-status > div {
+  font-family: var(--sal-serif) !important;
+  font-size: 17px !important;
+}
+:root[data-look="salumeria"] .look-status--error { --sal-status: var(--sal-rust); }
+:root[data-look="salumeria"] .look-status--warning { --sal-status: #d9b56a; }
+:root[data-look="salumeria"] .look-status--success { --sal-status: #a9c59a; }
+:root[data-look="salumeria"] .look-status--info { --sal-status: var(--sal-cream); }
+
+/* ═════════════════════════ Meldungen: ein kleines Kärtchen ═════════════════════════ */
+
+:root[data-look="salumeria"] .look-toast {
+  background: var(--sal-ink-2) !important;
+  border: 1px solid var(--sal-rule-strong) !important;
+  border-radius: 0 !important;
+  box-shadow: 0 0 0 4px var(--sal-ink-2), 0 0 0 5px var(--sal-rule), 0 24px 50px -18px #000 !important;
+  color: var(--sal-cream) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  text-shadow: none !important;
+  letter-spacing: 0.01em !important;
+  font-family: var(--sal-serif) !important;
+  font-size: 16.5px;
+}
+
+:root[data-look="salumeria"] .look-toast--error {
+  border-color: var(--sal-rust) !important;
+}
+
+/* ═════════════════════════ Kurzhinweise ═════════════════════════ */
+
+:root[data-look="salumeria"] .look-tooltip {
+  background-color: var(--surface-solid-raised) !important;
+  border: 1px solid var(--sal-rule-strong) !important;
+  border-radius: 0 !important;
+  color: var(--sal-cream) !important;
+  font-family: var(--sal-serif) !important;
+  font-size: 14px !important;
+}
+
+/* ═════════════════════════ Leere Zustände: die Scheibe im Rautenrahmen ═════════════════════════ */
+
+:root[data-look="salumeria"] .look-empty-icon > svg:first-child {
+  opacity: 0.85;
+  filter: saturate(0.7);
+}
+
+:root[data-look="salumeria"] .look-empty-icon::before {
+  content: "";
+  position: absolute;
+  inset: -9px;
+  border: 1px solid var(--sal-rule);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+/* ═════════════════════════ Update-Fenster: ein Etikett im Doppelrahmen ═════════════════════════ */
+
+:root[data-look="salumeria"] .look-updater {
+  background:
+    radial-gradient(ellipse 80% 55% at 50% 30%, rgba(var(--accent-rgb), 0.1), transparent 70%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.011) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.007) 0 1px, transparent 1px 3px),
+    var(--sal-ink) !important;
+  backdrop-filter: none !important;
+  color: var(--sal-cream);
+}
+
+:root[data-look="salumeria"] .look-updater-card {
+  background: transparent !important;
+  border: 0 !important;
+}
+
+/* der Doppelrahmen ums Fenster wie im Hauptfenster */
+:root[data-look="salumeria"] .look-updater-card::before,
+:root[data-look="salumeria"] .look-updater-card::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+:root[data-look="salumeria"] .look-updater-card::before {
+  inset: 9px;
+  border: 1px solid var(--sal-rule);
+}
+
+:root[data-look="salumeria"] .look-updater-card::after {
+  inset: 13px;
+  border: 1px solid rgba(var(--sal-cream-rgb), 0.08);
+}
+
+/* das Logo im Bogenrahmen wie das Porträt der Startseite */
+:root[data-look="salumeria"] .look-updater-logo {
+  width: 104px !important;
+  height: 128px !important;
+  padding: 18px 8px 10px;
+  border: 1px solid var(--sal-rule-strong);
+  border-radius: 52px 52px 0 0;
+  box-shadow: inset 0 0 0 4px var(--sal-ink), inset 0 0 0 5px var(--sal-rule);
+  object-fit: contain;
+}
+
+/* „Updater“ in gesperrten Kapitälchen zwischen zwei Linien */
+:root[data-look="salumeria"] .look-updater-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  color: var(--sal-cream) !important;
+  font-family: var(--sal-serif) !important;
+  font-size: 15px !important;
+  font-weight: 600;
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.32em;
+}
+
+:root[data-look="salumeria"] .look-updater-title::before,
+:root[data-look="salumeria"] .look-updater-title::after {
+  content: "";
+  width: 30px;
+  height: 1px;
+  background: var(--sal-rule-strong);
+}
+
+/* der Stand: eine kursive Zeile ohne Kasten */
+:root[data-look="salumeria"] .look-updater-status {
+  background: transparent !important;
+  border: 0 !important;
+  padding: 0 !important;
+  color: var(--sal-cream) !important;
+}
+
+:root[data-look="salumeria"] .look-updater-status span {
+  font-family: var(--sal-serif) !important;
+  font-size: 18px !important;
+  font-style: italic;
+  color: var(--sal-cream) !important;
+}
+
+:root[data-look="salumeria"] .look-updater-status svg {
+  width: 14px;
+  height: 14px;
+  color: var(--sal-muted) !important;
+}
+
+:root[data-look="salumeria"] .look-updater-status[data-status="error"] :is(span, svg) {
+  color: var(--sal-rust) !important;
+}
+
+/* Fortschritt: eine feine Linie, die rote Füllung endet in einer Raute */
+:root[data-look="salumeria"] .look-updater-progress {
+  height: 9px !important;
+  overflow: visible !important;
+  background: linear-gradient(var(--sal-rule), var(--sal-rule)) 0 50% / 100% 1px no-repeat !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+}
+
+:root[data-look="salumeria"] .look-updater-bar {
+  position: relative;
+  height: 3px !important;
+  margin-top: 3px;
+  border-radius: 0 !important;
+  background: var(--accent) !important;
+}
+
+:root[data-look="salumeria"] .look-updater-bar::after {
+  content: "";
+  position: absolute;
+  right: -5px;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  translate: 0 -50%;
+  rotate: 45deg;
+  background: var(--sal-ink);
+  border: 1px solid var(--sal-cream);
+}
+
+/* ═════════════════════════ Freunde: Nachrichten als feine Kärtchen ═════════════════════════ */
+
+:root[data-look="salumeria"] .look-chat-msg:not([data-own]) {
+  background-color: transparent !important;
+  box-shadow: inset 0 0 0 1px var(--sal-rule) !important;
+}
+
+:root[data-look="salumeria"] .look-chat-msg[data-own] {
+  background-color: var(--sal-paper) !important;
+  box-shadow: inset 0 0 0 2px var(--sal-paper), inset 0 0 0 3px rgba(15, 11, 10, 0.2) !important;
+}
+
+:root[data-look="salumeria"] .look-chat-msg[data-own] [class*="text-white"] { color: var(--sal-paper-ink) !important; }
+:root[data-look="salumeria"] .look-chat-msg[data-own] [class*="text-white/3"] { color: var(--sal-paper-muted) !important; }
+
+/* „Hinzufügen“ in gesperrten Kapitälchen ließ dem Namensfeld zu wenig Platz („Minecraft-Na…“) */
+:root[data-look="salumeria"] .look-friends-side form {
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+}
+
+:root[data-look="salumeria"] .look-friends-side form > button {
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+  letter-spacing: 0.03em !important;
+}
+
+/* Tagestrenner: kursiv in der Serife */
+:root[data-look="salumeria"] .look-chat-day {
+  font-family: var(--sal-serif) !important;
+  font-style: italic;
+  font-size: 14px !important;
+  color: var(--sal-muted) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-look="salumeria"] .look-option { transition: none; }
+}
+
+/* ═════════════════════════ Willkommen: Etikett mit Doppelrahmen ═════════════════════════ */
+
+:root[data-look="salumeria"] .look-welcome-panel {
+  background-color: var(--sal-ink-2) !important;
+  border-left: 1px solid var(--sal-rule-strong) !important;
+  box-shadow: inset 5px 0 0 var(--sal-ink-2), inset 6px 0 0 var(--sal-rule), -24px 0 60px -30px #000 !important;
+}
+
+:root[data-look="salumeria"] .look-welcome-panel-title {
+  font-size: 46px !important;
+  font-weight: 500 !important;
+}
+
+:root[data-look="salumeria"] .look-welcome-panel p {
+  font-family: var(--sal-serif);
+  font-size: 16px;
+  font-style: italic;
+}
+
+:root[data-look="salumeria"] .look-welcome-skip {
+  font-family: var(--sal-serif) !important;
+  font-size: 15px !important;
+  font-style: italic;
+}
+
+/* die zweite Zeile kursiv wie der Profilname auf der Startseite */
+:root[data-look="salumeria"] .look-welcome-title {
+  font-weight: 500 !important;
+}
+
+:root[data-look="salumeria"] .look-welcome-title > span {
+  font-style: italic;
+}
+
+:root[data-look="salumeria"] .look-welcome-controls > button {
+  color: var(--sal-muted);
+}

@@ -442,7 +442,9 @@ export function ModDetailPage({
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    // Ansatzpunkte für die Looks: look-mod-detail (Seite), look-mod-header, look-mod-section
+    // (+ look-mod-description | look-mod-side | look-mod-versions), look-mod-gallery / look-mod-shot
+    <div className="look-mod-detail flex flex-col h-full overflow-hidden">
       {/* Back Button — hidden when embedded inside a host that provides its
           own back control (e.g. the V3 Add-content sheet's breadcrumb). */}
       {!hideBackButton && (

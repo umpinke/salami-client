@@ -225,8 +225,11 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
     autoSaveTimeoutRef.current = setTimeout(async () => {
       setSaving(true);
       try {
-        const updatedConfig =
-          await ConfigService.setLauncherConfig(configToSave);
+        // Der Look wird außerhalb des Formulars gewählt (LookSync) – nie mit einem älteren Stand überschreiben
+        const look = useThemeStore.getState().look;
+        const updatedConfig = await ConfigService.setLauncherConfig(
+          look ? { ...configToSave, salami_look: look } : configToSave,
+        );
         setConfig(updatedConfig);
         // Salami: Start-Befehle/JVM-Optionen übernimmt das Backend nur nach nativer
         // Bestätigung – bei „Abbrechen“ die gespeicherten Werte zurück ins Formular.

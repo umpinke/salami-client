@@ -1,0 +1,426 @@
+/*
+ * Look „Feinkost-Theke“ – Dialoge, Nebenfenster und kleine Teile: Auswahl-Kacheln (look-option),
+ * Hinweise (look-status), Meldungen (look-toast), Kurzhinweise (look-tooltip), das Update-Fenster
+ * (look-updater). Alles nur unter :root[data-look="theke"]. Siehe ../CONTRACT.md
+ */
+
+/* ═════════════════════════ Auswahl-Kacheln ═════════════════════════ */
+
+/* auf der dunklen Tafel: kleine Kreidetafeln im Holzrahmen */
+:root[data-look="theke"] .look-option:not(.look-option--image) {
+  background-color: var(--theke-chalk) !important;
+  border: 2px solid var(--theke-wood) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4) !important;
+  color: var(--theke-chalk-text);
+  transition: background-color 150ms, border-color 150ms, translate 150ms;
+}
+
+:root[data-look="theke"] .look-option:not(.look-option--image):hover {
+  background-color: #2e4038 !important;
+  border-color: var(--theke-wood-light) !important;
+}
+
+/* gewählt: das rote Preisschild mit Creme-Rand */
+:root[data-look="theke"] .look-option:not(.look-option--image):is([data-selected], .look-option--selected) {
+  background-color: var(--accent) !important;
+  border-color: var(--theke-fat) !important;
+  translate: 0 1px;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4) !important;
+}
+
+:root[data-look="theke"] .look-option:is([data-selected], .look-option--selected) :is([class*="text-white"], h4, p, span) {
+  color: var(--theke-on-accent) !important;
+}
+
+:root[data-look="theke"] .look-option:is(.look-option--disabled, [aria-disabled="true"], :disabled) {
+  opacity: 0.45;
+}
+
+/* der Hauptweg („Eigenes Profil“): ein Bogen Butterbrotpapier mit Klebestreifen */
+:root[data-look="theke"] .look-option.look-option--main {
+  position: relative;
+  background:
+    repeating-linear-gradient(0deg, rgba(43, 29, 26, 0.035) 0 1px, transparent 1px 22px),
+    var(--theke-paper) !important;
+  border: 0 !important;
+  border-radius: 3px !important;
+  box-shadow: 0 12px 26px -14px rgba(0, 0, 0, 0.8), 0 3px 0 rgba(0, 0, 0, 0.3) !important;
+  rotate: -0.4deg;
+}
+
+:root[data-look="theke"] .look-option.look-option--main:hover {
+  background:
+    repeating-linear-gradient(0deg, rgba(43, 29, 26, 0.035) 0 1px, transparent 1px 22px),
+    var(--theke-paper-sheet) !important;
+}
+
+:root[data-look="theke"] .look-option.look-option--main::before {
+  content: "";
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  width: 84px;
+  height: 18px;
+  translate: -50% 0;
+  rotate: 2deg;
+  background: rgba(243, 227, 211, 0.55);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+}
+
+:root[data-look="theke"] .look-option--main [class*="text-white"] { color: var(--theke-pepper) !important; }
+:root[data-look="theke"] .look-option--main [class*="text-white/"] { color: var(--theke-ink-soft) !important; }
+
+/* Bild-Kacheln (Loader): das Bild bleibt, der Rahmen wird Holz; gewählt mit Creme und rotem Rand */
+:root[data-look="theke"] .look-option--image {
+  border: 3px solid var(--theke-wood) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45);
+}
+
+:root[data-look="theke"] .look-option--image:hover {
+  border-color: var(--theke-wood-light) !important;
+}
+
+:root[data-look="theke"] .look-option--image[data-selected] {
+  border-color: var(--theke-fat) !important;
+  box-shadow: 0 0 0 3px var(--accent), 0 3px 0 rgba(0, 0, 0, 0.45);
+}
+
+/* auf Papier (Karteikasten der Einstellungen): Kärtchen statt Tafeln */
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper, .look-mod-header) .look-option:not(.look-option--image) {
+  background-color: var(--theke-paper-2) !important;
+  border-color: var(--theke-paper-edge) !important;
+  box-shadow: 0 2px 0 rgba(43, 29, 26, 0.18) !important;
+  color: var(--theke-pepper) !important;
+}
+
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper, .look-mod-header) .look-option:not(.look-option--image):hover {
+  background-color: #f6ecdc !important;
+  border-color: var(--theke-ink) !important;
+}
+
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper, .look-mod-header) .look-option:not(.look-option--image):is([data-selected], .look-option--selected) {
+  background-color: var(--accent) !important;
+  border-color: color-mix(in srgb, var(--accent) 60%, black) !important;
+}
+
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper, .look-mod-header) .look-option:is([data-selected], .look-option--selected),
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper, .look-mod-header) .look-option:is([data-selected], .look-option--selected) * {
+  color: var(--theke-on-accent) !important;
+}
+
+/* helle Loader-Symbole (Forge) bekommen auf Papier einen Tintenrand */
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper, .look-mod-header) .look-option img {
+  filter: drop-shadow(0 0 1px rgba(43, 29, 26, 0.95)) drop-shadow(0 1px 0 rgba(43, 29, 26, 0.45));
+}
+
+/* getönte Akzent-Knöpfe (auch eingeschaltete) sind auf Papier blass rosa mit weißer Schrift – dort voll in der Akzentfarbe */
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper, .look-mod-header) :is(.look-btn--accent, .look-btn--active) {
+  background-color: var(--accent) !important;
+  border-color: color-mix(in srgb, var(--accent) 60%, black) !important;
+}
+
+/* ═════════════════════════ Hinweise: ein Zettel mit farbigem Rand ═════════════════════════ */
+
+/* steht der Hinweis allein im Dialog (Bestätigen, Löschen), bleibt darunter keine Lücke */
+:root[data-look="theke"] .look-modal .look-status:last-child {
+  margin-bottom: 0;
+}
+
+:root[data-look="theke"] .look-status {
+  --theke-status: var(--theke-wood);
+  position: relative;
+  background:
+    repeating-linear-gradient(0deg, rgba(43, 29, 26, 0.035) 0 1px, transparent 1px 22px),
+    var(--theke-paper) !important;
+  border: 0 !important;
+  border-left: 6px solid var(--theke-status) !important;
+  border-radius: 3px !important;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.32);
+  color: var(--theke-pepper) !important;
+  rotate: -0.3deg;
+}
+
+:root[data-look="theke"] .look-status > svg { color: var(--theke-status); }
+:root[data-look="theke"] .look-status--error { --theke-status: var(--theke-red); }
+:root[data-look="theke"] .look-status--warning { --theke-status: #c4841c; }
+:root[data-look="theke"] .look-status--success { --theke-status: #4d8a43; }
+
+/* ═════════════════════════ Meldungen: ein Schild wie oben auf der Markise ═════════════════════════ */
+
+:root[data-look="theke"] .look-toast {
+  background: var(--theke-pepper) !important;
+  border: 2px solid var(--theke-fat) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.4), 0 18px 30px -16px rgba(0, 0, 0, 0.8) !important;
+  color: var(--theke-fat) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  letter-spacing: 0 !important;
+  text-shadow: none !important;
+  font-family: "Fredoka", sans-serif;
+  font-weight: 500;
+}
+
+:root[data-look="theke"] .look-toast--error {
+  border-color: #e2725f !important;
+  background: #3a1512 !important;
+}
+
+:root[data-look="theke"] .look-toast--success {
+  border-color: #a8cf8e !important;
+}
+
+/* ═════════════════════════ Kurzhinweise: eine kleine Kreidetafel ═════════════════════════ */
+
+:root[data-look="theke"] .look-tooltip {
+  background-color: var(--theke-chalk) !important;
+  border: 2px solid var(--theke-wood) !important;
+  border-radius: 7px !important;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45), 0 14px 26px -12px rgba(0, 0, 0, 0.8) !important;
+  color: var(--theke-chalk-text) !important;
+  font-family: "Fredoka", sans-serif;
+}
+
+/* ═════════════════════════ Update-Fenster: ein kleiner Laden ═════════════════════════ */
+
+:root[data-look="theke"] .look-updater {
+  --theke-top: 46px;
+  --theke-stripe: 27px;
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.2) 0 2px, transparent 2px 82px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.014) 0 41px, transparent 41px 164px),
+    linear-gradient(180deg, #3b2418, #2a1912) !important;
+  backdrop-filter: none !important;
+  font-family: "Fredoka", sans-serif;
+}
+
+/* Markise über das ganze Fenster, darunter die Bogenkante */
+:root[data-look="theke"] .look-updater::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: var(--theke-top);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 38%, rgba(0, 0, 0, 0.14)),
+    repeating-linear-gradient(90deg, var(--theke-red) 0 var(--theke-stripe), var(--theke-fat) var(--theke-stripe) calc(var(--theke-stripe) * 2));
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+}
+
+:root[data-look="theke"] .look-updater::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--theke-top);
+  height: 12px;
+  background:
+    radial-gradient(circle at calc(var(--theke-stripe) / 2) 0, var(--theke-red) calc(var(--theke-stripe) / 2 - 1.5px), transparent calc(var(--theke-stripe) / 2 - 0.5px)) 0 0 / calc(var(--theke-stripe) * 2) 12px repeat-x,
+    radial-gradient(circle at calc(var(--theke-stripe) * 1.5) 0, var(--theke-fat) calc(var(--theke-stripe) / 2 - 1.5px), transparent calc(var(--theke-stripe) / 2 - 0.5px)) 0 0 / calc(var(--theke-stripe) * 2) 12px repeat-x;
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.3));
+  pointer-events: none;
+}
+
+:root[data-look="theke"] .look-updater-card {
+  background: transparent !important;
+  border: 0 !important;
+  padding-top: 34px;
+}
+
+/* das Logo hängt als rundes Schild an zwei Schnüren */
+:root[data-look="theke"] .look-updater-brand {
+  position: relative;
+  padding-top: 18px;
+}
+
+:root[data-look="theke"] .look-updater-brand::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  width: 70px;
+  height: 30px;
+  translate: -50% 0;
+  border: 2px solid var(--theke-rail);
+  border-bottom: 0;
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+}
+
+:root[data-look="theke"] .look-updater-logo {
+  width: 108px !important;
+  height: 108px !important;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--theke-pepper);
+  border: 3px solid var(--theke-fat);
+  box-shadow: 0 5px 0 rgba(0, 0, 0, 0.4);
+}
+
+:root[data-look="theke"] .look-updater-title {
+  margin-top: 10px;
+  padding: 3px 14px 2px;
+  background: var(--theke-paper);
+  color: var(--theke-pepper) !important;
+  border-radius: 3px;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+  rotate: -1.5deg;
+  font-family: var(--theke-display) !important;
+  font-size: 16px !important;
+}
+
+/* Stand der Dinge: Preisschild mit Loch */
+:root[data-look="theke"] .look-updater-status {
+  position: relative;
+  padding: 6px 14px 6px 22px !important;
+  background: var(--theke-fat) !important;
+  border: 0 !important;
+  border-radius: 4px !important;
+  clip-path: polygon(10px 0, 100% 0, 100% 100%, 10px 100%, 0 50%);
+  color: var(--theke-pepper) !important;
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.4));
+}
+
+:root[data-look="theke"] .look-updater-status::before {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  translate: 0 -50%;
+  border-radius: 999px;
+  background: var(--theke-pepper);
+}
+
+:root[data-look="theke"] .look-updater-status span,
+:root[data-look="theke"] .look-updater-status svg {
+  color: var(--theke-pepper) !important;
+}
+
+:root[data-look="theke"] .look-updater-status span {
+  font-family: "Fredoka", sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 600;
+}
+
+:root[data-look="theke"] .look-updater-status[data-status="error"] {
+  background: var(--theke-red) !important;
+}
+
+:root[data-look="theke"] .look-updater-status[data-status="error"] :is(span, svg) {
+  color: #fff !important;
+}
+
+/* Fortschritt: eine Salami auf dem Schneidebrett, die von links aufgeschnitten wird */
+:root[data-look="theke"] .look-updater-progress {
+  height: 22px !important;
+  padding: 4px 6px;
+  background: var(--theke-board) !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  box-shadow: inset 0 -4px 0 var(--theke-board-dark), 0 4px 0 rgba(0, 0, 0, 0.35);
+}
+
+:root[data-look="theke"] .look-updater-bar {
+  border-radius: 999px !important;
+  background:
+    radial-gradient(circle at 20% 35%, var(--theke-fat) 0 1.6px, transparent 2.2px) 0 0 / 14px 14px,
+    radial-gradient(circle at 70% 70%, var(--theke-fat) 0 1.3px, transparent 1.9px) 0 0 / 14px 14px,
+    var(--theke-red) !important;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.25), 0 0 0 1.5px #6a2a20;
+}
+
+/* ═════════════════════════ Freunde: Kreidetafel mit Namen, Zettel als Nachrichten ═════════════════════════ */
+
+/* die Liste links: eine Kreidetafel im Holzrahmen */
+:root[data-look="theke"] .look-friends-side {
+  background-color: var(--theke-chalk);
+  border-right: 6px solid var(--theke-wood) !important;
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.4);
+}
+
+:root[data-look="theke"] .look-friend-row {
+  border-color: rgba(233, 239, 230, 0.12) !important;
+}
+
+:root[data-look="theke"] .look-friend-row[data-active] {
+  background-color: rgba(233, 239, 230, 0.08) !important;
+}
+
+/* Nachrichten der anderen: ein Zettel Butterbrotpapier */
+:root[data-look="theke"] .look-chat-msg:not([data-own]) {
+  background: var(--theke-paper) !important;
+  border-radius: 3px 10px 10px 3px !important;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.3) !important;
+  rotate: -0.4deg;
+}
+
+:root[data-look="theke"] .look-chat-msg:not([data-own]) [class*="text-white"] { color: var(--theke-pepper) !important; }
+:root[data-look="theke"] .look-chat-msg:not([data-own]) [class*="text-white/3"] { color: var(--theke-ink-soft) !important; }
+
+/* eigene Nachrichten: das rote Preisschild */
+:root[data-look="theke"] .look-chat-msg[data-own] {
+  background: var(--accent) !important;
+  border-radius: 10px 3px 3px 10px !important;
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--accent) 55%, black) !important;
+  rotate: 0.4deg;
+}
+
+:root[data-look="theke"] .look-chat-msg[data-own] [class*="text-white"] { color: var(--theke-on-accent) !important; }
+:root[data-look="theke"] .look-chat-msg[data-own] [class*="text-white/3"] { opacity: 0.75; }
+
+/* Tagestrenner: ein kleines Kreideschild an der Wand */
+:root[data-look="theke"] .look-chat-day {
+  color: var(--theke-chalk-text) !important;
+}
+
+:root[data-look="theke"] .look-chat-day > span { background-color: rgba(214, 172, 132, 0.25) !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-look="theke"] .look-chat-msg { rotate: 0deg; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-look="theke"] .look-option { transition: none; }
+}
+
+/* ═════════════════════════ Willkommen: die Anmeldung als Kreidetafel unter der Markise ═════════════════════════ */
+
+/* Fensterknöpfe: kleine dunkle Schilder auf der Markise (sonst weiß auf Creme) */
+:root[data-look="theke"] .look-welcome-controls > button {
+  width: 26px;
+  height: 26px;
+  margin-top: 6px;
+  background: var(--theke-pepper);
+  border: 2px solid var(--theke-fat);
+  border-radius: 8px;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+  color: var(--theke-fat);
+}
+
+:root[data-look="theke"] .look-welcome-panel {
+  background-color: var(--theke-chalk) !important;
+  border-left: 8px solid var(--theke-wood) !important;
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.45), -24px 0 60px -30px #000 !important;
+  color: var(--theke-chalk-text);
+}
+
+/* der Titel auf einem Streifen Butterbrotpapier wie in den Dialogen */
+:root[data-look="theke"] .look-welcome-panel-title {
+  padding: 6px 20px 4px;
+  background: var(--theke-paper);
+  color: var(--theke-pepper) !important;
+  border-radius: 3px;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
+  rotate: -1.5deg;
+  font-family: var(--theke-display) !important;
+}
+
+:root[data-look="theke"] .look-welcome-panel p { color: rgba(233, 239, 230, 0.72) !important; }
+:root[data-look="theke"] .look-welcome-skip { color: rgba(233, 239, 230, 0.7) !important; }
+:root[data-look="theke"] .look-welcome-skip:hover { color: #fff !important; }

@@ -164,7 +164,10 @@ export function WindowSettingsTab({
                   }
                   size="md"
                   className={cn(
-                    "cursor-pointer text-sm preset-${preset.width}x${preset.height}",
+                    "look-option cursor-pointer text-sm preset-${preset.width}x${preset.height}",
+                    editedProfile.settings?.resolution?.width === preset.width &&
+                      editedProfile.settings?.resolution?.height === preset.height &&
+                      "look-option--selected",
                     editedProfile.settings?.resolution?.width ===
                       preset.width &&
                       editedProfile.settings?.resolution?.height ===

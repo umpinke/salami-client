@@ -228,8 +228,9 @@
   border-bottom: 2px solid var(--theke-pepper);
 }
 
-/* Papier: die gemeinsamen Bausteine sind für dunkle Flächen gebaut – hier Tinte statt Weiß */
-:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) {
+/* Papier: die gemeinsamen Bausteine sind für dunkle Flächen gebaut – hier Tinte statt Weiß
+   (Profil-Zutatenliste, Einstellungen, Kopf der Mod-Detailseite) */
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper, .look-mod-header) {
   background: var(--theke-paper-sheet);
   border: 2px solid var(--theke-paper-edge);
   color: var(--theke-pepper);
@@ -241,22 +242,22 @@
   --surface-solid: #f6ecdc;
   --surface-solid-raised: #efe2cc;
 }
-:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) [class*="text-white"] { color: var(--theke-pepper) !important; }
-:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) [class*="text-white/"] { color: var(--theke-ink-soft) !important; }
-:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) [class*="placeholder-white"]::placeholder,
-:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) [class*="placeholder:text-white"]::placeholder { color: rgba(43, 29, 26, 0.45) !important; }
-:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) [class*="bg-white/"] { background-color: rgba(43, 29, 26, 0.06) !important; }
-:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) [class*="border-white/"] { border-color: rgba(43, 29, 26, 0.18) !important; }
-:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) [class*="bg-black/"] { background-color: rgba(43, 29, 26, 0.08) !important; }
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper, .look-mod-header) [class*="text-white"] { color: var(--theke-pepper) !important; }
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper, .look-mod-header) [class*="text-white/"] { color: var(--theke-ink-soft) !important; }
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper, .look-mod-header) [class*="placeholder-white"]::placeholder,
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper, .look-mod-header) [class*="placeholder:text-white"]::placeholder { color: rgba(43, 29, 26, 0.45) !important; }
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper, .look-mod-header) [class*="bg-white/"] { background-color: rgba(43, 29, 26, 0.06) !important; }
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper, .look-mod-header) [class*="border-white/"] { border-color: rgba(43, 29, 26, 0.18) !important; }
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper, .look-mod-header) [class*="bg-black/"] { background-color: rgba(43, 29, 26, 0.08) !important; }
 /* inline gesetzte Weißtöne (z. B. die Schiene ausgeschalteter Schalter) */
-:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) [style*="background-color: rgba(255, 255, 255"] { background-color: rgba(43, 29, 26, 0.3) !important; }
-:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) [style*="color: rgba(255, 255, 255"]:not([style*="background-color: rgba(255, 255, 255"]) { color: var(--theke-ink-soft) !important; }
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper, .look-mod-header) [style*="background-color: rgba(255, 255, 255"] { background-color: rgba(43, 29, 26, 0.3) !important; }
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper, .look-mod-header) [style*="color: rgba(255, 255, 255"]:not([style*="background-color: rgba(255, 255, 255"]) { color: var(--theke-ink-soft) !important; }
 /* volle Knöpfe behalten weiße Schrift */
-:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) :is(.look-btn--primary, .look-btn--accent, .look-btn--destructive, .look-btn--danger, .look-btn--active),
-:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) :is(.look-btn--primary, .look-btn--accent, .look-btn--destructive, .look-btn--danger, .look-btn--active) * {
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper, .look-mod-header) :is(.look-btn--primary, .look-btn--accent, .look-btn--destructive, .look-btn--danger, .look-btn--active),
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper, .look-mod-header) :is(.look-btn--primary, .look-btn--accent, .look-btn--destructive, .look-btn--danger, .look-btn--active) * {
   color: #fff !important;
 }
-:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) .look-input {
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper, .look-mod-header) .look-input {
   background: transparent !important;
   border: 0 !important;
   border-bottom: 2px dashed rgba(43, 29, 26, 0.35) !important;
@@ -874,6 +875,187 @@
 :root[data-look="theke"] .look-settings-paper h3 { color: var(--theke-pepper) !important; }
 
 /* Auf Papier: flache Knöpfe in Tinte; die Look-Vorschaukarten bleiben dunkel mit heller Schrift */
-:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) :is(.look-btn--ghost, .look-btn--secondary, .look-btn--text) { color: var(--theke-pepper) !important; }
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper, .look-mod-header) :is(.look-btn--ghost, .look-btn--secondary, .look-btn--text) { color: var(--theke-pepper) !important; }
 :root[data-look="theke"] .look-settings-paper .look-picker [class*="text-white"] { color: #fff !important; }
 :root[data-look="theke"] .look-settings-paper .look-picker [class*="text-white/"] { color: rgba(255, 255, 255, 0.6) !important; }
+
+/* ═════════════════════════ Mod-Detailseite: Etikett, Kreidetafeln, Polaroids ═════════════════════════ */
+
+/* Kopf: das Produktetikett auf Papier (Papier-Regeln oben), die Markise bleibt als Band darüber */
+:root[data-look="theke"] .look-mod-header {
+  background:
+    repeating-linear-gradient(0deg, rgba(43, 29, 26, 0.035) 0 1px, transparent 1px 24px),
+    var(--theke-paper) !important;
+  border: 0 !important;
+  border-radius: 4px !important;
+  box-shadow: 0 16px 36px -14px rgba(0, 0, 0, 0.7), 0 4px 0 rgba(0, 0, 0, 0.3) !important;
+}
+
+:root[data-look="theke"] .look-mod-header > .salami-fat-spots {
+  border-radius: 4px 4px 0 0;
+}
+
+/* das Projektbild als aufgeklebtes Foto mit Tintenrand */
+:root[data-look="theke"] .look-mod-header .-mt-10 {
+  border-color: var(--theke-pepper) !important;
+  border-radius: 6px !important;
+  rotate: -2deg;
+}
+
+:root[data-look="theke"] .look-mod-header button.text-3xl {
+  font-family: var(--theke-display);
+  letter-spacing: 0.02em;
+}
+
+/* Etiketten auf dem Etikett: dunkler Rand wie auf der Profilseite */
+:root[data-look="theke"] .look-mod-header .look-label:not(.look-label--ghost) {
+  --theke-tag-edge: var(--theke-pepper);
+}
+
+:root[data-look="theke"] .look-mod-header .look-tag {
+  background-color: rgba(43, 29, 26, 0.08) !important;
+  color: var(--theke-ink-strong) !important;
+  box-shadow: inset 0 0 0 1px rgba(43, 29, 26, 0.2);
+}
+
+/* Beschreibung, Kennzahlen, Versionen: Kreidetafeln im Holzrahmen */
+:root[data-look="theke"] .look-mod-section {
+  background-color: var(--theke-chalk) !important;
+  border: 6px solid var(--theke-wood) !important;
+  border-radius: 6px !important;
+  box-shadow: inset 0 0 36px rgba(0, 0, 0, 0.42), 0 5px 0 rgba(0, 0, 0, 0.35) !important;
+  color: var(--theke-chalk-text);
+}
+
+:root[data-look="theke"] .look-mod-description {
+  border-width: 9px !important;
+}
+
+/* die Etiketten der Seitentafeln behalten ihren Preisschild-Schnitt; Haarlinien in Kreide */
+:root[data-look="theke"] .look-mod-section [class*="border-white/"] {
+  border-color: rgba(233, 239, 230, 0.18) !important;
+}
+
+/* Versionen: Kreidestreifen im Holzrahmen */
+:root[data-look="theke"] .look-mod-detail .look-version-row {
+  background-color: var(--theke-chalk) !important;
+  border: 2px solid var(--theke-wood) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+}
+
+:root[data-look="theke"] .look-mod-detail .look-version-row:hover {
+  background-color: #2e4038 !important;
+  border-color: var(--theke-wood-light) !important;
+}
+
+/* Galerie: Polaroids, leicht schief angeheftet */
+:root[data-look="theke"] .look-mod-gallery > div:last-child > div:last-child {
+  padding: 8px 4px 10px;
+}
+
+:root[data-look="theke"] .look-mod-shot {
+  padding: 7px 7px 22px;
+  background: #fbf6ec !important;
+  border: 0 !important;
+  border-radius: 2px !important;
+  box-shadow: 0 10px 18px -10px rgba(0, 0, 0, 0.85), 0 2px 0 rgba(0, 0, 0, 0.25) !important;
+  rotate: -1.2deg;
+}
+
+:root[data-look="theke"] .look-mod-shot:nth-child(even) {
+  rotate: 1deg;
+}
+
+:root[data-look="theke"] .look-mod-shot:hover {
+  rotate: 0deg;
+}
+
+/* der Titel steht auf dem weißen Rand wie mit Filzstift geschrieben */
+:root[data-look="theke"] .look-mod-shot > div:last-child:not(.absolute.inset-0):not(.top-2) {
+  background: none !important;
+  padding: 0 4px 3px;
+}
+
+:root[data-look="theke"] .look-mod-shot > div:last-child:not(.absolute.inset-0):not(.top-2) p {
+  color: var(--theke-pepper) !important;
+  text-align: center;
+}
+
+:root[data-look="theke"] .look-mod-shot > .absolute.inset-0 {
+  inset: 7px 7px 22px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-look="theke"] .look-mod-shot { rotate: 0deg; }
+}
+
+/* ═════════════════════════ Profile: Etiketten auf Butterbrotpapier ═════════════════════════ */
+
+/* wie die zuletzt gespielten auf der Startseite und die Produktkarte der Profilseite: Papier mit
+   Tinte; über den Kacheln bleibt das Stück Markise */
+:root[data-look="theke"] .look-profile-card {
+  background:
+    repeating-linear-gradient(0deg, rgba(43, 29, 26, 0.035) 0 1px, transparent 1px 22px),
+    var(--theke-paper) !important;
+  border: 0 !important;
+  border-radius: 4px !important;
+  box-shadow: 0 12px 24px -14px rgba(0, 0, 0, 0.8), 0 3px 0 rgba(0, 0, 0, 0.3) !important;
+  color: var(--theke-pepper);
+}
+
+:root[data-look="theke"] .look-profile-card:hover {
+  background:
+    repeating-linear-gradient(0deg, rgba(43, 29, 26, 0.035) 0 1px, transparent 1px 22px),
+    var(--theke-paper-sheet) !important;
+  box-shadow: 0 16px 26px -14px rgba(0, 0, 0, 0.85), 0 3px 0 rgba(0, 0, 0, 0.3), 0 0 0 2px var(--accent) !important;
+}
+
+/* (das Kontextmenü liegt in der Karte, bleibt aber eine dunkle Tafel) */
+:root[data-look="theke"] .look-profile-card [class*="text-white"]:not(.look-menu, .look-menu *) { color: var(--theke-pepper) !important; }
+:root[data-look="theke"] .look-profile-card [class*="text-white/"]:not(.look-menu, .look-menu *) { color: var(--theke-ink-soft) !important; }
+:root[data-look="theke"] .look-profile-card [class*="bg-white/"]:not(.look-label, .look-menu, .look-menu *) { background-color: rgba(43, 29, 26, 0.06) !important; }
+:root[data-look="theke"] .look-profile-card [class*="border-white/"]:not(.look-menu, .look-menu *) { border-color: rgba(43, 29, 26, 0.18) !important; }
+
+/* volle Start-Knöpfe behalten ihre helle Schrift */
+:root[data-look="theke"] .look-profile-card :is(.look-btn--primary, button[style*="background-color: rgb"]),
+:root[data-look="theke"] .look-profile-card :is(.look-btn--primary, button[style*="background-color: rgb"]) * {
+  color: var(--theke-on-accent) !important;
+}
+
+/* Name in der Schaufenster-Schrift */
+:root[data-look="theke"] .look-profile-card[data-layout="grid"] .font-minecraft.text-xl,
+:root[data-look="theke"] .look-profile-card[data-layout="grid"] h3 {
+  font-family: var(--theke-display);
+}
+
+/* Anheften und „…“ auf der Markise: kleine dunkle Schilder */
+:root[data-look="theke"] .look-profile-card [data-card-band] button[type="button"][class] {
+  background: var(--theke-pepper) !important;
+  border: 1.5px solid var(--theke-fat);
+  border-radius: 7px !important;
+  color: var(--theke-fat) !important;
+}
+
+/* Listen- und Kompaktzeilen: Etiketten mit Loch am linken Rand */
+:root[data-look="theke"] .look-profile-card:not([data-layout="grid"]) {
+  padding-left: 26px !important;
+}
+
+:root[data-look="theke"] .look-profile-card:not([data-layout="grid"])::before {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  translate: 0 -50%;
+  border-radius: 999px;
+  background: #2a1912;
+  box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.5), 0 0 0 1.5px var(--theke-paper-edge);
+}
+
+/* kleine Knöpfe der Zeilen (Ordner, Menü) in Tinte */
+:root[data-look="theke"] .look-profile-card:not([data-layout="grid"]) button:not([style*="background-color: rgb"], .look-menu *):hover {
+  background-color: rgba(43, 29, 26, 0.08) !important;
+}

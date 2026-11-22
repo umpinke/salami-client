@@ -217,7 +217,7 @@ export function BrowseTab({
                           e.currentTarget.src = "/icons/minecraft.png";
                         }}
                       />
-                      <span className="capitalize">{currentProfile.loader}</span>
+                      <span>{currentProfile.loader.charAt(0).toUpperCase() + currentProfile.loader.slice(1)}</span>
                       {(resolvedLoaderVersion?.version || currentProfile.loader_version) && (
                         <span className="text-white/50">
                           {resolvedLoaderVersion?.version || currentProfile.loader_version}

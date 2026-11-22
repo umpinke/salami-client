@@ -272,7 +272,8 @@ function AccountItem({
   return (
     <div
       ref={itemRef}
-      className={`flex items-center justify-between rounded-md ${
+      data-selected={account.active || undefined}
+      className={`look-option flex items-center justify-between rounded-md ${
         account.active ? "bg-white/10" : "bg-black/40 hover:bg-white/5"
       } border border-white/10 hover:border-white/20 transition-colors overflow-hidden ${
         !account.active && !effectiveIsLoading

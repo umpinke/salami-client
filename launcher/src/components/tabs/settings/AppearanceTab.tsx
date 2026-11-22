@@ -18,6 +18,7 @@ import { useSettingsConfig, useSettingsKeywords } from "./settings-context";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "../../ui/buttons/Button";
 import { Icon } from "@iconify/react";
+import { forgetUserMedia } from "../../../services/tauri-service";
 
 export function AppearanceTab() {
   const look = useThemeStore((state) => state.look);
@@ -162,7 +163,11 @@ export function AppearanceTab() {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => setCustomMedia(null, null)}
+                onClick={() => {
+                  // Salami: die Datei nicht länger dauerhaft für die Anzeige freigeben
+                  if (customMediaUrl) void forgetUserMedia(customMediaUrl).catch(() => undefined);
+                  setCustomMedia(null, null);
+                }}
                 icon={<Icon icon="solar:trash-bin-trash-bold" />}
               >
                 {t("settings.custom_background.clear")}

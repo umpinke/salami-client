@@ -47,7 +47,7 @@ export function ModDetailGallery({ images }: ModDetailGalleryProps) {
 
   return (
     <>
-      <div className="relative">
+      <div className="look-mod-gallery relative">
         {/* Section Title */}
         <SectionHeading
           className="mb-3"
@@ -100,7 +100,7 @@ export function ModDetailGallery({ images }: ModDetailGalleryProps) {
             <button
               key={image.url}
               onClick={() => openLightbox(index)}
-              className="group relative my-1 flex-shrink-0 overflow-hidden border transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+              className="look-mod-shot group relative my-1 flex-shrink-0 overflow-hidden border transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
               style={{
                 scrollSnapAlign: "start",
                 borderRadius: "var(--border-radius)",

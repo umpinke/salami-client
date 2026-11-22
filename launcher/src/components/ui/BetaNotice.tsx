@@ -20,7 +20,7 @@ export function BetaNotice({ tag, hint, feedbackLabel, feedbackUrl, className }:
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
       <span
-        className="rounded px-1.5 py-0.5 font-minecraft text-[10px] uppercase tracking-wider"
+        className="rounded px-1.5 py-0.5 font-minecraft text-[10px] tracking-wider"
         style={{ color: accentColor.value, backgroundColor: `${accentColor.value}1f` }}
       >
         {tag}

@@ -509,9 +509,9 @@ export function LogViewerCore({
   );
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
+    <div className="look-log-viewer flex-1 flex flex-col min-h-0">
       {/* Kopf: Stufen als Textreiter, rechts Datei und Anzeige-Optionen */}
-      <div className="flex items-end justify-between gap-4 border-b px-4 pt-3" style={{ borderColor: SURFACE.line }}>
+      <div className="look-log-toolbar flex items-end justify-between gap-4 border-b px-4 pt-3" style={{ borderColor: SURFACE.line }}>
         <LevelChips
           enabled={levelFilters}
           counts={levelCounts}
@@ -522,7 +522,7 @@ export function LogViewerCore({
             <button
               ref={fileDropdownButtonRef}
               onClick={() => setIsFileDropdownOpen(!isFileDropdownOpen)}
-              className="flex h-8 max-w-[240px] items-center gap-2 px-2.5 font-minecraft text-sm lowercase text-white/55 transition-colors hover:bg-white/[0.06] hover:text-white"
+              className="flex h-8 max-w-[240px] items-center gap-2 px-2.5 font-minecraft text-sm text-white/55 transition-colors hover:bg-white/[0.06] hover:text-white"
             >
               <Icon icon="solar:document-text-linear" className="h-4 w-4 shrink-0" />
               <span className="truncate">
@@ -561,7 +561,7 @@ export function LogViewerCore({
         onWheel={markUserScroll}
         onTouchMove={markUserScroll}
         onPointerDown={markUserScroll}
-        className="flex-1 min-h-0 flex flex-col border-y bg-black/20 py-1 outline-none"
+        className="look-log-lines flex-1 min-h-0 flex flex-col border-y bg-black/20 py-1 outline-none"
         style={{ borderColor: SURFACE.line }}
       >
         {filteredLogs.length === 0 ? (
@@ -588,13 +588,13 @@ export function LogViewerCore({
       </div>
 
       {/* Statuszeile */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+      <div className="look-log-status flex flex-wrap items-center justify-between gap-2 px-3 py-2">
         <div className="flex items-center gap-2 pl-1">
           <button
             type="button"
             onClick={() => (isAutoscrollEnabled ? setIsAutoscrollEnabled(false) : scrollToBottom())}
             title={isAutoscrollEnabled ? t("salami_logs.live") : t("salami_logs.paused")}
-            className="flex h-8 items-center gap-2 pr-2 font-minecraft text-sm lowercase transition-colors"
+            className="flex h-8 items-center gap-2 pr-2 font-minecraft text-sm transition-colors"
             style={{ color: isAutoscrollEnabled ? "#4ade80" : "rgba(255,255,255,0.45)" }}
           >
             <span

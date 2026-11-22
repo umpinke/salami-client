@@ -149,7 +149,7 @@ function VersionItem({
               {version.version_number}
             </span>
             {isInstalled && (
-              <span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-minecraft uppercase">
+              <span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-minecraft">
                 {t('modpack_versions.current')}
               </span>
             )}

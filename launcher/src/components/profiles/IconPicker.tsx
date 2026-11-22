@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc } from "@tauri-apps/api/core";
@@ -12,6 +12,10 @@ import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 import { BLOCK_ICONS } from "../../data/block-icons";
 import { useProfileIconLibraryStore } from "../../store/useProfileIconLibraryStore";
+import { allowUserMedia } from "../../services/tauri-service";
+
+/** Salami: unbekannte eigene Icon-Dateien nur einmal pro Sitzung nativ nachfragen. */
+let askedForLibraryFiles = false;
 
 /** A chosen icon — either a remote image URL or an absolute file path on disk. */
 export type ChosenIcon = { url: string } | { path: string };
@@ -50,6 +54,26 @@ export function IconPicker({ selected, onSelect, onClose }: IconPickerProps) {
     useProfileIconLibraryStore();
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [urlValue, setUrlValue] = useState("");
+  // Salami: Das Asset-Protokoll zeigt nur Launcher-Ordner – eigene Icon-Dateien erst freigeben
+  // lassen (gemerkt, gerade gewählt oder einmal nativ bestätigt), dann als Vorschau zeigen.
+  const [filesReady, setFilesReady] = useState(false);
+
+  useEffect(() => {
+    const files = customIcons.filter((ci) => ci.kind === "file").map((ci) => ci.value);
+    let cancelled = false;
+    const ask = !askedForLibraryFiles;
+    askedForLibraryFiles = true;
+    allowUserMedia(files, ask)
+      .catch(() => [])
+      .finally(() => {
+        if (!cancelled) setFilesReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // nur beim Öffnen; neu gewählte Dateien gibt handleUpload frei
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const pick = (icon: ChosenIcon) => {
     onSelect(icon);
@@ -74,6 +98,8 @@ export function IconPicker({ selected, onSelect, onClose }: IconPickerProps) {
         ],
       });
       if (typeof selectedPath === "string" && selectedPath) {
+        // Salami: gerade im Dialog gewählt → dauerhaft merken (Vorschau auch nach einem Neustart)
+        await allowUserMedia([selectedPath]).catch(() => []);
         addCustomFile(selectedPath);
       }
     } catch (err) {
@@ -87,7 +113,8 @@ export function IconPicker({ selected, onSelect, onClose }: IconPickerProps) {
     const trimmed = urlValue.trim();
     try {
       const parsed = new URL(trimmed);
-      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      // Salami: der Launcher lädt Profilbilder nur per https
+      if (parsed.protocol !== "https:") {
         throw new Error("unsupported protocol");
       }
     } catch {
@@ -205,7 +232,8 @@ export function IconPicker({ selected, onSelect, onClose }: IconPickerProps) {
             {customIcons.map((ci) => {
               const chosen: ChosenIcon =
                 ci.kind === "file" ? { path: ci.value } : { url: ci.value };
-              const src = ci.kind === "file" ? convertFileSrc(ci.value) : ci.value;
+              const src =
+                ci.kind === "file" ? (filesReady ? convertFileSrc(ci.value) : undefined) : ci.value;
               const active = isSelected(chosen);
               return (
                 <div

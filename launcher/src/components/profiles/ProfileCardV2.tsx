@@ -408,7 +408,8 @@ export function ProfileCardV2({
         : `${(profile.loader ?? "").charAt(0).toUpperCase()}${(profile.loader ?? "").slice(1)}`;
     return (
       <div
-        className="look-card group relative flex cursor-pointer flex-col border transition-all duration-200"
+        data-layout="grid"
+        className="look-card look-profile-card group relative flex cursor-pointer flex-col border transition-all duration-200"
         style={{
           backgroundColor: SURFACE.base,
           borderColor: isHovered ? hexAlpha(accentColor.value, 0.55) : SURFACE.line,
@@ -569,7 +570,8 @@ export function ProfileCardV2({
     const smallButton = `flex flex-shrink-0 items-center justify-center text-white/60 transition-colors hover:bg-white/10 hover:text-white ${isCompact ? "h-7 w-7" : "h-8 w-8"}`;
     return (
       <div
-        className={`group relative flex cursor-pointer items-center border transition-all duration-200 ${isCompact ? "gap-3 p-2.5" : "gap-4 p-3"}`}
+        data-layout={layoutMode}
+        className={`look-profile-card group relative flex cursor-pointer items-center border transition-all duration-200 ${isCompact ? "gap-3 p-2.5" : "gap-4 p-3"}`}
         style={{
           backgroundColor: isHovered ? SURFACE.hover : SURFACE.base,
           borderColor: isHovered ? hexAlpha(accentColor.value, 0.55) : SURFACE.line,
@@ -920,7 +922,7 @@ export function ProfileCardV2({
                         }}
                       />
                     )}
-                    <span className={`truncate max-w-[100px] ${isCompact ? 'text-base' : 'text-lg'} lowercase`}>{preferredAccount.username}</span>
+                    <span className={`truncate max-w-[100px] ${isCompact ? 'text-base' : 'text-lg'}`}>{preferredAccount.username}</span>
                   </div>
                 </Tooltip>
               )}
@@ -1105,7 +1107,7 @@ export function ProfileCardV2({
                     }}
                   />
                 )}
-                <span className="truncate max-w-[100px] text-lg lowercase">{preferredAccount.username}</span>
+                <span className="truncate max-w-[100px] text-lg">{preferredAccount.username}</span>
               </div>
             </Tooltip>
           )}

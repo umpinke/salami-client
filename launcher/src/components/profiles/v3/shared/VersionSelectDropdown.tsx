@@ -168,7 +168,7 @@ export function VersionSelectDropdown({
               </div>
               {version.release_type !== "release" && (
                 <span
-                  className={`text-[9px] uppercase px-1 py-0.5 rounded flex-shrink-0 ${
+                  className={`text-[9px] px-1 py-0.5 rounded flex-shrink-0 ${
                     version.release_type === "beta"
                       ? "bg-amber-400/15 text-amber-200 border border-amber-400/25"
                       : version.release_type === "alpha"
@@ -176,7 +176,8 @@ export function VersionSelectDropdown({
                         : "bg-white/10 text-white/60 border border-white/15"
                   }`}
                 >
-                  {version.release_type}
+                  {/* großgeschrieben im Text statt per CSS (CONTRACT: kein uppercase) */}
+                  {version.release_type.charAt(0).toUpperCase() + version.release_type.slice(1)}
                 </span>
               )}
             </button>

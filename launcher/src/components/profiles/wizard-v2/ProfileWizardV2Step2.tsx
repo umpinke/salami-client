@@ -323,7 +323,9 @@ export function ProfileWizardV2Step2({
             return (
               <div
                 key={loader.key}
-                className={`relative p-4 h-28 transition-all duration-200 rounded-lg overflow-hidden ${
+                data-selected={(selectedLoader === loader.key && !isDisabled) || undefined}
+                aria-disabled={isDisabled || undefined}
+                className={`look-option look-option--image relative p-4 h-28 transition-all duration-200 rounded-lg overflow-hidden ${
                   isDisabled
                     ? "opacity-50 cursor-not-allowed pointer-events-none border-0"
                     : selectedLoader === loader.key

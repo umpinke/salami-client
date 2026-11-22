@@ -54,7 +54,7 @@ export function LevelChips({
             aria-pressed={active}
             title={t(`salami_logs.toggle_${active ? "hide" : "show"}`, { level: t(`salami_logs.level.${level}`) })}
             className={cn(
-              "relative flex flex-shrink-0 items-baseline gap-1.5 pb-2.5 font-minecraft text-xl lowercase leading-none transition-colors duration-150",
+              "relative flex flex-shrink-0 items-baseline gap-1.5 pb-2.5 font-minecraft text-xl leading-none transition-colors duration-150",
               active ? "text-white" : "text-white/35 hover:text-white/70",
             )}
             style={{ borderRadius: 0 }}
@@ -239,7 +239,7 @@ export function LogToolButton({
       title={title ?? label}
       aria-label={title ?? label}
       className={cn(
-        "flex h-8 items-center gap-1.5 px-2.5 font-minecraft text-sm lowercase transition-[color,background-color,filter] duration-150 disabled:opacity-40",
+        "flex h-8 items-center gap-1.5 px-2.5 font-minecraft text-sm transition-[color,background-color,filter] duration-150 disabled:opacity-40",
         primary
           ? "hover:brightness-110"
           : active
@@ -303,7 +303,7 @@ export function LogEmptyState({ icon, title, hint }: { icon?: string; title: str
       ) : (
         <img src="/salami-logo-64.png" alt="" className="mb-1 h-10 w-10 rounded-full opacity-40 grayscale" />
       )}
-      <p className="font-minecraft text-2xl lowercase leading-none text-white/75">{title}</p>
+      <p className="font-minecraft text-2xl leading-none text-white/75">{title}</p>
       {hint && <p className="max-w-sm text-xs text-white/40">{hint}</p>}
     </div>
   );

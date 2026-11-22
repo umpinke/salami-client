@@ -114,6 +114,13 @@ export function SalamiAppSettings() {
         />
       </SettingRow>
 
+      {syncOn && status.paired === false && (
+        <div className="flex gap-2 my-2 rounded-lg border border-white/10 bg-white/5 p-3 font-minecraft text-xs text-white/70">
+          <Icon icon="solar:info-circle-bold" className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <span>{t("salami.app.not_paired")}</span>
+        </div>
+      )}
+
       {syncOn && status.storageFull && (
         <div className="flex gap-2 my-2 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 font-minecraft text-xs text-amber-100">
           <Icon icon="solar:danger-triangle-bold" className="w-4 h-4 flex-shrink-0 mt-0.5" />

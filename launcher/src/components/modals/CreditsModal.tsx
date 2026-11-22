@@ -43,7 +43,7 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
           <div className="flex items-center gap-4 border-b py-4" style={{ borderColor: SURFACE.line }}>
             <img src={BRAND.logoSmall} alt="" className="h-10 w-10 shrink-0 rounded-full" />
             <div className="min-w-0 flex-1">
-              <p className="font-minecraft text-2xl lowercase leading-none text-white">{BRAND.name}</p>
+              <p className="font-minecraft text-2xl leading-none text-white">{BRAND.name}</p>
               <p className="mt-1.5 font-minecraft text-xs text-white/50">{t("credits_modal.salami_role")}</p>
             </div>
             <IconButton
@@ -64,7 +64,7 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
               <Icon icon="solar:code-2-bold" className="h-5 w-5" style={{ color: accentColor.value }} />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="font-minecraft text-[11px] lowercase text-white/40">{t("credits_modal.built_on")}</p>
+              <p className="font-minecraft text-[11px] text-white/40">{t("credits_modal.built_on")}</p>
               <p className="mt-0.5 font-minecraft text-sm leading-snug text-white/80">{t("about.attribution")}</p>
             </div>
             <IconButton
@@ -85,7 +85,7 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
               <Icon icon="solar:code-bold" className="h-5 w-5 text-white/50" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="font-minecraft text-[11px] lowercase text-white/40">{t("credits_modal.original_ui")}</p>
+              <p className="font-minecraft text-[11px] text-white/40">{t("credits_modal.original_ui")}</p>
               <p className="mt-0.5 flex items-baseline gap-2 font-minecraft text-sm text-white/80">
                 Deadmake
                 <span className="text-xs text-white/40">aka Maggus</span>
@@ -108,7 +108,7 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
               onClick={() => handleOpenUrl(`${BRAND.sourceUrl}/blob/main/launcher/LICENSE`)}
             >
               <Icon icon="solar:arrow-right-up-bold" className="w-5 h-5" />
-              <span className="font-minecraft text-sm lowercase">{t('credits_modal.view_licenses')}</span>
+              <span className="font-minecraft text-sm">{t('credits_modal.view_licenses')}</span>
             </Button>
           </div>
         </div>

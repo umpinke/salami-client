@@ -29,7 +29,7 @@ export function ProfileSourceChooser({ onChoose, isBusy = false }: ProfileSource
       <button
         onClick={() => onChoose("blank")}
         disabled={isBusy}
-        className={`flex w-full items-center gap-5 px-6 py-5 text-left hover:-translate-y-0.5 disabled:opacity-50 ${FK_CARD_CLASS}`}
+        className={`look-option look-option--main flex w-full items-center gap-5 px-6 py-5 text-left hover:-translate-y-0.5 disabled:opacity-50 ${FK_CARD_CLASS}`}
         style={fkCardStyle(accentColor.value, false, true)}
       >
         {/* Salami: Hauptweg als volle Akzentfläche mit harter Unterkante */}
@@ -64,7 +64,7 @@ export function ProfileSourceChooser({ onChoose, isBusy = false }: ProfileSource
             key={source.id}
             onClick={() => onChoose(source.id)}
             disabled={isBusy}
-            className={`group flex w-full items-center gap-4 px-4 py-3 text-left disabled:opacity-50 ${FK_CARD_CLASS}`}
+            className={`look-option group flex w-full items-center gap-4 px-4 py-3 text-left disabled:opacity-50 ${FK_CARD_CLASS}`}
             style={fkCardStyle(accentColor.value)}
           >
             <Icon

@@ -298,7 +298,8 @@ export function ProfileWizardV2({
             return (
               <div
                 key={version.id}
-                className={`relative p-4 cursor-pointer transition-all duration-200 border-2 ${
+                data-selected={selectedVersion === version.id || undefined}
+                className={`look-option relative p-4 cursor-pointer transition-all duration-200 border-2 ${
                   selectedVersion === version.id
                     ? ""
                     : "border-transparent bg-white/[0.045] hover:bg-white/[0.08]"
@@ -325,8 +326,12 @@ export function ProfileWizardV2({
                   <h4 className="font-smallcaps text-lg text-white">
                     {version.id}
                   </h4>
-                  <p className="text-xs text-white/60 font-minecraft capitalize mt-1">
-                    {version.type}
+                  <p className="text-xs text-white/60 font-minecraft mt-1">
+                    {version.type === "release"
+                      ? t('profiles.wizard.release')
+                      : version.type === "snapshot"
+                        ? t('profiles.wizard.snapshot')
+                        : version.type}
                   </p>
                 </div>
               </div>

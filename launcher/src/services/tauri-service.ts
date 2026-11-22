@@ -46,4 +46,21 @@ export const getLauncherDirectory = (): Promise<string> => {
 export const openLauncherDirectory = async (): Promise<void> => {
   const launcherPath = await getLauncherDirectory();
   await invoke('open_directory', { path: launcherPath });
-}; 
+};
+
+/**
+ * Salami: Das Asset-Protokoll zeigt nur Launcher-Ordner. Eigene Bilder/Videos außerhalb
+ * (Hintergrund, Profil-Icons) gibt das Backend frei, wenn sie gerade im Datei-Dialog gewählt
+ * oder schon früher gemerkt wurden; mit `ask` fragt es für unbekannte einmal nativ nach.
+ *
+ * @returns die freigegebenen Pfade
+ */
+export const allowUserMedia = (paths: string[], ask = false): Promise<string[]> => {
+  if (paths.length === 0) return Promise.resolve([]);
+  return invoke<string[]>('allow_user_media', { paths, ask });
+};
+
+/** Salami: eigene Datei nicht mehr dauerhaft freigeben (Hintergrund entfernt, Icon gelöscht). */
+export const forgetUserMedia = (path: string): Promise<void> => {
+  return invoke<void>('forget_user_media', { path });
+};

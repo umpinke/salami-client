@@ -1,0 +1,285 @@
+/*
+ * Look „Pixel-Werkbank“ – Dialoge, Nebenfenster und kleine Teile: Auswahl-Kacheln als Slots
+ * (look-option), Hinweise (look-status), Meldungen (look-toast), Kurzhinweise (look-tooltip), das
+ * Update-Fenster (look-updater). Alles nur unter :root[data-look="werkbank"]. Siehe ../CONTRACT.md
+ */
+
+/* ═════════════════════════ Auswahl-Kacheln: Slots ═════════════════════════ */
+
+:root[data-look="werkbank"] .look-option:not(.look-option--image) {
+  background-color: var(--wb-slot) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: var(--wb-inset-sm) !important;
+  color: var(--wb-fat);
+  transform: none !important;
+}
+
+/* überfahren: der Slot hellt auf wie im Inventar */
+:root[data-look="werkbank"] .look-option:not(.look-option--image):hover {
+  background-color: #3b2c26 !important;
+}
+
+/* gewählt: der weiße Auswahlrahmen der Hotbar (nach innen – die Listen schneiden am Rand ab) */
+:root[data-look="werkbank"] .look-option:not(.look-option--image):is([data-selected], .look-option--selected) {
+  background-color: #3b2c26 !important;
+  box-shadow: inset 0 0 0 3px #fff, inset 0 0 0 5px #000 !important;
+}
+
+:root[data-look="werkbank"] .look-option:is([data-selected], .look-option--selected) :is([class*="text-white"], h4, p, span) {
+  color: #fff !important;
+}
+
+:root[data-look="werkbank"] .look-option:is(.look-option--disabled, [aria-disabled="true"], :disabled) {
+  opacity: 0.45;
+}
+
+/* Kennzeilen (Release, Snapshot …) grau wie die Zeilen eines Gegenstands-Tooltips */
+:root[data-look="werkbank"] .look-option p {
+  color: var(--wb-tip-grey, #a8a8a8) !important;
+}
+
+/* der Hauptweg: ein Steinknopf mit Fase, das Symbol ein roter Block */
+:root[data-look="werkbank"] .look-option.look-option--main {
+  background-color: var(--wb-stone) !important;
+  box-shadow: var(--wb-bevel-stone), 0 0 0 2px #000 !important;
+}
+
+:root[data-look="werkbank"] .look-option.look-option--main:hover {
+  background-color: var(--wb-stone-hi) !important;
+  box-shadow: var(--wb-bevel-stone), 0 0 0 2px #fff !important;
+}
+
+:root[data-look="werkbank"] .look-option--main > div:first-child {
+  border-radius: 0 !important;
+  box-shadow: var(--wb-bevel-acc), 0 0 0 2px #000 !important;
+}
+
+:root[data-look="werkbank"] .look-option--main [class*="text-white/"] {
+  color: #e0d4c8 !important;
+}
+
+/* Bild-Kacheln (Loader): schwarzer Umriss und Fase, gewählt mit weißem Rahmen */
+:root[data-look="werkbank"] .look-option--image {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: 0 0 0 2px #000;
+}
+
+:root[data-look="werkbank"] .look-option--image::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  box-shadow: inset 3px 3px 0 rgba(255, 255, 255, 0.18), inset -3px -3px 0 rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+:root[data-look="werkbank"] .look-option--image[data-selected]::after {
+  box-shadow: inset 0 0 0 3px #fff, inset 0 0 0 5px #000;
+}
+
+:root[data-look="werkbank"] .look-option--image h4 {
+  text-shadow: 0.1em 0.1em 0 #3f3f3f;
+}
+
+/* ═════════════════════════ Hinweise: Tafel mit Fase, Farben wie im Chat ═════════════════════════ */
+
+/* steht der Hinweis allein im Dialog (Bestätigen, Löschen), bleibt darunter keine Lücke */
+:root[data-look="werkbank"] .look-modal .look-status:last-child {
+  margin-bottom: 0;
+}
+
+:root[data-look="werkbank"] .look-status {
+  --wb-status: var(--wb-fat);
+  background-color: var(--wb-panel-dark) !important;
+  border: 2px solid #000 !important;
+  border-radius: 0 !important;
+  box-shadow: var(--wb-bevel-sm) !important;
+  color: var(--wb-fat) !important;
+}
+
+:root[data-look="werkbank"] .look-status > svg { color: var(--wb-status); }
+:root[data-look="werkbank"] .look-status > div { color: var(--wb-status); text-shadow: 0.1em 0.1em 0 rgba(0, 0, 0, 0.5); }
+:root[data-look="werkbank"] .look-status--error { --wb-status: #ff6b6b; }
+:root[data-look="werkbank"] .look-status--warning { --wb-status: #ffd75e; }
+:root[data-look="werkbank"] .look-status--success { --wb-status: #7ce35a; }
+
+/* ═════════════════════════ Meldungen: Fortschritts-Tafel wie im Spiel ═════════════════════════ */
+
+:root[data-look="werkbank"] .look-toast {
+  background-color: var(--wb-panel-dark) !important;
+  border: 2px solid #000 !important;
+  border-radius: 0 !important;
+  box-shadow: var(--wb-bevel-sm), var(--wb-drop) !important;
+  color: var(--wb-fat) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  letter-spacing: 0 !important;
+  font-size: 13px;
+}
+
+:root[data-look="werkbank"] .look-toast--error { color: #ffb3a6 !important; }
+:root[data-look="werkbank"] .look-toast--success { color: var(--wb-xp-text, #80ff20) !important; }
+
+/* ═════════════════════════ Kurzhinweise: Gegenstands-Tooltip ═════════════════════════ */
+
+:root[data-look="werkbank"] .look-tooltip {
+  background-color: var(--wb-tip-bg, #160a1c) !important;
+  border: 2px solid #3b1689 !important;
+  border-radius: 0 !important;
+  box-shadow: 0 0 0 2px #0b040e !important;
+  color: #fff !important;
+  text-shadow: 0.1em 0.1em 0 #3f3f3f;
+}
+
+/* ═════════════════════════ Leere Zustände: die Scheibe als Pixel-Block ═════════════════════════ */
+
+:root[data-look="werkbank"] .look-empty-icon > svg:first-child {
+  image-rendering: pixelated;
+}
+
+/* ═════════════════════════ Update-Fenster: Inventar-Tafel mit Erfahrungsleiste ═════════════════════════ */
+
+:root[data-look="werkbank"] .look-updater {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' shape-rendering='crispEdges'%3E%3Cg fill='%23000' fill-opacity='.18'%3E%3Crect x='0' y='0' width='4' height='4'/%3E%3Crect x='16' y='8' width='4' height='4'/%3E%3Crect x='8' y='20' width='4' height='4'/%3E%3Crect x='24' y='24' width='4' height='4'/%3E%3C/g%3E%3Cg fill='%23fff' fill-opacity='.04'%3E%3Crect x='8' y='4' width='4' height='4'/%3E%3Crect x='24' y='12' width='4' height='4'/%3E%3Crect x='0' y='28' width='4' height='4'/%3E%3C/g%3E%3C/svg%3E") 0 0 / 32px 32px,
+    var(--wb-bg) !important;
+  backdrop-filter: none !important;
+  image-rendering: pixelated;
+}
+
+/* die Tafel: gefaster Rahmen mit schwarzem Umriss */
+:root[data-look="werkbank"] .look-updater-card {
+  width: calc(100% - 24px) !important;
+  height: calc(100% - 24px) !important;
+  background-color: var(--wb-panel) !important;
+  border: 3px solid #000 !important;
+  box-shadow: var(--wb-bevel), 6px 6px 0 rgba(0, 0, 0, 0.5) !important;
+}
+
+:root[data-look="werkbank"] .look-updater-logo {
+  width: 96px !important;
+  height: 96px !important;
+  padding: 6px;
+  background: var(--wb-slot);
+  box-shadow: var(--wb-inset), 0 0 0 2px #000;
+}
+
+:root[data-look="werkbank"] .look-updater-title {
+  margin-top: 10px;
+  color: var(--wb-fat) !important;
+  font-size: 16px !important;
+  text-shadow: 0.1em 0.1em 0 #000;
+}
+
+:root[data-look="werkbank"] .look-updater-status {
+  background-color: var(--wb-slot) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: var(--wb-inset-sm) !important;
+}
+
+:root[data-look="werkbank"] .look-updater-status span {
+  color: var(--wb-fat) !important;
+  font-size: 12px !important;
+  text-shadow: 0.1em 0.1em 0 #000;
+}
+
+/* „Update wird geladen … 62 %“ bleibt eine Zeile; Fehlermeldungen dürfen umbrechen */
+:root[data-look="werkbank"] .look-updater-status:not([data-status="error"]) {
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+  white-space: nowrap;
+}
+
+:root[data-look="werkbank"] .look-updater-status[data-status="error"] span {
+  color: #ff6b6b !important;
+}
+
+/* Fortschritt: die grüne Erfahrungsleiste mit Teilstrichen (die Striche liegen über der Füllung) */
+:root[data-look="werkbank"] .look-updater-progress {
+  position: relative;
+  height: 12px !important;
+  background: #1a1a1a !important;
+  border: 2px solid #000 !important;
+  border-radius: 0 !important;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.08);
+}
+
+:root[data-look="werkbank"] .look-updater-progress::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, transparent 0 calc(100% / 18 - 2px), #000 calc(100% / 18 - 2px) calc(100% / 18));
+  pointer-events: none;
+}
+
+:root[data-look="werkbank"] .look-updater-bar {
+  border-radius: 0 !important;
+  background: linear-gradient(180deg, #c3f07a 0 30%, #80c71f 30% 75%, #4f8a10 75%) !important;
+}
+
+/* ═════════════════════════ Freunde: Nachrichten wie der Chat im Spiel ═════════════════════════ */
+
+/* die anderen: Zeilen auf halbdurchsichtigem Schwarz, wie der Chat über dem Spielfeld */
+:root[data-look="werkbank"] .look-chat-msg:not([data-own]) {
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* eigene: ein Steinblock mit Fase */
+:root[data-look="werkbank"] .look-chat-msg[data-own] {
+  background-color: var(--wb-stone) !important;
+  border-radius: 0 !important;
+  box-shadow: var(--wb-bevel-stone), 0 0 0 2px #000 !important;
+}
+
+:root[data-look="werkbank"] .look-chat-msg p {
+  text-shadow: 0.1em 0.1em 0 #000;
+}
+
+:root[data-look="werkbank"] .look-chat-msg:not([data-own]) p:first-child {
+  color: #fff !important;
+}
+
+:root[data-look="werkbank"] .look-chat-day {
+  color: var(--wb-dim) !important;
+}
+
+:root[data-look="werkbank"] .look-friend-row[data-active] {
+  background-color: #3b2c26 !important;
+  box-shadow: inset 0 0 0 3px #fff !important;
+}
+
+/* ═════════════════════════ Willkommen: Inventar-Tafel rechts ═════════════════════════ */
+
+:root[data-look="werkbank"] .look-welcome-panel {
+  background-color: var(--wb-panel) !important;
+  border-left: 3px solid #000 !important;
+  box-shadow: var(--wb-bevel), -8px 0 0 rgba(0, 0, 0, 0.35) !important;
+}
+
+:root[data-look="werkbank"] .look-welcome-panel-title,
+:root[data-look="werkbank"] .look-welcome-title {
+  text-shadow: 4px 4px 0 #000;
+}
+
+:root[data-look="werkbank"] .look-welcome-panel p {
+  color: var(--wb-dim) !important;
+}
+
+:root[data-look="werkbank"] .look-welcome-skip {
+  color: var(--wb-dim) !important;
+  border-radius: 0 !important;
+}
+
+:root[data-look="werkbank"] .look-welcome-controls > button {
+  width: 24px;
+  height: 24px;
+  background-color: var(--wb-stone);
+  border: 2px solid #000;
+  box-shadow: var(--wb-bevel-stone);
+  color: var(--wb-fat);
+}

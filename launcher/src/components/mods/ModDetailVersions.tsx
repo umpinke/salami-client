@@ -410,7 +410,7 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
     <div>
       <SectionHeading className="mb-3">{t('mod_detail.versions.title')}</SectionHeading>
       {/* Filter Bar */}
-      <div className="look-card mb-4 p-3" style={PLAIN_CARD}>
+      <div className="look-card look-mod-section look-mod-versions mb-4 p-3" style={PLAIN_CARD}>
         <div className="flex flex-wrap gap-2 items-center">
           {/* Version Type */}
           <Select

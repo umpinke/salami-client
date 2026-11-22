@@ -117,7 +117,7 @@ export function MinecraftLogWindow({ crashedProcess }: MinecraftLogWindowProps) 
 
   return (
     <div
-      className="h-screen flex flex-col"
+      className="look-log-window h-screen flex flex-col"
       style={{
         background: `radial-gradient(90% 45% at 18% -12%, ${hexAlpha(accentColor.value, 0.14)} 0%, transparent 70%), ${mixHex("#0f0d0e", accentColor.value, 0.04)}`,
       }}
@@ -140,7 +140,7 @@ export function MinecraftLogWindow({ crashedProcess }: MinecraftLogWindowProps) 
           )}
         </div>
 
-        <div className="w-[300px] flex-shrink-0 border-l" style={{ borderColor: SURFACE.line }}>
+        <div className="look-log-side w-[300px] flex-shrink-0 border-l" style={{ borderColor: SURFACE.line }}>
           <InstanceSidebar
             selectedInstanceId={selectedInstanceId || undefined}
             onSelectInstance={handleSelectInstance}

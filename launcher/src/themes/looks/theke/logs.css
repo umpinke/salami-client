@@ -1,0 +1,128 @@
+/*
+ * Look „Feinkost-Theke“ – Log-Fenster (eigenes Fenster neben dem Launcher): Markise als Kopfleiste,
+ * die Ausgabe als Kreidetafel im Holzrahmen, laufende Spiele als Bestellzettel. Nur unter
+ * :root[data-look="theke"]. Ansatzpunkte siehe ../CONTRACT.md („Log-Fenster“).
+ */
+
+:root[data-look="theke"] .look-log-window {
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.18) 0 2px, transparent 2px 160px),
+    linear-gradient(180deg, #3b2418, #2a1912) !important;
+  font-family: "Fredoka", sans-serif;
+}
+
+/* ── Kopfleiste: ein Streifen Markise, Titel auf einem Schild ── */
+:root[data-look="theke"] .look-log-titlebar {
+  position: relative;
+  height: 46px !important;
+  border-bottom: 0 !important;
+  background: repeating-linear-gradient(90deg, var(--theke-red) 0 48px, var(--theke-fat) 48px 96px);
+  box-shadow: 0 6px 10px -4px rgba(0, 0, 0, 0.55);
+}
+:root[data-look="theke"] .look-log-titlebar > div:first-child {
+  flex: 0 1 auto !important;
+  align-self: center;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 4px 14px 5px 10px;
+  color: var(--theke-fat);
+  background: var(--theke-pepper);
+  border: 3px solid var(--theke-fat);
+  border-radius: 8px;
+}
+:root[data-look="theke"] .look-log-titlebar .look-log-brand,
+:root[data-look="theke"] .look-log-titlebar .look-log-title {
+  font-family: "MinecraftTen", "Fredoka", sans-serif !important;
+  font-size: 17px !important;
+  color: var(--theke-fat) !important;
+}
+:root[data-look="theke"] .look-log-titlebar .look-log-title { opacity: 0.8; }
+:root[data-look="theke"] .look-log-titlebar .text-white\/20 { color: rgba(243, 227, 211, 0.4) !important; }
+/* Fensterknöpfe auf einer dunklen Plakette */
+:root[data-look="theke"] .look-log-titlebar > div:last-child {
+  align-self: center;
+  margin-right: 6px;
+  padding: 2px;
+  background: var(--theke-pepper);
+  border: 2px solid #6b4a3a;
+  border-radius: 8px;
+}
+:root[data-look="theke"] .look-log-titlebar > div:last-child button { height: 30px !important; width: 34px !important; border-radius: 5px; }
+:root[data-look="theke"] .look-log-titlebar > div:last-child svg { color: var(--theke-fat) !important; }
+
+/* ── Ausgabe: Kreidetafel im Holzrahmen ── */
+:root[data-look="theke"] .look-log-window .look-log-viewer {
+  margin: 14px 0 14px 14px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 30% 10%, rgba(255, 255, 255, 0.05), transparent 60%),
+    var(--theke-chalk);
+  border: 10px solid var(--theke-wood);
+  border-radius: 6px;
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.45), 0 12px 24px -10px rgba(0, 0, 0, 0.6);
+  color: var(--theke-chalk-text);
+}
+:root[data-look="theke"] .look-log-window .look-log-toolbar { border-color: rgba(233, 239, 230, 0.2) !important; }
+:root[data-look="theke"] .look-log-window .look-log-lines {
+  background: transparent !important;
+  border-color: rgba(233, 239, 230, 0.16) !important;
+}
+:root[data-look="theke"] .look-log-window .look-log-lines :is(.text-white, [class*="text-white/"]) { color: var(--theke-chalk-text) !important; }
+:root[data-look="theke"] .look-log-window .look-log-viewer .look-input {
+  background: rgba(233, 239, 230, 0.06) !important;
+  border-color: rgba(233, 239, 230, 0.22) !important;
+}
+:root[data-look="theke"] .look-log-window .look-log-status { border-top: 1px dashed rgba(233, 239, 230, 0.2); }
+
+/* ── Laufende Spiele: Bestellzettel aus Papier ── */
+:root[data-look="theke"] .look-log-window .look-log-side {
+  margin: 14px 14px 14px 18px;
+  width: 280px !important;
+  border: 0 !important;
+  overflow: hidden;
+  color: var(--theke-pepper);
+  background:
+    repeating-linear-gradient(0deg, rgba(43, 29, 26, 0.04) 0 1px, transparent 1px 24px),
+    var(--theke-paper);
+  border-radius: 3px;
+  box-shadow: 0 14px 30px -12px rgba(0, 0, 0, 0.7);
+  --surface-base: rgba(43, 29, 26, 0.04);
+  --surface-hover: rgba(43, 29, 26, 0.08);
+  --surface-raised: rgba(43, 29, 26, 0.12);
+  --surface-line: rgba(43, 29, 26, 0.16);
+  --surface-line-strong: rgba(43, 29, 26, 0.32);
+  --surface-solid: #f6ecdc;
+  --surface-solid-raised: #efe2cc;
+}
+:root[data-look="theke"] .look-log-side [class*="text-white"] { color: var(--theke-pepper) !important; }
+:root[data-look="theke"] .look-log-side [class*="text-white/"] { color: rgba(43, 29, 26, 0.62) !important; }
+:root[data-look="theke"] .look-log-side [class*="border-white/"] { border-color: rgba(43, 29, 26, 0.18) !important; }
+:root[data-look="theke"] .look-log-side [class*="bg-white/"] { background-color: rgba(43, 29, 26, 0.06) !important; }
+:root[data-look="theke"] .look-log-side [style*="color: rgba(255, 255, 255"] { color: rgba(43, 29, 26, 0.62) !important; }
+:root[data-look="theke"] .look-log-side :is(.look-btn--primary, .look-btn--accent, .look-btn--destructive, .look-btn--danger),
+:root[data-look="theke"] .look-log-side :is(.look-btn--primary, .look-btn--accent, .look-btn--destructive, .look-btn--danger) * { color: #fff !important; }
+:root[data-look="theke"] .look-log-sidebar > div:first-child {
+  border-bottom: 2px solid var(--theke-pepper) !important;
+  margin: 0 14px;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+:root[data-look="theke"] .look-log-sidebar > div:first-child span { font-family: "MinecraftTen", "Fredoka", sans-serif !important; }
+/* jedes Spiel ein Zettel: gestrichelt getrennt, der gewählte mit rotem Rand links */
+:root[data-look="theke"] .look-log-instance {
+  margin: 0 8px;
+  border-bottom: 2px dashed rgba(43, 29, 26, 0.25) !important;
+  background-color: transparent !important;
+}
+:root[data-look="theke"] .look-log-instance[data-active] {
+  background-color: rgba(178, 58, 58, 0.08) !important;
+  box-shadow: inset 4px 0 0 var(--theke-red);
+}
+:root[data-look="theke"] .look-log-instance:hover { background-color: rgba(43, 29, 26, 0.05) !important; }
+/* rote Knöpfe (Stop, Beenden) auf Papier: kräftig statt blass */
+:root[data-look="theke"] .look-log-side button[class*="bg-red-500/"] {
+  color: #fff !important;
+  background-color: var(--theke-red) !important;
+  box-shadow: 0 3px 0 var(--theke-red-dark);
+}
+:root[data-look="theke"] .look-log-side button[class*="bg-red-500/"] svg { color: #fff !important; }

@@ -67,8 +67,10 @@ export function FriendsTab() {
   if (!account) return <Notice icon="solar:user-cross-bold" text={t("salami.friends.sign_in")} />;
 
   return (
-    <div className="flex h-full min-h-0">
-      <aside className="flex w-[300px] shrink-0 flex-col border-r" style={{ borderColor: SURFACE.line }}>
+    // Ansatzpunkte für die Looks: look-friends (Seite), look-friends-side (Liste links), look-friend-row
+    // (data-active), look-chat, look-chat-day, look-chat-msg (data-own), look-input (Felder)
+    <div className="look-friends flex h-full min-h-0">
+      <aside className="look-friends-side flex w-[300px] shrink-0 flex-col border-r" style={{ borderColor: SURFACE.line }}>
         <ListHeader />
         <AddFriend />
         {error && <p className="px-4 pb-2 font-minecraft text-xs text-red-300">{error}</p>}
@@ -220,7 +222,7 @@ function AddFriend() {
   return (
     <form onSubmit={submit} className="flex items-center gap-2 px-4 py-3">
       <label
-        className="flex h-9 min-w-0 flex-1 items-center gap-2 border bg-black/25 px-3 transition-colors focus-within:border-white/25"
+        className="look-input flex h-9 min-w-0 flex-1 items-center gap-2 border bg-black/25 px-3 transition-colors focus-within:border-white/25"
         style={{ borderRadius: "var(--border-radius)", borderColor: SURFACE.line }}
       >
         <Icon icon="solar:user-plus-bold" className="h-4 w-4 shrink-0 text-white/40" />
@@ -375,7 +377,8 @@ function FriendList() {
             key={friend.uuid}
             type="button"
             onClick={() => void select(friend.uuid).catch((error) => toast.error(errorText(error)))}
-            className="flex w-full items-center gap-3 border-b px-4 py-2.5 text-left transition-colors duration-150 hover:bg-white/[0.04]"
+            data-active={active || undefined}
+            className="look-friend-row flex w-full items-center gap-3 border-b px-4 py-2.5 text-left transition-colors duration-150 hover:bg-white/[0.04]"
             style={{
               borderRadius: 0,
               borderColor: SURFACE.line,
@@ -506,7 +509,7 @@ function Conversation() {
   };
 
   return (
-    <section className="flex min-w-0 flex-1 flex-col">
+    <section className="look-chat flex min-w-0 flex-1 flex-col">
       <header className={cn("salami-fat-spots flex shrink-0 items-center gap-3 px-5", HEADER_HEIGHT)} style={kopfband(accent)}>
         {/* Salami: Kopf wie die Profil-Kachel – cremegerahmtes Bild, Status als Etikett */}
         <span className="border-2" style={{ borderColor: SALAMI_COLORS.fat, borderRadius: "calc(var(--border-radius) * 0.8)" }}>
@@ -536,7 +539,7 @@ function Conversation() {
         )}
         {days.map((day) => (
           <div key={day.label}>
-            <p className="my-3 flex items-center gap-3 font-minecraft text-[11px] text-white/35">
+            <p className="look-chat-day my-3 flex items-center gap-3 font-minecraft text-[11px] text-white/35">
               <span className="h-px flex-1" style={{ backgroundColor: SURFACE.line }} />
               {day.label}
               <span className="h-px flex-1" style={{ backgroundColor: SURFACE.line }} />
@@ -561,7 +564,7 @@ function Conversation() {
           <Icon icon={uploading > 0 ? "svg-spinners:ring-resize" : "solar:gallery-add-bold"} className="h-5 w-5" />
         </button>
         <label
-          className="flex h-10 min-w-0 flex-1 items-center gap-2 border bg-black/25 px-3 transition-colors focus-within:border-white/25"
+          className="look-input flex h-10 min-w-0 flex-1 items-center gap-2 border bg-black/25 px-3 transition-colors focus-within:border-white/25"
           style={{ borderRadius: "var(--border-radius)", borderColor: SURFACE.line }}
         >
           <input
@@ -612,7 +615,8 @@ function Bubble({ message, mine, accent, language }: { message: FriendMessage; m
   return (
     <div className={cn("mb-1.5 flex", mine ? "justify-end" : "justify-start")}>
       <div
-        className="max-w-[70%] px-3 py-2"
+        data-own={mine || undefined}
+        className="look-chat-msg max-w-[70%] px-3 py-2"
         style={{
           borderRadius: "var(--border-radius)",
           backgroundColor: mine ? hexAlpha(accent, 0.22) : SURFACE.hover,

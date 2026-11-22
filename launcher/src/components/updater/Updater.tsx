@@ -24,6 +24,7 @@ import { NebulaLiquidChrome } from "../effects/NebulaLiquidChrome";
 import { MatrixRainEffect } from "../effects/MatrixRainEffect";
 import { EnchantmentParticlesEffect } from "../effects/EnchantmentParticlesEffect";
 import { useEntranceAnimation } from "../../hooks/useEntranceAnimation";
+import { useLook } from "../../themes/looks/registry";
 
 interface UpdaterStatusPayload {
   message: string;
@@ -77,6 +78,7 @@ export default function Updater() {
   const closeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const accentColor = useThemeStore((state) => state.accentColor);
+  const look = useLook();
   const currentEffect = useBackgroundEffectStore(
     (state) => state.currentEffect,
   );
@@ -249,13 +251,16 @@ export default function Updater() {
   const safeAccentColor = accentColor.value || "#FFFFFF";
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-black/80 backdrop-blur-md flex items-center justify-center">
-      {renderBackgroundEffect()}
+    // Ansatzpunkte für die Looks: look-updater (Fenster), -card, -brand, -logo, -title, -status
+    // (data-status), -progress, -bar, -actions. Wie im Hauptfenster: malt der Look den Hintergrund
+    // selbst, entfallen die Hintergrund-Effekte.
+    <div className="look-updater relative h-screen w-screen overflow-hidden bg-black/80 backdrop-blur-md flex items-center justify-center">
+      {!look.ownsBackground && renderBackgroundEffect()}
 
       <div
         ref={containerRef}
         className={cn(
-          "relative flex flex-col items-center justify-between text-center",
+          "look-updater-card relative flex flex-col items-center justify-between text-center",
           "border rounded-none",
           "w-full h-full",
         )}
@@ -267,14 +272,14 @@ export default function Updater() {
         <div className="w-full pt-6" />
 
         <div className="flex-1 w-full flex flex-col items-center justify-center px-6 gap-8">
-          <div className="flex flex-col items-center">
+          <div className="look-updater-brand flex flex-col items-center">
             <img
               ref={logoRef}
               src="/logo.png"
               alt="Salami Client"
-              className="w-32 h-32 object-contain mb-1"
+              className="look-updater-logo w-32 h-32 object-contain mb-1"
             />
-            <p className="text-xs font-smallcaps text-white/70">
+            <p className="look-updater-title text-xs font-smallcaps text-white/70">
               {t('updater.title')}
             </p>
           </div>
@@ -282,8 +287,9 @@ export default function Updater() {
           <div className="flex items-center justify-center mb-4">
             {status === "uptodate" || status === "finished" ? (
               <div
+                data-status={status}
                 className={cn(
-                  "flex items-center justify-center gap-2 py-2 px-4",
+                  "look-updater-status flex items-center justify-center gap-2 py-2 px-4",
                   "border rounded-md",
                 )}
                 style={{
@@ -301,8 +307,9 @@ export default function Updater() {
               </div>
             ) : status === "error" ? (
               <div
+                data-status={status}
                 className={cn(
-                  "flex items-center justify-center gap-2 py-2 px-4",
+                  "look-updater-status flex items-center justify-center gap-2 py-2 px-4",
                   "border rounded-md",
                 )}
                 style={{
@@ -320,8 +327,9 @@ export default function Updater() {
               </div>
             ) : (
               <div
+                data-status={status}
                 className={cn(
-                  "flex items-center justify-center gap-2 py-2 px-4",
+                  "look-updater-status flex items-center justify-center gap-2 py-2 px-4",
                   "border rounded-md",
                 )}
                 style={{
@@ -339,7 +347,7 @@ export default function Updater() {
 
           {progress !== null && (
             <div
-              className="w-3/4 h-2.5 rounded-md overflow-hidden border"
+              className="look-updater-progress w-3/4 h-2.5 rounded-md overflow-hidden border"
               style={{
                 backgroundColor: `${safeAccentColor}15`,
                 borderColor: `${safeAccentColor}50`,
@@ -347,7 +355,7 @@ export default function Updater() {
             >
               <div
                 ref={progressRef}
-                className="h-full rounded-sm"
+                className="look-updater-bar h-full rounded-sm"
                 style={{
                   width: `${progress}%`,
                   backgroundColor: safeAccentColor,
@@ -357,7 +365,7 @@ export default function Updater() {
           )}
         </div>
 
-        <div className="w-full p-6 flex justify-center">
+        <div className="look-updater-actions w-full p-6 flex justify-center">
           {status === "error" && (
             <Button
               variant="destructive"

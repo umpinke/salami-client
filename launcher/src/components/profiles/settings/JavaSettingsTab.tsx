@@ -559,8 +559,9 @@ export function JavaSettingsTab({
                         key={java.path}
                         onClick={() => handleDetectedJavaListItemClick(java)}
                         title={java.path}
+                        data-selected={customJavaPathInput === java.path || undefined}
                         className={cn(
-                          "w-full text-left p-2 border transition-all duration-150 font-minecraft text-xs rounded-md",
+                          "look-option w-full text-left p-2 border transition-all duration-150 font-minecraft text-xs rounded-md",
                           customJavaPathInput === java.path
                             ? "bg-accent/30 border-accent text-white"
                             : "bg-white/[0.045] border-white/[0.09] hover:bg-white/[0.08] hover:border-white/20 text-white/80",

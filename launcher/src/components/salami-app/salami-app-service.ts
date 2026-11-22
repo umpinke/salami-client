@@ -5,6 +5,8 @@ export interface SalamiAppStatus {
   available: boolean;
   enabled: boolean;
   linked: boolean;
+  /** Mit dem aktiven Konto ist ein Handy gekoppelt – erst dann lädt der Launcher etwas hoch. */
+  paired?: boolean;
   accountName: string | null;
   pendingSessions: number;
   storageFull: boolean;

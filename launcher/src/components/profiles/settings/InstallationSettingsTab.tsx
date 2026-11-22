@@ -463,8 +463,9 @@ export function InstallationSettingsTab({
                             : "ghost"
                         }
                         size="sm"
+                        data-selected={editedProfile.game_version === version || undefined}
                         className={cn(
-                          "text-center text-sm w-full",
+                          "look-option text-center text-sm w-full",
                           editedProfile.game_version === version
                             ? "bg-accent/20 border-accent text-white"
                             : "bg-white/[0.045] hover:bg-white/[0.08] border-white/[0.09] text-white/80 hover:text-white",
@@ -508,7 +509,9 @@ export function InstallationSettingsTab({
                   key={loader.name}
                   variant={isSelected ? "flat" : "flat-secondary"}
                   className={cn(
-                    "p-3 flex flex-col items-center justify-center cursor-pointer platform-${loader.name}",
+                    "look-option p-3 flex flex-col items-center justify-center cursor-pointer platform-${loader.name}",
+                    isSelected && "look-option--selected",
+                    !isCompatible && "look-option--disabled",
                     isSelected
                       ? "bg-white/[0.08] grayscale-0 text-white"
                       : isCompatible

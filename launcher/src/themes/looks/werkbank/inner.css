@@ -1350,3 +1350,83 @@
     transition: none;
   }
 }
+
+/* ═════════════════════════ Mod-Detailseite: Inventar-Tafel, Buch und Bilderrahmen ═════════════════════════ */
+
+/* das Projektbild sitzt in einem Slot */
+:root[data-look="werkbank"] .look-mod-header .-mt-10 {
+  border: 0 !important;
+  border-radius: 0 !important;
+  padding: 4px;
+  background-color: var(--wb-slot) !important;
+  box-shadow: var(--wb-inset), 0 0 0 2px #000 !important;
+}
+
+:root[data-look="werkbank"] .look-mod-header button.text-3xl {
+  font-size: 32px;
+  text-shadow: 3px 3px 0 #000;
+}
+
+/* Beschreibung: eine aufgeschlagene Seite aus „Buch und Feder“ */
+:root[data-look="werkbank"] .look-mod-description {
+  background-color: #efe3c6 !important;
+  border: 3px solid #000 !important;
+  box-shadow: inset 3px 3px 0 #fbf3dd, inset -3px -3px 0 #c9b48a, 6px 6px 0 rgba(0, 0, 0, 0.45) !important;
+  padding: 22px 26px !important;
+}
+
+:root[data-look="werkbank"] .look-mod-description :is(h1, h2, h3, h4, h5, h6, p, li, ul, ol, em, strong, b, blockquote, td, th, span, div, summary) {
+  color: #3b2a20 !important;
+  text-shadow: none !important;
+}
+
+:root[data-look="werkbank"] .look-mod-description :is(h1, h2, h3, h4, h5, h6, strong, b) {
+  color: #1d130e !important;
+}
+
+:root[data-look="werkbank"] .look-mod-description a {
+  color: #8a1d1d !important;
+}
+
+:root[data-look="werkbank"] .look-mod-description :is(code, pre, th) {
+  background-color: rgba(59, 42, 32, 0.1) !important;
+}
+
+:root[data-look="werkbank"] .look-mod-description :is(hr, td, th, blockquote) {
+  border-color: rgba(59, 42, 32, 0.3) !important;
+}
+
+/* Galerie: Bilder in Gegenstandsrahmen (Holz) */
+:root[data-look="werkbank"] .look-mod-shot {
+  padding: 5px;
+  background-color: #6b4a2b !important;
+  border: 2px solid #000 !important;
+  border-radius: 0 !important;
+  box-shadow: inset 2px 2px 0 #9a7046, inset -2px -2px 0 #3d2a17, 4px 4px 0 rgba(0, 0, 0, 0.45) !important;
+  transform: none !important;
+}
+
+:root[data-look="werkbank"] .look-mod-shot:hover {
+  border-color: #fff !important;
+}
+
+:root[data-look="werkbank"] .look-mod-shot img {
+  image-rendering: auto;
+  box-shadow: 0 0 0 2px #000;
+}
+
+:root[data-look="werkbank"] .look-mod-shot > .absolute.inset-0 {
+  inset: 5px;
+}
+
+/* Versionen: Slot-Zeilen wie im Rezeptbuch */
+:root[data-look="werkbank"] .look-mod-detail .look-version-row {
+  background-color: var(--wb-slot) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: var(--wb-inset-sm) !important;
+}
+
+:root[data-look="werkbank"] .look-mod-detail .look-version-row:hover {
+  background-color: #3b2c26 !important;
+}

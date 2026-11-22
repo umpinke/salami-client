@@ -80,7 +80,8 @@ export function WelcomeScreen() {
     <div
       ref={rootRef}
       onMouseMove={onPointerMove}
-      className="welcome-screen fixed inset-0 z-[900] flex select-none"
+      // Ansatzpunkte für die Looks: look-welcome, -controls, -hero, -title, -panel, -panel-title, -skip
+      className="look-welcome welcome-screen fixed inset-0 z-[900] flex select-none"
       style={{ ["--px" as string]: 0, ["--py" as string]: 0, backgroundColor: GROUND }}
     >
       <style>{`
@@ -115,7 +116,7 @@ export function WelcomeScreen() {
       {/* Titlebar strip: drag region + controls, floating over both halves. */}
       <div
         data-tauri-drag-region
-        className="absolute top-0 inset-x-0 h-10 z-30 flex items-center justify-end px-4 gap-3"
+        className="look-welcome-controls absolute top-0 inset-x-0 h-10 z-30 flex items-center justify-end px-4 gap-3"
       >
         {([
           ["minimize", "pixel:minus-solid", "window.minimize"],
@@ -136,7 +137,7 @@ export function WelcomeScreen() {
       </div>
 
       {/* ── Hero half ──────────────────────────────────────────────────── */}
-      <div className="relative hidden md:flex flex-col justify-between flex-1 min-w-0 overflow-hidden p-12">
+      <div className="look-welcome-hero relative hidden md:flex flex-col justify-between flex-1 min-w-0 overflow-hidden p-12">
         {/* Layer 1 — the artwork, pushed far back: dimmed, desaturated and
             off-centred so it reads as texture under the copy rather than as a
             competing picture. Follows the pointer. */}
@@ -189,7 +190,7 @@ export function WelcomeScreen() {
 
         <div className="relative z-10">
           <h1
-            className="font-minecraft normal-case tracking-normal text-white leading-[0.98] text-[clamp(2.5rem,4.4vw,4.25rem)] max-w-[16ch]"
+            className="look-welcome-title font-minecraft normal-case tracking-normal text-white leading-[0.98] text-[clamp(2.5rem,4.4vw,4.25rem)] max-w-[16ch]"
             style={rise(140)}
           >
             {t("welcome.hero.line1")}
@@ -213,7 +214,7 @@ export function WelcomeScreen() {
 
       {/* ── Sign-in half ───────────────────────────────────────────────── */}
       <div
-        className="relative w-full md:w-[clamp(24rem,34%,30rem)] flex-shrink-0 flex flex-col justify-center px-10 py-12 border-l"
+        className="look-welcome-panel relative w-full md:w-[clamp(24rem,34%,30rem)] flex-shrink-0 flex flex-col justify-center px-10 py-12 border-l"
         style={{ backgroundColor: SURFACE.solid, borderColor: SURFACE.line, boxShadow: "-24px 0 60px -30px rgba(0,0,0,0.9)" }}
       >
         {/* Salami: Kopfband im Salami-Anschnitt statt Akzent-Schleier, damit die Spalte kein flacher Block ist */}
@@ -227,7 +228,7 @@ export function WelcomeScreen() {
             style={rise(80)}
           />
 
-          <h2 className="text-4xl font-minecraft normal-case tracking-normal text-white" style={rise(160)}>
+          <h2 className="look-welcome-panel-title text-4xl font-minecraft normal-case tracking-normal text-white" style={rise(160)}>
             {t("welcome.panel.title")}
           </h2>
           <p className="mt-3 text-sm text-white/60 leading-relaxed" style={rise(220)}>
@@ -245,7 +246,7 @@ export function WelcomeScreen() {
 
             <button
               onClick={skip}
-              className="welcome-round mt-3 w-full py-2.5 text-xs font-minecraft text-white/40 hover:text-white/75 hover:bg-white/5 transition-colors"
+              className="look-welcome-skip welcome-round mt-3 w-full py-2.5 text-xs font-minecraft text-white/40 hover:text-white/75 hover:bg-white/5 transition-colors"
             >
               {t("welcome.panel.skip")}
             </button>

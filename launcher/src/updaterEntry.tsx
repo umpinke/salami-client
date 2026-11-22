@@ -5,10 +5,13 @@ import { I18nextProvider } from "react-i18next";
 import Updater from "./components/updater/Updater";
 import i18n from "./i18n/i18n";
 import "./styles/globals.css";
+import { LookWindowSync } from "./themes/looks/LookWindowSync";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <I18nextProvider i18n={i18n}>
+      {/* derselbe Look wie das Hauptfenster (data-look, Akzent, Schrift) */}
+      <LookWindowSync />
       <Updater />
     </I18nextProvider>
   </React.StrictMode>,

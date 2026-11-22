@@ -331,7 +331,7 @@ export function App() {
     <div className="flex flex-col h-screen w-screen overflow-hidden">
         <ThemeInitializer />
         <SalamiModeSync />
-        <LookSync />
+        <LookSync syncToGame />
         <LookChooser />
         <UiScaleSync />
         <ScrollbarProvider />

@@ -1,0 +1,463 @@
+/*
+ * Look „Pixel-Werkbank“ – Log-Fenster (eigenes Fenster neben dem Launcher): die Kopfleiste als
+ * gefaste Tafel wie die obere Leiste des Launchers, die Ausgabe als Inventar-Tafel mit den Stufen
+ * als Kreativ-Reitern über einer dunklen Slot-Vertiefung, laufende Spiele als Slots in einer
+ * Seitentafel. Nur unter :root[data-look="werkbank"]; Ansatzpunkte: look-log-* (components/log).
+ */
+
+/* ── Fenster: das dunkle Schachbrett der Werkbank ── */
+:root[data-look="werkbank"] .look-log-window {
+  background:
+    linear-gradient(rgba(26, 18, 16, 0.8), rgba(26, 18, 16, 0.92)),
+    repeating-conic-gradient(#33231c 0 25%, #241813 0 50%) 0 0 / 32px 32px !important;
+  image-rendering: pixelated;
+}
+
+/* ── Kopfleiste: gefaste Tafel ── */
+:root[data-look="werkbank"] .look-log-titlebar {
+  flex-shrink: 0;
+  height: 48px !important;
+  margin: 10px 12px 0;
+  padding-left: 12px !important;
+  padding-right: 6px !important;
+  background: var(--wb-panel);
+  border: 3px solid #000 !important;
+  box-shadow: var(--wb-bevel);
+}
+
+:root[data-look="werkbank"] .look-log-titlebar > div:first-child {
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+:root[data-look="werkbank"] .look-log-titlebar > div:first-child img {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #000;
+  image-rendering: pixelated;
+}
+
+:root[data-look="werkbank"] .look-log-titlebar .look-log-brand {
+  font-size: 19px !important;
+  color: #fff !important;
+  text-shadow: 2px 2px 0 #000 !important;
+}
+
+:root[data-look="werkbank"] .look-log-titlebar .text-white\/20 {
+  color: var(--wb-stone-hi) !important;
+  text-shadow: 2px 2px 0 #000;
+}
+
+:root[data-look="werkbank"] .look-log-titlebar .look-log-title {
+  font-size: 17px !important;
+  color: var(--wb-dim) !important;
+  text-shadow: 2px 2px 0 #000 !important;
+}
+
+/* Fensterknöpfe als kleine Steinknöpfe */
+:root[data-look="werkbank"] .look-log-titlebar > div:last-child {
+  gap: 4px;
+}
+
+:root[data-look="werkbank"] .look-log-titlebar > div:last-child button {
+  width: 34px !important;
+  height: 30px !important;
+  background: var(--wb-stone);
+  border: 2px solid #000;
+  box-shadow: var(--wb-bevel-stone);
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+:root[data-look="werkbank"] .look-log-titlebar > div:last-child button:hover {
+  border-color: #fff;
+  background-color: #675046;
+}
+
+:root[data-look="werkbank"] .look-log-titlebar > div:last-child button:last-child:hover {
+  background-color: #8a2222;
+  box-shadow: inset 2px 2px 0 #c44a44, inset -2px -3px 0 #4f1010;
+}
+
+:root[data-look="werkbank"] .look-log-titlebar > div:last-child svg {
+  color: var(--wb-fat) !important;
+  filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.6));
+}
+
+/* ── Ausgabe: eine Inventar-Tafel ── */
+:root[data-look="werkbank"] .look-log-window .look-log-viewer {
+  margin: 12px 0 12px 12px;
+  padding: 10px 12px 4px;
+  background: var(--wb-panel);
+  border: 3px solid #000;
+  box-shadow: var(--wb-bevel), var(--wb-drop);
+}
+
+/* das Einzel-Fenster hat schon einen Rand um die Ausgabe */
+:root[data-look="werkbank"] .look-log-window > .p-3 > .look-log-viewer {
+  margin: 0;
+}
+
+/* Suche nach oben, damit die Stufen-Reiter direkt auf der Vertiefung sitzen */
+:root[data-look="werkbank"] .look-log-window .look-log-toolbar + div {
+  order: -1;
+  padding: 0 0 10px !important;
+}
+
+:root[data-look="werkbank"] .look-log-window .look-log-toolbar {
+  position: relative;
+  z-index: 1;
+  padding: 0 !important;
+  border-bottom: 0 !important;
+  align-items: flex-end !important;
+  gap: 10px !important;
+}
+
+/* Stufen als Kreativ-Reiter: eingeschaltete stehen vorn (Stein, Streifen in ihrer Farbe),
+   ausgeschaltete liegen dunkel dahinter */
+:root[data-look="werkbank"] .look-log-window .look-log-toolbar > div:first-child {
+  gap: 4px !important;
+  align-items: flex-end !important;
+}
+
+:root[data-look="werkbank"] .look-log-window .look-log-toolbar button[aria-pressed] {
+  align-items: center !important;
+  height: 34px;
+  padding: 3px 11px 0 !important;
+  font-size: 15px !important;
+  color: var(--wb-dim) !important;
+  background: var(--wb-panel-dark);
+  border: 3px solid #000;
+  border-bottom: 0;
+  box-shadow: inset 3px 3px 0 var(--wb-tab-hi), inset -3px 0 0 var(--wb-lo);
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6);
+}
+
+:root[data-look="werkbank"] .look-log-window .look-log-toolbar button[aria-pressed]:hover {
+  color: #fff !important;
+  background: #35251f;
+}
+
+:root[data-look="werkbank"] .look-log-window .look-log-toolbar button[aria-pressed="true"] {
+  height: 38px;
+  color: #fff !important;
+  background: var(--wb-stone);
+  box-shadow: inset 3px 3px 0 var(--wb-stone-hi), inset -3px 0 0 var(--wb-stone-lo);
+}
+
+:root[data-look="werkbank"] .look-log-window .look-log-toolbar button[aria-pressed="true"]:hover {
+  background: #675046;
+}
+
+/* der Farbstrich der Stufe wird zum Streifen oben am Reiter */
+:root[data-look="werkbank"] .look-log-window .look-log-toolbar button[aria-pressed] > span.absolute {
+  top: 0;
+  bottom: auto;
+  left: 0;
+  right: 0;
+  height: 3px;
+}
+
+:root[data-look="werkbank"] .look-log-window .look-log-toolbar button[aria-pressed] > span:not(.absolute) {
+  font-size: 12px;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.8);
+}
+
+/* rechts: Datei-Auswahl und Anzeige-Optionen als Steinknöpfe */
+:root[data-look="werkbank"] .look-log-window .look-log-toolbar > div:last-child {
+  margin-bottom: 6px !important;
+  gap: 4px !important;
+}
+
+:root[data-look="werkbank"] .look-log-window .look-log-toolbar > div:last-child button {
+  height: 30px !important;
+  color: var(--wb-fat) !important;
+  background-color: var(--wb-stone) !important;
+  border: 2px solid #000;
+  box-shadow: var(--wb-bevel-stone);
+}
+
+:root[data-look="werkbank"] .look-log-window .look-log-toolbar > div:last-child button:hover,
+:root[data-look="werkbank"] .look-log-window .look-log-toolbar > div:last-child button[style] {
+  border-color: #fff;
+}
+
+/* geöffnet: die Fase kehrt sich um */
+:root[data-look="werkbank"] .look-log-window .look-log-toolbar > div:last-child button[style] {
+  box-shadow: inset 2px 3px 0 rgba(0, 0, 0, 0.45), inset -2px -2px 0 rgba(255, 255, 255, 0.14);
+}
+
+/* Suchfeld: dunkle Vertiefung, mit Fokus weiß umrandet */
+:root[data-look="werkbank"] .look-log-window .look-log-viewer label.border {
+  height: 34px;
+  background-color: #120c0a !important;
+  border: 2px solid #000 !important;
+  box-shadow: var(--wb-inset-sm);
+}
+
+:root[data-look="werkbank"] .look-log-window .look-log-viewer label.border:focus-within {
+  border-color: #fff !important;
+}
+
+/* die Ausgabe in einer dunklen Slot-Vertiefung; die Zeilen bleiben glatt gezeichnet und lesbar */
+:root[data-look="werkbank"] .look-log-window .look-log-lines {
+  background: #0f0a08 !important;
+  border: 3px solid #000 !important;
+  box-shadow: inset 3px 3px 0 var(--wb-slot-lo), inset -3px -3px 0 var(--wb-slot-hi);
+  padding: 5px 3px 5px 3px !important;
+  -webkit-font-smoothing: antialiased;
+}
+
+:root[data-look="werkbank"] .look-log-window .look-log-lines .font-mono {
+  letter-spacing: 0 !important;
+}
+
+/* Statuszeile: Live grün wie die Erfahrung, Knöpfe gefast */
+:root[data-look="werkbank"] .look-log-window .look-log-status {
+  padding: 8px 0 6px !important;
+}
+
+:root[data-look="werkbank"] .look-log-window .look-log-status > div:first-child > button:first-child[style*="74, 222, 128"] {
+  color: var(--wb-xp) !important;
+  text-shadow: 2px 2px 0 #1d2a08;
+}
+
+:root[data-look="werkbank"] .look-log-window .look-log-status > div:first-child > span.w-px {
+  width: 2px;
+  height: 18px;
+  background: rgba(0, 0, 0, 0.55);
+  box-shadow: 2px 0 0 rgba(255, 255, 255, 0.06);
+}
+
+:root[data-look="werkbank"] .look-log-window .look-log-status .text-xs {
+  color: var(--wb-dim);
+}
+
+:root[data-look="werkbank"] .look-log-window .look-log-status > div:last-child {
+  gap: 4px !important;
+}
+
+:root[data-look="werkbank"] .look-log-window .look-log-status button:not(:first-child),
+:root[data-look="werkbank"] .look-log-window .look-log-status > div:last-child button:first-child {
+  height: 30px !important;
+  border: 2px solid #000;
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.55);
+  transition: border-color 0.15s, background-color 0.15s, filter 0.15s;
+}
+
+:root[data-look="werkbank"] .look-log-window .look-log-status > div:last-child button:not([style]),
+:root[data-look="werkbank"] .look-log-window .look-log-status > div:first-child button:not(:first-child) {
+  color: var(--wb-fat) !important;
+  background-color: var(--wb-stone) !important;
+  box-shadow: var(--wb-bevel-stone);
+}
+
+/* „Teilen“: der volle Akzent-Knopf */
+:root[data-look="werkbank"] .look-log-window .look-log-status > div:last-child button[style] {
+  color: #fff !important;
+  background-color: var(--wb-acc) !important;
+  box-shadow: var(--wb-bevel-acc);
+  text-shadow: 2px 2px 0 var(--wb-acc-ink);
+}
+
+:root[data-look="werkbank"] .look-log-window .look-log-status button:not(:disabled):hover {
+  border-color: #fff;
+  filter: none;
+}
+
+/* ── Laufende Spiele: eine Seitentafel, jedes Spiel ein Slot ── */
+:root[data-look="werkbank"] .look-log-window .look-log-side {
+  width: 288px !important;
+  margin: 12px 12px 12px 14px;
+  overflow: hidden;
+  background: var(--wb-panel);
+  border: 3px solid #000 !important;
+  box-shadow: var(--wb-bevel), var(--wb-drop);
+}
+
+:root[data-look="werkbank"] .look-log-sidebar > div:first-child {
+  padding: 12px 14px 10px !important;
+  border-bottom: 0 !important;
+}
+
+:root[data-look="werkbank"] .look-log-sidebar > div:first-child > span {
+  padding-bottom: 0 !important;
+  font-size: 16px !important;
+  color: var(--wb-dim) !important;
+  text-shadow: 2px 2px 0 #000;
+}
+
+:root[data-look="werkbank"] .look-log-sidebar > div:first-child > span > span {
+  display: none;
+}
+
+/* die Liste liegt in einer Vertiefung */
+:root[data-look="werkbank"] .look-log-sidebar > div:nth-child(2) {
+  margin: 0 10px;
+  padding: 4px;
+  background: #241915;
+  border: 2px solid #000;
+  box-shadow: var(--wb-inset-sm);
+}
+
+:root[data-look="werkbank"] .look-log-instance {
+  margin-bottom: 4px;
+  padding: 8px 30px 8px 8px !important;
+  border: 2px solid transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+
+:root[data-look="werkbank"] .look-log-instance:last-child {
+  margin-bottom: 0;
+}
+
+:root[data-look="werkbank"] .look-log-instance:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* gewählt: der weiße Auswahlrahmen der Hotbar */
+:root[data-look="werkbank"] .look-log-instance[data-active] {
+  border-color: #fff !important;
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+:root[data-look="werkbank"] .look-log-instance .w-11.h-11 {
+  width: 46px;
+  height: 46px;
+  background-color: var(--wb-slot) !important;
+  border: 0 !important;
+  box-shadow: var(--wb-inset-sm);
+}
+
+:root[data-look="werkbank"] .look-log-instance .w-11.h-11 img {
+  width: 34px;
+  height: 34px;
+  image-rendering: pixelated;
+}
+
+:root[data-look="werkbank"] .look-log-instance:hover .w-11.h-11::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  background: rgba(255, 255, 255, 0.18);
+  pointer-events: none;
+}
+
+:root[data-look="werkbank"] .look-log-instance > button {
+  top: 6px !important;
+  right: 6px !important;
+  color: var(--wb-dim) !important;
+  border: 2px solid transparent;
+}
+
+:root[data-look="werkbank"] .look-log-instance > button:hover {
+  color: #fff !important;
+  background: var(--wb-stone) !important;
+  border-color: #000;
+  box-shadow: var(--wb-bevel-stone);
+}
+
+/* lange Profilnamen dürfen in eine zweite Zeile umbrechen statt abzubrechen */
+:root[data-look="werkbank"] .look-log-instance .font-minecraft.text-sm {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  line-height: 1.2;
+  text-shadow: 2px 2px 0 #000 !important;
+}
+
+/* Fußbereich: Kennzahlen und Knöpfe des gewählten Spiels */
+:root[data-look="werkbank"] .look-log-sidebar > div.border-t {
+  border-top: 0 !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+}
+
+:root[data-look="werkbank"] .look-log-sidebar > div.border-t:last-child {
+  margin-top: 2px;
+  color: var(--wb-dim);
+  box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.45);
+}
+
+:root[data-look="werkbank"] .look-log-sidebar > div.border-t .text-white\/50 {
+  color: var(--wb-fat) !important;
+}
+
+/* RAM/CPU als Leiste mit Kerben wie die Erfahrungsanzeige */
+:root[data-look="werkbank"] .look-log-sidebar .h-1.overflow-hidden {
+  position: relative;
+  height: 10px;
+  background: #1a1410;
+  border: 2px solid #000;
+}
+
+:root[data-look="werkbank"] .look-log-sidebar .h-1.overflow-hidden::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, transparent 0 14px, rgba(0, 0, 0, 0.55) 14px 16px);
+}
+
+:root[data-look="werkbank"] .look-log-sidebar > div.border-t button {
+  height: 30px;
+  border: 2px solid #000;
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.55);
+  transition: border-color 0.15s, filter 0.15s;
+}
+
+:root[data-look="werkbank"] .look-log-sidebar > div.border-t button:hover {
+  border-color: #fff;
+}
+
+:root[data-look="werkbank"] .look-log-sidebar > div.border-t button[class*=" bg-red-500/"] {
+  color: #fff !important;
+  background-color: #8a2222 !important;
+  box-shadow: inset 2px 2px 0 #c44a44, inset -2px -3px 0 #4f1010;
+}
+
+:root[data-look="werkbank"] .look-log-sidebar > div.border-t button[class*=" bg-green-500/"] {
+  color: #fff !important;
+  background-color: #3f7a2a !important;
+  box-shadow: inset 2px 2px 0 #6fb04f, inset -2px -3px 0 #204314;
+}
+
+:root[data-look="werkbank"] .look-log-sidebar > div.border-t button[class*=" bg-white/10"] {
+  min-width: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--wb-stone) !important;
+  box-shadow: var(--wb-bevel-stone);
+}
+
+:root[data-look="werkbank"] .look-log-sidebar > div.border-t button[class*=" bg-white/10"]:not([style]) {
+  color: var(--wb-fat) !important;
+}
+
+/* ── Menüs der Ausgabe (Anzeige-Optionen, Datei-Auswahl): Inventar-Tafeln ── */
+:root[data-look="werkbank"] .fixed.bg-\[\#151213\] {
+  background-color: var(--wb-panel) !important;
+  border: 2px solid #000 !important;
+  box-shadow: var(--wb-bevel-sm), var(--wb-drop) !important;
+}
+
+@media (max-width: 999px) {
+  :root[data-look="werkbank"] .look-log-window .look-log-side {
+    width: 248px !important;
+  }
+
+  :root[data-look="werkbank"] .look-log-window .look-log-toolbar button[aria-pressed] {
+    padding: 3px 8px 0 !important;
+    font-size: 13px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-look="werkbank"] :is(.look-log-titlebar button, .look-log-status button, .look-log-instance, .look-log-sidebar button) {
+    transition: none !important;
+  }
+}

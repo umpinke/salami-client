@@ -8,6 +8,8 @@ import { ThekeSearchCard } from "./ThekeSearchCard";
 import "./texts";
 import "./look.css";
 import "./inner.css";
+import "./logs.css";
+import "./dialogs.css";
 
 /**
  * Look „Feinkost-Theke“: verspielter Feinkostladen – Holzwand, rot-creme gestreifte Markise,

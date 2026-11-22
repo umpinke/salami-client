@@ -189,7 +189,7 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
     <div className="space-y-4">
       {/* Compatibility Section */}
       {hasCompatibilityInfo && (
-        <div className="look-card p-4" style={PLAIN_CARD}>
+        <div className="look-card look-mod-section look-mod-side p-4" style={PLAIN_CARD}>
           <SectionHeading size="sm" className="mb-3">{t('mod_detail.compatibility')}</SectionHeading>
 
           <div className="space-y-3 text-xs font-minecraft">
@@ -264,7 +264,7 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
 
       {/* Dependencies Section */}
       {hasDependencies && (
-        <div className="look-card p-4" style={PLAIN_CARD}>
+        <div className="look-card look-mod-section look-mod-side p-4" style={PLAIN_CARD}>
           <SectionHeading size="sm" className="mb-3">{t('mod_detail.dependencies')} ({project.dependencies.length})</SectionHeading>
 
           <div className="space-y-2">
@@ -310,7 +310,7 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
 
       {/* Team Members Section */}
       {project.team_members.length > 0 && (
-        <div className="look-card p-4" style={PLAIN_CARD}>
+        <div className="look-card look-mod-section look-mod-side p-4" style={PLAIN_CARD}>
           <SectionHeading size="sm" className="mb-3">{t('mod_detail.team')} ({project.team_members.length})</SectionHeading>
 
           <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
@@ -352,7 +352,7 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
 
       {/* Donate Section */}
       {hasDonations && (
-        <div className="look-card p-4" style={PLAIN_CARD}>
+        <div className="look-card look-mod-section look-mod-side p-4" style={PLAIN_CARD}>
           <SectionHeading size="sm" className="mb-3">{t('mod_detail.support')}</SectionHeading>
 
           <div className="space-y-2">
@@ -370,7 +370,7 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
 
       {/* Links Section */}
       {hasLinks && (
-        <div className="look-card p-4" style={PLAIN_CARD}>
+        <div className="look-card look-mod-section look-mod-side p-4" style={PLAIN_CARD}>
           <SectionHeading size="sm" className="mb-3">{t('mod_detail.links_title')}</SectionHeading>
 
           <div className="space-y-2">
@@ -404,7 +404,7 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
       )}
 
       {/* Details Section */}
-      <div className="look-card p-4" style={PLAIN_CARD}>
+      <div className="look-card look-mod-section look-mod-side p-4" style={PLAIN_CARD}>
         <SectionHeading size="sm" className="mb-3">{t('mod_detail.details')}</SectionHeading>
 
         <div className="space-y-3 text-xs font-minecraft">

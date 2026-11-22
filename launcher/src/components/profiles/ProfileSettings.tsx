@@ -317,12 +317,13 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
       footer={renderFooter()}
       className="!max-w-6xl h-[85vh] min-h-[600px] flex flex-col"
     >
-      <div className="flex h-full p-4 gap-2">
+      {/* dieselben Ansatzpunkte wie die Launcher-Einstellungen (SettingsTab): jeder Look zeigt beide gleich */}
+      <div className="look-settings flex h-full p-4 gap-2">
         <div
           ref={sidebarRef}
-          className="w-64 flex flex-col flex-shrink-0"
+          className="look-settings-side w-64 flex flex-col flex-shrink-0"
         >
-          <div className="space-y-1.5 flex-1 overflow-y-auto scrollbar-hover px-1 pb-1">
+          <div className="look-settings-list space-y-1.5 flex-1 overflow-y-auto scrollbar-hover px-1 pb-1">
             {tabConfig.map((tab) => {
               const isActive = activeTab === tab.id;
 
@@ -330,8 +331,9 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
                 // Salami: aktiver Reiter = volle Akzentfarbe mit harter Unterkante (wie im Profil)
                 <button
                   key={tab.id}
+                  data-active={isActive || undefined}
                   className={cn(
-                    "w-full text-left px-3 h-11 transition-colors border-0 outline-none flex items-center gap-3",
+                    "look-settings-entry look-settings-tab w-full text-left px-3 h-11 transition-colors border-0 outline-none flex items-center gap-3",
                     isActive
                       ? ""
                       : "bg-transparent text-white/65 hover:bg-white/[0.08] hover:text-white",
@@ -358,11 +360,11 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
         </div>
 
         {/* Vertical separator line */}
-        <div className="flex items-center">
+        <div className="look-settings-divider flex items-center">
           <div className="border-l border-white/10 mx-4 my-3 h-[85%]"></div>
         </div>
 
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <div className="look-settings-paper flex-1 flex flex-col min-w-0 overflow-hidden">
           <div
             className="flex-1 py-2 px-5 overflow-y-auto overflow-x-hidden custom-scrollbar min-w-0"
             ref={contentRef}

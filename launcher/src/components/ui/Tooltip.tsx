@@ -126,7 +126,7 @@ export function Tooltip({
 
   const getTooltipClasses = () => {
     // z above modals/overlays (Modal + global modal portal use z-[1000]) so tooltips render on top
-    const baseClasses = "fixed z-[1100] px-3 py-2 text-xs font-minecraft text-white border pointer-events-none transition-opacity duration-200 rounded-lg shadow-[0_12px_30px_-10px_rgba(0,0,0,0.8)]";
+    const baseClasses = "look-tooltip fixed z-[1100] px-3 py-2 text-xs font-minecraft text-white border pointer-events-none transition-opacity duration-200 rounded-lg shadow-[0_12px_30px_-10px_rgba(0,0,0,0.8)]";
 
     return `${baseClasses} ${className}`;
   };

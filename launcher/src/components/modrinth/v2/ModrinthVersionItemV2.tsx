@@ -264,7 +264,7 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
         key={version.id}
         onMouseEnter={handleMouseEnterLocal}
         onMouseLeave={handleMouseLeaveLocal}
-        className="relative overflow-hidden transition-colors duration-150"
+        className="look-version-row relative overflow-hidden transition-colors duration-150"
         style={{
           backgroundColor: isHovered ? SURFACE.hover : SURFACE.base,
           border: `1px solid ${isHovered ? SURFACE.lineStrong : SURFACE.line}`,

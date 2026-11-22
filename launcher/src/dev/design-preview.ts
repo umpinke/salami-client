@@ -108,6 +108,31 @@ const SAMPLE_LOG = [
   "[21:28:02] [Render thread/INFO]: [CHAT] Welcome to the server!",
 ].join("\n");
 
+/** design-preview.html?window=logs zeigt statt des Launchers das Log-Fenster (eigenes Fenster in der App). */
+const LOG_WINDOW = new URLSearchParams(location.search).get("window") === "logs";
+/** design-preview.html?window=updater zeigt das Update-Fenster (325×400 in der App); `&status=error|downloading` wählt den Zustand. */
+const UPDATER_WINDOW = new URLSearchParams(location.search).get("window") === "updater";
+/** design-preview.html?signedout zeigt den Willkommens-Bildschirm (kein Konto). */
+const SIGNED_OUT = new URLSearchParams(location.search).has("signedout");
+const logProcess = {
+  id: "11111111-2222-3333-4444-555555555555",
+  profile_id: sampleProfiles[0].id,
+  start_time: new Date(Date.now() - 12 * 60_000).toISOString(),
+  state: "Running",
+  pid: 4242,
+  account_uuid: null,
+  account_name: "SalamiFan",
+  minecraft_version: sampleProfiles[0].game_version,
+  modloader: "fabric",
+  modloader_version: "0.19.5",
+  norisk_pack: null,
+  profile_name: sampleProfiles[0].name,
+  profile_image_url: null,
+  memory_max_mb: 4096,
+  log_session_id: "preview-session",
+  mods: [],
+};
+
 /** Cape-Speicher im Speicher (statt salami_capes/ im Launcher-Ordner). */
 const capeStore = {
   selected: "builtin:salami" as string | null,
@@ -363,6 +388,17 @@ mockIPC((cmd, args) => {
       return structuredClone(a.kind === "emotes" ? emoteCatalog : a.kind === "buddies" ? buddyCatalog : hatCatalog);
     case "salami_capes_download_template":
       return "C:\\Users\\Du\\Downloads\\salami_cape_vorlage.png";
+    // ── Log-Fenster (design-preview.html?window=logs): ein laufendes Spiel mit Ausgabe ──
+    case "get_processes":
+      return LOG_WINDOW ? [logProcess] : [];
+    case "get_process":
+      return LOG_WINDOW ? logProcess : null;
+    case "get_process_log_cursor": {
+      const cursor = (a.cursor as number) ?? 0;
+      return cursor === 0
+        ? { cursor: SAMPLE_LOG.length, output: SAMPLE_LOG, new_file: true }
+        : { cursor, output: "", new_file: false };
+    }
     case "get_profile_log_files":
       return ["C:/Salami/PVP/logs/latest.log", "C:/Salami/PVP/logs/2026-10-13-2.log.gz", "C:/Salami/PVP/logs/debug.log"];
     case "get_log_file_content":
@@ -385,11 +421,33 @@ mockIPC((cmd, args) => {
     case "get_launcher_version":
       return "1.0.0";
     case "get_active_account":
-      return sampleAccount;
+      return SIGNED_OUT ? null : sampleAccount;
     case "get_accounts":
-      return [sampleAccount];
+      return SIGNED_OUT ? [] : [sampleAccount];
     case "is_flatpak":
       return false;
+    // Profil-Einstellungen → Java & Speicher
+    case "get_system_ram_mb":
+      return 16384;
+    case "detect_java_installations_command":
+      return [
+        { path: "C:/Program Files/Eclipse Adoptium/jdk-21.0.5.11-hotspot/bin/javaw.exe", major_version: 21, vendor: "Eclipse Adoptium", architecture: "x64" },
+        { path: "C:/Program Files/Java/jdk-17/bin/javaw.exe", major_version: 17, vendor: "Oracle", architecture: "x64" },
+      ];
+    case "validate_java_path_command":
+      return true;
+    // Profil exportieren: Dateibaum
+    case "get_profile_directory_structure": {
+      const node = (path: string, is_dir: boolean, children: unknown[] = [], size = 0) =>
+        ({ name: path.split("/").pop(), path: `C:/Salami/PVP/${path}`, is_dir, children, size, last_modified: null });
+      return node("PVP", true, [
+        node("config", true, [node("config/sodium-options.json", false, [], 1_204)]),
+        node("mods", true, [node("mods/sodium.jar", false, [], 1_200_000), node("mods/modmenu.jar", false, [], 640_000)]),
+        node("resourcepacks", true),
+        node("options.txt", false, [], 5_120),
+        node("servers.dat", false, [], 812),
+      ]);
+    }
     case "refresh_norisk_packs":
       return null;
     case "refresh_standard_versions":
@@ -594,4 +652,19 @@ mockIPC((cmd, args) => {
 (window as unknown as { __TAURI_INTERNALS__: { convertFileSrc: (path: string) => string } })
   .__TAURI_INTERNALS__.convertFileSrc = (path) => path;
 
-await import("../main");
+if (UPDATER_WINDOW) {
+  await import("../updaterEntry");
+  // Zustand nachstellen: das Backend schickt `updater_status`-Ereignisse
+  const { emit } = await import("@tauri-apps/api/event");
+  const state = new URLSearchParams(location.search).get("status") ?? "downloading";
+  setTimeout(() => {
+    void emit("updater_status",
+      state === "error"
+        ? { status: "error", message: "Update download/install failed: network timeout" }
+        : state === "checking"
+          ? { status: "checking", message: "Checking for stable updates..." }
+          : { status: "downloading", message: "Downloading update: 24117248 bytes", progress: 62 });
+  }, 400);
+} else {
+  await import(LOG_WINDOW ? "../minecraftLogWindowEntry" : "../main");
+}

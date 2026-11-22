@@ -93,7 +93,7 @@ export function EmptyState({
     <div
       ref={containerRef}
       className={cn(
-        "flex flex-col items-center justify-center",
+        "look-empty flex flex-col items-center justify-center",
         compact ? "p-4" : "p-8",
         fullHeight ? "h-full w-full" : "auto",
         className,
@@ -120,7 +120,7 @@ export function EmptyState({
           onClick={onIconClick}
         >
           {/* Salami: das Symbol liegt auf einer Salamischeibe */}
-          <span className={cn("relative flex items-center justify-center", compact ? "w-14 h-14" : "w-20 h-20")}>
+          <span className={cn("look-empty-icon relative flex items-center justify-center", compact ? "w-14 h-14" : "w-20 h-20")}>
             <SalamiSlice size={80} className="absolute inset-0 h-full w-full opacity-90" />
             <Icon
               icon={icon}

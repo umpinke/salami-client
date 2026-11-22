@@ -145,7 +145,8 @@ function InstanceItem({
 
   return (
     <div
-      className="relative cursor-pointer border-b border-white/[0.08] py-3 pl-4 pr-3 transition-colors duration-150 hover:bg-white/[0.04]"
+      data-active={isSelected || undefined}
+      className="look-log-instance relative cursor-pointer border-b border-white/[0.08] py-3 pl-4 pr-3 transition-colors duration-150 hover:bg-white/[0.04]"
       style={{
         backgroundColor: isSelected ? `${accentColor.value}14` : undefined,
         boxShadow: isSelected ? `inset 3px 0 0 ${accentColor.value}` : undefined,
@@ -433,10 +434,10 @@ export function InstanceSidebar({
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="look-log-sidebar h-full flex flex-col">
       {/* Header */}
       <div className="flex items-end border-b border-white/[0.08] px-4 pt-3">
-        <span className="relative pb-2.5 font-minecraft text-xl lowercase leading-none text-white">
+        <span className="relative pb-2.5 font-minecraft text-xl leading-none text-white">
           {t('instances.title')}
           <span className="absolute inset-x-0 -bottom-px h-[3px]" style={{ backgroundColor: accentColor.value }} />
         </span>
@@ -622,7 +623,7 @@ export function InstanceSidebar({
       )}
 
       {/* Status Footer */}
-      <div className="border-t border-white/[0.08] px-4 py-2 text-xs font-minecraft lowercase text-white/45">
+      <div className="border-t border-white/[0.08] px-4 py-2 text-xs font-minecraft text-white/45">
         {instances.filter((i) => i.status === "running").length} {t('instances.running')}
       </div>
     </div>

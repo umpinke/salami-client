@@ -85,11 +85,11 @@ export function MultiVersionFilter({
       {isOpen && (
         <div className="absolute top-full left-0 mt-2 w-56 bg-black/90 backdrop-blur-sm border border-white/20 rounded-lg shadow-xl z-50 overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
-            <span className="text-white/60 font-minecraft text-xs lowercase">{t("profiles.filter.versions")}</span>
+            <span className="text-white/60 font-minecraft text-xs">{t("profiles.filter.versions")}</span>
             {isActive && (
               <button
                 onClick={onClear}
-                className="text-white/60 hover:text-white font-minecraft text-xs lowercase transition-colors"
+                className="text-white/60 hover:text-white font-minecraft text-xs transition-colors"
               >
                 {t("profiles.filter.clear")}
               </button>

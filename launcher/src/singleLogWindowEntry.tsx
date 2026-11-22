@@ -6,6 +6,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { SingleLogViewer } from "./components/log/SingleLogViewer";
 import { GlobalToaster } from "./components/ui/GlobalToaster";
 import i18n from "./i18n/i18n";
+import { LookWindowSync } from "./themes/looks/LookWindowSync";
 import "./styles/globals.css";
 
 // Get instance info from URL params
@@ -20,6 +21,7 @@ const startTime = startTimeParam ? parseInt(startTimeParam, 10) : undefined;
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <I18nextProvider i18n={i18n}>
+      <LookWindowSync />
       <SingleLogViewer instanceId={instanceId} instanceName={instanceName} profileId={profileId} accountName={accountName} startTime={startTime} />
       <GlobalToaster />
     </I18nextProvider>

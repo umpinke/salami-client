@@ -28,7 +28,7 @@ export function SalamiModeCard() {
       {enabled && <div className="absolute inset-0 salami-fat-spots opacity-60 pointer-events-none" />}
       <SalamiSlice size={56} className={enabled ? "salami-spin shrink-0" : "shrink-0 opacity-70"} />
       <div className="relative flex-1 min-w-0">
-        <div className="font-minecraft text-2xl text-white lowercase">{t("salami.mode.title")}</div>
+        <div className="font-minecraft text-2xl text-white">{t("salami.mode.title")}</div>
         <p className="text-sm text-white/70 mt-1">{t("salami.mode.description")}</p>
         <p className="text-xs text-white/50 mt-1">{t("salami.mode.game_hint")}</p>
       </div>

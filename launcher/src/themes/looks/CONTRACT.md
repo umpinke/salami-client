@@ -31,7 +31,12 @@ kann in Einstellungen → Darstellung → Look jederzeit wechseln. `LookSync` se
       die Ergebnisse stehen dann im Raster (`VirtuosoGrid`).
     - Vorbild: `theke/ThekeProfileDetail.tsx`, `ThekeContentItem.tsx`, `ThekeSearchCard.tsx`,
       `theke/inner.css`.
-- `look.css`: alle Regeln **nur** unter `:root[data-look="<id>"]`.
+- `look.css`: alle Regeln **nur** unter `:root[data-look="<id>"]`. Daneben `inner.css`
+  (Innenseiten), `logs.css` (Log-Fenster) und `dialogs.css` (Dialoge, Meldungen, Willkommen,
+  Update-Fenster) – alle in `index.tsx` importiert.
+- Vorschau: `design-preview.html` (Looks per `localStorage`, siehe `src/dev/design-preview.ts`);
+  `?window=updater` (`&status=checking | downloading | error`) zeigt das Update-Fenster,
+  `?signedout` den Willkommens-Bildschirm.
 
 ## Variablen (in `look.css` unter `:root[data-look="<id>"]` setzen)
 
@@ -65,7 +70,29 @@ Innenseiten: `look-profile-icon` (Profilbild), `look-content-toolbar` / `look-co
 (Inhaltsliste), `look-search-types` / `look-search-bar` / `filters-sidebar` (Mod-Browser),
 `look-clip-grid` / `look-clip-card` / `look-clip-caption` / `look-clip-title` / `look-clip-meta`
 (Clips), `look-settings` / `-side` / `-search` / `-list` / `-entry` / `-tab` (`data-active`) /
-`-sub` / `-divider` / `-paper` (Einstellungen), `look-picker` (Look-Auswahl).
+`-sub` / `-divider` / `-paper` (Einstellungen – dieselben Klassen trägt auch der Dialog
+„Profileinstellungen“, beide sehen in jedem Look gleich aus), `look-picker` (Look-Auswahl),
+`look-profile-card` + `data-layout="grid | list | compact"` (Profilübersicht; das Kontextmenü liegt
+in der Karte), `look-mod-detail` / `look-mod-header` / `look-mod-section` (+ `look-mod-description |
+look-mod-side | look-mod-versions`) / `look-mod-gallery` / `look-mod-shot` (Mod-Detailseite),
+`look-version-row` (eine Version im Versions-Verzeichnis), `look-friends` / `look-friends-side` /
+`look-friend-row` (`data-active`) / `look-chat` / `look-chat-day` / `look-chat-msg` (`data-own`)
+(Freunde und Chat).
+
+Dialoge und kleine Teile: `look-option` – wählbare Kachel oder Zeile in Dialogen und Einstellungen
+(Profil-Assistent, Versionen, Loader, Java, Auflösung, Konten); gewählt mit `data-selected` (wo der
+Baustein keine Attribute durchreicht: Klasse `look-option--selected`), gesperrt mit
+`aria-disabled` / `look-option--disabled`; `look-option--main` ist der Hauptweg (Eigenes Profil),
+`look-option--image` eine Kachel mit Bild im Hintergrund (Loader). `look-status` +
+`look-status--success | error | warning | info` (Hinweiskästen, `StatusMessage`), `look-toast`
+(+ `look-toast--success | error | loading`), `look-tooltip`, `look-empty` / `look-empty-icon`
+(leere Zustände). Diese Regeln stehen je Look in `dialogs.css`.
+
+Willkommen und Nebenfenster: `look-welcome` / `-controls` (Fensterknöpfe) / `-hero` / `-title` /
+`-panel` / `-panel-title` / `-skip`; Update-Fenster (325×400, eigenes Fenster mit `LookWindowSync`):
+`look-updater` / `-card` / `-brand` / `-logo` / `-title` / `-status` (`data-status`) / `-progress`
+/ `-bar` / `-actions`. Malt der Look den Hintergrund selbst (`ownsBackground`), entfallen dort wie
+im Hauptfenster die Hintergrund-Effekte.
 
 Helle Flächen (Papier) unter gemeinsamen Bausteinen: die Bausteine sind für dunkle Flächen gebaut
 (`text-white`, `bg-white/x`, inline `rgba(255, 255, 255, …)`, `--surface-*`). Auf einer hellen

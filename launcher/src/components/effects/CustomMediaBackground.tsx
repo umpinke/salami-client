@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useBackgroundEffectStore } from "../../store/background-effect-store";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { logError } from "../../utils/logging-utils";
+import { allowUserMedia } from "../../services/tauri-service";
 
 interface Props {
   activeTab: string;
@@ -14,8 +15,26 @@ export default function CustomMediaBackground({ activeTab }: Props) {
 
   const hiddenByTab = customMediaOnlyOnPlay && activeTab !== "play";
 
+  // Salami: Das Asset-Protokoll zeigt nur Launcher-Ordner – die eigene Datei erst freigeben
+  // lassen (gerade gewählt, gemerkt oder einmal nativ bestätigt), dann anzeigen.
+  const [readyUrl, setReadyUrl] = useState<string | null>(null);
+
   useEffect(() => {
     setMediaError(false);
+    setReadyUrl(null);
+    if (!customMediaUrl) return;
+    let cancelled = false;
+    allowUserMedia([customMediaUrl], true)
+      .catch((e) => {
+        logError(`[CustomMediaBackground] could not allow media: ${e}`);
+        return [];
+      })
+      .finally(() => {
+        if (!cancelled) setReadyUrl(customMediaUrl);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [customMediaUrl]);
 
   useEffect(() => {
@@ -46,7 +65,7 @@ export default function CustomMediaBackground({ activeTab }: Props) {
     };
   }, [customMediaType, customMediaUrl, hiddenByTab]);
 
-  if (!customMediaUrl || !customMediaType || mediaError) return null;
+  if (!customMediaUrl || !customMediaType || mediaError || readyUrl !== customMediaUrl) return null;
 
   const getQualityStyles = (): React.CSSProperties => {
     switch (customMediaQuality) {

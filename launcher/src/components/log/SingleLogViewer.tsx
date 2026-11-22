@@ -71,7 +71,7 @@ export function SingleLogViewer({ instanceId, instanceName, profileId, accountNa
 
   return (
     <div
-      className="h-screen flex flex-col"
+      className="look-log-window h-screen flex flex-col"
       style={{
         background: `radial-gradient(120% 60% at 50% -10%, ${accentColor.value}26 0%, transparent 60%), #0f0b0b`,
       }}

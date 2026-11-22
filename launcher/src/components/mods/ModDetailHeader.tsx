@@ -401,7 +401,7 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
 
   return (
     // Feinkost-Kopf: Karte mit Kopfband im Salami-Anschnitt, das Projektbild ragt ins Band
-    <div className="look-card relative overflow-hidden" style={{ ...PLAIN_CARD, boxShadow: KANTE_SOFT }}>
+    <div className="look-card look-mod-header relative overflow-hidden" style={{ ...PLAIN_CARD, boxShadow: KANTE_SOFT }}>
       <div
         className="salami-fat-spots relative flex h-16 items-start justify-end gap-4 px-4 pt-3"
         style={kopfband(accentColor.value)}

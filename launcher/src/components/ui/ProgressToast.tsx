@@ -21,7 +21,7 @@ export function ProgressToast({ message, progress, action }: ProgressToastProps)
 
   return (
     <div
-      className={`${TOAST_BASE_CLASSES} ${borderRadiusClass}`}
+      className={`look-toast ${TOAST_BASE_CLASSES} ${borderRadiusClass}`}
       style={baseStyles}
     >
       <div className="flex flex-col gap-2">
