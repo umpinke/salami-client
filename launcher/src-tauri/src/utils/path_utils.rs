@@ -938,9 +938,12 @@ pub async fn download_and_replace_file(
     )
     .await?;
 
-    // Remove old file if it exists (either enabled or disabled variant)
-    if current_path.exists() {
-        let _ = fs::remove_file(&current_path).await; // ignore errors
+    // Remove old file if it exists (either enabled or disabled variant).
+    // Salami: in den Papierkorb statt endgültig löschen, und nur Dateien (keine Ordner)
+    if current_path.is_file() {
+        if let Err(e) = crate::utils::trash_utils::move_path_to_trash(&current_path, Some("content_updates")).await {
+            warn!("Could not move the old mod {:?} to the trash: {}", current_path, e);
+        }
     }
 
     // Move tmp -> target

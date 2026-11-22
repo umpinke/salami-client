@@ -130,6 +130,11 @@ pub struct ImportWorldParams {
 // CRUD Commands
 #[tauri::command]
 pub async fn create_profile(params: CreateProfileParams) -> Result<Uuid, CommandError> {
+    // Salami: Versionen werden Teil von Ordnernamen und Download-Adressen
+    crate::utils::import_safety::require_version_like(&params.game_version)?;
+    if let Some(loader_version) = params.loader_version.as_deref().filter(|v| !v.is_empty()) {
+        crate::utils::import_safety::require_version_like(loader_version)?;
+    }
     let state = State::get().await?;
 
     // 1. Basis-Pfad für Profile bestimmen
@@ -667,6 +672,31 @@ async fn try_update_profile(id: Uuid, params: UpdateProfileParams) -> Result<(),
         info!("Updating profile name to: {}", name);
         profile.name = name.clone();
     }
+    // Salami: Versionen werden Teil von Ordnernamen und Download-Adressen – nur echte Versionsangaben
+    if let Some(game_version) = &params.game_version {
+        crate::utils::import_safety::require_version_like(game_version)?;
+    }
+    if let Some(loader_version) = params.loader_version.as_deref().filter(|v| !v.is_empty()) {
+        crate::utils::import_safety::require_version_like(loader_version)?;
+    }
+    if let Some(settings) = &params.settings {
+        let overrides = settings
+            .overwrite_loader_version
+            .iter()
+            .chain(settings.overwrite_loader_versions.values());
+        for version in overrides.filter(|v| !v.is_empty()) {
+            crate::utils::import_safety::require_version_like(version)?;
+        }
+    }
+    // Salami: Gruppen wie `..` wären der `groups`-Ordner selbst (geteilt von allen Gruppen-Profilen)
+    if params.clear_group != Some(true) {
+        if let Some(group) = &params.group {
+            if !crate::state::profile_state::ProfileManager::is_valid_group_name(group) {
+                return Err(AppError::InvalidInput(format!("Invalid group name: {:?}", group)).into());
+            }
+        }
+    }
+
     if let Some(game_version) = &params.game_version {
         // Borrow params.game_version
         info!("Updating game_version to: {}", game_version);
@@ -2483,12 +2513,24 @@ pub struct AddSymlinkParams {
 }
 
 #[tauri::command]
-pub async fn add_profile_symlink(params: AddSymlinkParams) -> Result<(), CommandError> {
+pub async fn add_profile_symlink(
+    app: tauri::AppHandle,
+    params: AddSymlinkParams,
+) -> Result<(), CommandError> {
     use crate::utils::symlink_utils;
-    
-    info!("Adding symlink for profile {}: {} -> {}", 
+
+    info!("Adding symlink for profile {}: {} -> {}",
           params.profile_id, params.relative_path, params.external_path);
-    
+
+    // Salami: nur ein Ziel, das der Nutzer im Datei-Dialog gewählt hat (sonst nativ nachfragen);
+    // keine Netzwerkpfade
+    crate::utils::user_paths::require_user_choice(
+        &app,
+        std::path::Path::new(&params.external_path),
+        "Der Launcher soll diesen Pfad in das Profil verlinken (das Spiel liest und schreibt dann dort):\nThe launcher will link this path into the profile (the game then reads and writes there):",
+    )
+    .await?;
+
     let state = State::get().await?;
     
     // Get the profile instance path
@@ -2557,10 +2599,12 @@ pub async fn remove_profile_symlink(
         .profile_manager
         .get_profile_instance_path(profile_id)
         .await?;
-    
-    let link_path = instance_path.join(&relative_path);
-    
-    if !link_path.exists() {
+
+    // Salami: nur Pfade innerhalb des Profils (kein `..`, kein Laufwerk)
+    let normalized_relative = crate::utils::import_safety::safe_relative_path(&relative_path)?;
+    let link_path = instance_path.join(&normalized_relative);
+
+    if std::fs::symlink_metadata(&link_path).is_err() {
         return Err(CommandError::from(AppError::Other(format!(
             "Symlink does not exist: {}",
             relative_path

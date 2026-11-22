@@ -113,9 +113,17 @@ pub struct ImportSyncPackIconParams {
 
 #[tauri::command]
 pub async fn import_sync_pack_icon(
+    app: tauri::AppHandle,
     params: ImportSyncPackIconParams,
 ) -> Result<String, CommandError> {
     let source = std::path::PathBuf::from(&params.path);
+    // Salami: nur ein Bild, das der Nutzer gewählt hat (sonst nativ nachfragen)
+    crate::utils::user_paths::require_readable_choice(
+        &app,
+        &source,
+        "Der Launcher soll dieses Bild als Icon in den Sync-Pack kopieren:\nThe launcher will copy this image into the sync pack as its icon:",
+    )
+    .await?;
     if !source.is_file() {
         return Err(AppError::Other(format!("'{}' is not a file", params.path)).into());
     }
@@ -175,10 +183,73 @@ pub struct SyncTargetParams {
     pub seed_from: Option<String>,
 }
 
+/// Salami: Liegt `candidate` genau dort, wo ein Profil des Launchers diesen Sync-Pfad hat? So
+/// sehen die Vorschläge aus `list_sync_seed_candidates` aus – die brauchen keine Rückfrage.
+async fn is_profile_copy_of(target_path: &str, candidate: &std::path::Path) -> bool {
+    let Ok(state) = State::get().await else { return false };
+    let Ok(profiles) = state.profile_manager.list_profiles().await else { return false };
+    profiles.iter().any(|profile| {
+        !paths::is_temp_profile_path(&profile.path)
+            && state
+                .profile_manager
+                .calculate_instance_path_for_profile(profile)
+                .ok()
+                .and_then(|instance| paths::instance_path_for(&instance, target_path).ok())
+                .is_some_and(|expected| paths::same_location(&expected, candidate))
+    })
+}
+
+/// Salami: Ein Pfad außerhalb des Launchers aus der Oberfläche (gemeinsamer Ordner oder Quelle
+/// zum Befüllen) gilt nur, wenn er der passende Ordner eines Profils ist, der Nutzer ihn im
+/// Datei-Dialog/per Drag & Drop gewählt hat oder ihn jetzt nativ bestätigt. Sonst könnte ein
+/// eingeschleustes Skript den Launcher beliebige Dateien lesen oder (beim Sync) überschreiben lassen.
+async fn approve_outside_path(
+    app: &tauri::AppHandle,
+    target_path: &str,
+    candidate: &std::path::Path,
+    what: &str,
+) -> Result<(), CommandError> {
+    crate::utils::path_guard::reject_network_path(candidate)?;
+    if is_profile_copy_of(target_path, candidate).await {
+        return Ok(());
+    }
+    crate::utils::user_paths::require_user_choice(app, candidate, what).await?;
+    Ok(())
+}
+
+const SHARED_FOLDER_PROMPT: &str = "Der Launcher soll diesen Pfad als gemeinsamen Sync-Ordner verwenden und beim Sync dort hineinschreiben:\nThe launcher will use this path as a shared sync folder and write into it when syncing:";
+const SEED_PROMPT: &str = "Der Launcher soll den Inhalt dieses Pfads in den Sync-Pack kopieren:\nThe launcher will copy the contents of this path into the sync pack:";
+
 #[tauri::command]
-pub async fn add_sync_pack_target(params: SyncTargetParams) -> Result<SyncTarget, CommandError> {
+pub async fn add_sync_pack_target(
+    app: tauri::AppHandle,
+    params: SyncTargetParams,
+) -> Result<SyncTarget, CommandError> {
+    // Salami: gemeinsamer Ordner außerhalb des Launchers nur, wenn der Nutzer ihn gewählt hat
+    if let Some(external) = params.external_path.as_deref().filter(|p| !p.trim().is_empty()) {
+        let candidate = paths::validate_external_master(external)?;
+        let state = State::get().await?;
+        let unchanged = match params.target_id {
+            Some(target_id) => state
+                .sync_pack_manager
+                .get_pack(params.pack_id)
+                .await?
+                .and_then(|pack| pack.targets.into_iter().find(|t| t.id == target_id))
+                .and_then(|t| t.external_path)
+                .is_some_and(|stored| paths::same_location(std::path::Path::new(&stored), &candidate)),
+            None => false,
+        };
+        if !unchanged {
+            approve_outside_path(&app, &params.path, &candidate, SHARED_FOLDER_PROMPT).await?;
+        }
+    }
+
     if let Some(seed) = params.seed_from.as_deref() {
         if params.external_path.is_none() {
+            let source = std::path::Path::new(seed);
+            if source.exists() {
+                approve_outside_path(&app, &params.path, source, SEED_PROMPT).await?;
+            }
             ingest::seed_master_from(params.pack_id, &params.path, &params.kind, seed).await?;
         }
     }
@@ -716,10 +787,14 @@ pub async fn get_or_create_default_sync_pack() -> Result<SyncPack, CommandError>
 
 #[tauri::command]
 pub async fn add_dropped_sync_target(
+    app: tauri::AppHandle,
     pack_id: Uuid,
     source_path: String,
 ) -> Result<DroppedSyncResult, CommandError> {
-    Ok(ingest::add_dropped_path(pack_id, &PathBuf::from(source_path)).await?)
+    // Salami: nur, was wirklich auf das Fenster gezogen (oder gewählt) wurde – sonst nachfragen
+    let source = PathBuf::from(source_path);
+    crate::utils::user_paths::require_user_choice(&app, &source, SHARED_FOLDER_PROMPT).await?;
+    Ok(ingest::add_dropped_path(pack_id, &source).await?)
 }
 
 #[derive(Debug, serde::Serialize)]

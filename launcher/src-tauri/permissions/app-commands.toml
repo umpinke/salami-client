@@ -262,5 +262,7 @@ permissions = [
   "allow-clip-rename",
   "allow-clip-open-folder",
   "allow-get-online-count",
+  "allow-allow-user-media",
+  "allow-forget-user-media",
   "allow-salami-take-pending-pack",
 ]

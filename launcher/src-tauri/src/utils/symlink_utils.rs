@@ -7,17 +7,18 @@ use tokio::fs;
 #[cfg(unix)]
 use std::os::unix::fs::symlink as symlink_dir;
 
-#[cfg(windows)]
-use std::fs::hard_link;
-
-/// Creates a symlink/junction/hardlink at `link_path` pointing to `target_path`
+/// Creates a symlink/junction at `link_path` pointing to `target_path`
 /// On Windows:
 /// - Directories: Junction Points (no admin rights needed)
-/// - Files: Hard Links (no admin rights needed) - tracked in metadata
+/// - Files: symbolic links (need Developer Mode or admin rights). Salami: never hard links – a
+///   hard link is the same file, so the game (or anything writing into the profile) would
+///   silently change the original wherever it lives.
 /// On Unix/Linux/macOS: Regular symlinks
-/// 
-/// For hard links on Windows, we also store metadata to track them
+///
+/// Netzwerkpfade (UNC/WebDAV) werden nie verlinkt.
 pub async fn create_symlink(target_path: &Path, link_path: &Path, is_dir: bool) -> Result<()> {
+    crate::utils::path_guard::reject_network_path(target_path)?;
+
     #[cfg(unix)]
     {
         tokio::task::spawn_blocking({
@@ -37,9 +38,9 @@ pub async fn create_symlink(target_path: &Path, link_path: &Path, is_dir: bool) 
             info!("Creating junction point from {:?} to {:?}", link_path, target_path);
             create_junction(target_path, link_path).await?;
         } else {
-            // For files, use hard links - no admin rights needed!
-            info!("Creating hard link from {:?} to {:?}", link_path, target_path);
-            create_hardlink(target_path, link_path).await?;
+            // Salami: Dateien als symbolischer Link, nie als Hardlink
+            info!("Creating file symlink from {:?} to {:?}", link_path, target_path);
+            create_file_symlink(target_path, link_path).await?;
         }
     }
 
@@ -54,6 +55,8 @@ async fn create_junction(target: &Path, junction: &Path) -> Result<()> {
         .await
         .map_err(|e| AppError::Other(format!("Failed to resolve target path: {}", e)))?;
     let target_abs = strip_verbatim_prefix(&target_abs);
+    // Salami: auch über eine Verknüpfung keine Netzwerkfreigabe verlinken
+    crate::utils::path_guard::reject_network_path(&target_abs)?;
     let junction_path = junction.to_path_buf();
 
     info!("Creating junction point: {:?} -> {:?}", junction_path, target_abs);
@@ -88,22 +91,25 @@ fn strip_verbatim_prefix(path: &Path) -> std::path::PathBuf {
 }
 
 #[cfg(windows)]
-async fn create_hardlink(target: &Path, link: &Path) -> Result<()> {
+async fn create_file_symlink(target: &Path, link: &Path) -> Result<()> {
     // Convert to absolute path
     let target_abs = tokio::fs::canonicalize(target).await
         .map_err(|e| AppError::Other(format!("Failed to resolve target file path: {}", e)))?;
-    
-    // Create hard link - no admin rights needed!
+    let target_abs = strip_verbatim_prefix(&target_abs);
+    crate::utils::path_guard::reject_network_path(&target_abs)?;
+
     tokio::task::spawn_blocking({
         let link = link.to_path_buf();
         let target_abs = target_abs.clone();
-        move || hard_link(&target_abs, &link)
+        move || std::os::windows::fs::symlink_file(&target_abs, &link)
     })
     .await
     .map_err(|e| AppError::Other(format!("Join error: {}", e)))?
-    .map_err(|e| AppError::Other(format!("Failed to create hard link: {}", e)))?;
+    // Ohne Entwicklermodus/Adminrechte meldet Windows „os error 1314“ – die Oberfläche zeigt dazu
+    // einen Hinweis (symlinks.windows_admin_required)
+    .map_err(|e| AppError::Other(format!("Failed to create file symlink: {}", e)))?;
 
-    info!("Successfully created hard link: {:?} -> {:?}", link, target_abs);
+    info!("Successfully created file symlink: {:?} -> {:?}", link, target_abs);
     Ok(())
 }
 
@@ -197,11 +203,13 @@ pub async fn find_all_links(directory: &Path) -> Result<Vec<SymlinkInfo>> {
                 let link_type = "symlink";
                 
                 #[cfg(windows)]
-                let link_type = if is_dir {
+                let points_to_dir = tokio::fs::metadata(&path).await.map(|m| m.is_dir()).unwrap_or(is_dir);
+                #[cfg(windows)]
+                let link_type = if points_to_dir {
                     "junction"
                 } else {
-                    // For files on Windows, we use hard links but can't detect them reliably
-                    "hardlink"
+                    // Salami: Dateien werden als symbolische Links angelegt (nie Hardlinks)
+                    "symlink"
                 };
                 
                 links.push(SymlinkInfo {
@@ -244,6 +252,27 @@ mod junction_tests {
         assert_eq!(std::fs::read_to_string(link.join("file.txt")).unwrap(), "ok");
 
         std::fs::remove_dir(&link).unwrap();
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[tokio::test]
+    async fn never_hard_links_files_or_network_targets() {
+        let base = std::env::temp_dir().join(format!("salami-filelink-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&base).unwrap();
+        let target = base.join("options.txt");
+        std::fs::write(&target, "original").unwrap();
+        let link = base.join("linked.txt");
+
+        match create_symlink(&target, &link, false).await {
+            // mit Entwicklermodus: ein echter symbolischer Link
+            Ok(()) => assert!(std::fs::symlink_metadata(&link).unwrap().file_type().is_symlink()),
+            // ohne: Fehler statt still einen Hardlink anzulegen
+            Err(_) => assert!(std::fs::symlink_metadata(&link).is_err()),
+        }
+
+        assert!(create_symlink(std::path::Path::new(r"\\attacker\share\x"), &base.join("net"), true).await.is_err());
+        assert!(create_symlink(std::path::Path::new(r"\\attacker\share\x.txt"), &base.join("net.txt"), false).await.is_err());
         let _ = std::fs::remove_dir_all(&base);
     }
 }

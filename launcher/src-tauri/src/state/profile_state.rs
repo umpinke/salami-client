@@ -973,7 +973,11 @@ impl ProfileManager {
 
             // Calculate the path for this profile and compare
             let other_path = path_calculator(profile);
-            if other_path == *target_path {
+            // Salami: auch wenn ein anderes Profil *innerhalb* dieses Ordners liegt (z. B. ein
+            // Profil, dessen Ordner der ganze `groups`-Ordner wäre), nichts wegräumen
+            if other_path == *target_path
+                || (!other_path.as_os_str().is_empty() && other_path.starts_with(target_path))
+            {
                 info!(
                     "Found another profile '{}' (ID: {}) using the same path: {:?}",
                     profile.name, profile_id, target_path
@@ -2393,6 +2397,15 @@ impl ProfileManager {
         sanitize_filename::sanitize(group_name.to_lowercase())
     }
 
+    /// Salami: Ergibt der Gruppenname einen eigenen Ordner? `..`, `.` oder ein leerer Name würden
+    /// zu `groups/` selbst – dann teilten sich alle Gruppen-Profile einen Ordner, und das Löschen
+    /// eines solchen Profils räumte die aller anderen mit weg.
+    pub fn is_valid_group_name(group_name: &str) -> bool {
+        let sanitized = Self::sanitize_group_name(group_name);
+        let trimmed = sanitized.trim();
+        !trimmed.is_empty() && trimmed != "." && trimmed != ".."
+    }
+
     /// Builds the default path using profile.path segments
     pub fn build_path_from_profile_path(profile: &Profile) -> PathBuf {
         Self::resolve_profile_path(&default_profile_path(), &profile.path)
@@ -2426,6 +2439,14 @@ impl ProfileManager {
                 } else {
                     Ok(namespace.join("new"))
                 }
+            } else if !Self::is_valid_group_name(group) {
+                // Salami: ungültiger Gruppenname (`..`, `.`, leer) → eigener Ordner wie ohne Gruppe,
+                // nie `groups/` selbst
+                warn!(
+                    "Profile '{}' has an unusable group name {:?}; using its own folder",
+                    profile.name, group
+                );
+                Ok(Self::build_path_from_profile_path(profile))
             } else {
                 // Other custom groups go to "groups/{sanitized_group_name}"
                 let sanitized_group = Self::sanitize_group_name(group);
@@ -2695,9 +2716,10 @@ impl ProfileManager {
             )));
         }
 
-        let enabled_path = custom_mods_path.join(&filename);
+        // Salami: nur ein schlichter Dateiname direkt in custom_mods (kein `..`, kein Laufwerk)
+        let enabled_path = crate::utils::path_guard::child_path(&custom_mods_path, &filename)?;
         let disabled_filename = format!("{}.disabled", filename);
-        let disabled_path = custom_mods_path.join(&disabled_filename);
+        let disabled_path = crate::utils::path_guard::child_path(&custom_mods_path, &disabled_filename)?;
 
         let current_enabled = enabled_path.exists();
         let currently_exists_as_disabled = disabled_path.exists();
@@ -3654,28 +3676,32 @@ impl ProfileManager {
 
         let custom_mods_dir = self.get_profile_custom_mods_path(profile_id).await?;
 
-        let enabled_path = custom_mods_dir.join(filename); // filename is the base name
+        // Salami: nur ein schlichter Dateiname direkt in custom_mods (kein `..`, kein Laufwerk)
+        let enabled_path = crate::utils::path_guard::child_path(&custom_mods_dir, filename)?;
         let disabled_filename = format!("{}.disabled", filename);
-        let disabled_path = custom_mods_dir.join(&disabled_filename);
+        let disabled_path = crate::utils::path_guard::child_path(&custom_mods_dir, &disabled_filename)?;
 
-        let file_to_delete = if enabled_path.exists() {
+        let file_to_delete = if enabled_path.is_file() {
             Some(enabled_path)
-        } else if disabled_path.exists() {
+        } else if disabled_path.is_file() {
             Some(disabled_path)
         } else {
             None
         };
 
         if let Some(path_to_delete) = file_to_delete {
-            log::debug!("Deleting custom mod file at path: {:?}", path_to_delete);
-            fs::remove_file(&path_to_delete).await.map_err(|e| {
-                log::error!(
-                    "Failed to delete custom mod file {:?}: {}",
-                    path_to_delete,
+            log::debug!("Moving custom mod file to the trash: {:?}", path_to_delete);
+            // Salami: Papierkorb statt endgültig löschen
+            crate::utils::trash_utils::move_path_to_trash(&path_to_delete, Some("files"))
+                .await
+                .map_err(|e| {
+                    log::error!(
+                        "Failed to delete custom mod file {:?}: {}",
+                        path_to_delete,
+                        e
+                    );
                     e
-                );
-                AppError::Io(e)
-            })?; // Propagate IO error
+                })?;
             info!(
                 "Successfully deleted custom mod file corresponding to '{}' for profile {}.",
                 filename, profile_id
@@ -3909,5 +3935,20 @@ mod mods_dir_migration_tests {
         // ohne alten Ordner: einfach der neue Name
         assert_eq!(migrated_mods_dir(&root, "1.20.1-forge"), root.join("salami-1.20.1-forge"));
         let _ = std::fs::remove_dir_all(&root);
+    }
+}
+
+#[cfg(test)]
+mod group_name_tests {
+    use super::ProfileManager;
+
+    #[test]
+    fn group_names_that_would_be_the_groups_folder_itself_are_rejected() {
+        for ok in ["PvP", "Modpacks 2", " leading", "a.b"] {
+            assert!(ProfileManager::is_valid_group_name(ok), "{ok:?}");
+        }
+        for bad in ["", " ", ".", "..", "...", "/", "\\", "con", "?"] {
+            assert!(!ProfileManager::is_valid_group_name(bad), "{bad:?}");
+        }
     }
 }

@@ -400,6 +400,29 @@ fn cape_server_down(e: reqwest::Error) -> AppError {
     AppError::Other(format!("Cape-Server nicht erreichbar: {e}"))
 }
 
+/// Ist `server_id` eine Salami-Anmeldung (`salami-` + 32…64 Kleinbuchstaben-Hex)? Ein echter
+/// Minecraft-Server meldet nie so eine serverId an (dort ist sie ein SHA-1-Hex mit höchstens
+/// einem `-` davor). Nur solche IDs meldet der Launcher bei Mojang an – sonst könnte ein
+/// übernommener Cape-/Sync-Server den Launcher die Anmeldung für einen fremden Minecraft-Server
+/// unterschreiben lassen und sich damit dort als dieser Spieler ausgeben.
+pub(crate) fn is_salami_server_id(server_id: &str) -> bool {
+    let Some(hex) = server_id.strip_prefix("salami-") else {
+        return false;
+    };
+    (32..=64).contains(&hex.len()) && hex.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+}
+
+/// Lehnt eine serverId ab, die keine Salami-Anmeldung ist ([`is_salami_server_id`]).
+pub(crate) fn require_salami_server_id(server_id: &str) -> Result<()> {
+    if is_salami_server_id(server_id) {
+        Ok(())
+    } else {
+        Err(AppError::Other(
+            "Der Server hat eine ungültige Anmelde-ID geschickt – aus Sicherheitsgründen wird sie nicht bei Mojang angemeldet".into(),
+        ))
+    }
+}
+
 /// Anmeldung beim Cape-Server wie beim Betreten eines Minecraft-Servers: der Launcher meldet
 /// eine serverId bei Mojang an, der Cape-Server fragt dort nach. Das Zugangstoken geht nur an
 /// Mojang. → serverId für die eigentliche Anfrage (nur einmal verwendbar)
@@ -413,6 +436,8 @@ pub(crate) async fn authenticate(base: &str, player_id: Uuid, access_token: &str
             .map_err(cape_server_down)?,
     )
     .await?;
+    // Nur Salami-Anmeldungen unterschreiben, nie die eines echten Minecraft-Servers
+    require_salami_server_id(&challenge.server_id)?;
 
     let joined = HTTP_CLIENT
         .post(MOJANG_JOIN_URL)
@@ -445,6 +470,10 @@ pub async fn submit_for_review(
         HTTP_CLIENT
             .post(format!("{base}/v1/capes/submit"))
             .timeout(Duration::from_secs(30))
+            // Anmeldung zusätzlich im Kopf: der Server prüft den Spieler, bevor er das große Bild
+            // liest (ältere Server lesen name/serverId weiter aus dem JSON)
+            .header("X-Salami-Name", player_name)
+            .header("X-Salami-Server-Id", server_id.as_str())
             .json(&serde_json::json!({
                 "name": player_name,
                 "serverId": server_id,
@@ -689,6 +718,33 @@ mod tests {
             .write_to(&mut out, ImageFormat::Png)
             .unwrap();
         out.into_inner()
+    }
+
+    #[test]
+    fn signs_only_salami_server_ids() {
+        let ok32 = format!("salami-{}", "0123456789abcdef".repeat(2));
+        let ok64 = format!("salami-{}", "0123456789abcdef".repeat(4));
+        assert!(is_salami_server_id(&ok32));
+        assert!(is_salami_server_id(&ok64));
+        assert!(require_salami_server_id(&ok32).is_ok());
+        for bad in [
+            // so sieht die serverId eines echten Minecraft-Servers aus
+            "-7c9d5b0044c130109a5d7b5fb5c317c02b4e28c1".to_string(),
+            "4ed1f46bbe04bc756bcb17c0c7ce3e4632f06a48".to_string(),
+            String::new(),
+            "salami-".to_string(),
+            format!("salami-{}", "a".repeat(31)),
+            format!("salami-{}", "a".repeat(65)),
+            format!("salami-{}", "A".repeat(32)),
+            format!("Salami-{}", "a".repeat(32)),
+            format!("salami-{}g", "a".repeat(32)),
+            format!(" salami-{}", "a".repeat(32)),
+            format!("salami-{}\n", "a".repeat(32)),
+            format!("x-salami-{}", "a".repeat(32)),
+        ] {
+            assert!(!is_salami_server_id(&bad), "{bad:?}");
+            assert!(require_salami_server_id(&bad).is_err(), "{bad:?}");
+        }
     }
 
     #[test]

@@ -12,6 +12,8 @@ const REQUEST_TIMEOUT_SECONDS: u64 = 30;
 static HTTP_CLIENT: Lazy<Client> = Lazy::new(|| {
     crate::config::http_client_builder()
         .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECONDS))
+        // Salami: Logs (mit Pfaden/Namen) nur verschlüsselt verschicken
+        .https_only(true)
         .build()
         .expect("Failed to build static HTTP client") // Should not fail in practice
 });

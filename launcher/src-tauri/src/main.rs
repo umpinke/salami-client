@@ -195,8 +195,22 @@ async fn main() {
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        // Salami: per Drag & Drop abgelegte Pfade gelten als vom Nutzer gewählt (utils::user_paths)
+        .on_window_event(|_window, event| {
+            if let tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) = event {
+                utils::user_paths::remember_dropped(paths);
+            }
+        })
+        .on_webview_event(|_webview, event| {
+            if let tauri::WebviewEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) = event {
+                utils::user_paths::remember_dropped(paths);
+            }
+        })
         .setup(|app| {
             let app_handle = app.handle().clone();
+
+            // Salami: Asset-Protokoll nur für die Launcher-Ordner (statt der ganzen Platte)
+            utils::asset_scope::init(&app_handle);
 
             // CLI cold-start: handle subcommands (version short-circuits GUI;
             // launch fires asynchronously after State::init completes).
@@ -430,6 +444,12 @@ async fn main() {
                     std::process::exit(1);
                 }
                 info!("State initialization finished successfully.");
+
+                // Salami: eigener Spielordner und Clip-Ordner aus der Konfiguration anzeigen dürfen
+                if let Ok(state) = state::state_manager::State::get().await {
+                    let config = state.config_manager.get_config().await;
+                    utils::asset_scope::allow_config_dirs(&state_init_app_handle, &config);
+                }
 
                 // Sweep last session's throwaway temp profiles into the trash
                 // (non-blocking, best-effort). The trash's purge_expired retention
@@ -856,6 +876,8 @@ async fn main() {
             commands::clip_commands::clip_rename,
             commands::clip_commands::clip_open_folder,
             utils::online_counter::get_online_count,
+            utils::user_media::allow_user_media,
+            utils::user_media::forget_user_media,
             integrations::norisk_packs::salami_take_pending_pack,
         ])
         .build(tauri::generate_context!())

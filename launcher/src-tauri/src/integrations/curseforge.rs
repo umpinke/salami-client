@@ -1501,7 +1501,7 @@ async fn read_manifest_from_zip(pack_path: &Path) -> Result<String> {
         })?;
 
     // Read the manifest content directly from the ZIP entry
-    let entry_reader = zip
+    let mut entry_reader = zip
         .reader_with_entry(manifest_entry_index)
         .await
         .map_err(|e| {
@@ -1509,11 +1509,16 @@ async fn read_manifest_from_zip(pack_path: &Path) -> Result<String> {
             AppError::Other(format!("Failed to read manifest entry: {}", e))
         })?;
 
-    let mut entry_reader_tokio = entry_reader.compat();
-    let mut buffer = Vec::new();
-    tokio::io::copy(&mut entry_reader_tokio, &mut buffer).await.map_err(|e| {
+    // Salami: höchstens MAX_PACK_MANIFEST_BYTES entpacken (Zip-Bomben)
+    let buffer = crate::utils::import_safety::read_capped(
+        &mut entry_reader,
+        crate::utils::import_safety::MAX_PACK_MANIFEST_BYTES,
+        "manifest.json",
+    )
+    .await
+    .map_err(|e| {
         error!("Failed to read manifest content from ZIP: {}", e);
-        AppError::Io(e)
+        e
     })?;
 
     let content = String::from_utf8(buffer).map_err(|e| {
@@ -1847,6 +1852,7 @@ pub async fn extract_curseforge_overrides(
 
     // Count override files for progress tracking
     let mut override_file_count = 0usize;
+    let mut override_bytes = 0u64;
     for index in 0..num_entries {
         if let Some(entry) = zip_lister.file().entries().get(index) {
             if let Ok(name) = entry.filename().as_str() {
@@ -1854,10 +1860,13 @@ pub async fn extract_curseforge_overrides(
                     && crate::utils::import_safety::canonical_path_under(name, &overrides_dir).is_some()
                 {
                     override_file_count += 1;
+                    override_bytes = override_bytes.saturating_add(entry.uncompressed_size());
                 }
             }
         }
     }
+    // Salami: Zip-Bomben – zu große Packs gar nicht erst entpacken
+    crate::utils::import_safety::check_overrides_budget(override_bytes)?;
 
     // Create a counter for tracking extraction progress
     let extraction_counter = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
@@ -2022,7 +2031,11 @@ pub async fn extract_curseforge_overrides(
                                 e
                             ))
                         })?;
-                    let mut entry_reader_tokio = entry_reader_futures.compat();
+                    // Salami: nie mehr als die angegebene Größe entpacken (Zip-Bomben)
+                    let mut entry_reader_tokio = tokio::io::AsyncReadExt::take(
+                        entry_reader_futures.compat(),
+                        entry_uncompressed_size,
+                    );
 
                     let mut file_writer =
                         fs::File::create(&task_final_dest_path).await.map_err(|e| {
@@ -2396,7 +2409,7 @@ pub async fn download_and_install_curseforge_modpack(
             image_type: "icon".to_string(),
         };
 
-        match crate::commands::path_commands::upload_profile_images(icon_payload).await {
+        match crate::commands::path_commands::store_profile_image(icon_payload).await {
             Ok(relative_icon_path) => {
                 info!(
                     "Successfully set profile icon from URL for profile {}. Icon at: {}",

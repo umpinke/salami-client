@@ -24,14 +24,14 @@ pub async fn salami_app_status() -> CommandResult<AppStatus> {
     Ok(salami_app::status().await)
 }
 
-/// Neuer Kopplungscode (6 Ziffern, 10 min) samt QR-Code. Holt danach im Hintergrund alles
-/// nach, damit die App nach dem Koppeln nicht leer ist.
+/// Neuer Kopplungscode (6 Ziffern, 10 min) samt QR-Code. Salami: Hochgeladen wird erst, wenn
+/// die Geräteliste (`salami_app_devices`, das Fenster fragt sie alle paar Sekunden ab) das erste
+/// gekoppelte Handy zeigt – dann holt der Launcher alles nach.
 #[tauri::command]
 pub async fn salami_app_pair_code() -> CommandResult<PairCode> {
     let (account, name) = active_account().await?;
     let code = salami_app::pair_code(account).await?;
     info!("[Salami-App] pairing code created for {}", name);
-    tokio::spawn(salami_app::sync_everything());
     Ok(code)
 }
 

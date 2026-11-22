@@ -304,14 +304,17 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf, event_id: Option<U
                 AppError::Other(format!("Failed to read profile.json entry: {}", e))
             })?;
 
-        let mut buffer = Vec::new();
-        entry_reader
-            .read_to_end_checked(&mut buffer)
-            .await
-            .map_err(|e| {
-                error!("Failed to read profile.json content: {}", e);
-                AppError::Other(format!("Zip entry read error: {}", e))
-            })?;
+        // Salami: höchstens MAX_PACK_MANIFEST_BYTES entpacken (Zip-Bomben)
+        let buffer = crate::utils::import_safety::read_capped(
+            &mut entry_reader,
+            crate::utils::import_safety::MAX_PACK_MANIFEST_BYTES,
+            "profile.json",
+        )
+        .await
+        .map_err(|e| {
+            error!("Failed to read profile.json content: {}", e);
+            e
+        })?;
 
         String::from_utf8(buffer).map_err(|e| {
             error!("Failed to convert profile.json to string: {}", e);
@@ -429,15 +432,19 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf, event_id: Option<U
 
     // Count override files for progress tracking
     let mut override_file_count = 0usize;
+    let mut override_bytes = 0u64;
     for index in 0..num_entries {
         if let Some(entry) = zip_lister_for_overrides.file().entries().get(index) {
             if let Ok(name) = entry.filename().as_str() {
                 if name.starts_with("overrides/") && !name.ends_with('/') {
                     override_file_count += 1;
+                    override_bytes = override_bytes.saturating_add(entry.uncompressed_size());
                 }
             }
         }
     }
+    // Salami: Zip-Bomben – zu große Packs gar nicht erst entpacken
+    crate::utils::import_safety::check_overrides_budget(override_bytes)?;
 
     // Create a counter for tracking extraction progress
     let extraction_counter = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
@@ -615,7 +622,11 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf, event_id: Option<U
                                 e
                             ))
                         })?;
-                    let mut entry_reader_tokio = entry_reader_futures.compat();
+                    // Salami: nie mehr als die angegebene Größe entpacken (Zip-Bomben)
+                    let mut entry_reader_tokio = tokio::io::AsyncReadExt::take(
+                        entry_reader_futures.compat(),
+                        entry_uncompressed_size,
+                    );
 
                     let mut file_writer =
                         fs::File::create(&task_final_dest_path).await.map_err(|e| {

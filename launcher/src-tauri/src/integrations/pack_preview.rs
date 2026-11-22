@@ -601,11 +601,13 @@ async fn read_zip_entry(zip: &mut PackZip, candidates: &[&str]) -> Result<String
         .await
         .map_err(|e| AppError::Other(format!("Failed to open manifest entry: {}", e)))?;
 
-    let mut buffer = Vec::new();
-    reader
-        .read_to_end_checked(&mut buffer)
-        .await
-        .map_err(|e| AppError::Other(format!("Failed to read manifest entry: {}", e)))?;
+    // Salami: höchstens MAX_PACK_MANIFEST_BYTES entpacken (Zip-Bomben)
+    let buffer = crate::utils::import_safety::read_capped(
+        &mut reader,
+        crate::utils::import_safety::MAX_PACK_MANIFEST_BYTES,
+        "manifest entry",
+    )
+    .await?;
 
     String::from_utf8(buffer)
         .map_err(|e| AppError::Other(format!("Manifest is not valid UTF-8: {}", e)))

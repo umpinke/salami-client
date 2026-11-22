@@ -52,6 +52,23 @@ impl From<ModrinthProjectType> for ContentType {
     }
 }
 
+/// Salami: Alte Version eines Pakets (Shader-, Ressourcen-, Datenpaket) beim Aktualisieren in den
+/// Papierkorb legen statt endgültig zu löschen. Der Name kommt aus der Oberfläche: nur ein
+/// schlichter Dateiname direkt in `dir` (kein `..`, kein Laufwerk) – sonst Fehler, bevor etwas
+/// angefasst wird. → ob etwas verschoben wurde
+pub async fn trash_old_content(dir: &Path, filename: &str) -> Result<bool> {
+    let enabled = crate::utils::path_guard::child_path(dir, filename)?;
+    let disabled = crate::utils::path_guard::child_path(dir, &format!("{}.disabled", filename))?;
+    for path in [enabled, disabled] {
+        if fs::symlink_metadata(&path).await.is_ok() {
+            debug!("Moving old content to the trash: {}", path.display());
+            crate::utils::trash_utils::move_path_to_trash(&path, Some("content_updates")).await?;
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 /// Adds content (resourcepack, shaderpack, datapack) from Modrinth or CurseForge to a profile
 pub async fn add_content_to_profile(
     profile_id: Uuid,

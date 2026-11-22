@@ -640,8 +640,34 @@ pub async fn ping_minecraft_server(
     Ok(ping_result)
 }
 
+/// Salami: Eine Skin-Datei von der Platte nur, wenn der Nutzer sie im Datei-Dialog gewählt hat oder
+/// sie in den Launcher-Ordnern liegt (sonst nativ nachfragen); nie Netzwerkpfade.
+async fn check_skin_source<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    source: &SkinSource,
+) -> Result<(), CommandError> {
+    match source {
+        SkinSource::FilePath(data) => {
+            let path = mc_utils::skin_file_path(&data.path);
+            crate::utils::user_paths::require_readable_choice(
+                app,
+                &path,
+                "Der Launcher soll diese Datei als Skin lesen:\nThe launcher will read this file as a skin:",
+            )
+            .await?;
+        }
+        SkinSource::Url(data) => {
+            mc_utils::check_skin_url(&data.url)?;
+        }
+        // Base64 kommt aus der Oberfläche selbst, Profile über die Mojang-API – nichts zu prüfen
+        SkinSource::Base64(_) | SkinSource::Profile(_) => {}
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn add_skin_locally(
+    app: tauri::AppHandle,
     payload: AddLocalSkinCommandPayload,
 ) -> Result<MinecraftSkin, CommandError> {
     info!(
@@ -651,6 +677,9 @@ pub async fn add_skin_locally(
 
     let mut final_skin_name = payload.target_skin_name.clone();
     let final_skin_variant = payload.target_skin_variant.clone();
+
+    // Salami: Datei nur aus Dialog/Launcher-Ordnern, Adresse nur https zu Skin-Seiten
+    check_skin_source(&app, &payload.source).await?;
 
     // Extract base64 data using the reusable function
     let base64_data = get_base64_from_skin_source(&payload.source).await?;
@@ -738,6 +767,7 @@ pub async fn add_skin_locally(
 
 #[tauri::command]
 pub async fn get_base64_from_skin_source_command(
+    app: tauri::AppHandle,
     source: SkinSource,
 ) -> Result<String, CommandError> {
     debug!(
@@ -745,6 +775,8 @@ pub async fn get_base64_from_skin_source_command(
         source
     );
 
+    // Salami: Datei nur aus Dialog/Launcher-Ordnern, Adresse nur https zu Skin-Seiten
+    check_skin_source(&app, &source).await?;
     let base64_data = get_base64_from_skin_source(&source).await?;
 
     debug!(

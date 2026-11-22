@@ -36,11 +36,23 @@ pub struct ListExternalInstancesParams {
 
 #[tauri::command]
 pub async fn list_external_instances(
+    app: tauri::AppHandle,
     params: ListExternalInstancesParams,
 ) -> Result<Vec<ExternalInstanceRef>, CommandError> {
     let (adapter, resolved) = detect::open(params.launcher, &PathBuf::from(params.root)).await?;
 
-    Ok(adapter.list_instances(&resolved).await?)
+    let instances = adapter.list_instances(&resolved).await?;
+    // Salami: Das Asset-Protokoll zeigt nur Launcher-Ordner – die Icons der gefundenen Instanzen
+    // (Bilddateien des anderen Launchers) einzeln freigeben
+    for instance in &instances {
+        if let Some(icon) = instance.icon_path.as_deref() {
+            let icon = std::path::Path::new(icon);
+            if crate::utils::user_media::is_media_file(icon) {
+                crate::utils::asset_scope::allow_launcher_file(&app, icon);
+            }
+        }
+    }
+    Ok(instances)
 }
 
 #[derive(Deserialize)]

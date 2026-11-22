@@ -83,18 +83,35 @@ pub fn validate_target_path(path: &str, kind: &SyncTargetKind) -> Result<String>
 }
 
 static PROTECTED_OS_ROOTS: Lazy<Vec<PathBuf>> = Lazy::new(|| {
-    ["SystemRoot", "ProgramFiles", "ProgramFiles(x86)", "ProgramData"]
+    let mut roots: Vec<PathBuf> = ["SystemRoot", "ProgramFiles", "ProgramFiles(x86)", "ProgramData"]
         .iter()
         .filter_map(|key| std::env::var(key).ok())
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
-        .collect()
+        .collect();
+    // Salami: Autostart/Startmenü – eine Datei dort liefe bei der nächsten Anmeldung
+    if let Ok(appdata) = std::env::var("APPDATA") {
+        if !appdata.is_empty() {
+            roots.push(PathBuf::from(appdata).join("Microsoft").join("Windows").join("Start Menu"));
+        }
+    }
+    roots
 });
 
 fn protected_roots() -> Vec<PathBuf> {
     let mut roots = vec![sync_packs_root()];
     roots.extend(PROTECTED_OS_ROOTS.iter().cloned());
     roots
+}
+
+/// Zeigen beide Pfade auf denselben Ort (kanonisch, unter Windows ohne Groß-/Kleinschreibung)?
+pub fn same_location(a: &Path, b: &Path) -> bool {
+    let resolve = |p: &Path| {
+        let resolved = p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
+        comparable(&resolved)
+    };
+    let (a, b) = (resolve(a), resolve(b));
+    !a.is_empty() && a == b
 }
 
 fn comparable(path: &Path) -> String {
@@ -119,6 +136,10 @@ fn reject_external_master(candidate: &Path, protected: &[PathBuf]) -> Result<()>
 
     if !candidate.is_absolute() {
         return Err(reject("it is not an absolute path"));
+    }
+    // Salami: keine Freigaben anderer Rechner (UNC/WebDAV)
+    if crate::utils::path_guard::is_network_path(candidate) {
+        return Err(reject("it is a network path"));
     }
     if candidate.parent().is_none() {
         return Err(reject("it is the root of a drive"));
@@ -168,10 +189,26 @@ pub fn validate_external_master(path: &str) -> Result<PathBuf> {
     }
 
     let candidate = PathBuf::from(strip_unc_prefix(path));
-    let resolved = candidate
-        .canonicalize()
-        .map(|p| PathBuf::from(strip_unc_prefix(&p.to_string_lossy())))
-        .unwrap_or_else(|_| candidate.clone());
+    // Netzwerkpfade nicht erst auflösen (das würde den fremden Rechner kontaktieren)
+    if crate::utils::path_guard::is_network_path(Path::new(path))
+        || crate::utils::path_guard::is_network_path(&candidate)
+    {
+        return Err(AppError::Other(format!(
+            "'{}' cannot be used as a shared folder: it is a network path",
+            path
+        )));
+    }
+    let resolved = match candidate.canonicalize() {
+        // `\\?\UNC\server\share` → Netzwerk (Verknüpfung auf eine Freigabe)
+        Ok(p) if crate::utils::path_guard::is_network_path(&p) => {
+            return Err(AppError::Other(format!(
+                "'{}' cannot be used as a shared folder: it is a network path",
+                path
+            )))
+        }
+        Ok(p) => PathBuf::from(strip_unc_prefix(&p.to_string_lossy())),
+        Err(_) => candidate.clone(),
+    };
 
     reject_external_master(&resolved, &protected_roots())?;
     Ok(resolved)
@@ -201,6 +238,38 @@ pub fn is_temp_profile_path(profile_path: &str) -> bool {
         || [crate::branding::PROFILES_NAMESPACE, crate::branding::LEGACY_PROFILES_NAMESPACE]
             .iter()
             .any(|ns| normalized.starts_with(&format!("{ns}/temp/")) || normalized.contains(&format!("/{ns}/temp/")))
+}
+
+#[cfg(test)]
+mod external_master_tests {
+    use super::*;
+
+    #[test]
+    fn rejects_network_relative_and_protected_masters() {
+        #[cfg(windows)]
+        {
+            for bad in [r"\\attacker\share\options.txt", r"//attacker/share", r"\\?\UNC\attacker\share\x", "relative\\x"] {
+                assert!(validate_external_master(bad).is_err(), "{bad}");
+            }
+            if let Ok(appdata) = std::env::var("APPDATA") {
+                let startup = PathBuf::from(appdata)
+                    .join("Microsoft")
+                    .join("Windows")
+                    .join("Start Menu")
+                    .join("Programs")
+                    .join("Startup")
+                    .join("x.bat");
+                assert!(validate_external_master(&startup.to_string_lossy()).is_err());
+            }
+        }
+        assert!(validate_external_master("").is_err());
+        let ok = std::env::temp_dir().join(format!("salami-sync-master-{}", std::process::id()));
+        std::fs::create_dir_all(&ok).unwrap();
+        assert!(validate_external_master(&ok.to_string_lossy()).is_ok());
+        assert!(same_location(&ok, &ok.join(".")));
+        assert!(!same_location(&ok, &ok.join("other")));
+        let _ = std::fs::remove_dir_all(&ok);
+    }
 }
 
 pub async fn list_pack_local_jars(pack_id: Uuid) -> Result<Vec<PathBuf>> {

@@ -116,9 +116,20 @@ impl MinecraftInstance {
             .filter(|value| !value.trim().is_empty())
         {
             let candidate = PathBuf::from(declared);
-            if candidate.starts_with(root) || candidate.starts_with(dir) {
-                if let Some(found) = first_existing([candidate]).await {
-                    return Some(IconRef::File(found));
+            // Salami: kanonisch vergleichen – `root\..\..\x.png` beginnt zwar textlich mit `root`,
+            // liegt aber außerhalb; Netzwerkpfade gar nicht erst auflösen
+            if !crate::utils::path_guard::is_network_path(&candidate) {
+                let resolved = tokio::fs::canonicalize(&candidate).await.ok();
+                let root = tokio::fs::canonicalize(root).await.ok();
+                let dir = tokio::fs::canonicalize(dir).await.ok();
+                let inside = resolved.as_deref().is_some_and(|path| {
+                    root.as_deref().is_some_and(|r| path.starts_with(r))
+                        || dir.as_deref().is_some_and(|d| path.starts_with(d))
+                });
+                if inside {
+                    if let Some(found) = first_existing([candidate]).await {
+                        return Some(IconRef::File(found));
+                    }
                 }
             }
         }

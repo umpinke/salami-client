@@ -375,6 +375,12 @@ pub async fn revert_crash_fix(applied: AppliedFix) -> Result<(), CommandError> {
             pm.delete_mod(profile_id, new_mod_id).await?;
         }
         AppliedFix::Loader { profile_id, loader_key, prev_use_overwrite, prev_legacy, prev_map } => {
+            // Salami: die Werte kommen aus der Oberfläche zurück – nur echte Loader und Versionen
+            // (sie landen in Download-Adressen und Ordnernamen)
+            crate::state::profile_state::ModLoader::from_str(&loader_key)?;
+            for version in prev_legacy.iter().chain(prev_map.iter()) {
+                crate::utils::import_safety::require_version_like(version)?;
+            }
             let mut p = pm.get_profile(profile_id).await?;
             p.settings.use_overwrite_loader_version = prev_use_overwrite;
             p.settings.overwrite_loader_version = prev_legacy;

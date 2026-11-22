@@ -51,6 +51,75 @@ pub fn http_client_builder() -> reqwest::ClientBuilder {
     reqwest::ClientBuilder::new()
         .user_agent(APP_USER_AGENT)
         .dns_resolver(std::sync::Arc::new(BlockingResolver))
+        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+            let decision = redirect_decision(attempt.url(), attempt.previous());
+            match decision {
+                RedirectDecision::Follow => attempt.follow(),
+                RedirectDecision::Stop => attempt.stop(),
+                RedirectDecision::TooMany => attempt.error("too many redirects"),
+            }
+        }))
+}
+
+/// Salami: CurseForge-Hosts, an die der API-Key (`x-api-key`) gehen darf.
+fn is_curseforge_host(url: &reqwest::Url) -> bool {
+    url.host_str().is_some_and(|host| {
+        let host = host.to_ascii_lowercase();
+        host == "api.curseforge.com"
+            || crate::utils::import_safety::CURSEFORGE_HOSTS.contains(&host.as_str())
+    })
+}
+
+#[derive(Debug, PartialEq)]
+enum RedirectDecision {
+    Follow,
+    Stop,
+    TooMany,
+}
+
+/// Salami: Weiterleitungen folgen wie bisher (höchstens 10), aber nie von https auf http und nie
+/// von einem CurseForge-Host zu einem fremden – reqwest entfernt bei fremden Hosts nur die
+/// Standard-Anmeldeköpfe, nicht den CurseForge-Key `x-api-key`.
+fn redirect_decision(next: &reqwest::Url, previous: &[reqwest::Url]) -> RedirectDecision {
+    if previous.len() >= 10 {
+        return RedirectDecision::TooMany;
+    }
+    let Some(last) = previous.last() else {
+        return RedirectDecision::Follow;
+    };
+    if last.scheme() == "https" && next.scheme() != "https" {
+        return RedirectDecision::Stop;
+    }
+    if previous.iter().any(is_curseforge_host) && !is_curseforge_host(next) {
+        return RedirectDecision::Stop;
+    }
+    RedirectDecision::Follow
+}
+
+#[cfg(test)]
+mod redirect_tests {
+    use super::{redirect_decision, RedirectDecision};
+    use reqwest::Url;
+
+    fn url(s: &str) -> Url {
+        Url::parse(s).unwrap()
+    }
+
+    #[test]
+    fn curseforge_key_never_follows_to_other_hosts() {
+        let cdn = url("https://edge.forgecdn.net/files/1/2/a.jar");
+        assert_eq!(redirect_decision(&url("https://mediafilez.forgecdn.net/files/1/2/a.jar"), &[cdn.clone()]), RedirectDecision::Follow);
+        assert_eq!(redirect_decision(&url("https://evil.example/a.jar"), &[cdn.clone()]), RedirectDecision::Stop);
+        let api = url("https://api.curseforge.com/v1/mods/1");
+        assert_eq!(redirect_decision(&url("https://evil.example/"), &[api]), RedirectDecision::Stop);
+        // andere Hosts leiten wie gewohnt weiter …
+        let modrinth = url("https://cdn.modrinth.com/data/x.jar");
+        assert_eq!(redirect_decision(&url("https://cdn2.modrinth.com/data/x.jar"), &[modrinth.clone()]), RedirectDecision::Follow);
+        // … aber nie von https auf http
+        assert_eq!(redirect_decision(&url("http://cdn.modrinth.com/data/x.jar"), &[modrinth.clone()]), RedirectDecision::Stop);
+        let many: Vec<Url> = (0..10).map(|_| modrinth.clone()).collect();
+        assert_eq!(redirect_decision(&modrinth, &many), RedirectDecision::TooMany);
+    }
 }
 
 /// HTTP Client with launcher agent

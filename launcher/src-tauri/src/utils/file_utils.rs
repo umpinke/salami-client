@@ -43,6 +43,9 @@ pub fn write_atomic_sync(path: &Path, contents: &[u8]) -> Result<()> {
     Ok(())
 }
 
+/// Größtes Icon, das aus einem Archiv gelesen wird.
+const MAX_ARCHIVE_ICON_BYTES: u64 = 8 * 1024 * 1024;
+
 /// Helper function to read a specific zip entry by index and encode it as Base64
 async fn read_zip_entry_as_base64(
     zip: &mut ZipFileReader<tokio::io::BufReader<tokio::fs::File>>,
@@ -56,13 +59,24 @@ async fn read_zip_entry_as_base64(
         ))
     })?;
 
+    // Salami: Icons sind klein – höchstens so viel entpacken (Schutz vor Zip-Bomben)
     let mut buffer = Vec::new();
-    entry_reader.read_to_end(&mut buffer).await.map_err(|e| {
-        AppError::ArchiveReadError(format!(
-            "Failed to read content of {}: {}",
-            entry_filename_for_error, e
-        ))
-    })?;
+    (&mut entry_reader)
+        .take(MAX_ARCHIVE_ICON_BYTES + 1)
+        .read_to_end(&mut buffer)
+        .await
+        .map_err(|e| {
+            AppError::ArchiveReadError(format!(
+                "Failed to read content of {}: {}",
+                entry_filename_for_error, e
+            ))
+        })?;
+    if buffer.len() as u64 > MAX_ARCHIVE_ICON_BYTES {
+        return Err(AppError::ArchiveReadError(format!(
+            "Icon {} is larger than {} bytes",
+            entry_filename_for_error, MAX_ARCHIVE_ICON_BYTES
+        )));
+    }
 
     let base64_string = STANDARD.encode(&buffer);
     Ok(base64_string)

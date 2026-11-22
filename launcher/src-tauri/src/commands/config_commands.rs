@@ -41,6 +41,13 @@ pub async fn set_launcher_config(app: AppHandle, mut config: LauncherConfig) -> 
         config.custom_game_directory = current.custom_game_directory.clone();
     }
 
+    // Salami: neuer Clip-Ordner nur, wenn der Nutzer ihn im Datei-Dialog gewählt hat oder ihn
+    // nativ bestätigt – dort legt der Launcher Dateien ab, listet, lädt hoch und löscht sie.
+    if let Err(e) = guard_clip_output_dir(&app, &current, &mut config).await {
+        warn!("[Config] Clip folder change refused, keeping the previous one: {}", e.message);
+        config.clips.output_dir = current.clips.output_dir.clone();
+    }
+
     // Validate concurrent downloads value
     if config.concurrent_downloads == 0 || config.concurrent_downloads > 10 {
         return Err(CommandError::from(AppError::Other(format!(
@@ -53,8 +60,44 @@ pub async fn set_launcher_config(app: AppHandle, mut config: LauncherConfig) -> 
     state.config_manager.set_config(config.clone()).await?;
     state.apply_io_limit(config.concurrent_io_limit);
 
+    // Salami: bestätigter Spiel-/Clip-Ordner darf in der Oberfläche angezeigt werden
+    crate::utils::asset_scope::allow_config_dirs(&app, &config);
+
     // Return the updated config
     Ok(config)
+}
+
+/// Salami: Clip-Ordner aus der Oberfläche prüfen (siehe `set_launcher_config`).
+async fn guard_clip_output_dir(
+    app: &AppHandle,
+    current: &LauncherConfig,
+    config: &mut LauncherConfig,
+) -> Result<()> {
+    let new_dir = config
+        .clips
+        .output_dir
+        .clone()
+        .filter(|dir| !dir.as_os_str().is_empty());
+    config.clips.output_dir = new_dir.clone();
+    let Some(dir) = new_dir else {
+        return Ok(()); // zurück zum Standardordner ist immer erlaubt
+    };
+    if current.clips.output_dir.as_deref() == Some(dir.as_path()) {
+        return Ok(());
+    }
+    if !dir.is_absolute() {
+        return Err(AppError::Other(format!("Clip folder must be an absolute path: {}", dir.display())).into());
+    }
+    if dir.exists() && !dir.is_dir() {
+        return Err(AppError::Other(format!("Clip folder is not a folder: {}", dir.display())).into());
+    }
+    crate::utils::user_paths::require_user_choice(
+        app,
+        &dir,
+        "Der Launcher soll Clips künftig in diesem Ordner speichern (und dort Clips auflisten, hochladen und löschen):\nThe launcher will save clips to this folder (and list, upload and delete clips there):",
+    )
+    .await?;
+    Ok(())
 }
 
 #[command]

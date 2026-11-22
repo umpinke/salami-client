@@ -511,6 +511,44 @@ fn is_coordinate_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | '+')
 }
 
+/// Salami: Größte Manifest-Datei in einem Modpack (`modrinth.index.json`, `manifest.json` …).
+pub const MAX_PACK_MANIFEST_BYTES: u64 = 32 * 1024 * 1024;
+/// Salami: So viel dürfen die mitgelieferten Dateien (`overrides/`) eines Modpacks entpackt
+/// zusammen höchstens groß sein (laut Inhaltsverzeichnis des Archivs). Jede Datei wird außerdem
+/// nur bis zu ihrer angegebenen Größe entpackt – eine Zip-Bombe kann so nicht die Platte füllen.
+pub const MAX_PACK_OVERRIDES_BYTES: u64 = 16 * 1024 * 1024 * 1024;
+
+/// Salami: Liest einen Archiv-Eintrag ganz, aber höchstens `limit` Bytes (Zip-Bomben).
+pub async fn read_capped<R: futures::AsyncRead + Unpin>(reader: R, limit: u64, what: &str) -> Result<Vec<u8>> {
+    use futures::AsyncReadExt;
+    let mut buffer = Vec::new();
+    reader
+        .take(limit + 1)
+        .read_to_end(&mut buffer)
+        .await
+        .map_err(|e| AppError::Other(format!("Failed to read {}: {}", what, e)))?;
+    if buffer.len() as u64 > limit {
+        return Err(AppError::Other(format!(
+            "{} is larger than {} MiB",
+            what,
+            limit / (1024 * 1024)
+        )));
+    }
+    Ok(buffer)
+}
+
+/// Salami: Summe der angegebenen Größen der mitgelieferten Dateien – zu groß → Fehler.
+pub fn check_overrides_budget(total_declared: u64) -> Result<()> {
+    if total_declared > MAX_PACK_OVERRIDES_BYTES {
+        return Err(AppError::Other(format!(
+            "The modpack's bundled files would unpack to {} GiB (limit {} GiB)",
+            total_declared / (1024 * 1024 * 1024),
+            MAX_PACK_OVERRIDES_BYTES / (1024 * 1024 * 1024)
+        )));
+    }
+    Ok(())
+}
+
 /// Salami: Archiv-Eintrag sicher an einen Zielordner hängen – nur normale Pfadteile, kein
 /// absoluter Pfad, kein Laufwerk, kein `..` (Zip-Slip). `None` heißt: Eintrag überspringen.
 pub fn safe_archive_join(base: &Path, entry: impl AsRef<Path>) -> Option<PathBuf> {
@@ -664,6 +702,17 @@ mod canonical_pack_path_tests {
         for bad in ["a/b", "a\\b", "..", "../x", "C:x", "x?y", "x%2e", "x#y", " x", "x.", ""] {
             assert!(require_version_like(bad).is_err(), "{bad:?}");
         }
+    }
+
+    #[tokio::test]
+    async fn capped_reads_stop_zip_bombs() {
+        let small: &[u8] = b"{\"ok\":true}";
+        assert_eq!(read_capped(small, 64, "manifest").await.unwrap(), small);
+        let big = vec![b'x'; 100];
+        assert!(read_capped(big.as_slice(), 64, "manifest").await.is_err());
+        assert_eq!(read_capped(big.as_slice(), 100, "manifest").await.unwrap().len(), 100);
+        assert!(check_overrides_budget(MAX_PACK_OVERRIDES_BYTES).is_ok());
+        assert!(check_overrides_budget(MAX_PACK_OVERRIDES_BYTES + 1).is_err());
     }
 
     #[test]

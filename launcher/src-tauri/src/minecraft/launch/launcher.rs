@@ -358,6 +358,14 @@ impl MinecraftLauncher {
             "-Dsalami.theme={}",
             if launcher_config.salami_theme { "salami" } else { "default" }
         ));
+        // Salami-Looks: die Menüs im Spiel folgen dem Look, der im Launcher gewählt ist
+        command.arg(format!(
+            "-Dsalami.look={}",
+            match launcher_config.salami_look.as_deref() {
+                Some(look @ ("theke" | "werkbank" | "salumeria")) => look,
+                _ => "theke",
+            }
+        ));
         // Salami Capes: im Launcher gewähltes Cape (builtin:<name>, Pfad oder none)
         command.arg(format!(
             "-Dsalami.cape={}",

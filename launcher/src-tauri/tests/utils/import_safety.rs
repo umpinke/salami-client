@@ -279,7 +279,6 @@ fn safe_relative_path_keeps_folder_names_the_os_allows() {
     for good in [
         "resourcepacks",
         "My Packs",
-        "CON",
         "shaders.backup",
         "a.b.c",
     ] {
@@ -289,6 +288,9 @@ fn safe_relative_path_keeps_folder_names_the_os_allows() {
             good
         );
     }
+    // Salami: reservierte Windows-Namen lehnt safe_relative_path seit der Härtung ab
+    // (`safe_file_component`) – unter Windows wäre `CON` ein Gerät, kein Ordner.
+    assert!(safe_relative_path("CON").is_err());
 }
 
 #[test]

@@ -145,10 +145,6 @@ pub async fn update_resourcepack_from_modrinth(
         })?;
     }
 
-    // Find and delete the old file (including .disabled variant)
-    let old_path = resourcepacks_dir.join(&resourcepack.filename);
-    let old_path_disabled = resourcepacks_dir.join(format!("{}.disabled", resourcepack.filename));
-
     let was_disabled = resourcepack.is_disabled;
 
     // Find the primary file in the new version
@@ -162,25 +158,12 @@ pub async fn update_resourcepack_from_modrinth(
                 new_version.name, new_version.id
             ))
         })?;
+    // Salami: neuen Namen prüfen, bevor das alte Paket weggeräumt wird
+    crate::utils::import_safety::check_content_file_name(&primary_file.filename).map_err(AppError::Other)?;
 
-    // Check and delete the old file
-    if old_path.exists() {
-        debug!("Removing old resource pack file: {}", old_path.display());
-        fs::remove_file(&old_path).await.map_err(|e| {
-            AppError::Other(format!("Failed to remove old resource pack file: {}", e))
-        })?;
-    } else if old_path_disabled.exists() {
-        debug!(
-            "Removing old disabled resource pack file: {}",
-            old_path_disabled.display()
-        );
-        fs::remove_file(&old_path_disabled).await.map_err(|e| {
-            AppError::Other(format!(
-                "Failed to remove old disabled resource pack file: {}",
-                e
-            ))
-        })?;
-    } else {
+    // Salami: alte Datei (auch .disabled) in den Papierkorb – nur ein schlichter Name direkt im
+    // resourcepacks-Ordner, nie ein Pfad aus der Oberfläche
+    if !crate::utils::profile_utils::trash_old_content(&resourcepacks_dir, &resourcepack.filename).await? {
         warn!(
             "Old resource pack file not found: {}",
             resourcepack.filename

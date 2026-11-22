@@ -35,6 +35,34 @@ use tokio::sync::mpsc; // Für den Channel
 const PROCESSES_FILENAME: &str = "processes.json";
 const NOTIFY_EVENT_CHANNEL_BUFFER: usize = 100;
 
+/// Salami: Größte Abweichung zwischen dem gemerkten Startzeitpunkt eines Spiels und dem, den das
+/// Betriebssystem für die PID meldet. Weicht sie stärker ab, gehört die PID inzwischen einem
+/// anderen Programm (PIDs werden wiederverwendet) – das darf der Launcher weder als Spiel
+/// anzeigen noch beenden.
+const PID_START_TOLERANCE_SECS: i64 = 120;
+
+/// Salami: Ist der Prozess mit diesem Startzeitpunkt (Sekunden seit 1970, wie `sysinfo` ihn
+/// meldet) noch das Spiel, das der Launcher um `recorded` gestartet hat?
+pub(crate) fn start_times_match(process_start_secs: u64, recorded: DateTime<Utc>) -> bool {
+    let Ok(start) = i64::try_from(process_start_secs) else {
+        return false;
+    };
+    (start - recorded.timestamp()).abs() <= PID_START_TOLERANCE_SECS
+}
+
+/// Salami: Der Befehl „nach dem Beenden“ läuft nur, wenn er noch genau so in den (nativ
+/// bestätigten) Einstellungen steht.
+pub(crate) fn post_exit_hook_still_configured(hook: &str, configured: Option<&str>) -> bool {
+    let hook = hook.trim();
+    !hook.is_empty() && configured.map(str::trim) == Some(hook)
+}
+
+/// Salami: Läuft unter der PID noch genau dieses Spiel (siehe [`start_times_match`])?
+fn is_same_process(sys: &System, metadata: &ProcessMetadata) -> bool {
+    sys.process(Pid::from(metadata.pid as usize))
+        .is_some_and(|process| start_times_match(process.start_time(), metadata.start_time))
+}
+
 /// Held while a profile launch is prepared and installed; see [`ProcessManager::claim_launch`].
 pub struct LaunchClaim {
     claims: Arc<dashmap::DashSet<Uuid>>,
@@ -437,8 +465,9 @@ impl ProcessManager {
                                                                              // Stattdessen app_handle verwenden oder für ProfileManager den State übergeben.
 
                 for mut metadata in loaded_metadata {
-                    let process_pid = Pid::from(metadata.pid as usize);
-                    if sys.process(process_pid).is_some() {
+                    // Salami: nur, wenn unter der PID noch dasselbe Spiel läuft (PIDs werden
+                    // wiederverwendet – sonst würde „Stoppen“ ein fremdes Programm beenden)
+                    if is_same_process(&sys, &metadata) {
                         if metadata.state == ProcessState::Starting
                             || metadata.state == ProcessState::Stopping
                         {
@@ -1273,7 +1302,16 @@ impl ProcessManager {
             let pid_to_refresh = Pid::from(pid_to_kill as usize);
             sys.refresh_processes(ProcessesToUpdate::Some(&[pid_to_refresh]), false);
 
-            if let Some(sys_process) = sys.process(pid_to_refresh) {
+            // Salami: nie ein anderes Programm beenden, das die PID inzwischen bekommen hat
+            let same_process = is_same_process(&sys, &process.metadata);
+            if !same_process && sys.process(pid_to_refresh).is_some() {
+                log::warn!(
+                    "PID {} now belongs to another program (start time differs); not killing it, treating process {} as stopped.",
+                    pid_to_kill,
+                    process_id
+                );
+                kill_successful = true;
+            } else if let Some(sys_process) = sys.process(pid_to_refresh) {
                 if sys_process.kill() {
                     log::info!("Kill signal sent successfully to PID {}.", pid_to_kill);
                     kill_successful = true;
@@ -1353,7 +1391,7 @@ impl ProcessManager {
             interval.tick().await;
             log::trace!("Running periodic process and watcher check...");
 
-            let mut pids_to_check_in_map: Vec<(Uuid, u32)> = Vec::new();
+            let mut pids_to_check_in_map: Vec<(Uuid, u32, DateTime<Utc>)> = Vec::new();
             {
                 let processes_map_reader = processes_arc.read().await;
                 if processes_map_reader.is_empty() {
@@ -1362,7 +1400,7 @@ impl ProcessManager {
                 } else {
                     pids_to_check_in_map = processes_map_reader
                         .iter()
-                        .map(|(id, process)| (*id, process.metadata.pid))
+                        .map(|(id, process)| (*id, process.metadata.pid, process.metadata.start_time))
                         .collect();
                 }
             }
@@ -1379,13 +1417,17 @@ impl ProcessManager {
                 let mut sys = System::new();
                 let pids_to_refresh: Vec<Pid> = pids_to_check_in_map
                     .iter()
-                    .map(|(_, pid_u32)| Pid::from(*pid_u32 as usize)) // Dereferenzieren von pid_u32
+                    .map(|(_, pid_u32, _)| Pid::from(*pid_u32 as usize)) // Dereferenzieren von pid_u32
                     .collect();
                 sys.refresh_processes(ProcessesToUpdate::Some(&pids_to_refresh), false);
 
-                for (id, pid) in pids_to_check_in_map {
+                for (id, pid, started) in pids_to_check_in_map {
                     // Hier pids_to_check_in_map verwenden, nicht pids_to_refresh
-                    if sys.process(Pid::from(pid as usize)).is_none() {
+                    // Salami: eine wiederverwendete PID (anderer Startzeitpunkt) zählt als beendet
+                    let still_ours = sys
+                        .process(Pid::from(pid as usize))
+                        .is_some_and(|p| start_times_match(p.start_time(), started));
+                    if !still_ours {
                         log::warn!("Periodic check found managed process {} (PID: {}) no longer running. Marking for removal.", id, pid);
                         dead_process_ids_from_map.push(id);
                     } else {
@@ -1785,6 +1827,17 @@ impl ProcessManager {
             None => return, // No process metadata available
         };
 
+        // Salami: nur den Befehl ausführen, der jetzt noch (nativ bestätigt) in den Einstellungen
+        // steht – nie einen, der nur in processes.json oder alten Prozessdaten auftaucht
+        let configured = state.config_manager.get_config().await.hooks.post_exit;
+        if !post_exit_hook_still_configured(hook, configured.as_deref()) {
+            log::warn!(
+                "Post-exit hook of process {} is no longer the configured one; not running it.",
+                process_id
+            );
+            return;
+        }
+
         log::info!(
             "Executing post-exit hook for process {}: {}",
             process_id,
@@ -1949,4 +2002,32 @@ impl PostInitializationHandler for ProcessManager {
 
 pub fn default_processes_path() -> PathBuf {
     LAUNCHER_DIRECTORY.root_dir().join(PROCESSES_FILENAME)
+}
+
+#[cfg(test)]
+mod pid_reuse_tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    #[test]
+    fn a_reused_pid_is_not_our_game() {
+        let started = Utc.with_ymd_and_hms(2026, 11, 22, 12, 0, 0).unwrap();
+        let at = started.timestamp() as u64;
+        assert!(start_times_match(at, started));
+        assert!(start_times_match(at + 5, started));
+        assert!(start_times_match(at - 3, started));
+        // dieselbe PID, aber Stunden später gestartet: ein anderes Programm
+        assert!(!start_times_match(at + 3 * 3600, started));
+        assert!(!start_times_match(at - 3600, started));
+        assert!(!start_times_match(0, started));
+    }
+
+    #[test]
+    fn post_exit_hook_runs_only_while_configured() {
+        assert!(post_exit_hook_still_configured("backup.bat", Some("backup.bat")));
+        assert!(post_exit_hook_still_configured(" backup.bat ", Some("backup.bat")));
+        assert!(!post_exit_hook_still_configured("evil.exe", Some("backup.bat")));
+        assert!(!post_exit_hook_still_configured("backup.bat", None));
+        assert!(!post_exit_hook_still_configured("", Some("")));
+    }
 }

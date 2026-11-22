@@ -1683,6 +1683,108 @@ pub async fn fetch_image_as_base64(url: &str) -> Result<String> {
     Ok(BASE64.encode(&download_bytes(url).await?))
 }
 
+/// Salami: Seiten, von denen Skins per Adresse geladen werden dürfen (nur https). Andere Adressen
+/// – vor allem `localhost` oder Geräte im Heimnetz – lädt der Launcher nicht.
+pub const SKIN_URL_HOSTS: &[&str] = &[
+    "textures.minecraft.net",
+    "crafatar.com",
+    "mc-heads.net",
+    "minotar.net",
+    "visage.surgeplay.com",
+    "s.namemc.com",
+    "namemc.com",
+    "www.minecraftskins.com",
+    "minecraftskins.com",
+    "novaskin.me",
+    "www.planetminecraft.com",
+    "static.planetminecraft.com",
+    "skinmc.net",
+    "mineskin.org",
+    "i.imgur.com",
+    "raw.githubusercontent.com",
+    "cdn.discordapp.com",
+    "media.discordapp.net",
+];
+
+const MAX_SKIN_BYTES: usize = 2 * 1024 * 1024;
+
+/// Salami: Adresse eines Skins: nur https zu [`SKIN_URL_HOSTS`].
+pub fn check_skin_url(url: &str) -> Result<url::Url> {
+    let parsed = url::Url::parse(url)
+        .map_err(|_| AppError::InvalidInput(format!("Keine gültige Adresse / not a valid URL: {}", url)))?;
+    let host = parsed.host_str().unwrap_or_default().to_ascii_lowercase();
+    if parsed.scheme() != "https" || !SKIN_URL_HOSTS.contains(&host.as_str()) {
+        return Err(AppError::InvalidInput(format!(
+            "Skins nur per https von bekannten Skin-Seiten / skins only via https from known skin sites ({})",
+            SKIN_URL_HOSTS.join(", ")
+        )));
+    }
+    Ok(parsed)
+}
+
+/// Salami: Ist das ein PNG in Skin-Größe (64×64, 64×32 oder HD-Vielfache bis 1024)?
+pub fn check_skin_png(bytes: &[u8]) -> Result<()> {
+    if bytes.len() > MAX_SKIN_BYTES {
+        return Err(AppError::InvalidInput("Skin-Datei ist zu groß / skin file is too large".into()));
+    }
+    if image::guess_format(bytes).ok() != Some(image::ImageFormat::Png) {
+        return Err(AppError::InvalidInput("Skins müssen PNG-Bilder sein / skins must be PNG images".into()));
+    }
+    let (width, height) = image::ImageReader::with_format(std::io::Cursor::new(bytes), image::ImageFormat::Png)
+        .into_dimensions()
+        .map_err(|e| AppError::InvalidInput(format!("Skin-Bild unlesbar / unreadable skin image: {}", e)))?;
+    let side_ok = width >= 64 && width <= 1024 && width % 64 == 0;
+    if !side_ok || !(height == width || height * 2 == width) {
+        return Err(AppError::InvalidInput(format!(
+            "Kein Skin-Format ({}×{}) / not a skin layout",
+            width, height
+        )));
+    }
+    Ok(())
+}
+
+/// Salami: Skin von einer erlaubten Adresse laden – Weiterleitungen nur zu erlaubten Seiten,
+/// Größe begrenzt, Inhalt muss ein Skin-PNG sein.
+async fn download_skin_png(url: &str) -> Result<Vec<u8>> {
+    use futures::StreamExt;
+    check_skin_url(url)?;
+    let client = crate::config::http_client_builder()
+        .connect_timeout(crate::config::HTTP_CONNECT_TIMEOUT)
+        .timeout(std::time::Duration::from_secs(30))
+        .https_only(true)
+        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+            if attempt.previous().len() > 5 {
+                return attempt.error("too many redirects");
+            }
+            if check_skin_url(attempt.url().as_str()).is_ok() {
+                attempt.follow()
+            } else {
+                attempt.stop()
+            }
+        }))
+        .build()
+        .map_err(|e| AppError::Other(format!("HTTP client: {}", e)))?;
+    let response = client.get(url).send().await.map_err(AppError::MinecraftApi)?;
+    if !response.status().is_success() {
+        return Err(AppError::Other(format!(
+            "Failed to download from URL {}: {}",
+            url,
+            response.status()
+        )));
+    }
+    let mut bytes = Vec::new();
+    let mut stream = response.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(AppError::MinecraftApi)?;
+        if bytes.len() + chunk.len() > MAX_SKIN_BYTES {
+            return Err(AppError::InvalidInput("Skin-Datei ist zu groß / skin file is too large".into()));
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    check_skin_png(&bytes)?;
+    Ok(bytes)
+}
+
 pub fn normalize_uuid(uuid: &str) -> String {
     uuid.replace('-', "").to_lowercase()
 }
@@ -1842,6 +1944,19 @@ pub fn extract_skin_info_from_profile(
     Ok((skin_url, skin_variant, profile_name))
 }
 
+/// Pfad aus einer FilePath-Quelle (`/C:/Users/…` → `C:/Users/…` unter Windows).
+pub fn skin_file_path(raw: &str) -> PathBuf {
+    let mut corrected = raw.to_string();
+    if cfg!(windows)
+        && corrected.starts_with('/')
+        && corrected.len() > 2
+        && corrected.chars().nth(2) == Some(':')
+    {
+        corrected.remove(0);
+    }
+    PathBuf::from(corrected)
+}
+
 /// Extracts base64 encoded image data from various SkinSource types.
 /// This function handles all the logic for fetching and encoding skin data from different sources.
 ///
@@ -1873,7 +1988,8 @@ pub async fn get_base64_from_skin_source(source: &SkinSource) -> Result<String> 
                 "[MC Utils] Processing URL source: {}",
                 url_data.url
             );
-            fetch_image_as_base64(&url_data.url).await
+            // Salami: nur https von bekannten Skin-Seiten, nur Skin-PNGs
+            Ok(BASE64.encode(download_skin_png(&url_data.url).await?))
         }
         SkinSource::FilePath(filepath_data) => {
             debug!(
@@ -1881,21 +1997,15 @@ pub async fn get_base64_from_skin_source(source: &SkinSource) -> Result<String> 
                 filepath_data.path
             );
 
-            let mut corrected_path_string = filepath_data.path.clone();
-            if cfg!(windows) {
-                // Example: /C:/Users/username -> C:/Users/username
-                if corrected_path_string.starts_with("/")
-                    && corrected_path_string.len() > 2
-                    && corrected_path_string.chars().nth(2) == Some(':')
-                {
-                    corrected_path_string.remove(0);
-                }
-            }
-            let corrected_path = PathBuf::from(corrected_path_string);
+            // Salami: der Aufrufer (Befehl) hat den Pfad schon geprüft (`skin_file_path`)
+            let corrected_path = skin_file_path(&filepath_data.path);
             debug!(
                 "[MC Utils] Using corrected path for reading: {:?}",
                 corrected_path
             );
+            if tokio::fs::metadata(&corrected_path).await.map(|m| m.len()).unwrap_or(0) > MAX_SKIN_BYTES as u64 {
+                return Err(AppError::InvalidInput("Skin-Datei ist zu groß / skin file is too large".into()));
+            }
 
             let file_content = tokio::fs::read(&corrected_path).await.map_err(|e| {
                 error!(
@@ -1904,6 +2014,7 @@ pub async fn get_base64_from_skin_source(source: &SkinSource) -> Result<String> 
                 );
                 AppError::Io(e)
             })?;
+            check_skin_png(&file_content)?;
             Ok(BASE64.encode(&file_content))
         }
         SkinSource::Base64(base64_content_data) => {

@@ -35,19 +35,49 @@ pub struct FileInfo {
     pub modified: i64, // Unix timestamp
 }
 
+/// Salami: Ordner, deren Einträge auch Ordner sein dürfen (Pakete in Ordnerform). Überall sonst
+/// arbeiten Datei-Befehle der Oberfläche nur mit Dateien – sonst ließe sich z. B. ein ganzer
+/// Profilordner verschieben.
+const FOLDER_ENTRY_PARENTS: &[&str] = &["shaderpacks", "resourcepacks", "datapacks"];
+
+/// Salami: Pfad aus der Oberfläche → (kanonischer Elternordner in den Launcher-Ordnern,
+/// Basisname ohne `.disabled`). Lehnt `..`, `.`, Laufwerke und geschützte Dateien ab.
+fn checked_launcher_entry(file_path: &str) -> Result<(PathBuf, String), CommandError> {
+    let input_path = PathBuf::from(file_path);
+    if crate::utils::path_guard::is_protected(&input_path) {
+        return Err(CommandError::from(AppError::Other("Changing this file is not allowed".to_string())));
+    }
+    let name = crate::utils::path_guard::plain_file_name(&input_path)?;
+    let parent = input_path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .ok_or_else(|| AppError::Other(format!("Not a full path: {}", file_path)))?;
+    let parent_dir = crate::utils::path_guard::ensure_allowed(parent)?;
+    let base = name.strip_suffix(".disabled").unwrap_or(&name).to_string();
+    crate::utils::import_safety::safe_file_component(&base)?;
+    if crate::utils::path_guard::is_protected(Path::new(&base)) {
+        return Err(CommandError::from(AppError::Other("Changing this file is not allowed".to_string())));
+    }
+    Ok((parent_dir, base))
+}
+
+fn folder_entries_allowed(parent_dir: &Path) -> bool {
+    parent_dir
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(|n| FOLDER_ENTRY_PARENTS.iter().any(|p| n.eq_ignore_ascii_case(p)))
+        .unwrap_or(false)
+}
+
 /// Sets a file as enabled or disabled by adding or removing the .disabled extension
 #[tauri::command]
 pub async fn set_file_enabled(file_path: String, enabled: bool) -> Result<(), CommandError> {
     let input_path = PathBuf::from(&file_path);
-    // Salami: nur innerhalb der Launcher-Ordner, nie geschützte Dateien
-    if crate::utils::path_guard::is_protected(&input_path) {
-        return Err(CommandError::from(AppError::Other("Changing this file is not allowed".to_string())));
-    }
-    crate::utils::path_guard::ensure_allowed(input_path.parent().unwrap_or_else(|| Path::new(".")))?;
+    // Salami: nur innerhalb der Launcher-Ordner, nie geschützte Dateien, nur schlichte Namen
+    let (parent_dir_buf, true_base_name_checked) = checked_launcher_entry(&file_path)?;
 
-    let input_filename_cow = input_path.file_name().unwrap_or_default().to_string_lossy();
-    let input_filename = input_filename_cow.as_ref();
-    let parent_dir = input_path.parent().unwrap_or_else(|| Path::new("")); // Handles case where input_path might be just a filename
+    let input_filename = true_base_name_checked.as_str();
+    let parent_dir = parent_dir_buf.as_path();
 
     // Determine the true base name by stripping .disabled if it exists on the input filename
     let true_base_name = if input_filename.ends_with(".disabled") {
@@ -91,6 +121,14 @@ pub async fn set_file_enabled(file_path: String, enabled: bool) -> Result<(), Co
         );
         log::error!("{}", error_message);
         return Err(CommandError::from(AppError::Other(error_message)));
+    }
+
+    // Salami: Ordner nur in Paket-Ordnern umbenennen, sonst nur Dateien
+    if current_path.is_dir() && !folder_entries_allowed(parent_dir) {
+        return Err(CommandError::from(AppError::Other(format!(
+            "Not a file: {}",
+            current_path.display()
+        ))));
     }
 
     // Check if the file is already in the desired state.
@@ -158,24 +196,13 @@ pub async fn set_file_enabled(file_path: String, enabled: bool) -> Result<(), Co
 #[tauri::command]
 pub async fn delete_file(file_path: String) -> Result<(), CommandError> {
     let input_path = PathBuf::from(&file_path);
-    // Salami: nur innerhalb der Launcher-Ordner, nie geschützte Dateien
-    if crate::utils::path_guard::is_protected(&input_path) {
-        return Err(CommandError::from(AppError::Other("Deleting this file is not allowed".to_string())));
-    }
-    crate::utils::path_guard::ensure_allowed(input_path.parent().unwrap_or_else(|| Path::new(".")))?;
+    // Salami: nur innerhalb der Launcher-Ordner, nie geschützte Dateien, nur schlichte Namen
+    // (`…\mods\..` hätte sonst den Ordner `mods` selbst gemeint)
+    let (parent_dir_buf, effective_base) = checked_launcher_entry(&file_path)?;
 
     // Determine the parent directory and the effective base file name (without .disabled potentially)
-    let parent_dir = input_path.parent().unwrap_or_else(|| Path::new("."));
-    let input_file_name_cow = input_path.file_name().unwrap_or_default().to_string_lossy();
-    let input_file_name = input_file_name_cow.as_ref();
-
-    let effective_base_file_name = if input_file_name.ends_with(".disabled") {
-        input_file_name
-            .strip_suffix(".disabled")
-            .unwrap_or(input_file_name)
-    } else {
-        input_file_name
-    };
+    let parent_dir = parent_dir_buf.as_path();
+    let effective_base_file_name = effective_base.as_str();
 
     info!(
         "Attempting to delete file based on effective base name: '{}' (from input '{}')",
@@ -221,6 +248,14 @@ pub async fn delete_file(file_path: String) -> Result<(), CommandError> {
         );
         CommandError::from(AppError::Io(e))
     })?;
+
+    // Salami: Ordner nur in Paket-Ordnern (Shader in Ordnerform), sonst nur Dateien
+    if metadata.is_dir() && !folder_entries_allowed(parent_dir) {
+        return Err(CommandError::from(AppError::Other(format!(
+            "Not a file: {}",
+            actual_path_to_delete.display()
+        ))));
+    }
 
     // Move to trash instead of hard delete
     let category = if metadata.is_dir() { Some("directories") } else { Some("files") };
@@ -280,6 +315,13 @@ pub async fn open_file_directory(
     }
 }
 
+/// Salami: Höchstens so viele Archive pro Aufruf (ein Profil hat selten mehr Mods).
+const MAX_ICON_ARCHIVES: usize = 5_000;
+/// Salami: Größte Vorschau und größtes Ausgangsbild für `get_image_preview`.
+const MAX_PREVIEW_SIDE: u32 = 2048;
+const MAX_PREVIEW_SOURCE_BYTES: u64 = 64 * 1024 * 1024;
+const MAX_PREVIEW_SOURCE_SIDE: u32 = 16_384;
+
 /// Fetches the first PNG icon found within a list of archive files (.zip, .jar) as Base64 strings.
 ///
 /// # Arguments
@@ -298,9 +340,17 @@ pub async fn get_icons_for_archives(
     info!("Fetching icons for {} archives...", archive_paths.len());
     let mut results_map: HashMap<String, Option<String>> = HashMap::new();
 
-    for path_str in archive_paths {
-        let archive_path = Path::new(&path_str);
-        let result = file_utils::find_first_png_in_archive_as_base64(archive_path).await;
+    for path_str in archive_paths.into_iter().take(MAX_ICON_ARCHIVES) {
+        // Salami: nur Archive innerhalb der Launcher-Ordner (keine beliebigen Dateien lesen)
+        let archive_path = match crate::utils::path_guard::ensure_allowed(Path::new(&path_str)) {
+            Ok(path) => path,
+            Err(e) => {
+                warn!("Refusing icon lookup for {}: {}", path_str, e);
+                results_map.insert(path_str, None);
+                continue;
+            }
+        };
+        let result = file_utils::find_first_png_in_archive_as_base64(&archive_path).await;
 
         match result {
             Ok(base64_icon) => {
@@ -454,7 +504,18 @@ pub async fn get_image_preview(
         payload.path, payload.width, payload.height, payload.quality
     );
 
-    let image_path = PathBuf::from(&payload.path);
+    // Salami: Vorschaugröße begrenzen (sonst ließe sich mit riesigen Maßen der Speicher füllen)
+    if payload.width.is_some_and(|w| w == 0 || w > MAX_PREVIEW_SIDE)
+        || payload.height.is_some_and(|h| h == 0 || h > MAX_PREVIEW_SIDE)
+    {
+        return Err(CommandError::from(AppError::InvalidInput(format!(
+            "Preview size must be between 1 and {} pixels",
+            MAX_PREVIEW_SIDE
+        ))));
+    }
+
+    // Salami: nur Bilder innerhalb der Launcher-Ordner (keine beliebigen Dateien lesen)
+    let image_path = crate::utils::path_guard::ensure_allowed(Path::new(&payload.path))?;
 
     if !image_path.exists() {
         let error_msg = format!("Image file not found: {}", image_path.display());
@@ -465,6 +526,12 @@ pub async fn get_image_preview(
         let error_msg = format!("Path is not a file: {}", image_path.display());
         error!("{}", error_msg);
         return Err(CommandError::from(AppError::Other(error_msg)));
+    }
+    if fs::metadata(&image_path).await.map(|m| m.len()).unwrap_or(0) > MAX_PREVIEW_SOURCE_BYTES {
+        return Err(CommandError::from(AppError::InvalidInput(format!(
+            "Image is too large for a preview: {}",
+            image_path.display()
+        ))));
     }
 
     // Read the original image bytes
@@ -478,7 +545,19 @@ pub async fn get_image_preview(
     };
 
     // Load image using the 'image' crate for broad format support and metadata
-    let img: DynamicImage = match image::load_from_memory(&image_bytes) {
+    // Salami: mit Grenzen für Maße und Speicher (Dekompressionsbomben)
+    let decoded = image::ImageReader::new(Cursor::new(&image_bytes))
+        .with_guessed_format()
+        .map_err(|e| CommandError::from(AppError::Other(format!("Failed to read image: {}", e))))
+        .map(|mut reader| {
+            let mut limits = image::Limits::default();
+            limits.max_image_width = Some(MAX_PREVIEW_SOURCE_SIDE);
+            limits.max_image_height = Some(MAX_PREVIEW_SOURCE_SIDE);
+            limits.max_alloc = Some(512 * 1024 * 1024);
+            reader.limits(limits);
+            reader.decode()
+        })?;
+    let img: DynamicImage = match decoded {
         Ok(img) => img,
         Err(e) => {
             let error_msg = format!(

@@ -170,7 +170,9 @@ pub async fn copy_world_directory(
         .get_profile_instance_path(source_profile_id)
         .await?;
     let source_saves_path = source_instance_path.join("saves");
-    let source_world_path = source_saves_path.join(source_world_folder);
+    // Salami: nur ein schlichter Ordnername direkt in saves (kein `..`, kein Laufwerk)
+    let source_world_path = crate::utils::path_guard::child_path(&source_saves_path, source_world_folder)
+        .map_err(|_| AppError::InvalidInput("Source folder name invalid.".to_string()))?;
 
     let target_instance_path = profile_manager
         .get_profile_instance_path(target_profile_id)
@@ -735,7 +737,11 @@ pub async fn delete_world_directory(profile_id: Uuid, world_folder: &str) -> Res
         .get_profile_instance_path(profile_id)
         .await?;
     let saves_path = instance_path.join("saves");
-    let world_path = saves_path.join(world_folder);
+    // Salami: nur ein schlichter Ordnername direkt in saves – `..` oder `D:` hätten sonst den
+    // Profilordner bzw. ein ganzes Laufwerk gemeint
+    let world_path = crate::utils::path_guard::child_path(&saves_path, world_folder).map_err(|_| {
+        AppError::InvalidInput("Invalid world folder name provided.".to_string())
+    })?;
 
     info!("Target world path for deletion: {}", world_path.display());
 

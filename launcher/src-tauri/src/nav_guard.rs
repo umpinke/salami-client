@@ -44,10 +44,12 @@ pub fn is_allowed(window_label: &str, url: &Url) -> bool {
 
 fn is_local(url: &Url) -> bool {
     match url.scheme() {
-        "tauri" | "asset" => true,
+        // Salami: `asset:` / asset.localhost nie als ganze Seite – dort lägen lokale Dateien
+        // (z. B. eine HTML-Datei aus einem Profil) mit Zugriff auf die Launcher-Befehle
+        "tauri" => true,
         "about" => url.as_str() == "about:blank",
         "http" | "https" => match url.host_str() {
-            Some("tauri.localhost") | Some("asset.localhost") | Some("ipc.localhost") => true,
+            Some("tauri.localhost") | Some("ipc.localhost") => true,
             // `tauri dev` lädt die Oberfläche vom Vite-Server
             Some("localhost") | Some("127.0.0.1") => cfg!(debug_assertions),
             _ => false,
@@ -84,6 +86,9 @@ mod tests {
         assert!(!is_allowed("main", &url("https://login.live.com/")));
         assert!(!is_allowed("main", &url("file:///C:/Users/x/AppData/Roaming/salamiclient/SalamiClient/accounts.json")));
         assert!(!is_allowed("main", &url("javascript:alert(1)")));
+        assert!(!is_allowed("main", &url("http://asset.localhost/C%3A%2Fx%2Fevil.html")));
+        assert!(!is_allowed("main", &url("asset://localhost/C%3A%2Fx%2Fevil.html")));
+        assert!(!is_allowed("signin", &url("http://asset.localhost/x.html")));
     }
 
     #[test]

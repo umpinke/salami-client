@@ -141,10 +141,6 @@ pub async fn update_datapack_from_modrinth(
             .map_err(|e| AppError::Other(format!("Failed to create datapacks directory: {}", e)))?;
     }
 
-    // Find and delete the old file (including .disabled variant)
-    let old_path = datapacks_dir.join(&datapack.filename);
-    let old_path_disabled = datapacks_dir.join(format!("{}.disabled", datapack.filename));
-
     let was_disabled = datapack.is_disabled;
 
     // Find the primary file in the new version
@@ -163,24 +159,12 @@ pub async fn update_datapack_from_modrinth(
             ))
         })?;
 
-    // Check and delete the old file
-    if old_path.exists() {
-        debug!("Removing old data pack file: {}", old_path.display());
-        fs::remove_file(&old_path)
-            .await
-            .map_err(|e| AppError::Other(format!("Failed to remove old data pack file: {}", e)))?;
-    } else if old_path_disabled.exists() {
-        debug!(
-            "Removing old disabled data pack file: {}",
-            old_path_disabled.display()
-        );
-        fs::remove_file(&old_path_disabled).await.map_err(|e| {
-            AppError::Other(format!(
-                "Failed to remove old disabled data pack file: {}",
-                e
-            ))
-        })?;
-    } else {
+    // Salami: neuen Namen prüfen, bevor das alte Paket weggeräumt wird
+    crate::utils::import_safety::check_content_file_name(&primary_file.filename).map_err(AppError::Other)?;
+
+    // Salami: alte Datei (auch .disabled) in den Papierkorb – nur ein schlichter Name direkt im
+    // datapacks-Ordner, nie ein Pfad aus der Oberfläche
+    if !crate::utils::profile_utils::trash_old_content(&datapacks_dir, &datapack.filename).await? {
         warn!("Old data pack file not found: {}", datapack.filename);
     }
 

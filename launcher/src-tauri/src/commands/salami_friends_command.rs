@@ -68,7 +68,19 @@ pub async fn salami_friends_read(with: String) -> CommandResult<()> {
 
 /// Bild oder Clip von der Festplatte an einen Freund schicken.
 #[tauri::command]
-pub async fn salami_friends_send_file(to: String, path: String) -> CommandResult<Value> {
+pub async fn salami_friends_send_file(
+    app: tauri::AppHandle,
+    to: String,
+    path: String,
+) -> CommandResult<Value> {
+    // Salami: nur eine Datei, die der Nutzer gewählt/hereingezogen hat oder die der Launcher ohnehin
+    // anzeigt (Screenshots, Clips) – sonst nativ nachfragen, bevor sie den PC verlässt
+    crate::utils::user_paths::require_readable_choice(
+        &app,
+        Path::new(&path),
+        "Der Launcher soll diese Datei an einen Freund schicken (sie wird hochgeladen):\nThe launcher will send this file to a friend (it will be uploaded):",
+    )
+    .await?;
     Ok(salami_friends::send_file(&to, Path::new(&path)).await?)
 }
 

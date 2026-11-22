@@ -240,7 +240,7 @@ pub async fn download_and_install_modrinth_modpack(
             image_type: "icon".to_string(),
         };
 
-        match crate::commands::path_commands::upload_profile_images(icon_payload).await {
+        match crate::commands::path_commands::store_profile_image(icon_payload).await {
             Ok(relative_icon_path) => {
                 log::info!(
                     "Successfully set profile icon from URL for profile {}. Icon at: {}",

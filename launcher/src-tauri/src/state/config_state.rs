@@ -393,6 +393,10 @@ pub struct LauncherConfig {
     /// Salami-Modus: wird beim Start als `-Dsalami.theme` an salami-core übergeben.
     #[serde(default)]
     pub salami_theme: bool,
+    /// Look der Salami-Menüs im Spiel – derselbe wie im Launcher gewählt (`theke`, `werkbank`,
+    /// `salumeria`). Geht beim Start als `-Dsalami.look` an salami-core; `None` = Theke.
+    #[serde(default)]
+    pub salami_look: Option<String>,
     /// Spielzeit und Screenshots mit der Salami-App fürs Handy synchronisieren
     /// (`integrations::salami_app`). Standardmäßig an.
     #[serde(default = "default_true_bool")]
@@ -492,6 +496,7 @@ impl Default for LauncherConfig {
             clips: ClipConfig::default(),
             log_level: LogLevel::default(),
             salami_theme: false,
+            salami_look: None,
             salami_app_sync: true,
             salami_app_clips: true,
         }
@@ -834,6 +839,7 @@ impl ConfigManager {
                     },
                     log_level: new_config.log_level,
                     salami_theme: new_config.salami_theme,
+                    salami_look: new_config.salami_look.clone(),
                     salami_app_sync: new_config.salami_app_sync,
                     salami_app_clips: new_config.salami_app_clips,
                 };

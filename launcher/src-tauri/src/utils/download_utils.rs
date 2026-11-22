@@ -384,6 +384,7 @@ impl DownloadUtils {
             if config.keep_existing_if_locked
                 && held_by_other_process
                 && Self::is_intact_existing_file(target_path).await
+                && Self::existing_matches_expected(target_path, config).await
             {
                 warn!(
                     "{:?} is in use (probably by a running game) and cannot be replaced right now; keeping the existing copy",
@@ -408,6 +409,30 @@ impl DownloadUtils {
             .extension()
             .is_some_and(|e| e.eq_ignore_ascii_case("jar"));
         !is_jar || Self::is_zip_file_complete(target_path).await
+    }
+
+    /// Salami: Die vorhandene Datei bleibt nur stehen, wenn sie genau die erwartete ist (Prüfsumme
+    /// und Größe, soweit bekannt) – sonst liefe das Spiel mit einer Datei, die die Prüfung nicht
+    /// bestanden hat (z. B. einer untergeschobenen Bibliothek).
+    async fn existing_matches_expected(target_path: &Path, config: &DownloadConfig) -> bool {
+        if let Some(size) = config.expected_size {
+            if fs::metadata(target_path).await.map(|m| m.len()).ok() != Some(size) {
+                return false;
+            }
+        }
+        if let Some(expected) = config.expected_sha1.as_deref() {
+            match crate::utils::hash_utils::calculate_sha1_from_file(target_path).await {
+                Ok(actual) if actual.eq_ignore_ascii_case(expected) => {}
+                _ => return false,
+            }
+        }
+        if let Some(expected) = config.expected_sha256.as_deref() {
+            match crate::utils::hash_utils::calculate_sha256_from_file(target_path).await {
+                Ok(actual) if actual.eq_ignore_ascii_case(expected) => {}
+                _ => return false,
+            }
+        }
+        true
     }
 
     /// Teildatei neben dem Ziel (gleicher Ordner, damit das Umbenennen atomar bleibt).
@@ -749,5 +774,31 @@ impl DownloadUtils {
 
         debug!("EOCD signature not found - ZIP file incomplete: {:?}", file_path);
         false
+    }
+}
+
+#[cfg(test)]
+mod keep_existing_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn a_locked_file_is_only_kept_when_it_verifies() {
+        let dir = std::env::temp_dir().join(format!("salami-keep-existing-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("lib.txt");
+        std::fs::write(&file, "abc").unwrap();
+
+        // SHA-1("abc")
+        let good = DownloadConfig::new().with_sha1("A9993E364706816ABA3E25717850C26C9CD0D89D");
+        assert!(DownloadUtils::existing_matches_expected(&file, &good).await);
+        let bad = DownloadConfig::new().with_sha1("0000000000000000000000000000000000000000");
+        assert!(!DownloadUtils::existing_matches_expected(&file, &bad).await);
+        let mut wrong_size = DownloadConfig::new();
+        wrong_size.expected_size = Some(4);
+        assert!(!DownloadUtils::existing_matches_expected(&file, &wrong_size).await);
+        // ohne erwartete Werte entscheidet nur die Vollständigkeitsprüfung
+        assert!(DownloadUtils::existing_matches_expected(&file, &DownloadConfig::new()).await);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

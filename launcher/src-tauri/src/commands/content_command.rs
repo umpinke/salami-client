@@ -42,6 +42,44 @@ pub struct UninstallContentPayload {
                                                       // Add other parameters here later if needed, e.g., content_type (mod, resourcepack, etc.)
 }
 
+/// Salami: Ordner, in denen Inhalte eines Profils liegen (Mods, Shader-, Ressourcen-, Datenpakete).
+fn profile_content_dirs(
+    state_manager: &AppStateManager,
+    profile: &crate::state::profile_state::Profile,
+) -> crate::error::Result<(Vec<PathBuf>, Vec<PathBuf>)> {
+    let instance = state_manager
+        .profile_manager
+        .calculate_instance_path_for_profile(profile)?;
+    let packs = vec![
+        instance.join("shaderpacks"),
+        instance.join("resourcepacks"),
+        instance.join("datapacks"),
+    ];
+    let mods = state_manager.profile_manager.mod_scan_dirs(profile)?;
+    Ok((mods, packs))
+}
+
+/// Salami: Ein Pfad aus der Oberfläche, der ein Inhalt dieses Profils sein soll: schlichter Name
+/// direkt in einem Inhaltsordner des Profils (kanonisch), Ordner nur bei Paketen (Shader in
+/// Ordnerform), nie bei Mods. → kanonischer Pfad
+async fn profile_content_path(
+    state_manager: &AppStateManager,
+    profile_id: Uuid,
+    path: &str,
+) -> crate::error::Result<PathBuf> {
+    let profile = state_manager.profile_manager.get_profile(profile_id).await?;
+    let (mods, packs) = profile_content_dirs(state_manager, &profile)?;
+    let all: Vec<PathBuf> = mods.iter().chain(packs.iter()).cloned().collect();
+    let canonical = crate::utils::path_guard::ensure_direct_child_of_any(std::path::Path::new(path), &all)?;
+    if canonical.is_dir() {
+        let in_packs = crate::utils::path_guard::ensure_direct_child_of_any(&canonical, &packs).is_ok();
+        if !in_packs {
+            return Err(AppError::Other(format!("'{}' is a folder, not a mod file", path)));
+        }
+    }
+    Ok(canonical)
+}
+
 async fn uninstall_content_by_sha1_internal(
     profile_id: Uuid,
     sha1_to_delete: &str,
@@ -434,7 +472,10 @@ pub async fn toggle_content_from_profile(
             path_str,
             payload.enabled
         );
-        return file_command::set_file_enabled(path_str.clone(), payload.enabled).await;
+        // Salami: nur Inhalte dieses Profils (schlichter Name direkt in einem Inhaltsordner)
+        let state_manager = AppStateManager::get().await?;
+        let checked = profile_content_path(&state_manager, payload.profile_id, path_str).await?;
+        return file_command::set_file_enabled(checked.to_string_lossy().to_string(), payload.enabled).await;
     }
 
     perf.mark("entry");
@@ -796,13 +837,13 @@ pub async fn uninstall_contents_from_profile(
         CommandError::from(AppError::Other(format!("Failed to get internal state: {}", e)))
     })?;
 
-    let mut direct_paths: Vec<String> = Vec::new();
+    let mut direct_paths: Vec<(Uuid, String)> = Vec::new();
     let mut by_profile: HashMap<Uuid, (HashSet<String>, Option<profile_utils::ContentType>)> =
         HashMap::new();
 
     for payload in payloads {
         if let Some(path) = payload.file_path {
-            direct_paths.push(path);
+            direct_paths.push((payload.profile_id, path));
             continue;
         }
         let Some(hash) = payload.sha1_hash else {
@@ -824,9 +865,18 @@ pub async fn uninstall_contents_from_profile(
         direct_paths.len()
     ));
 
-    for path in direct_paths {
-        match fs::remove_file(&path).await {
-            Ok(()) => result.files_deleted += 1,
+    // Salami: nur Inhalte des jeweiligen Profils, und in den Papierkorb statt endgültig löschen
+    for (profile_id, path) in direct_paths {
+        let checked = match profile_content_path(&state_manager, profile_id, &path).await {
+            Ok(checked) => checked,
+            Err(e) => {
+                log::error!("Batch uninstall refused {}: {}", path, e);
+                result.failed += 1;
+                continue;
+            }
+        };
+        match crate::utils::trash_utils::move_path_to_trash(&checked, Some("files")).await {
+            Ok(_) => result.files_deleted += 1,
             Err(e) => {
                 log::error!("Batch uninstall could not delete {}: {}", path, e);
                 result.failed += 1;
@@ -974,7 +1024,9 @@ pub async fn uninstall_content_from_profile(
             "Proceeding with uninstallation by file_path: {}",
             path_to_delete
         );
-        match file_command::delete_file(path_to_delete.clone()).await {
+        // Salami: nur Inhalte dieses Profils (schlichter Name direkt in einem Inhaltsordner)
+        let checked = profile_content_path(&state_manager, payload.profile_id, &path_to_delete).await?;
+        match file_command::delete_file(checked.to_string_lossy().to_string()).await {
             Ok(_) => {
                 log::info!(
                     "Successfully deleted file {} for profile {}",
@@ -1573,8 +1625,18 @@ pub async fn switch_content_version(
                     payload.new_version_details.id
                 );
 
-                crate::utils::path_utils::download_and_replace_file(
+                // Salami: nur eine Mod-Datei dieses Profils ersetzen
+                let checked = profile_content_path(
+                    &state_manager,
+                    payload.profile_id,
                     &current_item_details.path_str,
+                )
+                .await?;
+                let profile = state_manager.profile_manager.get_profile(payload.profile_id).await?;
+                let (mod_dirs, _) = profile_content_dirs(&state_manager, &profile)?;
+                crate::utils::path_guard::ensure_direct_child_of_any(&checked, &mod_dirs)?;
+                crate::utils::path_utils::download_and_replace_file(
+                    &checked.to_string_lossy(),
                     &primary_file.filename,
                     &primary_file.url,
                     primary_file.hashes.get("sha1").map(|x| x.as_str()),

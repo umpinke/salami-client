@@ -141,10 +141,6 @@ pub async fn update_shaderpack_from_modrinth(
         })?;
     }
 
-    // Find and delete the old file/directory (including .disabled variant)
-    let old_path = shaderpacks_dir.join(&shaderpack.filename);
-    let old_path_disabled = shaderpacks_dir.join(format!("{}.disabled", shaderpack.filename));
-
     let was_disabled = shaderpack.is_disabled;
 
     // Find the primary file in the new version
@@ -158,40 +154,12 @@ pub async fn update_shaderpack_from_modrinth(
                 new_version.name, new_version.id
             ))
         })?;
+    // Salami: neuen Namen prüfen, bevor das alte Paket weggeräumt wird
+    crate::utils::import_safety::check_content_file_name(&primary_file.filename).map_err(AppError::Other)?;
 
-    // Check and delete the old file/directory
-    if old_path.exists() {
-        debug!("Removing old shader pack: {}", old_path.display());
-        if old_path.is_dir() {
-            fs::remove_dir_all(&old_path).await.map_err(|e| {
-                AppError::Other(format!("Failed to remove old shader pack directory: {}", e))
-            })?;
-        } else {
-            fs::remove_file(&old_path).await.map_err(|e| {
-                AppError::Other(format!("Failed to remove old shader pack file: {}", e))
-            })?;
-        }
-    } else if old_path_disabled.exists() {
-        debug!(
-            "Removing old disabled shader pack: {}",
-            old_path_disabled.display()
-        );
-        if old_path_disabled.is_dir() {
-            fs::remove_dir_all(&old_path_disabled).await.map_err(|e| {
-                AppError::Other(format!(
-                    "Failed to remove old disabled shader pack directory: {}",
-                    e
-                ))
-            })?;
-        } else {
-            fs::remove_file(&old_path_disabled).await.map_err(|e| {
-                AppError::Other(format!(
-                    "Failed to remove old disabled shader pack file: {}",
-                    e
-                ))
-            })?;
-        }
-    } else {
+    // Salami: alte Datei/alten Ordner (auch .disabled) in den Papierkorb – nur ein schlichter
+    // Name direkt im shaderpacks-Ordner, nie ein Pfad aus der Oberfläche
+    if !crate::utils::profile_utils::trash_old_content(&shaderpacks_dir, &shaderpack.filename).await? {
         warn!("Old shader pack not found: {}", shaderpack.filename);
     }
 

@@ -446,6 +446,8 @@ fn parse_java_architecture(probe_output: &str) -> Option<Architecture> {
 
 /// Gets information about a Java installation at the given path
 pub async fn get_java_info(java_path: &Path) -> Result<JavaInstallation> {
+    // Salami: nie ein Java von einer Netzwerkfreigabe (UNC/WebDAV) starten
+    crate::utils::path_guard::reject_network_path(java_path)?;
     let java_path = if java_path.is_dir() {
         let java_exe = match OS {
             OperatingSystem::WINDOWS => "java.exe",

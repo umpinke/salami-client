@@ -20,6 +20,11 @@
 //!   `salami_app_clips`, erledigte Hashes in `salami_app_clips.json`.
 //! - **Kopplung**: Code + QR-Code für die App, Geräteliste, „Daten löschen“ (siehe
 //!   `commands::salami_app_command`). Abschalten per Einstellung `salami_app_sync`.
+//! - **Erst nach dem Koppeln** (Salami): Hochgeladen wird nur für Konten, mit denen laut der
+//!   letzten Geräteliste des Servers mindestens ein Handy gekoppelt ist (`paired_devices` in
+//!   `salami_app.json`). Bis dahin bleiben Sitzungen nur lokal liegen; Screenshots und Clips werden
+//!   nicht einmal angefasst. Das „alles nachholen“ läuft, sobald eine Geräteliste das erste Gerät
+//!   zeigt. Wird das letzte Gerät entfernt oder werden die Daten gelöscht, hört der Upload auf.
 
 use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
@@ -75,6 +80,62 @@ struct AppStore {
     /// Noch nicht (vollständig) gemeldete Sitzungen. Offene bleiben bis zum Spielende liegen.
     #[serde(default)]
     sessions: Vec<PlaySession>,
+    /// Salami: Minecraft-UUID → Anzahl gekoppelter Handys laut der letzten Geräteliste vom
+    /// Server. Hochgeladen (Spielzeit, Screenshots, Clips) wird nur für Konten mit mindestens
+    /// einem Gerät. Ältere Launcher kannten das Feld nicht: nach dem Update gilt erst einmal kein
+    /// Konto als gekoppelt, bis der Server eine nicht leere Geräteliste meldet.
+    #[serde(default)]
+    paired_devices: BTreeMap<String, u32>,
+}
+
+/// Salami: Darf für ein Konto hochgeladen werden? Nur mit eingeschaltetem Sync (`salami_app_sync`)
+/// und mindestens einem gekoppelten Handy.
+fn uploads_allowed(sync_on: bool, paired_devices: u32) -> bool {
+    sync_on && paired_devices > 0
+}
+
+/// Salami: Clips zusätzlich nur mit eingeschaltetem Schalter „Clips hochladen“.
+fn clip_uploads_allowed(sync_on: bool, clips_on: bool, paired_devices: u32) -> bool {
+    clips_on && uploads_allowed(sync_on, paired_devices)
+}
+
+/// Salami: Trägt die Anzahl der Geräte aus einer Geräteliste des Servers ein (0 = entkoppelt).
+/// → `true`, wenn das Konto damit gerade erst gekoppelt wurde (vorher kein Gerät).
+fn record_devices(paired: &mut BTreeMap<String, u32>, account: &str, count: usize) -> bool {
+    let before = paired.get(account).copied().unwrap_or(0);
+    let count = u32::try_from(count).unwrap_or(u32::MAX);
+    if count == 0 {
+        paired.remove(account);
+    } else {
+        paired.insert(account.to_string(), count);
+    }
+    before == 0 && count > 0
+}
+
+/// Salami: Wie viele Handys sind mit diesem Konto gekoppelt (letzter bekannter Stand)?
+fn paired_devices(account: Uuid) -> u32 {
+    read_store(|s| s.paired_devices.get(&account.to_string()).copied().unwrap_or(0))
+}
+
+/// Salami: Ungekoppelt bleiben Sitzungen nur lokal liegen – höchstens so viele (älteste fliegen).
+const MAX_BUFFERED_SESSIONS: usize = 2000;
+
+/// Salami: Puffer für ungekoppelte Konten begrenzen (offene Sitzungen bleiben immer).
+fn trim_buffer(sessions: &mut Vec<PlaySession>) {
+    let closed = sessions.iter().filter(|s| !s.open).count();
+    if closed <= MAX_BUFFERED_SESSIONS {
+        return;
+    }
+    let mut drop = closed - MAX_BUFFERED_SESSIONS;
+    sessions.sort_by_key(|s| s.end);
+    sessions.retain(|s| {
+        if drop > 0 && !s.open {
+            drop -= 1;
+            false
+        } else {
+            true
+        }
+    });
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -332,6 +393,10 @@ async fn login(account: &Credentials) -> std::result::Result<String, Failure> {
             .await,
     )
     .await?;
+    // Nur Salami-Anmeldungen unterschreiben, nie die eines echten Minecraft-Servers
+    if let Err(e) = crate::integrations::salami_capes::require_salami_server_id(&challenge.server_id) {
+        return Err(Failure::Server(StatusCode::OK, e.to_string()));
+    }
 
     let joined = HTTP_CLIENT
         .post(MOJANG_JOIN_URL)
@@ -548,6 +613,11 @@ pub async fn flush_sessions() {
         Err(_) => return,
     };
     for (account, sessions) in by_account {
+        // Salami: erst senden, wenn ein Handy gekoppelt ist – bis dahin bleiben sie lokal
+        if !uploads_allowed(true, paired_devices(account)) {
+            log::debug!("[Salami-App] {} session(s) kept locally until a phone is paired", sessions.len());
+            continue;
+        }
         for chunk in sessions.chunks(MAX_SESSIONS_PER_CALL) {
             let body = serde_json::json!({ "sessions": chunk.iter().map(session_json).collect::<Vec<_>>() });
             let result: std::result::Result<SessionsResponse, Failure> = with_token(account, |token| {
@@ -794,6 +864,10 @@ async fn upload_shot(base: &str, account: Uuid, shot: &Shot, hash: &str) -> std:
 /// Gleicht diese Screenshots mit dem Server ab und lädt fehlende für `account` hoch.
 async fn sync_shots(account: Uuid, shots: Vec<Shot>, prune: bool) -> std::result::Result<ScreenshotReport, Failure> {
     let mut report = ScreenshotReport::default();
+    // Salami: ohne gekoppeltes Handy nichts hochladen (und nicht einmal anmelden)
+    if !uploads_allowed(sync_enabled().await, paired_devices(account)) {
+        return Ok(report);
+    }
     if storage_full_recently() {
         report.storage_full = true;
         return Ok(report);
@@ -1115,12 +1189,18 @@ async fn put_clip(url: &str, token: &str, clip: &Clip) -> std::result::Result<()
         .map(|_| ())
 }
 
-/// Clip-Ordner, wenn Clips hochgeladen werden sollen: Sync an und Schalter „Clips hochladen“ an.
+/// Clip-Ordner, wenn Clips hochgeladen werden sollen: Sync an, Schalter „Clips hochladen“ an und
+/// (Salami) ein Handy mit dem aktiven Konto gekoppelt.
 async fn clip_dir_if_enabled() -> Option<PathBuf> {
     server_url()?;
     let state = State::get().await.ok()?;
     let config = state.config_manager.get_config().await;
-    (config.salami_app_sync && config.salami_app_clips).then(|| config.clips.resolved_output_dir())
+    let paired = match active_account_id().await {
+        Some(account) => paired_devices(account),
+        None => 0,
+    };
+    clip_uploads_allowed(config.salami_app_sync, config.salami_app_clips, paired)
+        .then(|| config.clips.resolved_output_dir())
 }
 
 /// Wird fertig, sobald der laufende Abgleich aufhören soll: „Daten löschen“ oder Schalter aus.
@@ -1155,6 +1235,10 @@ async fn run_clip_sync() -> std::result::Result<ClipReport, Failure> {
     let Some(account) = active_account_id().await else {
         return Ok(report);
     };
+    // Salami: ohne gekoppeltes Handy keine Clips hochladen
+    if paired_devices(account) == 0 {
+        return Ok(report);
+    }
     let base = base()?;
     let epoch = CLIPS_EPOCH.load(Ordering::SeqCst);
     let index_path = clips_path();
@@ -1370,14 +1454,21 @@ pub async fn sync_everything() {
     if !sync_enabled().await {
         return;
     }
+    // Salami: Sitzungen nur für gekoppelte Konten (siehe flush_sessions)
     flush_sessions().await;
     if let Some(account) = active_account_id().await {
-        if let Err(failure) = sync_all_screenshots(account).await {
-            log::info!("[Salami-App] screenshot sync postponed: {}", failure.message());
+        // Salami: ohne gekoppeltes Handy nicht einmal die Screenshots durchsuchen
+        if paired_devices(account) > 0 {
+            if let Err(failure) = sync_all_screenshots(account).await {
+                log::info!("[Salami-App] screenshot sync postponed: {}", failure.message());
+            }
         }
     }
     request_clip_sync();
 }
+
+/// Salami: So oft (in Takten, also Minuten) prüft der Launcher, ob das Handy noch gekoppelt ist.
+const PAIRING_CHECK_EVERY: u64 = 60;
 
 async fn tick(round: u64, was_enabled: &mut bool) {
     let enabled = sync_enabled().await;
@@ -1391,6 +1482,15 @@ async fn tick(round: u64, was_enabled: &mut bool) {
     }
     let just_enabled = !*was_enabled;
     *was_enabled = true;
+
+    // Salami: Kopplung nachprüfen (nach dem Start/Einschalten und dann stündlich) – nur mit schon
+    // vorhandenem Token. Hochgeladen wird erst mit gekoppeltem Handy.
+    let mut newly_paired = false;
+    if just_enabled || round % PAIRING_CHECK_EVERY == 0 {
+        if let Some(account) = active_account_id().await {
+            newly_paired = refresh_pairing(account).await;
+        }
+    }
 
     let Ok(state) = State::get().await else {
         return;
@@ -1410,10 +1510,13 @@ async fn tick(round: u64, was_enabled: &mut bool) {
         for game in &running {
             touch_running(&mut s.sessions, game, now);
         }
-        close_orphans(&mut s.sessions, &running_ids)
+        let closed = close_orphans(&mut s.sessions, &running_ids);
+        // Salami: bis zum Koppeln bleiben Sitzungen nur lokal – in Grenzen
+        trim_buffer(&mut s.sessions);
+        closed
     });
 
-    if just_enabled {
+    if just_enabled || newly_paired {
         sync_everything().await;
         return;
     }
@@ -1527,7 +1630,53 @@ pub async fn devices(account: Uuid) -> Result<Vec<Device>> {
         async move { read_json(request.send().await).await }
     })
     .await?;
+    // Salami: gerade gekoppelt → jetzt (und erst jetzt) alles nachholen, damit die App nicht leer ist
+    if note_devices(account, response.devices.len()) && sync_enabled().await {
+        log::info!("[Salami-App] phone paired, syncing now");
+        tokio::spawn(sync_everything());
+    }
     Ok(response.devices)
+}
+
+/// Salami: Geräteliste vom Server merken. → `true`, wenn das Konto damit gerade erst gekoppelt
+/// wurde (vorher kein Gerät).
+fn note_devices(account: Uuid, count: usize) -> bool {
+    let newly_paired = update_store(|s| record_devices(&mut s.paired_devices, &account.to_string(), count));
+    if count == 0 {
+        log::info!("[Salami-App] no phone paired with this account, nothing is uploaded");
+    }
+    newly_paired
+}
+
+/// Salami: Kopplung im Hintergrund nachprüfen (Handy in der App entkoppelt, Stand nach dem
+/// Update) – nur mit schon vorhandenem Token, ohne neue Anmeldung: Wer nie gekoppelt hat, löst
+/// so keine Anfrage aus. → `true`, wenn das Konto dabei gerade erst als gekoppelt erkannt wurde.
+async fn refresh_pairing(account: Uuid) -> bool {
+    let Ok(base) = base() else { return false };
+    let Some(token) = read_store(|s| s.tokens.get(&account.to_string()).cloned()) else {
+        return false;
+    };
+    let request = HTTP_CLIENT
+        .get(format!("{base}/v1/devices"))
+        .timeout(Duration::from_secs(10))
+        .bearer_auth(token);
+    match read_json::<DevicesResponse>(request.send().await).await {
+        Ok(response) => note_devices(account, response.devices.len()),
+        // Token abgelaufen: nur wer schon gekoppelt ist, meldet sich dafür neu an (wie beim
+        // Hochladen); sonst bleibt das Konto ungekoppelt, bis der Nutzer selbst koppelt
+        Err(Failure::Unauthorized) => {
+            if paired_devices(account) > 0 {
+                if let Err(e) = devices(account).await {
+                    log::debug!("[Salami-App] pairing check postponed: {}", e);
+                }
+            }
+            false
+        }
+        Err(failure) => {
+            log::debug!("[Salami-App] pairing check postponed: {}", failure.message());
+            false
+        }
+    }
 }
 
 fn is_valid_device_id(id: &str) -> bool {
@@ -1547,6 +1696,13 @@ pub async fn remove_device(account: Uuid, id: &str) -> Result<()> {
         async move { read_json::<serde_json::Value>(request.send().await).await }
     })
     .await?;
+    // Salami: ein Gerät weniger; war es das letzte, hört der Upload sofort auf. Danach den
+    // genauen Stand vom Server holen.
+    let left = paired_devices(account).saturating_sub(1);
+    note_devices(account, left as usize);
+    if let Err(e) = devices(account).await {
+        log::debug!("[Salami-App] device list after removal not available: {}", e);
+    }
     Ok(())
 }
 
@@ -1587,11 +1743,14 @@ pub async fn delete_all_data(active: Option<Uuid>) -> Result<usize> {
         update_store(|s| {
             s.tokens.remove(&account.to_string());
             s.sessions.retain(|x| x.account != account);
+            s.paired_devices.remove(&account.to_string());
         });
     }
     update_store(|s| {
         s.tokens.clear();
         s.sessions.clear();
+        // Salami: die Geräte sind mit gelöscht – bis zum nächsten Koppeln nichts mehr hochladen
+        s.paired_devices.clear();
     });
     // ein laufender Clip-Upload bricht ab und schreibt seine Liste nicht mehr zurück
     CLIPS_EPOCH.fetch_add(1, Ordering::SeqCst);
@@ -1614,6 +1773,9 @@ pub struct AppStatus {
     pub enabled: bool,
     /// Aktives Konto ist beim Sync-Server angemeldet.
     pub linked: bool,
+    /// Salami: Mit dem aktiven Konto ist mindestens ein Handy gekoppelt – nur dann lädt der
+    /// Launcher etwas hoch (Spielzeit, Screenshots, Clips).
+    pub paired: bool,
     pub account_name: Option<String>,
     pub pending_sessions: usize,
     pub storage_full: bool,
@@ -1628,9 +1790,12 @@ pub async fn status() -> AppStatus {
         Ok(state) => state.minecraft_account_manager_v2.get_active_account().await.ok().flatten(),
         Err(_) => None,
     };
-    let (linked, pending_sessions) = read_store(|s| {
+    let (linked, paired, pending_sessions) = read_store(|s| {
         (
             account.as_ref().is_some_and(|a| s.tokens.contains_key(&a.id.to_string())),
+            account
+                .as_ref()
+                .is_some_and(|a| s.paired_devices.get(&a.id.to_string()).copied().unwrap_or(0) > 0),
             s.sessions.len(),
         )
     });
@@ -1638,6 +1803,7 @@ pub async fn status() -> AppStatus {
         available: server_url().is_some(),
         enabled: sync_enabled().await,
         linked,
+        paired,
         account_name: account.map(|a| a.username),
         pending_sessions,
         storage_full: storage_full_recently(),
@@ -1687,6 +1853,58 @@ mod tests {
         // zweites Spielende ändert nichts mehr
         assert!(!close_session(&mut sessions, &g, at(20)));
         assert_eq!(sessions[0].end, at(12));
+    }
+
+    #[test]
+    fn nothing_is_uploaded_until_a_phone_is_paired() {
+        assert!(!uploads_allowed(true, 0));
+        assert!(uploads_allowed(true, 1));
+        assert!(!uploads_allowed(false, 3));
+        assert!(!clip_uploads_allowed(true, true, 0));
+        assert!(!clip_uploads_allowed(true, false, 1));
+        assert!(!clip_uploads_allowed(false, true, 1));
+        assert!(clip_uploads_allowed(true, true, 1));
+    }
+
+    #[test]
+    fn pairing_comes_only_from_device_lists() {
+        // salami_app.json eines älteren Launchers (Sync war an, Token da): gilt als nicht gekoppelt
+        let old: AppStore = serde_json::from_str(
+            r#"{"install_id":"x","tokens":{"00000000-0000-0000-0000-000000000007":"L.t"},"sessions":[]}"#,
+        )
+        .unwrap();
+        assert!(old.paired_devices.is_empty());
+
+        let mut paired = BTreeMap::new();
+        let account = "00000000-0000-0000-0000-000000000007";
+        assert!(record_devices(&mut paired, account, 1)); // erstes Handy → jetzt nachholen
+        assert!(!record_devices(&mut paired, account, 2)); // weiteres Handy: war schon gekoppelt
+        assert_eq!(paired.get(account), Some(&2));
+        assert!(!record_devices(&mut paired, account, 0)); // letztes Handy entfernt
+        assert!(!paired.contains_key(account));
+        assert!(record_devices(&mut paired, account, 1)); // neu gekoppelt → wieder nachholen
+
+        let mut store = old;
+        store.paired_devices = paired;
+        let again: AppStore = serde_json::from_str(&serde_json::to_string(&store).unwrap()).unwrap();
+        assert_eq!(again.paired_devices.get(account), Some(&1));
+    }
+
+    #[test]
+    fn buffered_sessions_stay_bounded_until_pairing() {
+        let mut sessions = Vec::new();
+        for i in 0..(MAX_BUFFERED_SESSIONS as i64 + 50) {
+            let g = game(Uuid::new_v4(), at(i * 10));
+            touch_running(&mut sessions, &g, at(i * 10 + 5));
+            close_session(&mut sessions, &g, at(i * 10 + 5));
+        }
+        let running = game(Uuid::new_v4(), at(0));
+        touch_running(&mut sessions, &running, at(1));
+        trim_buffer(&mut sessions);
+        assert_eq!(sessions.iter().filter(|s| !s.open).count(), MAX_BUFFERED_SESSIONS);
+        assert!(sessions.iter().any(|s| s.open), "the running game's session is kept");
+        // die ältesten sind weg
+        assert!(sessions.iter().filter(|s| !s.open).all(|s| s.end >= at(50 * 10)));
     }
 
     #[test]

@@ -62,6 +62,7 @@ pub async fn get_launcher_directory() -> Result<String> {
 /// This handles different ImageSource types and returns a format suitable for web display
 #[command]
 pub async fn resolve_image_path(
+    app: tauri::AppHandle,
     image_source: ImageSource,
     profile_id: Option<String>,
 ) -> Result<String> {
@@ -150,14 +151,31 @@ pub async fn resolve_image_path(
 
         // AbsolutePath: Already a complete path, just convert to URL
         ImageSource::AbsolutePath { path } => {
-            let path_buf = PathBuf::from(path);
+            let path_buf = PathBuf::from(&path);
 
             debug!("Using absolute path: {:?}", path_buf);
+            // Salami: Netzwerkpfade nicht anfassen
+            crate::utils::path_guard::reject_network_path(&path_buf)?;
             if !path_buf.exists() {
                 error!("Image file does not exist: {:?}", path_buf);
                 return Err(
                     AppError::Other(format!("Image file does not exist: {:?}", path_buf)).into(),
                 );
+            }
+
+            // Salami: Das Asset-Protokoll zeigt nur Launcher-Ordner. Ein Profilbild mit festem Pfad
+            // (ältere Profile) wird freigegeben, wenn es wirklich Icon/Hintergrund dieses Profils ist.
+            if let Some(id) = profile_id.as_deref().and_then(|id| Uuid::parse_str(id).ok()) {
+                let state = State::get().await?;
+                if let Ok(profile) = state.profile_manager.get_profile(id).await {
+                    let is_own = [profile.banner.as_ref(), profile.background.as_ref()]
+                        .into_iter()
+                        .flatten()
+                        .any(|b| matches!(&b.source, ImageSource::AbsolutePath { path: own } if *own == path));
+                    if is_own && crate::utils::user_media::is_media_file(&path_buf) {
+                        crate::utils::asset_scope::allow_launcher_file(&app, &path_buf);
+                    }
+                }
             }
 
             Ok(path_buf.to_string_lossy().to_string())
@@ -168,9 +186,34 @@ pub async fn resolve_image_path(
 /// Uploads an image as a profile icon, copying it to a standard location within the profile's directory.
 /// Returns the relative path to the icon within the profile directory.
 #[command]
-pub async fn upload_profile_images(payload: UploadProfileImagesPayload) -> Result<String> {
+pub async fn upload_profile_images(
+    app: tauri::AppHandle,
+    payload: UploadProfileImagesPayload,
+) -> Result<String> {
     debug!("Uploading profile image with payload: {:?}", payload);
 
+    // Salami: eine Bilddatei nur, wenn der Nutzer sie gewählt hat (oder sie ohnehin angezeigt
+    // werden darf); eine Adresse nur per https
+    if let Some(local) = payload.path.as_deref() {
+        crate::utils::user_paths::require_readable_choice(
+            &app,
+            std::path::Path::new(local),
+            "Der Launcher soll dieses Bild als Profilbild kopieren:\nThe launcher will copy this image as the profile picture:",
+        )
+        .await?;
+    } else if let Some(url) = payload.icon_url.as_deref() {
+        if !url.starts_with("https://") {
+            return Err(AppError::Other(format!("Only https image addresses are allowed: {}", url)).into());
+        }
+    }
+
+    store_profile_image(payload).await
+}
+
+/// Kopiert/lädt das Profilbild und trägt es ein (ohne Prüfung der Quelle – für Aufrufe aus dem
+/// Launcher selbst, z. B. Modpack-Icons von Modrinth/CurseForge; die Oberfläche geht über
+/// [`upload_profile_images`]).
+pub async fn store_profile_image(payload: UploadProfileImagesPayload) -> Result<String> {
     let state = State::get().await?;
 
     let profile_uuid = payload.profile_id;

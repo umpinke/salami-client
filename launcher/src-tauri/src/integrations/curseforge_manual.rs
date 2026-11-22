@@ -137,13 +137,24 @@ struct Hashes {
     fingerprint: Option<Option<u64>>,
 }
 
-async fn matches_cached(path: &Path, file: &ManualFile, cache: &mut HashMap<PathBuf, Hashes>) -> bool {
+/// `by_name`: die Datei trägt genau den Namen der CurseForge-Datei (oder dessen Browser-Variante).
+/// Der CurseForge-Fingerabdruck (Murmur2, 32 Bit) lässt sich gezielt nachbauen – ohne SHA1 wird
+/// deshalb nur eine Datei mit passendem Namen übernommen, nie irgendein anderer Download.
+async fn matches_cached(
+    path: &Path,
+    file: &ManualFile,
+    by_name: bool,
+    cache: &mut HashMap<PathBuf, Hashes>,
+) -> bool {
     let hashes = cache.entry(path.to_path_buf()).or_default();
     if let Some(expected) = &file.sha1 {
         if hashes.sha1.is_none() {
             hashes.sha1 = Some(hash_utils::calculate_sha1_from_file(path).await.ok());
         }
         return hashes.sha1.as_ref().and_then(|h| h.as_deref()).is_some_and(|h| h.eq_ignore_ascii_case(expected));
+    }
+    if !by_name {
+        return false;
     }
     if let Some(expected) = file.fingerprint {
         if hashes.fingerprint.is_none() {
@@ -169,18 +180,23 @@ pub async fn pick_up_from_downloads(files: Vec<ManualFile>) -> Vec<ManualFile> {
 
     'files: for file in files {
         // erst die Namen, unter denen der Browser sie speichert, dann die neuesten Downloads
-        let mut candidates: Vec<PathBuf> = name_variants(&file.file_name)
+        // (umbenannte Dateien nur, wenn eine SHA1 bekannt ist – siehe `matches_cached`)
+        let mut candidates: Vec<(PathBuf, bool)> = name_variants(&file.file_name)
             .into_iter()
+            .filter(|name| crate::utils::import_safety::safe_file_component(name).is_ok())
             .map(|name| dir.join(name))
             .filter(|path| path.is_file())
+            .map(|path| (path, true))
             .collect();
-        for path in &recent {
-            if !candidates.contains(path) {
-                candidates.push(path.clone());
+        if file.sha1.is_some() {
+            for path in &recent {
+                if !candidates.iter().any(|(known, _)| known == path) {
+                    candidates.push((path.clone(), false));
+                }
             }
         }
-        for path in candidates {
-            if !matches_cached(&path, &file, &mut cache).await {
+        for (path, by_name) in candidates {
+            if !matches_cached(&path, &file, by_name, &mut cache).await {
                 continue;
             }
             match copy_into_place(&path, &file.target).await {
@@ -306,6 +322,36 @@ mod tests {
 
         copy_into_place(&good, &file(None).target).await.unwrap();
         assert_eq!(std::fs::read(dir.join("cache").join("mod.jar")).unwrap(), b"richtiger Inhalt");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn fingerprint_alone_needs_the_exact_name() {
+        let dir = std::env::temp_dir().join(format!("salami-cf-fingerprint-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("other-download.jar");
+        std::fs::write(&path, b"irgendein Inhalt").unwrap();
+        let fingerprint = hash_utils::calculate_curseforge_fingerprint(&path).await.unwrap();
+        let sha1 = hash_utils::calculate_sha1_from_file(&path).await.unwrap();
+        let file = |sha1: Option<String>| ManualFile {
+            name: "Mod".into(),
+            project_id: 1,
+            file_id: 2,
+            file_name: "mod.jar".into(),
+            sha1,
+            fingerprint: Some(fingerprint),
+            target: dir.join("cache").join("mod.jar"),
+            folder: None,
+        };
+        let mut cache = HashMap::new();
+        // nur Fingerabdruck: ein Download mit anderem Namen zählt nicht …
+        assert!(!matches_cached(&path, &file(None), false, &mut cache).await);
+        // … der passende Name schon
+        assert!(matches_cached(&path, &file(None), true, &mut cache).await);
+        // mit SHA1 zählt der Inhalt, egal wie die Datei heißt
+        let mut cache = HashMap::new();
+        assert!(matches_cached(&path, &file(Some(sha1)), false, &mut cache).await);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

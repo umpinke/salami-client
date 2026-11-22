@@ -423,6 +423,7 @@ pub async fn clip_open_folder(app: tauri::AppHandle) -> Result<(), CommandError>
     use tauri_plugin_opener::OpenerExt;
 
     let dir = clip_dir().await?;
+    crate::utils::path_guard::reject_network_path(&dir)?;
     if !dir.exists() {
         std::fs::create_dir_all(&dir).map_err(|e| {
             crate::error::AppError::Other(format!(
@@ -431,9 +432,22 @@ pub async fn clip_open_folder(app: tauri::AppHandle) -> Result<(), CommandError>
             ))
         })?;
     }
+    // Salami: nur einen Ordner öffnen – eine Datei würde der Explorer mit ihrem Programm starten
+    let dir = dir.canonicalize().map_err(|e| {
+        crate::error::AppError::Other(format!("could not resolve the clip folder {}: {e}", dir.display()))
+    })?;
+    if !dir.is_dir() {
+        return Err(crate::error::AppError::Other(format!(
+            "the clip folder is not a folder: {}",
+            dir.display()
+        ))
+        .into());
+    }
+    let shown = dir.to_string_lossy();
+    let shown = shown.strip_prefix(r"\\?\").unwrap_or(&shown).to_string();
 
     app.opener()
-        .open_path(dir.to_string_lossy(), None::<&str>)
+        .open_path(shown, None::<&str>)
         .map_err(|e| crate::error::AppError::Other(format!("could not open the clip folder: {e}")))?;
     Ok(())
 }
