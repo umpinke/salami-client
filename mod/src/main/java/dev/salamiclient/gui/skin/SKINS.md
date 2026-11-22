@@ -9,9 +9,8 @@ Spiel mit `-Dsalami.look=theke|werkbank|salumeria`; `Skins.current()` lädt per 
 |---|---|---|
 | Feinkost-Theke | `gui/skin/theke` | fertig – Vorbild |
 | Pixel-Werkbank | `gui/skin/werkbank` | fertig |
-| Salumeria | `gui/skin/salumeria` | offen |
+| Salumeria | `gui/skin/salumeria` | fertig |
 
-Entwürfe (854 × 480, GUI-Größe 2): `design-concepts-ingame/` im Repo (a = Theke, b = Werkbank, c = Salumeria).
 
 ## Der Vertrag
 

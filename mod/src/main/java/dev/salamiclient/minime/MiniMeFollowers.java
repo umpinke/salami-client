@@ -110,8 +110,8 @@ public final class MiniMeFollowers {
 			double y = f.prevY + (f.y - f.prevY) * partial;
 			double z = f.prevZ + (f.z - f.prevZ) * partial;
 			float yaw = f.prevYaw + (((f.yaw - f.prevYaw) % 360f + 540f) % 360f - 180f) * partial;
-			float walk = f.prevWalk + (f.walk - f.prevWalk) * partial;
-			model.pose(MiniMeModel.Pose.WALK, walk, f.amount, mc.level.getGameTime() + partial);
+			// Phase und Stärke der Schritte überblenden, sonst ruckeln die Beine im Takt der Ticks
+			model.pose(MiniMeModel.Pose.WALK, f.walk(partial), f.amount(partial), mc.level.getGameTime() + partial);
 
 			BlockPos at = BlockPos.containing(x, y + 0.5, z);
 			int light = mc.level.getBrightness(LightLayer.BLOCK, at) << 4 | mc.level.getBrightness(LightLayer.SKY, at) << 20;

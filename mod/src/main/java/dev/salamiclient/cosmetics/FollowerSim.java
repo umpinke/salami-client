@@ -56,8 +56,27 @@ public final class FollowerSim {
 		/** Laufphase, wächst mit der zurückgelegten Strecke. */
 		public float walk;
 		public float prevWalk;
-		/** Wie stark gerade gelaufen wird, 0 = steht. */
+		/** Zurückgelegte Strecke in Blöcken (waagerecht), z. B. für den Takt der Hüpfer eines Buddys. */
+		public double distance;
+		public double prevDistance;
+		/** Wie stark gerade gelaufen wird, 0 = steht. Ändert sich pro Tick – zum Zeichnen {@link #amount(float)}. */
 		public float amount;
+		public float prevAmount;
+
+		/** Laufstärke zwischen zwei Ticks: ohne Überblenden springt sie 20-mal pro Sekunde. */
+		public float amount(float partial) {
+			return prevAmount + (amount - prevAmount) * partial;
+		}
+
+		/** Laufphase zwischen zwei Ticks. */
+		public float walk(float partial) {
+			return prevWalk + (walk - prevWalk) * partial;
+		}
+
+		/** Strecke zwischen zwei Ticks. */
+		public double distance(float partial) {
+			return prevDistance + (distance - prevDistance) * partial;
+		}
 		/** Was die Figur ist – der Skin-Name eines Mini Me oder die id eines Buddys. */
 		public String what = "";
 		double fall;
@@ -73,7 +92,7 @@ public final class FollowerSim {
 			onGround = false;
 			following = false;
 			stuck = 0;
-			amount = 0;
+			amount = prevAmount = 0;
 		}
 	}
 
@@ -141,6 +160,8 @@ public final class FollowerSim {
 		f.prevZ = f.z;
 		f.prevYaw = f.yaw;
 		f.prevWalk = f.walk;
+		f.prevDistance = f.distance;
+		f.prevAmount = f.amount;
 		double dx = player.getX() - f.x;
 		double dz = player.getZ() - f.z;
 		double dist = Math.sqrt(dx * dx + dz * dz);
@@ -211,12 +232,13 @@ public final class FollowerSim {
 
 		if (f.following && moved > 0.02) {
 			f.yaw = approachAngle(f.yaw, (float) Math.toDegrees(Math.atan2(-movedX, movedZ)), 25f);
-		} else {
-			// steht: langsam zum Spieler drehen
+		} else if (dist > PERSONAL) {
+			// steht: langsam zum Spieler drehen (steht er fast darauf, springt die Richtung hin und her – dann nicht)
 			f.yaw = approachAngle(f.yaw, (float) Math.toDegrees(Math.atan2(-dx, dz)), 8f);
 		}
 		// kurze Beine: schnellere Schritte als ein großer Spieler auf derselben Strecke
 		f.walk += (float) Math.min(2.0, moved * 4 / scale);
+		f.distance += moved;
 		float wanted = (float) Math.min(1, moved * 6);
 		f.amount += (wanted - f.amount) * 0.4f;
 	}

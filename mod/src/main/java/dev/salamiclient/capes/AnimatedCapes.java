@@ -382,9 +382,13 @@ public final class AnimatedCapes {
 	private static final class CapeTexture extends DynamicTexture {
 		CapeTexture(String name, int width, int height) {
 			super(() -> "salami cape " + name, width, height, true);
-			// einmal leer hochladen, danach kommt nur noch der benutzte Ausschnitt; das Bild selbst wird nicht mehr gebraucht
+			// einmal leer hochladen, danach kommt nur noch der benutzte Ausschnitt; das große Bild selbst
+			// wird nicht mehr gebraucht. Ein winziges bleibt stehen statt keinem: in 26.3 schließen close()
+			// und setPixels() das Bild ohne Prüfung – ohne Bild brach close() mit einer NullPointerException
+			// ab, bevor die Textur auf der Grafikkarte frei war (jeder Wechsel von Cape oder Auflösung ließ
+			// so bis zu 32 MB Grafikspeicher liegen).
 			upload();
-			setPixels(null);
+			setPixels(new NativeImage(1, 1, false));
 			//? if >=1.21.11 {
 			this.sampler = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR);
 			//?} else {

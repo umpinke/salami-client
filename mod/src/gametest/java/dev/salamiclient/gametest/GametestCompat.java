@@ -1,9 +1,13 @@
 package dev.salamiclient.gametest;
 
 import dev.salamiclient.SalamiClient;
+import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.client.Minecraft;
+import net.minecraft.server.packs.repository.PackRepository;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 /** Aufrufe der Gametest-API, die sich zwischen Minecraft-Versionen unterscheiden. */
@@ -71,6 +75,35 @@ final class GametestCompat {
 		/*return client.gui.overlay() != null;
 		*///?} else
 		return client.getOverlay() != null;
+	}
+
+	/**
+	 * Ressourcenpakete, die ein Testlauf mitbringt ({@code -PsalamiExtraRunFiles} mit {@code resourcepacks/}),
+	 * einschalten – z. B. die Animationen, die Punchy! Moves braucht. Ohne solche Pakete passiert nichts.
+	 */
+	static void enableExtraResourcePacks(ClientGameTestContext context) {
+		boolean added = context.computeOnClient(c -> {
+			PackRepository packs = c.getResourcePackRepository();
+			packs.reload();
+			List<String> selected = new ArrayList<>(packs.getSelectedIds());
+			boolean any = false;
+			for (String id : packs.getAvailableIds()) {
+				if (id.startsWith("file/") && !selected.contains(id)) {
+					selected.add(id);
+					any = true;
+				}
+			}
+			if (any) {
+				SalamiClient.LOG.info("[Gametest] Ressourcenpakete des Testlaufs: {}", selected);
+				packs.setSelected(selected);
+				c.reloadResourcePacks();
+			}
+			return any;
+		});
+		if (added) {
+			context.waitTicks(2);
+			context.waitFor(c -> !hasOverlay(c), 2400);
+		}
 	}
 
 	/** Anzahl aller Partikel; ab 26.2 liefert Minecraft „Art Anzahl … T Summe“ statt nur der Zahl. */

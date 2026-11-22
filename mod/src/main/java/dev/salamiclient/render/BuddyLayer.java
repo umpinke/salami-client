@@ -31,8 +31,14 @@ import org.joml.Quaternionf;
  * <li>Kopf: steht oben auf dem Kopf oder auf dem Hut, den der Spieler trägt.</li>
  * <li>Hand: baumelt unter der linken Hand; hängt dort schon ein Mini Me, unter der rechten.</li>
  * </ul>
+ *
+ * <p>An Hand und Kopf bleibt er aufrecht ({@link ModelAnchor#upright}): die Stelle wandert mit, er
+ * selbst schlägt aber nicht jeden Armschwung und jedes Nicken mit.
  */
 public final class BuddyLayer extends RenderLayer<AvatarRenderState, PlayerModel> {
+	/** So weit (0..1) kippt eine Figur auf dem Kopf beim Nicken mit; ganz mit kippt sie bis 90° weg. */
+	static final float HEAD_TILT = 0.35f;
+
 	public BuddyLayer(RenderLayerParent<AvatarRenderState, PlayerModel> parent) {
 		super(parent);
 	}
@@ -73,7 +79,6 @@ public final class BuddyLayer extends RenderLayer<AvatarRenderState, PlayerModel
 				}
 			}
 			case HEAD -> {
-				ModelAnchor.to(poseStack, parent, parent.head);
 				float top = -8f;
 				Hat hat = HatsModule.hatOf(state.id);
 				if (hat != null && hat.anchor() == Hat.Anchor.HEAD) {
@@ -82,14 +87,15 @@ public final class BuddyLayer extends RenderLayer<AvatarRenderState, PlayerModel
 				if (!state.headEquipment.isEmpty()) {
 					top -= 1.1f; // über den Helm (der steht einen Pixel über)
 				}
-				poseStack.translate(0f, top / 16f, 0f);
+				// steht oben auf dem Kopf und schaut mit ihm, kippt beim Nicken aber nur ein wenig mit
+				ModelAnchor.upright(poseStack, parent, parent.head, 0f, top, 0f, parent.head, HEAD_TILT);
 			}
 			case HAND -> {
-				// unter dem Handende (10 Pixel unter der Schulter), baumelt leicht hin und her
+				// hängt unter dem Handende (10 Pixel unter der Schulter) – aufrecht, statt jeden Armschwung
+				// mitzumachen – und baumelt leicht hin und her
 				MiniMeModule.Wish mini = MiniMeModule.of(player);
 				boolean left = mini == null || mini.place() != MiniMeModule.Place.HAND;
-				ModelAnchor.to(poseStack, parent, left ? parent.leftArm : parent.rightArm);
-				poseStack.translate((left ? 1f : -1f) / 16f, 10.3f / 16f, 0f);
+				ModelAnchor.upright(poseStack, parent, left ? parent.leftArm : parent.rightArm, left ? 1f : -1f, 10.3f, 0f, parent.body, 0f);
 				poseStack.mulPose(new Quaternionf().rotationZ((float) Math.sin(state.ageInTicks * 0.1f) * 0.12f));
 				// der Nullpunkt des Buddys ist unten: um seine Höhe nach unten, dann hängt er an seinem Scheitel
 				poseStack.translate(0f, -buddy.model().top() * buddy.scale() / 16f, 0f);

@@ -31,6 +31,8 @@ import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.debug.DebugScreenEntries;
+import net.minecraft.client.gui.components.debug.DebugScreenEntryStatus;
 import net.minecraft.client.player.RemotePlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
@@ -108,6 +110,23 @@ public final class SalamiCustomizeGameTest implements FabricClientGameTest {
 			for (Module module : List.of(cps, info, keys)) {
 				modules.setEnabled(module, true);
 			}
+		});
+
+		// Hitboxen (F3+B) dauerhaft an: das Salami-HUD muss trotzdem erscheinen. 1.8.7 hat es dann
+		// versteckt, weil Minecraft seit 1.21.9 schon bei einem dauerhaften Debug-Eintrag „Debug-Anzeige
+		// offen“ meldet.
+		var hitboxesBefore = context.computeOnClient(c -> c.debugEntries.getStatus(DebugScreenEntries.ENTITY_HITBOXES));
+		context.runOnClient(c -> {
+			c.debugEntries.setStatus(DebugScreenEntries.ENTITY_HITBOXES, DebugScreenEntryStatus.ALWAYS_ON);
+			modules.setProfiling(true);
+			modules.resetTimings();
+		});
+		context.waitTicks(5);
+		long[] infoTimes = context.computeOnClient(c -> modules.profile().get(info));
+		check(infoTimes != null && infoTimes[0] > 0, "Salami HUD hidden while hitboxes (F3+B) are always on");
+		context.runOnClient(c -> {
+			modules.setProfiling(false);
+			c.debugEntries.setStatus(DebugScreenEntries.ENTITY_HITBOXES, hitboxesBefore);
 		});
 		check(setting(cps, "accent_color").isHidden(), "custom colors visible while turned off");
 		check(setting(cps, "background_color").isHidden() && setting(cps, "background").isHidden(),

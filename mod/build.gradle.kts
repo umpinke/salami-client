@@ -69,7 +69,17 @@ val syncPackMods = tasks.register<Sync>("syncPackMods") {
 	// Fabric API leert den Testordner vor jedem Lauf – erst danach die Mods hineinlegen
 	mustRunAfter(tasks.matching { it.name == "deleteGameTestRunDir" })
 }
-tasks.matching { it.name == "runClientGameTest" }.configureEach { dependsOn(syncPackMods) }
+// Dateien fremder Mods für diesen Lauf, z. B. config/ (damit keine Einführung über dem Bild liegt) und
+// resourcepacks/ (die Gametests schalten Pakete daraus ein): -PsalamiExtraRunFiles=C:/…/ordner
+val extraRunFiles = providers.gradleProperty("salamiExtraRunFiles")
+val syncExtraRunFiles = tasks.register<Copy>("syncExtraRunFiles") {
+	if (extraRunFiles.isPresent) {
+		from(extraRunFiles.get())
+	}
+	into(layout.buildDirectory.dir("run/clientGameTest"))
+	mustRunAfter(tasks.matching { it.name == "deleteGameTestRunDir" })
+}
+tasks.matching { it.name == "runClientGameTest" }.configureEach { dependsOn(syncPackMods, syncExtraRunFiles) }
 
 /**
  * Modrinth-Maven-Koordinaten der Pack-Mods für eine Minecraft-Version (packs/salami-packs.json).
@@ -181,6 +191,15 @@ tasks.processResources {
 				}
 			}
 		}
+	}
+}
+
+// Mixins der Gametests (Umgehungen für Mods, die nur Testläufe mitladen): Java-Stufe wie die Mod
+tasks.matching { it.name == "processGametestResources" }.configureEach {
+	val props = mapOf("java" to requiredJava.majorVersion)
+	inputs.properties(props)
+	(this as ProcessResources).filesMatching("salami-gametest.mixins.json") {
+		expand(props)
 	}
 }
 

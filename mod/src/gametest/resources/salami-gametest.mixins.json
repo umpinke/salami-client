@@ -1,0 +1,18 @@
+{
+	"required": true,
+	"package": "dev.salamiclient.gametest.mixin",
+	"plugin": "dev.salamiclient.gametest.mixin.GametestMixinPlugin",
+	"compatibilityLevel": "JAVA_${java}",
+	"client": [
+		"CapeModelProbeMixin",
+		"FrameProbeMixin",
+		"MissingKeyDefaultMixin",
+		"ModelAnchorProbeMixin",
+		"ModelPartProbeMixin",
+		"WorldDrawProbeMixin",
+		"WorldModelProbeMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

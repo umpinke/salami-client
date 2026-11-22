@@ -15,9 +15,13 @@
 			"dev.salamiclient.gametest.SalamiBenchmarkGameTest",
 			"dev.salamiclient.gametest.SalamiCapesGameTest",
 			"dev.salamiclient.gametest.SalamiMinigamesGameTest",
-			"dev.salamiclient.gametest.SalamiCosmeticsGameTest"
+			"dev.salamiclient.gametest.SalamiCosmeticsGameTest",
+			"dev.salamiclient.gametest.SalamiCosmeticsMotionGameTest"
 		]
 	},
+	"mixins": [
+		"salami-gametest.mixins.json"
+	],
 	"depends": {
 		"salami": "*"
 	}

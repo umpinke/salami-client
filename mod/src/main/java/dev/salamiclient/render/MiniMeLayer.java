@@ -23,8 +23,9 @@ import net.minecraft.world.entity.player.Player;
 
 /**
  * Mini Me am Spielermodell: an der linken Hand hängend, auf der rechten Schulter oder auf dem
- * Kopf sitzend. Folgt dem jeweiligen Körperteil (Arm schwingt, Kopf dreht sich mit). Das
- * hinterherlaufende Mini Me zeichnet {@link MiniMeFollowers} in der Welt.
+ * Kopf sitzend. Folgt dem jeweiligen Körperteil (die Hand trägt es mit, der Kopf dreht es mit), bleibt
+ * an Hand und Kopf aber aufrecht ({@link ModelAnchor#upright}). Das hinterherlaufende Mini Me
+ * zeichnet {@link MiniMeFollowers} in der Welt.
  */
 public final class MiniMeLayer extends RenderLayer<AvatarRenderState, PlayerModel> {
 	/** Größe gegenüber dem Spieler, wenn das Mini Me an ihm sitzt oder hängt. */
@@ -60,9 +61,9 @@ public final class MiniMeLayer extends RenderLayer<AvatarRenderState, PlayerMode
 		poseStack.pushPose();
 		switch (wish.place()) {
 			case HAND -> {
-				// linke Hand (dort ist meist nichts): Handende 10 Pixel unter der Schulter
-				ModelAnchor.to(poseStack, parent, parent.leftArm);
-				poseStack.translate(1f / 16f, 10.5f / 16f, 0f);
+				// linke Hand (dort ist meist nichts): Handende 10 Pixel unter der Schulter. Es hängt aufrecht
+				// daran, statt jeden Armschwung mitzumachen.
+				ModelAnchor.upright(poseStack, parent, parent.leftArm, 1f, 10.5f, 0f, parent.body, 0f);
 				poseStack.scale(SCALE, SCALE, SCALE);
 				float[] hand = MiniMeModel.hangingHand(slim);
 				poseStack.translate(-hand[0] / 16f, -hand[1] / 16f, -hand[2] / 16f);
@@ -77,9 +78,8 @@ public final class MiniMeLayer extends RenderLayer<AvatarRenderState, PlayerMode
 				model.pose(MiniMeModel.Pose.SIT, 0f, 0f, state.ageInTicks);
 			}
 			case HEAD -> {
-				// oben auf dem Kopf, dreht sich mit dem Kopf
-				ModelAnchor.to(poseStack, parent, parent.head);
-				poseStack.translate(0f, -8.6f / 16f, 0f);
+				// oben auf dem Kopf, dreht sich mit dem Kopf – kippt beim Nicken aber nur ein wenig mit
+				ModelAnchor.upright(poseStack, parent, parent.head, 0f, -8.6f, 0f, parent.head, BuddyLayer.HEAD_TILT);
 				poseStack.scale(SCALE, SCALE, SCALE);
 				poseStack.translate(0f, -12f / 16f, 0f);
 				model.pose(MiniMeModel.Pose.SIT, 0f, 0f, state.ageInTicks);
