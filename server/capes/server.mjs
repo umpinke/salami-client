@@ -8,8 +8,12 @@
  * sie auf der Prüf-Webseite (/admin) freigibt.
  *
  * Spiel (salami-core):
- *   POST /v1/auth/challenge                         → {"serverId":"…"}
+ *   POST /v1/auth/challenge                         → {"serverId":"salami-<32 Hex>"}
+ *        Das Präfix „salami-“ hat kein echter Minecraft-Server-Hash: die Clients melden nur solche
+ *        serverIds bei Mojang an, ein übernommener Server kann sie also keine fremde Anmeldung unterschreiben lassen.
  *   PUT  /v1/capes/me  {"name","serverId","cape","hat"?,"minime"?,"buddy"?} → {"status":"approved"|"pending"|"rejected", …}
+ *        (wie POST /v1/capes/submit) name und serverId zusätzlich als Kopfzeilen X-Salami-Name und
+ *        X-Salami-Server-Id: dann prüft der Server die Anmeldung, bevor er das (große) Bild liest.
  *        cape: {"builtin":"salami"} | {"png":"<base64>"} | null (kein Cape)
  *        hat: "santa", "crown" … (Cosmetics → Hüte, ein Hut aus dem Katalog hats.json) oder fehlt/null;
  *        unbekannte Hüte werden ignoriert
@@ -96,6 +100,7 @@ import { BUDDY_PLACES, parseBuddyCatalog } from "./buddies.mjs";
 import { parseCatalog } from "./emotes.mjs";
 import { createFriends } from "./friends.mjs";
 import { parseHatCatalog } from "./hats.mjs";
+import { ipBucket, Slots } from "./limits.mjs";
 import { parseOfficialCatalog } from "./official.mjs";
 import { capeId, decodeCape, encodeRgba, PngError } from "./png.mjs";
 
@@ -125,6 +130,12 @@ const UPLOADS_PER_DAY = env("UPLOADS_PER_DAY", 10);
 const MAX_PENDING = env("MAX_PENDING", 500);
 /** Gleichzeitig offene Live-Verbindungen (Capes und Freunde zusammen, pro laufendem Spiel meist zwei). */
 const MAX_STREAMS = env("MAX_STREAMS", 5_000);
+/**
+ * Davon höchstens so viele ohne Anmeldung (/v1/capes/events). Der Rest bleibt den angemeldeten
+ * Freunde-Verbindungen vorbehalten, damit anonyme Verbindungen sie nicht verdrängen.
+ */
+const MAX_ANON_STREAMS = Math.min(env("MAX_ANON_STREAMS", Math.floor(MAX_STREAMS * 0.6)), MAX_STREAMS);
+/** Pro IP (IPv6: pro /64-Netz), Capes und Freunde zusammen. */
 const MAX_STREAMS_PER_IP = env("MAX_STREAMS_PER_IP", 20);
 /** Lebenszeichen auf offenen Live-Verbindungen, damit Proxy und Spiel tote Verbindungen erkennen. */
 const HEARTBEAT_MS = 20_000;
@@ -149,7 +160,9 @@ const CATALOG_RELOAD_MS = env("CATALOG_RELOAD_MS", 30_000);
 const EMOTES_PER_MINUTE = env("EMOTES_PER_MINUTE", 20);
 /** So lange gilt eine Emote-Anmeldung. */
 const EMOTE_SESSION_MS = 12 * 3_600_000;
-const MAX_EMOTE_SESSIONS = 20_000;
+const MAX_EMOTE_SESSIONS = env("MAX_EMOTE_SESSIONS", 20_000);
+/** Emote-Anmeldungen pro Spieler (Spiel, zweiter PC …) – bei der nächsten fällt die älteste weg. */
+const MAX_EMOTE_SESSIONS_PER_PLAYER = env("MAX_EMOTE_SESSIONS_PER_PLAYER", 5);
 /** Plätze des Mini Me in salami-core (dort `MiniMeModule.Place`, ohne `none`). */
 const MINIME_PLACES = new Set(["hand", "shoulder", "head", "follow"]);
 /** Gültiger Minecraft-Name – nur dessen Skin zeigt das Mini Me. */
@@ -173,8 +186,27 @@ const PLAYER_NAME = /^[A-Za-z0-9_]{1,16}$/;
 const MAX_PNG_BYTES = 4 * 1024 * 1024;
 const MAX_UPLOAD_BODY = Math.ceil((MAX_PNG_BYTES * 4) / 3) + 4096;
 const MAX_SMALL_BODY = 16 * 1024;
-const CHALLENGE_TTL_MS = 60_000;
-const MAX_CHALLENGES = 10_000;
+/**
+ * Große Anfragen (eigene Cape-Bilder, bis ~5,6 MB) liegen beim Lesen im Speicher. Deshalb gibt es dafür
+ * nur wenige Plätze: angemeldete Spieler (Anmeldung per Kopfzeilen X-Salami-Name/X-Salami-Server-Id,
+ * vor dem Lesen geprüft) einen je Spieler, ältere Clients ohne diese Kopfzeilen einen kleinen Rest je IP.
+ */
+const MAX_BIG_BODIES = env("MAX_BIG_BODIES", 16);
+const MAX_ANON_BIG_BODIES = env("MAX_ANON_BIG_BODIES", 4);
+const MAX_ANON_BIG_BODIES_PER_IP = env("MAX_ANON_BIG_BODIES_PER_IP", 1);
+/** So lange darf der Körper einer Anfrage brauchen, danach wird die Verbindung getrennt. */
+const BODY_TIMEOUT_MS = env("BODY_TIMEOUT_MS", 30_000);
+/** Speichern fehlgeschlagen (z. B. Platte voll): so lange bis zum nächsten Versuch. */
+const SAVE_RETRY_MS = env("SAVE_RETRY_MS", 30_000);
+/**
+ * Anmelde-Challenges: `salami-` + 32 Hex-Zeichen. Ein echter Minecraft-Server-Hash sieht nie so aus –
+ * deshalb unterschreiben die Clients nur solche serverIds und nie die Anmeldung für einen fremden Server.
+ */
+const CHALLENGE_PREFIX = "salami-";
+const CHALLENGE_TTL_MS = env("CHALLENGE_TTL_MS", 60_000);
+const MAX_CHALLENGES = env("MAX_CHALLENGES", 50_000);
+/** Offene Challenges pro IP (IPv6: pro /64-Netz). */
+const MAX_CHALLENGES_PER_IP = env("MAX_CHALLENGES_PER_IP", 20);
 const MAX_LOOKUP = 200;
 const MAX_REASON = 200;
 /** Höchstens so viele Capes liefert die Galerie (neueste zuerst). */
@@ -219,8 +251,18 @@ function saveNow() {
   clearTimeout(saveTimer);
   saveTimer = null;
   const tmp = `${DB_FILE}.tmp`;
-  writeFileSync(tmp, JSON.stringify(db));
-  renameSync(tmp, DB_FILE);
+  try {
+    writeFileSync(tmp, JSON.stringify(db));
+    renameSync(tmp, DB_FILE);
+  } catch (e) {
+    // z. B. Platte voll: nicht abstürzen (sonst startet systemd den Dienst immer wieder neu und
+    // verliert jedes Mal die Änderungen) – die Daten bleiben im Speicher, später nochmal versuchen.
+    console.error(`[salami-capes] capes.json nicht gespeichert (${e.code ?? e.message}), neuer Versuch in ${SAVE_RETRY_MS / 1000} s`);
+    try {
+      unlinkSync(tmp);
+    } catch {}
+    saveTimer = setTimeout(saveNow, SAVE_RETRY_MS);
+  }
 }
 function scheduleSave() {
   if (!saveTimer) saveTimer = setTimeout(saveNow, 500);
@@ -314,17 +356,38 @@ const uploadAllowed = (uuid) => underDailyLimit(uploads, uuid, UPLOADS_PER_DAY);
 /** uuid → Zeitpunkte eigener Meldungen (letzte 24 h) */
 const reportLog = new Map();
 
-/** serverId → Ablaufzeit */
+/** serverId → { expires, ip } in der Reihenfolge der Ausgabe (gleiche Laufzeit: die ältesten vorn) */
 const challenges = new Map();
+/** IP (IPv6: /64) → Zahl offener Challenges */
+const challengesPerIp = new Map();
+
+/** Nimmt eine Challenge aus der Tabelle. → ihr Eintrag oder undefined */
+function takeChallenge(serverId) {
+  const entry = challenges.get(serverId);
+  if (!entry) return undefined;
+  challenges.delete(serverId);
+  const left = (challengesPerIp.get(entry.ip) ?? 1) - 1;
+  if (left > 0) challengesPerIp.set(entry.ip, left);
+  else challengesPerIp.delete(entry.ip);
+  return entry;
+}
+
+/** Abgelaufene Challenges weg – nur vorn, wo die ältesten stehen, deshalb auch bei vielen schnell. */
+function sweepChallenges(now = Date.now()) {
+  for (const [id, entry] of challenges) {
+    if (entry.expires >= now) break;
+    takeChallenge(id);
+  }
+}
 
 function sweep(now = Date.now()) {
-  for (const [id, expires] of challenges) if (expires < now) challenges.delete(id);
+  sweepChallenges(now);
   for (const [key, r] of rate) if (now - r.windowStart > r.windowMs) rate.delete(key);
   for (const log of [uploads, reportLog]) {
     for (const [uuid, list] of log) if (!list.some((t) => now - t < 86_400_000)) log.delete(uuid);
   }
   for (const [ip, f] of adminFailures) if (now - f.since >= ADMIN_LOCK_MS) adminFailures.delete(ip);
-  for (const [hash, session] of emoteSessions) if (session.expires < now) emoteSessions.delete(hash);
+  sweepEmoteSessions(now);
   friends.sweep(now);
 }
 
@@ -362,6 +425,7 @@ class HttpError extends Error {
   }
 }
 
+/** Liest den Körper (höchstens `limit` Bytes, höchstens BODY_TIMEOUT_MS lang) in den Speicher. */
 function readBody(req, limit) {
   return new Promise((resolve, reject) => {
     const declared = Number(req.headers["content-length"]);
@@ -371,18 +435,39 @@ function readBody(req, limit) {
       return;
     }
     let size = 0;
-    const chunks = [];
+    let chunks = [];
+    let settled = false;
+    const finish = (error, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error) {
+        chunks = [];
+        reject(error);
+      } else {
+        resolve(value);
+      }
+    };
+    // Wer den Körper absichtlich langsam (oder gar nicht) schickt, hält sonst Speicher und Verbindung fest.
+    const timer = setTimeout(() => {
+      finish(new HttpError(408, "Anfrage kam zu langsam an"));
+      req.destroy();
+    }, BODY_TIMEOUT_MS);
     req.on("data", (chunk) => {
+      if (settled) return;
       size += chunk.length;
       if (size > limit) {
-        reject(new HttpError(413, "Anfrage zu groß"));
+        finish(new HttpError(413, "Anfrage zu groß"));
         req.destroy();
         return;
       }
       chunks.push(chunk);
     });
-    req.on("end", () => resolve(Buffer.concat(chunks)));
-    req.on("error", () => reject(new HttpError(400, "Anfrage abgebrochen")));
+    req.on("end", () => finish(null, Buffer.concat(chunks)));
+    req.on("error", () => finish(new HttpError(400, "Anfrage abgebrochen")));
+    req.on("close", () => {
+      if (!req.complete) finish(new HttpError(400, "Anfrage abgebrochen"));
+    });
   });
 }
 
@@ -395,15 +480,55 @@ async function readJson(req, limit) {
   throw new HttpError(400, "ungültiges JSON");
 }
 
+/** Plätze für große Anfragen: nach der Anmeldung je Spieler einer, ohne Anmeldung wenige je IP (MAX_BIG_BODIES). */
+const bigBodies = new Slots(MAX_BIG_BODIES, 1);
+const anonBigBodies = new Slots(MAX_ANON_BIG_BODIES, MAX_ANON_BIG_BODIES_PER_IP);
+
+/**
+ * Liest eine Anfrage, die ein Cape-Bild enthalten kann. Neuere Clients schicken die Anmeldung zusätzlich als
+ * Kopfzeilen (X-Salami-Name, X-Salami-Server-Id): dann fragt der Server Mojang, bevor er den Körper liest.
+ * Ältere Clients haben sie nur im Körper – für sie gibt es nur wenige Plätze je IP.
+ * → { body, player } – player ist null, wenn die Anmeldung noch aus dem Körper geprüft werden muss
+ */
+async function readUpload(req, ip) {
+  const name = req.headers["x-salami-name"];
+  const serverId = req.headers["x-salami-server-id"];
+  let player = null;
+  if (name !== undefined || serverId !== undefined) {
+    try {
+      player = await verifyPlayer(name, serverId);
+    } catch (e) {
+      req.resume();
+      throw e;
+    }
+  }
+  const declared = Number(req.headers["content-length"]);
+  if (Number.isFinite(declared) && declared <= MAX_SMALL_BODY) return { body: await readJson(req, MAX_SMALL_BODY), player };
+  const release = player ? bigBodies.acquire(player.uuid) : anonBigBodies.acquire(ip);
+  if (!release) {
+    req.resume();
+    throw new HttpError(503, "gerade zu viele Uploads, bitte gleich nochmal versuchen");
+  }
+  try {
+    return { body: await readJson(req, MAX_UPLOAD_BODY), player };
+  } finally {
+    release();
+  }
+}
+
 const dashed = (hex) =>
   `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`.toLowerCase();
 
 // ------------------------------------------------------------------ Anmeldung (Mojang)
 
-function newChallenge() {
+/** Neue Challenge für diese IP (schon als ipBucket). → serverId `salami-` + 32 Hex-Zeichen */
+function newChallenge(ip, now = Date.now()) {
+  if ((challengesPerIp.get(ip) ?? 0) >= MAX_CHALLENGES_PER_IP || challenges.size >= MAX_CHALLENGES) sweepChallenges(now);
+  if ((challengesPerIp.get(ip) ?? 0) >= MAX_CHALLENGES_PER_IP) throw new HttpError(429, "zu viele Anmeldungen, kurz warten");
   if (challenges.size >= MAX_CHALLENGES) throw new HttpError(503, "gerade zu viele Anmeldungen");
-  const serverId = randomBytes(20).toString("hex");
-  challenges.set(serverId, Date.now() + CHALLENGE_TTL_MS);
+  const serverId = `${CHALLENGE_PREFIX}${randomBytes(16).toString("hex")}`;
+  challenges.set(serverId, { expires: now + CHALLENGE_TTL_MS, ip });
+  challengesPerIp.set(ip, (challengesPerIp.get(ip) ?? 0) + 1);
   return serverId;
 }
 
@@ -412,11 +537,10 @@ async function verifyPlayer(name, serverId) {
   if (typeof name !== "string" || !PLAYER_NAME.test(name) || typeof serverId !== "string") {
     throw new HttpError(400, "name oder serverId fehlt");
   }
-  const expires = challenges.get(serverId);
-  challenges.delete(serverId); // nur einmal verwendbar
-  if (!expires || expires < Date.now()) throw new HttpError(401, "Anmeldung abgelaufen, bitte neu versuchen");
+  const entry = takeChallenge(serverId); // nur einmal verwendbar
+  if (!entry || entry.expires < Date.now()) throw new HttpError(401, "Anmeldung abgelaufen, bitte neu versuchen");
 
-  const url = `${MOJANG_SESSION_URL}/session/minecraft/hasJoined?username=${encodeURIComponent(name)}&serverId=${serverId}`;
+  const url = `${MOJANG_SESSION_URL}/session/minecraft/hasJoined?username=${encodeURIComponent(name)}&serverId=${encodeURIComponent(serverId)}`;
   let response;
   try {
     response = await fetch(url, { signal: AbortSignal.timeout(8_000) });
@@ -470,9 +594,9 @@ function capeResult(id) {
   return { status: entry.status, id, ...(entry.status === "rejected" && entry.reason ? { reason: entry.reason } : {}) };
 }
 
-async function handleSetCape(req, res) {
-  const body = await readJson(req, MAX_UPLOAD_BODY);
-  const { uuid, name } = await verifyPlayer(body.name, body.serverId);
+async function handleSetCape(req, res, ip) {
+  const { body, player } = await readUpload(req, ip);
+  const { uuid, name } = player ?? (await verifyPlayer(body.name, body.serverId));
   const previous = db.players[uuid]?.cape?.id;
   const visibleBefore = JSON.stringify(visibleCape(db.players[uuid]));
   const cape = body.cape ?? null;
@@ -513,10 +637,10 @@ async function handleSetCape(req, res) {
 }
 
 /** Launcher: eigenes Cape gleich nach dem Hinzufügen einreichen – das getragene Cape bleibt. */
-async function handleSubmit(req, res) {
-  const body = await readJson(req, MAX_UPLOAD_BODY);
+async function handleSubmit(req, res, ip) {
+  const { body, player } = await readUpload(req, ip);
   if (typeof body.png !== "string") throw new HttpError(400, "png fehlt");
-  const { uuid, name } = await verifyPlayer(body.name, body.serverId);
+  const { uuid, name } = player ?? (await verifyPlayer(body.name, body.serverId));
   const id = storeCape(body.png, uuid, name, new Date().toISOString());
   const cape = db.capes[id];
   if (cape.status === "pending") cape.viaLauncher = true;
@@ -732,15 +856,25 @@ async function handleReview(req, res, admin, id, action) {
 
 /** Offene Live-Verbindungen: res → { ip, kind } – kind "capes" (Cape-Änderungen) oder "friends" (friends.mjs) */
 const streams = new Map();
+/** IP (IPv6: /64) → Zahl offener Live-Verbindungen */
+const streamsPerIp = new Map();
+/** Offene Verbindungen ohne Anmeldung (kind "capes") */
+let anonStreams = 0;
 
 /**
- * Öffnet eine Live-Verbindung. Die Grenzen gelten für Cape- und Freunde-Verbindungen
- * zusammen; onClose läuft genau einmal, wenn die Verbindung zugeht.
+ * Öffnet eine Live-Verbindung. MAX_STREAMS und MAX_STREAMS_PER_IP gelten für Cape- und Freunde-Verbindungen
+ * zusammen; die anonymen Cape-Verbindungen dürfen davon höchstens MAX_ANON_STREAMS belegen.
+ * onClose läuft genau einmal, wenn die Verbindung zugeht.
  */
 function openStream(req, res, ip, kind, onClose) {
-  let fromIp = 0;
-  for (const other of streams.values()) if (other.ip === ip) fromIp++;
-  if (streams.size >= MAX_STREAMS || fromIp >= MAX_STREAMS_PER_IP) throw new HttpError(503, "zu viele Verbindungen");
+  const anonymous = kind === "capes";
+  if (
+    streams.size >= MAX_STREAMS ||
+    (anonymous && anonStreams >= MAX_ANON_STREAMS) ||
+    (streamsPerIp.get(ip) ?? 0) >= MAX_STREAMS_PER_IP
+  ) {
+    throw new HttpError(503, "zu viele Verbindungen");
+  }
   res.writeHead(200, {
     ...SECURITY_HEADERS,
     "Content-Type": "text/event-stream; charset=utf-8",
@@ -750,8 +884,15 @@ function openStream(req, res, ip, kind, onClose) {
   });
   res.write("retry: 5000\n: verbunden\n\n");
   streams.set(res, { ip, kind });
+  streamsPerIp.set(ip, (streamsPerIp.get(ip) ?? 0) + 1);
+  if (anonymous) anonStreams += 1;
   const drop = () => {
-    if (streams.delete(res)) onClose?.();
+    if (!streams.delete(res)) return;
+    const left = (streamsPerIp.get(ip) ?? 1) - 1;
+    if (left > 0) streamsPerIp.set(ip, left);
+    else streamsPerIp.delete(ip);
+    if (anonymous) anonStreams -= 1;
+    onClose?.();
   };
   req.on("close", drop);
   res.on("close", drop);
@@ -932,17 +1073,46 @@ const CATALOGS = [emoteCatalog, hatCatalog, buddyCatalog, officialCatalog];
 
 // ------------------------------------------------------------------ Emotes
 
-/** SHA-256(Token) → { uuid, expires } – nur im Speicher, Emotes selbst werden nie gespeichert. */
+/**
+ * SHA-256(Token) → { uuid, expires } – nur im Speicher, Emotes selbst werden nie gespeichert.
+ * Reihenfolge der Anmeldung (gleiche Laufzeit: die ältesten vorn).
+ */
 const emoteSessions = new Map();
+/** uuid → Token-Hashes dieses Spielers, älteste zuerst */
+const emoteSessionsOf = new Map();
 const tokenHash = (token) => createHash("sha256").update(token).digest("hex");
+
+function dropEmoteSession(hash) {
+  const session = emoteSessions.get(hash);
+  if (!session) return;
+  emoteSessions.delete(hash);
+  const list = emoteSessionsOf.get(session.uuid);
+  const index = list ? list.indexOf(hash) : -1;
+  if (index >= 0) list.splice(index, 1);
+  if (list?.length === 0) emoteSessionsOf.delete(session.uuid);
+}
+
+function sweepEmoteSessions(now = Date.now()) {
+  for (const [hash, session] of emoteSessions) {
+    if (session.expires >= now) break;
+    dropEmoteSession(hash);
+  }
+}
 
 async function handleEmoteSession(req, res) {
   const body = await readJson(req, MAX_SMALL_BODY);
   const { uuid, name } = await verifyPlayer(body.name, body.serverId);
-  if (emoteSessions.size >= MAX_EMOTE_SESSIONS) sweep();
-  if (emoteSessions.size >= MAX_EMOTE_SESSIONS) throw new HttpError(503, "gerade zu viele Anmeldungen");
+  // Wie bei den Freunde-Tokens: höchstens ein paar je Spieler, bei der nächsten fällt die älteste weg
+  for (let mine = emoteSessionsOf.get(uuid); mine?.length >= MAX_EMOTE_SESSIONS_PER_PLAYER; mine = emoteSessionsOf.get(uuid)) {
+    dropEmoteSession(mine[0]);
+  }
+  if (emoteSessions.size >= MAX_EMOTE_SESSIONS) sweepEmoteSessions();
+  // immer noch voll: die älteste Anmeldung überhaupt fällt weg, statt alle neuen abzuweisen
+  while (emoteSessions.size > 0 && emoteSessions.size >= MAX_EMOTE_SESSIONS) dropEmoteSession(emoteSessions.keys().next().value);
   const token = randomBytes(24).toString("base64url");
-  emoteSessions.set(tokenHash(token), { uuid, expires: Date.now() + EMOTE_SESSION_MS });
+  const hash = tokenHash(token);
+  emoteSessions.set(hash, { uuid, expires: Date.now() + EMOTE_SESSION_MS });
+  emoteSessionsOf.set(uuid, [...(emoteSessionsOf.get(uuid) ?? []), hash]);
   send(res, 200, { token, uuid, name });
 }
 
@@ -1008,7 +1178,8 @@ function serveAdminFile(res, file) {
 async function route(req, res) {
   const url = new URL(req.url ?? "/", "http://localhost");
   const path = url.pathname;
-  const ip = clientIp(req);
+  // Alle Grenzen „pro IP“ zählen bei IPv6 pro /64-Netz (sonst nimmt man einfach die nächste Adresse)
+  const ip = ipBucket(clientIp(req));
 
   if (req.method === "GET" && path === "/health") {
     res.writeHead(200, { "Content-Type": "text/plain" });
@@ -1091,10 +1262,10 @@ async function route(req, res) {
   }
 
   if (rateLimited("api", ip, RATE_PER_MINUTE)) throw new HttpError(429, "zu viele Anfragen");
-  if (req.method === "POST" && path === "/v1/auth/challenge") return send(res, 200, { serverId: newChallenge() });
+  if (req.method === "POST" && path === "/v1/auth/challenge") return send(res, 200, { serverId: newChallenge(ip) });
   if (req.method === "POST" && path === "/v1/emotes/session") return handleEmoteSession(req, res);
-  if (req.method === "PUT" && path === "/v1/capes/me") return handleSetCape(req, res);
-  if (req.method === "POST" && path === "/v1/capes/submit") return handleSubmit(req, res);
+  if (req.method === "PUT" && path === "/v1/capes/me") return handleSetCape(req, res, ip);
+  if (req.method === "POST" && path === "/v1/capes/submit") return handleSubmit(req, res, ip);
   if (req.method === "POST" && path === "/v1/capes/status") return handleStatus(req, res);
   if (req.method === "POST" && path === "/v1/capes/report") return handleReport(req, res);
 

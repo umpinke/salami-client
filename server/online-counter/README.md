@@ -8,6 +8,7 @@ Läuft unter **https://salami-client-zaehler.umpinke.de**: systemd-Dienst `salam
 - Wer sich 90 s nicht meldet, gilt als offline. Beim Schließen meldet sich der Launcher sofort ab.
 - Alles liegt nur im Arbeitsspeicher. Es gibt keine Datenbank und kein Log der IDs.
 - Pro IP zählen höchstens 10 Launcher, und pro IP sind höchstens 30 Anfragen pro Minute erlaubt. So kann niemand die Zahl künstlich hochtreiben.
+- Lebenszeichen nimmt der Zähler nur als `Content-Type: application/json` und ohne `Origin`-Kopfzeile an (so schickt sie der Launcher), sonst `415`. Eine fremde Webseite kann ohne CORS-Freigabe nur `text/plain` & Co. schicken und Browser setzen bei POST immer `Origin` – so kann keine Webseite ihre Besucher mitzählen lassen. Offenes CORS gibt es nur für `GET /v1/online`.
 
 Benötigt **Node.js 18 oder neuer**. Es gibt keine Abhängigkeiten und kein `npm install`.
 
@@ -36,7 +37,7 @@ Benötigt **Node.js 18 oder neuer**. Es gibt keine Abhängigkeiten und kein `npm
    sudo systemctl enable --now salami-online
    ```
 
-   Liegt Node nicht unter `/usr/bin/node` (prüfen mit `which node`), passe `ExecStart` in der Service-Datei an.
+   Liegt Node nicht unter `/usr/bin/node` (prüfen mit `which node`), passe `ExecStart` in der Service-Datei an. Die Service-Datei lauscht nur lokal für einen Proxy davor (siehe [Mit Domain und HTTPS](#mit-domain-und-https-empfohlen)); ohne Proxy dort `HOST=0.0.0.0` und `TRUST_PROXY=0` setzen, sonst sind Schritt 4 und 5 nicht erreichbar.
 
 4. **Port freigeben** (bei `ufw`, sonst entsprechend in deiner Firewall bzw. beim Hoster):
 
@@ -72,7 +73,7 @@ online.deine-domain.de {
 }
 ```
 
-In der Service-Datei dann `HOST=127.0.0.1` und `TRUST_PROXY=1` setzen. So erkennt der Zähler die echte IP für die Obergrenze pro IP. Port 8787 muss dann **nicht** in der Firewall offen sein. Im Launcher steht anschließend `Some("https://online.deine-domain.de")`.
+Die Service-Datei im Repo ist dafür eingestellt (`HOST=127.0.0.1`, `TRUST_PROXY=1`, so läuft auch salami-client-zaehler.umpinke.de). So erkennt der Zähler die echte IP für die Obergrenze pro IP. Port 8787 muss dann **nicht** in der Firewall offen sein. Ohne Proxy (Schritt 4 oben) stattdessen `HOST=0.0.0.0` und `TRUST_PROXY=0` setzen. Im Launcher steht anschließend `Some("https://online.deine-domain.de")`.
 
 Bei nginx genauso: `proxy_pass http://127.0.0.1:8787;` und `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`.
 
@@ -100,7 +101,7 @@ Unter Windows bleibt der Dienst z. B. mit [NSSM](https://nssm.cc/) oder der Aufg
 
 | Anfrage | Antwort |
 |---|---|
-| `POST /v1/heartbeat` mit `{"id":"<uuid>"}` | `{"online":42}` |
-| `POST /v1/leave` mit `{"id":"<uuid>"}` | `{"online":41}` |
+| `POST /v1/heartbeat` mit `{"id":"<uuid>"}` | `{"online":42}` – nur `application/json` ohne `Origin`, sonst `415` |
+| `POST /v1/leave` mit `{"id":"<uuid>"}` | `{"online":41}` – ebenso |
 | `GET /v1/online` | `{"online":41}`, mit offenem CORS, z. B. für die Website |
 | `GET /health` | `ok` |

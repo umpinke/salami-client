@@ -67,6 +67,8 @@ async function startServer(port, mojangPort) {
       FRIENDS_CLIP_MB: "1",
       FRIENDS_MEDIA_QUOTA_MB: "1",
       MAX_STREAMS_PER_IP: "50",
+      // Die Tests fragen dieselben Spieler mehrfach an; Sperrfrist und Stundengrenze prüft limits.test.mjs
+      FRIENDS_REQUEST_COOLDOWN_MS: "0",
     },
     stdio: ["ignore", "pipe", "inherit"],
   });

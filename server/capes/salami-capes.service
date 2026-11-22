@@ -20,6 +20,13 @@ StateDirectory=salami-capes
 Restart=always
 RestartSec=5
 
+# Obergrenze für den Arbeitsspeicher, damit ein Fehler oder Angriff nicht den ganzen Server lahmlegt
+# (dann beendet systemd nur diesen Dienst und startet ihn neu). Große Anfragen sind im Dienst selbst
+# begrenzt (MAX_BIG_BODIES …). Der JavaScript-Speicher bleibt mit --max-old-space-size darunter,
+# der Rest ist für Puffer und Verbindungen.
+MemoryMax=768M
+Environment=NODE_OPTIONS=--max-old-space-size=576
+
 # Abschotten: der Dienst braucht nur Netzwerk und seinen Datenordner.
 NoNewPrivileges=true
 ProtectSystem=strict
