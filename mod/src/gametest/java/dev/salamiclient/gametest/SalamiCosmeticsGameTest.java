@@ -51,6 +51,7 @@ public final class SalamiCosmeticsGameTest implements FabricClientGameTest {
 			return;
 		}
 		ModuleManager modules = SalamiClient.get().modules();
+		GametestCompat.enableExtraResourcePacks(context);
 		try (TestSingleplayerContext world = context.worldBuilder().create()) {
 			GametestCompat.waitForChunksRender(world);
 			world.getServer().runCommand("time set noon");
