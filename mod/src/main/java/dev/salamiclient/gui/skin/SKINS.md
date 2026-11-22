@@ -86,6 +86,33 @@ Identifier.fromNamespaceAndPath("salami", "<look>/<name>"), x, y, w, h, farbe)`.
 Kreide, Papier, Stempel, Regler-Griff) erzeugt `mod/tools/skin-textures/theke.py`
 (`python -I theke.py <ausgabeordner>`, braucht Pillow).
 
+## Die Salumeria
+
+- `Salumeria.java`: Farben (Etikett #1a1110, Creme #f3e7d6, Salami-Rot #b23a3a, Schrift-Rot #da6a5e) und
+  Helfer in **Bildschirmpixeln** (Haarlinie, doppelte Linie, Raute, Punktlinie – bei jeder GUI-Größe fein
+  und scharf), römische Ziffern, italienische Zahlwörter („dieci di sessantanove“).
+- `Serif.java`: Cormorant Garamond als TTF-Schrift. Minecraft zeichnet TTF-Glyphen ohne Glättung; scharf
+  sind sie nur, wenn „oversample“ den Bildschirmpixeln pro gezeichnetem Pixel entspricht. Deshalb gibt
+  es jeden Schnitt (`roman`, `italic`, `caps` = kleinere Antiqua für Kapitälchen) in mehreren
+  Auflösungen (`assets/salami/font/salumeria/<schnitt>_<oversample×10>.json`), und `Serif` wählt beim
+  Zeichnen die passende. Schriftarten als `Serif.Type` (Schnitt, Größe, Kapitälchen); Grundlinie wie bei
+  der Pixelschrift 7 unter der Oberkante; `Serif.fit` passt ein wie `TextFit` (Kapitälchen → normal →
+  kleiner → „…“). Fließtext der Bildschirme bleibt in der Pixelschrift.
+- Die Schriftdateien sind feste Medium-Schnitte (500) der variablen Launcher-Schriften (Light wäre zu
+  dünn): `mod/tools/skin-textures/salumeria.py <assets/salami>` rechnet sie aus
+  `launcher/public/fonts/` (ohne fontTools), schreibt die Definitionen und das Logo-Sprite. Lizenz:
+  `font/cormorant-garamond-OFL.txt`.
+- `SalumeriaSkin`: WINDOW/POPUP = Etikett mit doppelter Haarlinie, SIDE = tieferes Feld, Schalter = Raute
+  (rot gefüllt = an, Umriss = aus), Knöpfe in Kapitälchen (ohne Buchstaben in der Pixelschrift),
+  Reiter = Kapitälchen mit roter Unterstreichung, Überschriften in der Antiqua.
+- `SalumeriaMenuView`: Etikett mit Logo, „Salami“, kursivem Stand, Einträgen als Gänge (Ziffer,
+  Kapitälchen, Punktlinie, kursive Angabe); knapp ohne Logo, dann enger, zuletzt verkleinert.
+- `SalumeriaModsView`: „Carta“ mit Register links (Ziffern, Zähler, rot unterstrichen, Werkzeuge) und
+  Einträgen rechts in 1–3 Spalten; unter dem Namen so viele **ganze Sätze** der Beschreibung, wie in
+  zwei Zeilen passen (ein langer erster Satz bis vier), Reihen so hoch wie ihr längster Eintrag; der
+  ganze Text im Tooltip, wenn nicht alles steht.
+- Look-eigene Texte: `salami.salumeria.*`.
+
 ## Screenshots pro Look
 
 Aus `mod/`:

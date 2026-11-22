@@ -1,0 +1,14 @@
+{
+  "providers": [
+    {
+      "type": "ttf",
+      "file": "salami:cormorant-garamond-medium.ttf",
+      "size": 11.0,
+      "oversample": 1.5
+    },
+    {
+      "type": "reference",
+      "id": "minecraft:default"
+    }
+  ]
+}
