@@ -1,9 +1,10 @@
 package dev.salamiclient.gui;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import dev.salamiclient.gui.skin.Skin;
+import dev.salamiclient.gui.skin.Skins;
 import dev.salamiclient.render.GuiDraw;
 import dev.salamiclient.setting.ColorSetting;
-import dev.salamiclient.theme.Theme;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.resources.language.I18n;
@@ -136,7 +137,7 @@ public final class ColorPicker {
 	}
 
 	private int[] resetButton(Font font) {
-		int w = font.width(I18n.get("salami.colorpicker.reset")) + 8;
+		int w = font.width(I18n.get("salami.colorpicker.reset")) + 12;
 		return new int[] {x0 + PAD + INNER_W - w, buttonY(), x0 + PAD + INNER_W, buttonY() + ROW_H};
 	}
 
@@ -155,12 +156,13 @@ public final class ColorPicker {
 
 	// ------------------------------------------------------------------ Zeichnen
 
-	public void render(GuiGraphics g, Font font, Theme theme, int mouseX, int mouseY) {
+	public void render(GuiGraphics g, Font font, int mouseX, int mouseY) {
 		if (setting.get() != shown && drag == Drag.NONE) {
 			load(setting.get());
 		}
-		g.fill(x0, y0, x0 + WIDTH, y0 + HEIGHT, theme.panel() | 0xFF000000);
-		GuiDraw.outline(g, x0, y0, WIDTH, HEIGHT, theme.accent());
+		Skin skin = Skins.current();
+		Skin.Ink ink = skin.ink(Skin.Surface.POPUP);
+		skin.surface(g, Skin.Surface.POPUP, x0, y0, WIDTH, HEIGHT);
 
 		// Farbfeld: links weiß → rechts volle Farbe, oben hell → unten schwarz
 		int[] f = field();
@@ -169,7 +171,7 @@ public final class ColorPicker {
 			int top = ColorSetting.fromHsv(hue, i / (float) (w - 1), 1F, 255);
 			g.fillGradient(f[0] + i, f[1], f[0] + i + 1, f[3], top, 0xFF000000);
 		}
-		GuiDraw.outline(g, f[0] - 1, f[1] - 1, w + 2, f[3] - f[1] + 2, theme.outline());
+		GuiDraw.outline(g, f[0] - 1, f[1] - 1, w + 2, f[3] - f[1] + 2, ink.line());
 		int markX = f[0] + Math.round(saturation * (w - 1));
 		int markY = f[1] + Math.round((1 - value) * (FIELD_H - 1));
 		GuiDraw.outline(g, markX - 2, markY - 2, 5, 5, 0xFF000000);
@@ -180,7 +182,7 @@ public final class ColorPicker {
 		for (int j = 0; j < FIELD_H; j++) {
 			g.fill(h[0], h[1] + j, h[2], h[1] + j + 1, ColorSetting.fromHsv(j / (float) (FIELD_H - 1), 1F, 1F, 255));
 		}
-		GuiDraw.outline(g, h[0] - 1, h[1] - 1, BAR_W + 2, FIELD_H + 2, theme.outline());
+		GuiDraw.outline(g, h[0] - 1, h[1] - 1, BAR_W + 2, FIELD_H + 2, ink.line());
 		barMarker(g, h, Math.round(hue * (FIELD_H - 1)));
 
 		int opaque = ColorSetting.fromHsv(hue, saturation, value, 255);
@@ -189,7 +191,7 @@ public final class ColorPicker {
 			int[] a = alphaBar();
 			checker(g, a);
 			g.fillGradient(a[0], a[1], a[2], a[3], opaque, opaque & 0x00FFFFFF);
-			GuiDraw.outline(g, a[0] - 1, a[1] - 1, BAR_W + 2, FIELD_H + 2, theme.outline());
+			GuiDraw.outline(g, a[0] - 1, a[1] - 1, BAR_W + 2, FIELD_H + 2, ink.line());
 			barMarker(g, a, Math.round((1 - alpha / 255F) * (FIELD_H - 1)));
 		}
 
@@ -197,16 +199,18 @@ public final class ColorPicker {
 		int[] p = preview();
 		checker(g, p);
 		g.fill(p[0], p[1], p[2], p[3], setting.argb());
-		GuiDraw.outline(g, p[0], p[1], p[2] - p[0], p[3] - p[1], theme.outline());
+		GuiDraw.outline(g, p[0], p[1], p[2] - p[0], p[3] - p[1], ink.line());
 		int[] hb = hexBox();
-		g.fill(hb[0], hb[1], hb[2], hb[3], 0xFF0B0B0E);
-		GuiDraw.outline(g, hb[0], hb[1], hb[2] - hb[0], hb[3] - hb[1],
-			editingHex ? (hexInvalid ? theme.warning() : theme.accent()) : theme.outline());
+		skin.input(g, hb[0], hb[1], hb[2] - hb[0], hb[3] - hb[1], editingHex);
+		if (hexInvalid) {
+			GuiDraw.outline(g, hb[0], hb[1], hb[2] - hb[0], hb[3] - hb[1], ink.warning());
+		}
+		Skin.Ink inputInk = skin.ink(Skin.Surface.INPUT);
 		String hex = editingHex ? hexBuffer : ColorSetting.toHex(setting.get());
-		GuiDraw.text(g, font, hex, hb[0] + 3, hb[1] + 2, theme.text(), false);
+		GuiDraw.text(g, font, hex, hb[0] + 3, hb[1] + 2, inputInk.text(), false);
 		if (editingHex && (System.currentTimeMillis() / 500) % 2 == 0) {
 			int cx = hb[0] + 3 + font.width(hex);
-			g.fill(cx, hb[1] + 2, cx + 1, hb[3] - 2, theme.text());
+			g.fill(cx, hb[1] + 2, cx + 1, hb[3] - 2, inputInk.text());
 		}
 
 		// Schnellauswahl
@@ -215,22 +219,19 @@ public final class ColorPicker {
 			g.fill(s[0], s[1], s[2], s[3], ColorSetting.PALETTE[i]);
 			boolean selected = !setting.isChroma() && (setting.get() | 0xFF000000) == ColorSetting.PALETTE[i];
 			GuiDraw.outline(g, s[0], s[1], s[2] - s[0], s[3] - s[1],
-				selected ? theme.accent() : inside(s, mouseX, mouseY) ? 0xFFFFFFFF : theme.outline());
+				selected ? ink.accent() : inside(s, mouseX, mouseY) ? ink.text() : ink.line());
 		}
 
 		// Regenbogen + Zurücksetzen
 		if (setting.chromaAllowed()) {
 			int[] c = chromaButton(font);
 			boolean on = setting.isChroma();
-			g.fill(c[0], c[1], c[2], c[3], inside(c, mouseX, mouseY) ? theme.hover() | 0x40000000 : 0x00000000);
-			g.fill(c[0] + 1, c[1] + 2, c[0] + 9, c[1] + 10, on ? setting.argb() | 0xFF000000 : 0xFF0B0B0E);
-			GuiDraw.outline(g, c[0] + 1, c[1] + 2, 8, 8, theme.outline());
-			GuiDraw.text(g, font, I18n.get("salami.colorpicker.chroma"), c[0] + 12, c[1] + 2, on ? theme.accent() : theme.text(), false);
+			skin.checkbox(g, c[0] + 1, c[1] + 2, 8, on, Skin.UiState.of(inside(c, mouseX, mouseY)));
+			GuiDraw.text(g, font, I18n.get("salami.colorpicker.chroma"), c[0] + 12, c[1] + 2, on ? ink.accent() : ink.text(), false);
 		}
 		int[] r = resetButton(font);
-		boolean resetHover = inside(r, mouseX, mouseY);
-		g.fill(r[0], r[1], r[2], r[3], resetHover ? theme.accent() : theme.header());
-		GuiDraw.text(g, font, I18n.get("salami.colorpicker.reset"), r[0] + 4, r[1] + 2, resetHover ? 0xFF000000 : theme.headerText(), false);
+		skin.button(g, font, r[0], r[1], r[2] - r[0], r[3] - r[1], I18n.get("salami.colorpicker.reset"), Skin.ButtonKind.SECONDARY,
+			Skin.UiState.of(inside(r, mouseX, mouseY)));
 	}
 
 	private static void barMarker(GuiGraphics g, int[] bar, int offset) {

@@ -1,7 +1,8 @@
 package dev.salamiclient.gui;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import dev.salamiclient.SalamiClient;
+import dev.salamiclient.gui.skin.Skin;
+import dev.salamiclient.gui.skin.TextFit;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.ModuleManager;
 import dev.salamiclient.modules.client.GuiScaleModule;
@@ -15,7 +16,6 @@ import dev.salamiclient.setting.NumberSetting;
 import dev.salamiclient.setting.Setting;
 import dev.salamiclient.setting.StringListSetting;
 import dev.salamiclient.setting.TextSetting;
-import dev.salamiclient.theme.Theme;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
@@ -37,6 +37,7 @@ public final class ModSettingsScreen extends Screen {
 	private static final int ROW = 18;
 	private static final int PAD = 10;
 	private static final int CONTROL_W = 120;
+	private static final int MAX_W = 360;
 
 	private final ModuleManager modules;
 	private final Module module;
@@ -124,23 +125,41 @@ public final class ModSettingsScreen extends Screen {
 
 	private int[] frame() {
 		int uiW = Math.round(width / uiScale);
-		int uiH = Math.round(height / uiScale);
-		int w = Math.min(uiW - 16, 340);
-		int h = Math.min(uiH - 16, 300);
-		int x0 = (uiW - w) / 2;
-		int y0 = (uiH - h) / 2;
-		return new int[] {x0, y0, x0 + w, y0 + h};
+		return SalamiWindow.frame(uiW, Math.round(height / uiScale), MAX_W, Math.min(320, naturalHeight(uiW)));
+	}
+
+	/** Höhe, bei der alle Einstellungen ohne Scrollen hineinpassen (das Fenster wird nicht größer als nötig). */
+	private int naturalHeight(int uiW) {
+		int w = Math.min(uiW - 16, MAX_W);
+		Component text = module.description();
+		int desc = text == null ? 0 : font.split(text, w - 2 * PAD).size();
+		int rows = 0;
+		boolean header = false;
+		boolean any = false;
+		for (Setting<?> setting : module.settings()) {
+			if (setting.isHidden()) {
+				continue;
+			}
+			if (setting.isAppearance() && !header && any) {
+				header = true;
+				rows++;
+			}
+			any = true;
+			rows++;
+		}
+		return Math.max(110, SalamiWindow.HEADER + 5 + desc * 10 + (desc > 0 ? 5 : 0) + rows * ROW + PAD + 2);
 	}
 
 	private int[] backButton() {
-		int[] f = frame();
-		int w = font.width(I18n.get("salami.mods.back")) + 12;
-		return new int[] {f[0] + 4, f[1] + 5, f[0] + 4 + w, f[1] + 19};
+		return SalamiWindow.backButton(font, frame());
 	}
 
+	/** Schalter des Moduls oben rechts samt „An“/„Aus“ davor. */
 	private int[] toggle() {
 		int[] f = frame();
-		return new int[] {f[2] - 30, f[1] + 7, f[2] - 8, f[1] + 17};
+		int label = Math.max(font.width(I18n.get("salami.on")), font.width(I18n.get("salami.off")));
+		int size = SalamiWindow.skin().toggleSize()[0];
+		return new int[] {f[2] - PAD - size - 4 - label, f[1] + 6, f[2] - PAD, f[1] + 6 + Math.max(11, SalamiWindow.skin().toggleSize()[1])};
 	}
 
 	private List<FormattedCharSequence> description() {
@@ -154,8 +173,8 @@ public final class ModSettingsScreen extends Screen {
 
 	private int[] content() {
 		int[] f = frame();
-		int top = f[1] + HEADER + 6 + description().size() * 10 + (description().isEmpty() ? 0 : 6);
-		return new int[] {f[0] + PAD, top, f[2] - PAD, f[3] - PAD};
+		int top = SalamiWindow.contentTop(f) + description().size() * 10 + (description().isEmpty() ? 0 : 5);
+		return new int[] {f[0] + PAD, top, f[2] - PAD - 6, f[3] - PAD};
 	}
 
 	private List<Row> rows() {
@@ -216,16 +235,12 @@ public final class ModSettingsScreen extends Screen {
 	@Override
 	//? if >=26.1 {
 	/*public void extractBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-	*///?} else
+		super.extractBackground(graphics, mouseX, mouseY, partialTick);
+	*///?} else {
 	public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-		if (minecraft.level == null) {
-			// ohne Welt (Titelbildschirm, Mod Menu): Panorama dahinter wie in Minecrafts eigenen Menüs
-			//? if >=26.1 {
-			/*super.extractBackground(graphics, mouseX, mouseY, partialTick);
-			*///?} else
-			super.renderBackground(graphics, mouseX, mouseY, partialTick);
-		}
-		graphics.fill(0, 0, width, height, 0xAA000000);
+		super.renderBackground(graphics, mouseX, mouseY, partialTick);
+	//?}
+		SalamiWindow.backdrop(graphics, width, height, uiScale);
 	}
 
 	@Override
@@ -241,7 +256,8 @@ public final class ModSettingsScreen extends Screen {
 			scrollToSetting(scrollTo);
 			scrollTo = null;
 		}
-		Theme theme = SalamiClient.get().theme();
+		Skin skin = SalamiWindow.skin();
+		Skin.Ink ink = skin.ink(Skin.Surface.WINDOW);
 		int mx = (int) (mouseX / uiScale);
 		int my = (int) (mouseY / uiScale);
 		Component tooltip = null;
@@ -250,44 +266,39 @@ public final class ModSettingsScreen extends Screen {
 		g.pose().scale(uiScale, uiScale);
 
 		int[] f = frame();
-		int fw = f[2] - f[0];
-		int fh = f[3] - f[1];
-		GuiDraw.rounded(g, f[0] + 1, f[1] + 3, fw, fh, 6, 0x50000000);
-		GuiDraw.rounded(g, f[0], f[1], fw, fh, 6, theme.panel() | 0xFF000000);
-		GuiDraw.roundedOutline(g, f[0], f[1], fw, fh, 6, theme.outline());
-		g.fill(f[0] + 1, f[1] + HEADER - 1, f[2] - 1, f[1] + HEADER, theme.outline());
+		int[] toggle = toggle();
+		boolean overPicker = picker != null && picker.contains(mx, my);
+		SalamiWindow.draw(g, font, f, I18n.get(module.translationKey()), overPicker ? -1 : mx, my, f[2] - toggle[0]);
+		boolean on = module.isEnabled();
+		int size = skin.toggleSize()[0];
+		Skin.UiState toggleState = Skin.UiState.of(!overPicker && inside(toggle, mx, my));
+		skin.toggle(g, toggle[2] - size, toggle[1], on, toggleState);
+		String state = I18n.get(on ? "salami.on" : "salami.off");
+		GuiDraw.text(g, font, state, toggle[2] - size - 4 - font.width(state), toggle[1] + 2, on ? ink.accent() : ink.dim(), false);
 
-		int[] back = backButton();
-		boolean backHover = inside(back, mx, my);
-		GuiDraw.rounded(g, back[0], back[1], back[2] - back[0], back[3] - back[1], 3, backHover ? theme.hover() | 0x20000000 : 0);
-		GuiDraw.text(g, font, I18n.get("salami.mods.back"), back[0] + 6, back[1] + 3, backHover ? theme.headerText() : theme.textDim(), false);
-
-		String name = I18n.get(module.translationKey());
-		GuiDraw.centeredText(g, font, name, (f[0] + f[2]) / 2, f[1] + 8, module.isEnabled() ? theme.accent() : theme.headerText());
-		drawSwitch(g, theme, toggle(), module.isEnabled());
-
-		int dy = f[1] + HEADER + 6;
+		int dy = SalamiWindow.contentTop(f);
 		for (FormattedCharSequence line : description()) {
-			GuiDraw.text(g, font, line, f[0] + PAD, dy, theme.textDim(), false);
+			GuiDraw.text(g, font, line, f[0] + PAD, dy, ink.dim(), false);
 			dy += 10;
 		}
 
 		int[] c = content();
-		g.enableScissor(c[0], c[1], c[2], c[3]);
-		boolean overPicker = picker != null && picker.contains(mx, my);
+		g.enableScissor(c[0] - 4, c[1], c[2] + 4, c[3]);
 		for (Row row : rows()) {
 			if (row.y() + ROW < c[1] || row.y() > c[3]) {
 				continue;
 			}
 			if (row.isHeader()) {
 				String title = I18n.get("salami.mods.appearance");
-				GuiDraw.text(g, font, title, c[0], row.y() + 8, theme.accent(), false);
-				g.fill(c[0] + font.width(title) + 6, row.y() + 12, c[2], row.y() + 13, theme.outline());
+				skin.heading(g, font, title, c[0], row.y() + 7, ink.accent(), 1f);
+				int titleW = skin.headingWidth(font, title, 1f);
+				skin.divider(g, c[0] + titleW + 6, row.y() + 11, c[2] - c[0] - titleW - 6, Skin.Surface.WINDOW);
 				continue;
 			}
-			boolean hovered = !overPicker && mx >= c[0] && mx < c[2] && my >= row.y() && my < row.y() + ROW && my >= c[1] && my < c[3];
+			boolean hovered = !overPicker && mx >= c[0] - 4 && mx < c[2] + 4 && my >= row.y() && my < row.y() + ROW && my >= c[1] && my < c[3];
+			skin.row(g, c[0] - 4, row.y(), c[2] - c[0] + 8, ROW, editingText == row.setting() || listeningKeybind == row.setting(),
+				Skin.UiState.of(hovered));
 			if (hovered) {
-				GuiDraw.rounded(g, c[0] - 4, row.y(), c[2] - c[0] + 8, ROW, 3, theme.hover());
 				String desc = SettingText.description(row.setting());
 				if (desc != null) {
 					tooltip = Component.literal(desc);
@@ -295,12 +306,13 @@ public final class ModSettingsScreen extends Screen {
 					tooltip = Component.translatable("salami.clickgui.edit_in_config");
 				}
 			}
-			GuiDraw.text(g, font, font.plainSubstrByWidth(SettingText.label(row.setting()), c[2] - c[0] - CONTROL_W - 8), c[0], row.y() + 5, theme.text(), false);
-			renderControl(g, theme, row, mx, my);
+			TextFit.draw(g, font, SettingText.label(row.setting()), c[0] + 2, row.y() + 5, c[2] - c[0] - CONTROL_W - 10, ink.text());
+			renderControl(g, skin, row, overPicker ? -1 : mx, my);
 		}
 		g.disableScissor();
+		renderScrollbar(g, skin, c, mx, my);
 		if (picker != null) {
-			picker.render(g, font, theme, mx, my);
+			picker.render(g, font, mx, my);
 		}
 
 		g.pose().popMatrix();
@@ -309,70 +321,72 @@ public final class ModSettingsScreen extends Screen {
 		}
 	}
 
-	private void renderControl(GuiGraphics g, Theme theme, Row row, int mx, int my) {
+	private void renderScrollbar(GuiGraphics g, Skin skin, int[] c, int mx, int my) {
+		int total = contentHeight();
+		int visible = c[3] - c[1];
+		if (total <= visible) {
+			return;
+		}
+		int thumb = Math.max(14, visible * visible / total);
+		int thumbY = (int) Math.round((visible - thumb) * (scroll / (total - visible)));
+		int x = c[2] + 4;
+		skin.scrollbar(g, x, c[1], 3, visible, thumbY, thumb, Skin.UiState.of(mx >= x - 1 && mx < x + 4 && my >= c[1] && my < c[3]));
+	}
+
+	private void renderControl(GuiGraphics g, Skin skin, Row row, int mx, int my) {
 		Setting<?> setting = row.setting();
+		Skin.Ink ink = skin.ink(Skin.Surface.WINDOW);
+		Skin.Ink inputInk = skin.ink(Skin.Surface.INPUT);
 		int[] r = control(row);
-		int textY = r[1] + 2;
+		int h = r[3] - r[1];
+		int textY = r[1] + (h - 8) / 2 + 1;
+		boolean hovered = inside(new int[] {r[0], row.y(), r[2], row.y() + ROW}, mx, my);
+		Skin.UiState state = Skin.UiState.of(hovered);
 		if (setting instanceof BoolSetting bool) {
-			drawSwitch(g, theme, new int[] {r[2] - 22, r[1] + 1, r[2], r[3] - 1}, bool.isOn());
+			int[] size = skin.toggleSize();
+			skin.toggle(g, r[2] - size[0], r[1] + (h - size[1]) / 2, bool.isOn(), state);
 		} else if (setting instanceof NumberSetting number) {
 			String value = number.display();
 			int trackRight = r[2] - font.width(value) - 6;
-			int trackY = (r[1] + r[3]) / 2;
-			GuiDraw.rounded(g, r[0], trackY - 1, trackRight - r[0], 3, 1, theme.outline());
-			int knobX = r[0] + (int) Math.round((trackRight - r[0]) * number.fraction());
-			GuiDraw.rounded(g, r[0], trackY - 1, Math.max(3, knobX - r[0]), 3, 1, theme.accent());
-			GuiDraw.rounded(g, knobX - 3, trackY - 3, 7, 7, 3, theme.headerText());
-			GuiDraw.text(g, font, value, r[2] - font.width(value), textY, theme.text(), false);
+			skin.slider(g, r[0], r[1], trackRight - r[0], h, (float) number.fraction(), draggedSlider == number ? Skin.UiState.PRESSED : state);
+			GuiDraw.text(g, font, value, r[2] - font.width(value), textY, ink.text(), false);
 		} else if (setting instanceof ModeSetting<?> mode) {
 			String value = SettingText.modeLabel(mode);
-			int w = font.width(value) + 18;
-			GuiDraw.rounded(g, r[2] - w, r[1], w, r[3] - r[1], 3, 0x14FFFFFF);
-			GuiDraw.text(g, font, value, r[2] - w + 9, textY, theme.headerText(), false);
-			GuiDraw.text(g, font, "<", r[2] - w + 3, textY, theme.textDim(), false);
-			GuiDraw.text(g, font, ">", r[2] - 7, textY, theme.textDim(), false);
+			int w = Math.min(r[2] - r[0], font.width(value) + 22);
+			skin.button(g, font, r[2] - w, r[1], w, h, value, Skin.ButtonKind.SECONDARY, state);
+			int arrows = skin.buttonInk(Skin.ButtonKind.SECONDARY, state);
+			GuiDraw.text(g, font, "<", r[2] - w + 4, textY - 1, GuiDraw.fade(arrows, 0.55F), false);
+			GuiDraw.text(g, font, ">", r[2] - 8, textY - 1, GuiDraw.fade(arrows, 0.55F), false);
 		} else if (setting instanceof KeybindSetting keybind) {
-			String value = listeningKeybind == keybind ? "..." : keybind.keyName();
+			boolean listening = listeningKeybind == keybind;
+			String value = listening ? "..." : keybind.keyName();
 			int w = Math.max(40, font.width(value) + 10);
-			GuiDraw.rounded(g, r[2] - w, r[1], w, r[3] - r[1], 3, listeningKeybind == keybind ? theme.accent() : 0xFF0B0B0E);
-			GuiDraw.roundedOutline(g, r[2] - w, r[1], w, r[3] - r[1], 3, theme.outline());
-			GuiDraw.text(g, font, value, r[2] - w + (w - font.width(value)) / 2, textY, listeningKeybind == keybind ? 0xFF000000 : theme.text(), false);
+			skin.input(g, r[2] - w, r[1], w, h, listening);
+			GuiDraw.text(g, font, value, r[2] - w + (w - font.width(value)) / 2, textY, listening ? inputInk.accent() : inputInk.text(), false);
 		} else if (setting instanceof ColorSetting color) {
 			String hex = color.isChroma() ? I18n.get("salami.colorpicker.chroma") : ColorSetting.toHex(color.get());
-			GuiDraw.text(g, font, hex, r[2] - 24 - font.width(hex), textY, theme.textDim(), false);
-			GuiDraw.rounded(g, r[2] - 20, r[1], 20, r[3] - r[1], 3, color.argb());
-			GuiDraw.roundedOutline(g, r[2] - 20, r[1], 20, r[3] - r[1], 3, picker != null && picker.setting() == color ? theme.accent() : theme.outline());
+			GuiDraw.text(g, font, hex, r[2] - 24 - font.width(hex), textY, ink.dim(), false);
+			g.fill(r[2] - 20, r[1], r[2], r[3], color.argb());
+			GuiDraw.outline(g, r[2] - 20, r[1], 20, h, picker != null && picker.setting() == color ? ink.accent() : hovered ? ink.text() : ink.line());
 		} else if (setting instanceof StringListSetting list) {
 			String value = I18n.get("salami.clickgui.entries", list.get().size());
-			GuiDraw.text(g, font, value, r[2] - font.width(value), textY, theme.textDim(), false);
+			GuiDraw.text(g, font, value, r[2] - font.width(value), textY, ink.dim(), false);
 		} else if (setting instanceof ActionSetting action) {
-			boolean hovered = inside(r, mx, my);
-			GuiDraw.rounded(g, r[0], r[1], r[2] - r[0], r[3] - r[1], 3, hovered ? theme.accent() : theme.header());
-			String label = I18n.get(action.buttonKey());
-			GuiDraw.text(g, font, label, r[0] + (r[2] - r[0] - font.width(label)) / 2, textY, hovered ? 0xFF000000 : theme.headerText(), false);
+			skin.button(g, font, r[0], r[1], r[2] - r[0], h, I18n.get(action.buttonKey()), Skin.ButtonKind.SECONDARY, state);
 		} else if (setting instanceof TextSetting text) {
 			boolean editing = editingText == text;
-			GuiDraw.rounded(g, r[0], r[1], r[2] - r[0], r[3] - r[1], 3, 0xFF0B0B0E);
-			GuiDraw.roundedOutline(g, r[0], r[1], r[2] - r[0], r[3] - r[1], 3, editing ? theme.accent() : theme.outline());
+			skin.input(g, r[0], r[1], r[2] - r[0], h, editing);
 			String value = editing ? editBuffer : text.get();
 			String shown = font.plainSubstrByWidth(value, r[2] - r[0] - 8, editing);
-			GuiDraw.text(g, font, shown, r[0] + 3, textY, value.isEmpty() && !editing ? theme.textDim() : theme.text(), false);
+			GuiDraw.text(g, font, shown, r[0] + 3, textY, value.isEmpty() && !editing ? inputInk.dim() : inputInk.text(), false);
 			if (editing && (System.currentTimeMillis() / 500) % 2 == 0) {
 				int cx = r[0] + 3 + font.width(shown);
-				g.fill(cx, r[1] + 2, cx + 1, r[3] - 2, theme.text());
+				g.fill(cx, r[1] + 2, cx + 1, r[3] - 2, inputInk.text());
 			}
 		} else {
 			String value = String.valueOf(setting.get());
-			GuiDraw.text(g, font, value, r[2] - font.width(value), textY, theme.text(), false);
+			GuiDraw.text(g, font, value, r[2] - font.width(value), textY, ink.text(), false);
 		}
-	}
-
-	private void drawSwitch(GuiGraphics g, Theme theme, int[] r, boolean on) {
-		int h = r[3] - r[1];
-		GuiDraw.rounded(g, r[0], r[1], r[2] - r[0], h, h / 2, on ? theme.accent() : 0xFF3A3A44);
-		int size = h - 2;
-		int knob = on ? r[2] - 1 - size : r[0] + 1;
-		GuiDraw.rounded(g, knob, r[1] + 1, size, size, size / 2, on ? GuiDraw.textOn(theme.accent()) : 0xFFF3F3F3);
 	}
 
 	// ------------------------------------------------------------------ Eingabe

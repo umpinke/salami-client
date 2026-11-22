@@ -56,7 +56,7 @@ public final class EmotePropLayer extends RenderLayer<AvatarRenderState, PlayerM
 				case LEFT_LEG -> parent.leftLeg;
 			};
 			poseStack.pushPose();
-			limb.translateAndRotate(poseStack);
+			ModelAnchor.to(poseStack, parent, limb);
 			poseStack.translate(prop.at()[0] / 16f, prop.at()[1] / 16f, prop.at()[2] / 16f);
 			poseStack.mulPose(new Quaternionf().rotationZYX(prop.rot()[2], prop.rot()[1], prop.rot()[0]));
 			// die Flächen stehen in Spieler-Pixeln; die Requisite wächst mit dem Einblenden des Emotes

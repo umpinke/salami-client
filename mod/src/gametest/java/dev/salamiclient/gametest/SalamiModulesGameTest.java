@@ -110,7 +110,7 @@ public final class SalamiModulesGameTest implements FabricClientGameTest {
 			int uiWidth = Math.round(c.getWindow().getGuiScaledWidth() / ui);
 			int hudLeft = uiWidth - (c.font.width(I18n.get("salami.clickgui.hud_editor")) + 12) - 6;
 			double toWindow = c.getWindow().getGuiScale() * ui;
-			return new double[] {(hudLeft - 4 - 7) * toWindow, 11 * toWindow};
+			return new double[] {(hudLeft - 4 - 7) * toWindow, (ClickGuiScreen.barTop() + ClickGuiScreen.BAR_H / 2.0) * toWindow};
 		});
 		context.getInput().setCursorPos(plus[0], plus[1]);
 		context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_LEFT);

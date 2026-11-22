@@ -136,8 +136,13 @@ public final class ModuleManager {
 
 	public void renderHud(GuiGraphics graphics, DeltaTracker delta) {
 		long start = System.nanoTime();
-		// Während der F3-Anzeige keine Salami-HUD-Elemente darüber (Anzeigen an Spielern bleiben)
-		boolean debugScreen = Minecraft.getInstance().getDebugOverlay().showDebugScreen();
+		// Während der F3-Anzeige keine Salami-HUD-Elemente darüber (Anzeigen an Spielern bleiben).
+		// Nicht showDebugScreen(): seit 1.21.9 ist das auch wahr, wenn nur ein einzelner Debug-Eintrag
+		// dauerhaft eingeblendet ist (z. B. FPS „immer anzeigen“) – dann war das ganze Salami-HUD weg.
+		//? if >=1.21.11 {
+		boolean debugScreen = Minecraft.getInstance().debugEntries.isOverlayVisible();
+		//?} else
+		/*boolean debugScreen = Minecraft.getInstance().debugEntries.isF3Visible();*/
 		for (Module module : active) {
 			if (debugScreen && module instanceof HudModule) {
 				continue;

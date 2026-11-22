@@ -133,6 +133,11 @@ loom {
 				jvmArguments.add("-Dsalami.repoDir=${rootProject.projectDir.parentFile.absolutePath}")
 				// Nur einzelne Tests: -PsalamiTests=Benchmark,Client (Teile des Klassennamens)
 				providers.gradleProperty("salamiTests").orNull?.let { jvmArguments.add("-Dsalami.tests=$it") }
+				// Mit fremden Mods testen (Verträglichkeit): -PsalamiExtraMods=C:/pfad/a.jar;C:/pfad/b.jar
+				// (der Mods-Ordner des Testlaufs wird vor jedem Lauf geleert)
+				providers.gradleProperty("salamiExtraMods").orNull?.let { jvmArguments.add("-Dfabric.addMods=$it") }
+				// Look der Salami-Menüs (wie im Launcher gewählt): -PsalamiLook=theke|werkbank|salumeria
+				providers.gradleProperty("salamiLook").orNull?.let { jvmArguments.add("-Dsalami.look=$it") }
 			}
 		}
 	}

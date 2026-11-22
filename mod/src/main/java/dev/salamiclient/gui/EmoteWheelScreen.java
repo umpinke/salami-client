@@ -6,8 +6,9 @@ import dev.salamiclient.emotes.Emote;
 import dev.salamiclient.emotes.EmoteCatalog;
 import dev.salamiclient.emotes.EmoteIcons;
 import dev.salamiclient.emotes.Emotes;
+import dev.salamiclient.gui.skin.Skin;
+import dev.salamiclient.gui.skin.Skins;
 import dev.salamiclient.render.GuiDraw;
-import dev.salamiclient.theme.Theme;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
@@ -120,6 +121,7 @@ public final class EmoteWheelScreen extends Screen {
 	/*public void extractBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
 	*///?} else
 	public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+		// Kein Hintergrund des Looks: das Rad liegt im laufenden Spiel, man soll sich weiter sehen
 		graphics.fill(0, 0, width, height, 0x78000000);
 	}
 
@@ -131,7 +133,8 @@ public final class EmoteWheelScreen extends Screen {
 	public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
 		super.render(g, mouseX, mouseY, partialTick);
 	//?}
-		Theme theme = SalamiClient.get().theme();
+		Skin skin = Skins.current();
+		Skin.Ink popup = skin.ink(Skin.Surface.POPUP);
 		if (page >= pages()) {
 			page = 0; // der Katalog ist kleiner geworden
 		}
@@ -146,31 +149,31 @@ public final class EmoteWheelScreen extends Screen {
 			int x = pos[0];
 			int y = pos[1];
 			boolean on = i == hovered;
-			GuiDraw.rounded(g, x, y, w, CHIP_H, 6, on ? theme.accent() : 0xE0121216);
-			GuiDraw.roundedOutline(g, x, y, w, CHIP_H, 6, on ? 0x40FFFFFF : 0x26FFFFFF);
-			int text = on ? GuiDraw.textOn(theme.accent()) : 0xFFE6E6EC;
-			g.blit(RenderPipelines.GUI_TEXTURED, EmoteIcons.texture(emote), x + 5, y + 3, 0f, 0f, ICON, ICON,
+			Skin.ButtonKind kind = on ? Skin.ButtonKind.PRIMARY : Skin.ButtonKind.SECONDARY;
+			Skin.UiState state = on ? Skin.UiState.HOVER : Skin.UiState.NORMAL;
+			skin.button(g, font, x, y, w, CHIP_H, "", kind, state);
+			int text = skin.buttonInk(kind, state);
+			g.blit(RenderPipelines.GUI_TEXTURED, EmoteIcons.texture(emote), x + 5, y + 2, 0f, 0f, ICON, ICON,
 				EmoteIcons.SIZE, EmoteIcons.SIZE, EmoteIcons.SIZE, EmoteIcons.SIZE, text);
-			GuiDraw.text(g, font, emote.displayName(), x + ICON + 9, y + 7, text, false);
+			GuiDraw.text(g, font, emote.displayName(), x + ICON + 9, y + 6, text, false);
 			GuiDraw.text(g, font, String.valueOf(i + 1), x + w - 9, y + 2, GuiDraw.fade(text, 0.5F), false);
 		}
 		// Mitte: gewähltes Emote oder Hinweis, darunter die Seite
 		Emote chosen = emoteAt(hovered);
 		String middle = chosen != null ? chosen.displayName() : I18n.get("salami.emotes.wheel");
 		int mw = font.width(middle) + 16;
-		GuiDraw.rounded(g, (width - mw) / 2, height / 2 - 9, mw, 18, 6, 0xE8121216);
-		GuiDraw.centeredText(g, font, middle, width / 2, height / 2 - 4, chosen != null ? theme.accent() : 0xFFB8B8C0);
+		skin.surface(g, Skin.Surface.POPUP, (width - mw) / 2, height / 2 - 9, mw, 18);
+		GuiDraw.text(g, font, middle, (width - font.width(middle)) / 2, height / 2 - 4, chosen != null ? popup.accent() : popup.text(), false);
 		int pages = pages();
 		if (pages > 1) {
 			// ein Punkt pro Seite
 			int dotsWidth = pages * 7 - 3;
 			int dx = (width - dotsWidth) / 2;
 			for (int i = 0; i < pages; i++) {
-				GuiDraw.rounded(g, dx + i * 7, height / 2 + 13, 4, 4, 2, i == page ? theme.accent() : 0x60FFFFFF);
+				GuiDraw.rounded(g, dx + i * 7, height / 2 + 14, 4, 4, 2, i == page ? popup.accent() : 0x90FFFFFF);
 			}
 		}
-		String hint = I18n.get(pages > 1 ? "salami.emotes.wheel.hint_pages" : "salami.emotes.wheel.hint");
-		GuiDraw.centeredText(g, font, hint, width / 2, height - 14, 0xFF9A9AA4);
+		SalamiWindow.hint(g, font, I18n.get(pages > 1 ? "salami.emotes.wheel.hint_pages" : "salami.emotes.wheel.hint"), width, height);
 	}
 
 	private void play(int slot) {

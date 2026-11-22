@@ -237,7 +237,7 @@ public final class SalamiMinigamesGameTest implements FabricClientGameTest {
 			int games = c.font.width(I18n.get("salami.clickgui.minigames")) + 12;
 			double x = 6 + mods + 4 + configs + 4 + cosmetics + 4 + games / 2.0;
 			double toWindow = c.getWindow().getGuiScale() * ui;
-			return new double[] {x * toWindow, 11 * toWindow};
+			return new double[] {x * toWindow, (ClickGuiScreen.barTop() + ClickGuiScreen.BAR_H / 2.0) * toWindow};
 		});
 		context.getInput().setCursorPos(pos[0], pos[1]);
 		context.waitTick();

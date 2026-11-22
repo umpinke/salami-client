@@ -2,9 +2,10 @@ package dev.salamiclient.gui;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.SalamiClient;
+import dev.salamiclient.gui.skin.Skin;
+import dev.salamiclient.gui.skin.TextFit;
 import dev.salamiclient.modules.client.GuiScaleModule;
 import dev.salamiclient.render.GuiDraw;
-import dev.salamiclient.theme.Theme;
 import dev.salamiclient.util.Chat;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
@@ -43,8 +44,7 @@ import java.util.function.Consumer;
  * Zeichnen und Klicken rechnen in denselben skalierten Koordinaten.
  */
 public final class ConfigsScreen extends Screen {
-	private static final int HEADER = 24;
-	private static final int PAD = 10;
+	private static final int PAD = SalamiWindow.PAD;
 	private static final int ACTION_H = 28;
 	private static final int ACTION_GAP = 5;
 	/** Nur ein Dateidialog gleichzeitig. */
@@ -85,22 +85,16 @@ public final class ConfigsScreen extends Screen {
 	private int[] frame() {
 		int uiW = Math.round(width / uiScale);
 		int uiH = Math.round(height / uiScale);
-		int w = Math.min(uiW - 16, 300);
-		int h = Math.min(uiH - 16, HEADER + 30 + Action.values().length * (ACTION_H + ACTION_GAP) + 22);
-		int x0 = (uiW - w) / 2;
-		int y0 = (uiH - h) / 2;
-		return new int[] {x0, y0, x0 + w, y0 + h};
+		return SalamiWindow.frame(uiW, uiH, 300, SalamiWindow.HEADER + 30 + Action.values().length * (ACTION_H + ACTION_GAP) + 30);
 	}
 
 	private int[] backButton() {
-		int[] f = frame();
-		int w = font.width(I18n.get("salami.mods.back")) + 12;
-		return new int[] {f[0] + 4, f[1] + 5, f[0] + 4 + w, f[1] + 19};
+		return SalamiWindow.backButton(font, frame());
 	}
 
 	private int[] actionRect(Action action) {
 		int[] f = frame();
-		int top = f[1] + HEADER + 30 + action.ordinal() * (ACTION_H + ACTION_GAP);
+		int top = SalamiWindow.contentTop(f) + 24 + action.ordinal() * (ACTION_H + ACTION_GAP);
 		return new int[] {f[0] + PAD, top, f[2] - PAD, top + ACTION_H};
 	}
 
@@ -113,16 +107,12 @@ public final class ConfigsScreen extends Screen {
 	@Override
 	//? if >=26.1 {
 	/*public void extractBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-	*///?} else
+		super.extractBackground(graphics, mouseX, mouseY, partialTick);
+	*///?} else {
 	public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-		if (minecraft.level == null) {
-			// ohne Welt (Titelbildschirm, Mod Menu): Panorama dahinter wie in Minecrafts eigenen Menüs
-			//? if >=26.1 {
-			/*super.extractBackground(graphics, mouseX, mouseY, partialTick);
-			*///?} else
-			super.renderBackground(graphics, mouseX, mouseY, partialTick);
-		}
-		graphics.fill(0, 0, width, height, 0xAA000000);
+		super.renderBackground(graphics, mouseX, mouseY, partialTick);
+	//?}
+		SalamiWindow.backdrop(graphics, width, height, uiScale);
 	}
 
 	@Override
@@ -133,7 +123,8 @@ public final class ConfigsScreen extends Screen {
 	public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
 		super.render(g, mouseX, mouseY, partialTick);
 	//?}
-		Theme theme = SalamiClient.get().theme();
+		Skin skin = SalamiWindow.skin();
+		Skin.Ink ink = skin.ink(Skin.Surface.WINDOW);
 		int mx = (int) (mouseX / uiScale);
 		int my = (int) (mouseY / uiScale);
 
@@ -142,42 +133,34 @@ public final class ConfigsScreen extends Screen {
 
 		int[] f = frame();
 		int fw = f[2] - f[0];
-		int fh = f[3] - f[1];
-		GuiDraw.rounded(g, f[0] + 1, f[1] + 3, fw, fh, 6, 0x50000000);
-		GuiDraw.rounded(g, f[0], f[1], fw, fh, 6, theme.panel() | 0xFF000000);
-		GuiDraw.roundedOutline(g, f[0], f[1], fw, fh, 6, theme.outline());
-		g.fill(f[0] + 1, f[1] + HEADER - 1, f[2] - 1, f[1] + HEADER, theme.outline());
-
-		int[] back = backButton();
-		boolean backHover = inside(back, mx, my);
-		GuiDraw.rounded(g, back[0], back[1], back[2] - back[0], back[3] - back[1], 3, backHover ? theme.hover() | 0x20000000 : 0);
-		GuiDraw.text(g, font, I18n.get("salami.mods.back"), back[0] + 6, back[1] + 3, backHover ? theme.headerText() : theme.textDim(), false);
-		GuiDraw.centeredText(g, font, title.getString(), (f[0] + f[2]) / 2, f[1] + 8, theme.headerText());
+		SalamiWindow.draw(g, font, f, title.getString(), mx, my, 0);
 
 		List<FormattedCharSequence> hint = font.split(Component.translatable("salami.configs.hint"), fw - 2 * PAD);
 		for (int i = 0; i < Math.min(2, hint.size()); i++) {
-			GuiDraw.text(g, font, hint.get(i), f[0] + PAD, f[1] + HEADER + 6 + i * 10, theme.textDim(), false);
+			GuiDraw.text(g, font, hint.get(i), f[0] + PAD, SalamiWindow.contentTop(f) + i * 10, ink.dim(), false);
 		}
 
 		for (Action action : Action.values()) {
 			int[] r = actionRect(action);
 			boolean hovered = inside(r, mx, my);
 			boolean danger = action == Action.RESET;
-			int edge = hovered ? (danger ? theme.warning() : theme.accent()) : theme.outline();
-			GuiDraw.rounded(g, r[0], r[1], r[2] - r[0], r[3] - r[1], 4, 0xFF120F10);
-			if (hovered) {
-				GuiDraw.rounded(g, r[0], r[1], r[2] - r[0], r[3] - r[1], 4, theme.hover());
-			}
-			GuiDraw.roundedOutline(g, r[0], r[1], r[2] - r[0], r[3] - r[1], 4, edge);
-			int labelColor = danger ? theme.warning() : hovered ? theme.headerText() : theme.text();
-			GuiDraw.text(g, font, GuiDraw.ellipsize(font, I18n.get(action.key), r[2] - r[0] - 24), r[0] + 8, r[1] + 5, labelColor, false);
-			GuiDraw.text(g, font, GuiDraw.ellipsize(font, I18n.get(action.descKey), r[2] - r[0] - 24), r[0] + 8, r[1] + 16, theme.textDim(), false);
-			GuiDraw.text(g, font, ">", r[2] - 12 + (hovered ? 2 : 0), r[1] + 10, hovered ? edge : theme.outline(), false);
+			skin.row(g, r[0], r[1], r[2] - r[0], r[3] - r[1], false, Skin.UiState.of(hovered));
+			Skin.Ink card = skin.ink(Skin.Surface.CARD);
+			int labelColor = danger ? card.warning() : hovered ? card.accent() : card.text();
+			int room = r[2] - r[0] - 26;
+			TextFit.draw(g, font, I18n.get(action.key), r[0] + 8, r[1] + 5, room, labelColor);
+			TextFit.draw(g, font, I18n.get(action.descKey), r[0] + 8, r[1] + 16, room, card.dim());
+			int arrowX = r[2] - 12 + (hovered ? 2 : 0);
+			GuiDraw.text(g, font, ">", arrowX, r[1] + 10, hovered ? labelColor : card.line(), false);
 		}
 
 		if (!status.getString().isEmpty()) {
-			String line = GuiDraw.ellipsize(font, status.getString(), fw - 2 * PAD);
-			GuiDraw.centeredText(g, font, line, (f[0] + f[2]) / 2, f[3] - 16, statusError ? theme.warning() : theme.accent());
+			List<FormattedCharSequence> lines = font.split(status, fw - 2 * PAD);
+			int y = f[3] - 8 - lines.size() * 10;
+			for (FormattedCharSequence line : lines) {
+				GuiDraw.text(g, font, line, (f[0] + f[2] - font.width(line)) / 2, y, statusError ? ink.warning() : ink.accent(), false);
+				y += 10;
+			}
 		}
 
 		g.pose().popMatrix();

@@ -21,8 +21,10 @@ import dev.salamiclient.modules.visual.HatsModule;
 import dev.salamiclient.modules.visual.BuddyModule;
 import dev.salamiclient.modules.visual.MiniMeModule;
 import dev.salamiclient.minime.MiniMeSkins;
+import dev.salamiclient.gui.skin.Icons;
+import dev.salamiclient.gui.skin.Skin;
+import dev.salamiclient.gui.skin.TextFit;
 import dev.salamiclient.render.GuiDraw;
-import dev.salamiclient.theme.Theme;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
@@ -57,18 +59,17 @@ import java.util.concurrent.CompletableFuture;
  * ({@link dev.salamiclient.cosmetics.Catalogs}) – kommt dort etwas dazu, baut sich das Menü neu auf.
  */
 public final class CosmeticsScreen extends Screen {
-	private static final int HEADER = 24;
 	private static final int TABS = 18;
-	private static final int PAD = 10;
+	private static final int PAD = SalamiWindow.PAD;
+	/** Platz unten im Fenster für Hinweis bzw. Meldung (zwei Zeilen, verkleinert drei). */
+	private static final int NOTICE_H = 24;
 	private static final int CARD_W = 78;
-	private static final int CARD_H = 64;
+	private static final int CARD_H = 60;
 	private static final int GAP = 6;
-	private static final int PREVIEW_W = 22;
-	private static final int PREVIEW_H = 35;
-	/** Abstand der Vorschau vom oberen Kartenrand; darunter Name und Kennzeichen. */
-	private static final int PREVIEW_Y = 5;
-	/** Lange Namen werden bis auf diese Größe verkleinert, erst danach gekürzt. */
-	private static final float MIN_LABEL_SCALE = 0.7f;
+	private static final int PREVIEW_W = 20;
+	private static final int PREVIEW_H = 32;
+	/** Abstand der Vorschau vom oberen Kartenrand; darunter Name (bis zwei Zeilen) und Kennzeichen. */
+	private static final int PREVIEW_Y = 4;
 	/** Breite der festen Cape-Bilder in der Jar (Peperoni, Schneidebrett). */
 	private static final int STATIC_SIZE = 256;
 
@@ -520,26 +521,27 @@ public final class CosmeticsScreen extends Screen {
 	private int[] frame() {
 		int uiW = Math.round(width / uiScale);
 		int uiH = Math.round(height / uiScale);
-		int w = Math.min(uiW - 16, 450);
-		int h = Math.min(uiH - 16, 300);
-		int x0 = (uiW - w) / 2;
-		int y0 = (uiH - h) / 2;
-		return new int[] {x0, y0, x0 + w, y0 + h};
+		return SalamiWindow.frame(uiW, uiH, 460, 320);
 	}
 
 	private int[] backButton() {
-		int[] f = frame();
-		return new int[] {f[0] + 4, f[1] + 5, f[0] + 4 + font.width(I18n.get("salami.mods.back")) + 12, f[1] + 19};
+		return SalamiWindow.backButton(font, frame());
+	}
+
+	/** Oberkante der Reiter. */
+	private int tabsTop() {
+		return SalamiWindow.contentTop(frame());
 	}
 
 	/** Reiter oben, nebeneinander: {x0, y0, x1, y1}. */
 	private int[] tabRect(Tab which) {
 		int[] f = frame();
 		int x = f[0] + PAD;
+		int y = tabsTop();
 		for (Tab t : Tab.values()) {
 			int w = font.width(I18n.get(t.key)) + 14;
 			if (t == which) {
-				return new int[] {x, f[1] + HEADER + 4, x + w, f[1] + HEADER + 4 + TABS - 2};
+				return new int[] {x, y, x + w, y + TABS - 2};
 			}
 			x += w + 4;
 		}
@@ -548,8 +550,8 @@ public final class CosmeticsScreen extends Screen {
 
 	private int[] content() {
 		int[] f = frame();
-		int top = f[1] + HEADER + 4 + TABS + 4 + (tab == Tab.MINIME || tab == Tab.BUDDIES ? NAME_ROW : 0);
-		return new int[] {f[0] + PAD, top, f[2] - PAD, f[3] - PAD - 22};
+		int top = tabsTop() + TABS + 4 + (tab == Tab.MINIME || tab == Tab.BUDDIES ? NAME_ROW : 0);
+		return new int[] {f[0] + PAD, top, f[2] - PAD - 6, f[3] - PAD - NOTICE_H};
 	}
 
 	private int columns() {
@@ -596,8 +598,8 @@ public final class CosmeticsScreen extends Screen {
 	/** Namensfeld im Reiter Mini Me: {x0, y0, x1, y1}. */
 	private int[] nameField() {
 		int[] f = frame();
-		int y = f[1] + HEADER + 4 + TABS + 6;
-		return new int[] {f[0] + PAD + 22, y, f[0] + PAD + 22 + 140, y + 16};
+		int y = tabsTop() + TABS + 4;
+		return new int[] {f[0] + PAD + 22, y, f[0] + PAD + 22 + 120, y + 16};
 	}
 
 	private int[] nameButton() {
@@ -609,7 +611,7 @@ public final class CosmeticsScreen extends Screen {
 	/** Knopf für einen Platz im Reiter Buddys: {x0, y0, x1, y1}. */
 	private int[] placeButton(BuddyModule.Place which) {
 		int[] f = frame();
-		int y = f[1] + HEADER + 4 + TABS + 6;
+		int y = tabsTop() + TABS + 4;
 		int x = f[0] + PAD;
 		for (BuddyModule.Place place : BuddyModule.Place.values()) {
 			int w = font.width(placeLabel(place)) + 12;
@@ -630,16 +632,12 @@ public final class CosmeticsScreen extends Screen {
 	@Override
 	//? if >=26.1 {
 	/*public void extractBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-	*///?} else
+		super.extractBackground(graphics, mouseX, mouseY, partialTick);
+	*///?} else {
 	public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-		if (minecraft.level == null) {
-			// ohne Welt (Titelbildschirm, Mod Menu): Panorama dahinter wie in Minecrafts eigenen Menüs
-			//? if >=26.1 {
-			/*super.extractBackground(graphics, mouseX, mouseY, partialTick);
-			*///?} else
-			super.renderBackground(graphics, mouseX, mouseY, partialTick);
-		}
-		graphics.fill(0, 0, width, height, 0xAA000000);
+		super.renderBackground(graphics, mouseX, mouseY, partialTick);
+	//?}
+		SalamiWindow.backdrop(graphics, width, height, uiScale);
 	}
 
 	@Override
@@ -651,7 +649,8 @@ public final class CosmeticsScreen extends Screen {
 		super.render(g, mouseX, mouseY, partialTick);
 	//?}
 		TextInput.sync(this, isTyping());
-		Theme theme = SalamiClient.get().theme();
+		Skin skin = SalamiWindow.skin();
+		Skin.Ink ink = skin.ink(Skin.Surface.WINDOW);
 		int mx = (int) (mouseX / uiScale);
 		int my = (int) (mouseY / uiScale);
 		clampScroll();
@@ -659,34 +658,20 @@ public final class CosmeticsScreen extends Screen {
 		g.pose().pushMatrix();
 		g.pose().scale(uiScale, uiScale);
 		int[] f = frame();
-		GuiDraw.roundRect(g, f[0], f[1], f[2] - f[0], f[3] - f[1], theme.outline());
-		GuiDraw.roundRect(g, f[0] + 1, f[1] + 1, f[2] - f[0] - 2, f[3] - f[1] - 2, theme.panel() | 0xFF000000);
-		g.fill(f[0] + 1, f[1] + 1, f[2] - 1, f[1] + HEADER - 2, theme.header());
-		g.fill(f[0] + 1, f[1] + HEADER - 2, f[2] - 1, f[1] + HEADER - 1, theme.accent());
-		GuiDraw.centeredText(g, font, I18n.get("salami.cosmetics.title"), (f[0] + f[2]) / 2, f[1] + 8, theme.headerText());
-		int[] back = backButton();
-		boolean backHover = inside(back, mx, my);
-		GuiDraw.roundRect(g, back[0], back[1], back[2] - back[0], back[3] - back[1], backHover ? theme.accent() : theme.outline());
-		GuiDraw.roundRect(g, back[0] + 1, back[1] + 1, back[2] - back[0] - 2, back[3] - back[1] - 2, backHover ? theme.header() : theme.panel() | 0xFF000000);
-		GuiDraw.text(g, font, I18n.get("salami.mods.back"), back[0] + 6, back[1] + 3, theme.headerText(), false);
+		SalamiWindow.draw(g, font, f, I18n.get("salami.cosmetics.title"), mx, my, 0);
 
 		// Reiter: Capes, Hüte, Buddys, Mini Me, Emotes
 		for (Tab t : Tab.values()) {
 			int[] r = tabRect(t);
-			boolean active = t == tab;
-			boolean hovered = inside(r, mx, my);
-			GuiDraw.roundRect(g, r[0], r[1], r[2] - r[0], r[3] - r[1], active ? theme.accent() : hovered ? theme.textDim() : theme.outline());
-			if (!active) {
-				GuiDraw.roundRect(g, r[0] + 1, r[1] + 1, r[2] - r[0] - 2, r[3] - r[1] - 2, hovered ? theme.header() : theme.panel() | 0xFF000000);
-			}
-			GuiDraw.text(g, font, I18n.get(t.key), r[0] + 7, r[1] + 4, active ? GuiDraw.textOn(theme.accent()) : theme.headerText(), false);
+			skin.tab(g, font, r[0], r[1], r[2] - r[0], r[3] - r[1], I18n.get(t.key), null, t == tab, false,
+				Skin.UiState.of(t != tab && inside(r, mx, my)));
 		}
 
 		if (tab == Tab.MINIME) {
-			renderNameRow(g, theme, mx, my);
+			renderNameRow(g, skin, mx, my);
 		}
 		if (tab == Tab.BUDDIES) {
-			renderPlaceRow(g, theme, mx, my);
+			renderPlaceRow(g, skin, mx, my);
 		}
 		if (tab == Tab.EMOTES && emoteRevision != EmoteCatalog.revision()
 			|| tab == Tab.HATS && (hatRevision != HatCatalog.revision() || buddyRevision != BuddyCatalog.revision())
@@ -708,10 +693,10 @@ public final class CosmeticsScreen extends Screen {
 			}
 			int[] pos = cardPos(i);
 			boolean hovered = mx >= pos[0] && mx < pos[0] + CARD_W && my >= pos[1] && my < pos[1] + CARD_H && inside(c, mx, my);
-			renderCard(g, theme, cards.get(i), pos[0], pos[1], hovered, cards.get(i).key().equals(current));
+			renderCard(g, skin, cards.get(i), pos[0], pos[1], hovered, cards.get(i).key().equals(current));
 		}
 		g.disableScissor();
-		renderScrollbar(g, theme, c);
+		renderScrollbar(g, skin, c);
 
 		Component line = notice != null ? notice : Component.translatable(switch (tab) {
 			case HATS -> "salami.cosmetics.hat.info";
@@ -720,11 +705,14 @@ public final class CosmeticsScreen extends Screen {
 			case MINIME -> "salami.cosmetics.minime.info";
 			default -> "salami.cosmetics.info";
 		}, emoteKey());
-		List<FormattedCharSequence> lines = font.split(line, f[2] - f[0] - 2 * PAD);
-		for (int i = 0; i < Math.min(2, lines.size()); i++) {
-			GuiDraw.text(g, font, lines.get(i), f[0] + PAD, f[3] - PAD - 18 + i * 10, notice != null && noticeError ? theme.warning() : theme.textDim(), false);
-		}
+		// ganz zeigen: zwei Zeilen, sonst kleiner; was dann noch fehlt, steht im Tooltip
+		int noticeTop = f[3] - PAD - NOTICE_H + 3;
+		TextFit.Wrapped wrapped = TextFit.wrapBlock(font, line, f[2] - f[0] - 2 * PAD, NOTICE_H + 2);
+		wrapped.draw(g, font, f[0] + PAD, noticeTop, notice != null && noticeError ? ink.warning() : ink.dim());
 		g.pose().popMatrix();
+		if (wrapped.cut() && my >= noticeTop && my < f[3] - 4 && mx >= f[0] && mx < f[2]) {
+			g.setTooltipForNextFrame(font.split(line, 240), mouseX, mouseY);
+		}
 	}
 
 	/** Tatsächlich belegte Taste für das Emote-Rad (für Hinweistexte). */
@@ -739,26 +727,21 @@ public final class CosmeticsScreen extends Screen {
 		return key.isUnbound() ? Component.translatable("salami.setting.unbound") : key.getTranslatedKeyMessage();
 	}
 
-	private void renderCard(GuiGraphics g, Theme theme, Card card, int x, int y, boolean hovered, boolean equipped) {
-		GuiDraw.roundRect(g, x, y, CARD_W, CARD_H, equipped ? theme.accent() : hovered ? theme.textDim() : theme.outline());
-		GuiDraw.roundRect(g, x + 1, y + 1, CARD_W - 2, CARD_H - 2, 0xFF101014);
-		if (equipped) {
-			GuiDraw.roundRect(g, x + 1, y + 1, CARD_W - 2, CARD_H - 2, theme.enabledRow());
-		}
-		if (hovered) {
-			GuiDraw.roundRect(g, x + 1, y + 1, CARD_W - 2, CARD_H - 2, theme.hover());
-		}
+	private void renderCard(GuiGraphics g, Skin skin, Card card, int x, int y, boolean hovered, boolean equipped) {
+		Skin.Ink ink = skin.ink(Skin.Surface.CARD);
+		skin.row(g, x, y, CARD_W, CARD_H, equipped, Skin.UiState.of(hovered));
 		int px = x + (CARD_W - PREVIEW_W) / 2;
 		int py = y + PREVIEW_Y;
 		switch (card.key()) {
 			case "none", "hat:none", "buddy:none", "minime:none" -> {
-				GuiDraw.outline(g, px, py, PREVIEW_W, PREVIEW_H, theme.textDim());
-				GuiDraw.centeredText(g, font, "—", px + PREVIEW_W / 2, py + PREVIEW_H / 2 - 4, theme.textDim());
+				GuiDraw.outline(g, px, py, PREVIEW_W, PREVIEW_H, ink.line());
+				Icons.cross(g, px + PREVIEW_W / 2 - 2, py + PREVIEW_H / 2 - 2, ink.dim());
 			}
 			case "upload" -> {
-				GuiDraw.outline(g, px, py, PREVIEW_W, PREVIEW_H, hovered ? theme.accent() : theme.textDim());
-				g.fill(px + PREVIEW_W / 2 - 1, py + 12, px + PREVIEW_W / 2 + 1, py + PREVIEW_H - 12, hovered ? theme.accent() : theme.text());
-				g.fill(px + 5, py + PREVIEW_H / 2 - 1, px + PREVIEW_W - 5, py + PREVIEW_H / 2 + 1, hovered ? theme.accent() : theme.text());
+				int color = hovered ? ink.accent() : ink.dim();
+				GuiDraw.outline(g, px, py, PREVIEW_W, PREVIEW_H, color);
+				g.fill(px + PREVIEW_W / 2 - 1, py + 10, px + PREVIEW_W / 2 + 1, py + PREVIEW_H - 10, color);
+				g.fill(px + 4, py + PREVIEW_H / 2 - 1, px + PREVIEW_W - 4, py + PREVIEW_H / 2 + 1, color);
 			}
 			case "minime:hand", "minime:shoulder", "minime:head", "minime:follow" -> {
 				int size = PREVIEW_W;
@@ -767,27 +750,27 @@ public final class CosmeticsScreen extends Screen {
 			default -> {
 				Emote emote = card.key().startsWith("emote:") ? EmoteCatalog.get(card.key().substring("emote:".length())) : null;
 				if (emote != null) {
-					// Strichfigur in der Haltung des Emotes
-					int size = PREVIEW_H - 3;
+					// Strichfigur in der Haltung des Emotes – in der Schriftfarbe der Karte
+					int size = PREVIEW_H - 2;
 					int ix = x + (CARD_W - size) / 2;
-					g.blit(RenderPipelines.GUI_TEXTURED, EmoteIcons.texture(emote), ix, py + 2, 0f, 0f, size, size,
-						EmoteIcons.SIZE, EmoteIcons.SIZE, EmoteIcons.SIZE, EmoteIcons.SIZE);
+					g.blit(RenderPipelines.GUI_TEXTURED, EmoteIcons.texture(emote), ix, py + 1, 0f, 0f, size, size,
+						EmoteIcons.SIZE, EmoteIcons.SIZE, EmoteIcons.SIZE, EmoteIcons.SIZE, ink.text());
 					break;
 				}
 				Hat hat = card.key().startsWith("hat:") ? HatCatalog.get(card.key().substring("hat:".length())) : null;
 				if (hat != null) {
 					// das Modell des Hutes, quadratisch in der Mitte der Vorschau
-					int size = PREVIEW_H - 3;
+					int size = PREVIEW_H - 2;
 					int ix = x + (CARD_W - size) / 2;
-					g.blit(RenderPipelines.GUI_TEXTURED, HatIcons.texture(hat), ix, py + 2, 0f, 0f, size, size,
+					g.blit(RenderPipelines.GUI_TEXTURED, HatIcons.texture(hat), ix, py + 1, 0f, 0f, size, size,
 						HatIcons.SIZE, HatIcons.SIZE, HatIcons.SIZE, HatIcons.SIZE);
 					break;
 				}
 				Hat buddy = card.key().startsWith("buddy:") ? BuddyCatalog.get(card.key().substring("buddy:".length())) : null;
 				if (buddy != null) {
-					int size = PREVIEW_H - 3;
+					int size = PREVIEW_H - 2;
 					int ix = x + (CARD_W - size) / 2;
-					g.blit(RenderPipelines.GUI_TEXTURED, HatIcons.texture("buddy", buddy), ix, py + 2, 0f, 0f, size, size,
+					g.blit(RenderPipelines.GUI_TEXTURED, HatIcons.texture("buddy", buddy), ix, py + 1, 0f, 0f, size, size,
 						HatIcons.SIZE, HatIcons.SIZE, HatIcons.SIZE, HatIcons.SIZE);
 					break;
 				}
@@ -809,47 +792,35 @@ public final class CosmeticsScreen extends Screen {
 				if (texture != null) {
 					// Vorderseite des Capes: im 64x32-Layout bei (1,1), 10x16 Pixel – bei HD entsprechend größer
 					int k = textureWidth / 64;
+					g.fill(px - 1, py - 1, px + PREVIEW_W + 1, py + PREVIEW_H + 1, 0x30000000);
 					g.blit(RenderPipelines.GUI_TEXTURED, texture, px, py, k, k, PREVIEW_W, PREVIEW_H,
 						10 * k, 16 * k, textureWidth, textureWidth / 2);
 				} else if (card.builtin() != null || official != null) {
 					// wird gerade gemalt (wenige Zehntelsekunden) oder vom Server geladen
-					GuiDraw.outline(g, px, py, PREVIEW_W, PREVIEW_H, theme.outline());
-					GuiDraw.centeredText(g, font, "…", px + PREVIEW_W / 2, py + PREVIEW_H / 2 - 4, theme.textDim());
+					GuiDraw.outline(g, px, py, PREVIEW_W, PREVIEW_H, ink.line());
+					GuiDraw.centeredText(g, font, "…", px + PREVIEW_W / 2, py + PREVIEW_H / 2 - 4, ink.dim());
 				} else {
-					GuiDraw.outline(g, px, py, PREVIEW_W, PREVIEW_H, theme.warning());
-					GuiDraw.centeredText(g, font, "?", px + PREVIEW_W / 2, py + PREVIEW_H / 2 - 4, theme.warning());
+					GuiDraw.outline(g, px, py, PREVIEW_W, PREVIEW_H, ink.warning());
+					GuiDraw.text(g, font, "?", px + (PREVIEW_W - font.width("?")) / 2, py + PREVIEW_H / 2 - 4, ink.warning(), false);
 				}
 			}
 		}
-		int labelY = py + PREVIEW_H + 5;
-		renderLabel(g, card.label(), x + CARD_W / 2, labelY, CARD_W - 6, equipped ? theme.headerText() : theme.text());
 		if (equipped) {
-			renderLabel(g, I18n.get("salami.cosmetics.equipped_badge"), x + CARD_W / 2, labelY + 11, CARD_W - 6, theme.accent());
-		} else if (card.key().startsWith("own:") || card.key().equals("custom")) {
-			renderLabel(g, I18n.get("salami.cosmetics.own_badge"), x + CARD_W / 2, labelY + 11, CARD_W - 6, theme.textDim());
-		} else if (card.key().startsWith("official:")) {
-			renderLabel(g, I18n.get("salami.cosmetics.official_badge"), x + CARD_W / 2, labelY + 11, CARD_W - 6, theme.textDim());
+			// angelegt: Stempel oben rechts
+			int[] size = skin.toggleSize();
+			skin.toggle(g, x + CARD_W - size[0] - 3, y + 3, true, Skin.UiState.NORMAL);
 		}
-	}
-
-	/** Zentrierter Text; zu lange Namen werden erst verkleinert, dann mit „…“ gekürzt. */
-	private void renderLabel(GuiGraphics g, String text, int centerX, int y, int maxWidth, int color) {
-		int width = font.width(text);
-		if (width <= maxWidth) {
-			GuiDraw.centeredText(g, font, text, centerX, y, color);
-			return;
+		// Name in bis zu zwei Zeilen; passt er in eine, steht darunter „Eigenes“ bzw. „Offiziell“
+		int labelY = py + PREVIEW_H + 3;
+		List<String> lines = TextFit.wrap(font, card.label(), CARD_W - 6, 2);
+		String badge = card.key().startsWith("own:") || card.key().equals("custom") ? I18n.get("salami.cosmetics.own_badge")
+			: card.key().startsWith("official:") ? I18n.get("salami.cosmetics.official_badge") : null;
+		for (int i = 0; i < lines.size(); i++) {
+			TextFit.drawCentered(g, font, lines.get(i), x + CARD_W / 2, labelY + i * 9, CARD_W - 6, equipped ? ink.accent() : ink.text());
 		}
-		float scale = Math.max(MIN_LABEL_SCALE, maxWidth / (float) width);
-		String shown = text;
-		if (width * scale > maxWidth) {
-			int room = (int) (maxWidth / scale) - font.width("…");
-			shown = font.plainSubstrByWidth(text, room).stripTrailing() + "…";
+		if (lines.size() == 1 && badge != null) {
+			TextFit.drawCentered(g, font, badge, x + CARD_W / 2, labelY + 9, CARD_W - 6, ink.dim());
 		}
-		g.pose().pushMatrix();
-		g.pose().translate(centerX - font.width(shown) * scale / 2f, y + (1 - scale) * 4);
-		g.pose().scale(scale, scale);
-		GuiDraw.text(g, font, shown, 0, 0, color, false);
-		g.pose().popMatrix();
 	}
 
 	/** Gesicht des Mini-Me-Skins (mit Kopfbedeckungs-Schicht) als Quadrat. */
@@ -865,71 +836,64 @@ public final class CosmeticsScreen extends Screen {
 	}
 
 	/** Gesicht, Namensfeld, Übernehmen und der Ladezustand des Skins. */
-	private void renderNameRow(GuiGraphics g, Theme theme, int mx, int my) {
+	private void renderNameRow(GuiGraphics g, Skin skin, int mx, int my) {
+		Skin.Ink ink = skin.ink(Skin.Surface.WINDOW);
+		Skin.Ink inputInk = skin.ink(Skin.Surface.INPUT);
 		int[] field = nameField();
 		renderFace(g, miniMeTexture(), field[0] - 20, field[1], 16);
-		GuiDraw.roundRect(g, field[0], field[1], field[2] - field[0], field[3] - field[1], nameFocused ? theme.accent() : theme.outline());
-		GuiDraw.roundRect(g, field[0] + 1, field[1] + 1, field[2] - field[0] - 2, field[3] - field[1] - 2, 0xFF0C0C10);
+		skin.input(g, field[0], field[1], field[2] - field[0], field[3] - field[1], nameFocused);
 		if (nameBuffer.isEmpty() && !nameFocused) {
-			GuiDraw.text(g, font, I18n.get("salami.cosmetics.minime.placeholder"), field[0] + 4, field[1] + 4, theme.textDim(), false);
+			TextFit.draw(g, font, I18n.get("salami.cosmetics.minime.placeholder"), field[0] + 4, field[1] + 4, field[2] - field[0] - 8,
+				inputInk.dim());
 		} else {
-			GuiDraw.text(g, font, nameBuffer, field[0] + 4, field[1] + 4, theme.text(), false);
+			GuiDraw.text(g, font, nameBuffer, field[0] + 4, field[1] + 4, inputInk.text(), false);
 		}
 		if (nameFocused && (System.currentTimeMillis() / 500) % 2 == 0) {
 			int cx = field[0] + 4 + font.width(nameBuffer);
-			g.fill(cx, field[1] + 3, cx + 1, field[3] - 3, theme.text());
+			g.fill(cx, field[1] + 3, cx + 1, field[3] - 3, inputInk.text());
 		}
 		int[] b = nameButton();
-		boolean hovered = inside(b, mx, my);
-		GuiDraw.roundRect(g, b[0], b[1], b[2] - b[0], b[3] - b[1], theme.accent());
-		if (hovered) {
-			GuiDraw.roundRect(g, b[0] + 1, b[1] + 1, b[2] - b[0] - 2, b[3] - b[1] - 2, 0x30FFFFFF);
-		}
-		GuiDraw.text(g, font, I18n.get("salami.cosmetics.minime.apply"), b[0] + 6, b[1] + 4, GuiDraw.textOn(theme.accent()), false);
+		skin.button(g, font, b[0], b[1], b[2] - b[0], b[3] - b[1], I18n.get("salami.cosmetics.minime.apply"), Skin.ButtonKind.PRIMARY,
+			Skin.UiState.of(inside(b, mx, my)));
 		MiniMeModule mini = MiniMeModule.instance();
 		String name = mini == null ? "" : mini.name();
 		if (!name.isEmpty()) {
-			String key = switch (MiniMeSkins.state(name)) {
+			MiniMeSkins.State state = MiniMeSkins.state(name);
+			String key = switch (state) {
 				case LOADING -> "salami.cosmetics.minime.loading";
 				case READY -> "salami.cosmetics.minime.ready";
 				case NOT_FOUND -> "salami.cosmetics.minime.not_found";
 				case UNREACHABLE -> "salami.cosmetics.minime.unreachable";
 			};
-			MiniMeSkins.State state = MiniMeSkins.state(name);
-			int color = state == MiniMeSkins.State.NOT_FOUND || state == MiniMeSkins.State.UNREACHABLE ? theme.warning() : theme.textDim();
-			GuiDraw.text(g, font, I18n.get(key, name), b[2] + 8, b[1] + 4, color, false);
+			int color = state == MiniMeSkins.State.NOT_FOUND || state == MiniMeSkins.State.UNREACHABLE ? ink.warning() : ink.dim();
+			int[] f = frame();
+			TextFit.draw(g, font, I18n.get(key, name), b[2] + 8, b[1] + 4, f[2] - PAD - b[2] - 8, color);
 		}
 	}
 
-	/** Die Plätze eines Buddys als Knöpfe; der gewählte ist hervorgehoben. */
-	private void renderPlaceRow(GuiGraphics g, Theme theme, int mx, int my) {
+	/** Die Plätze eines Buddys als Reiter; der gewählte ist hervorgehoben. */
+	private void renderPlaceRow(GuiGraphics g, Skin skin, int mx, int my) {
 		BuddyModule buddies = BuddyModule.instance();
 		for (BuddyModule.Place place : BuddyModule.Place.values()) {
 			int[] r = placeButton(place);
 			boolean active = buddies != null && buddies.place() == place;
-			boolean hovered = inside(r, mx, my);
-			GuiDraw.roundRect(g, r[0], r[1], r[2] - r[0], r[3] - r[1], active ? theme.accent() : hovered ? theme.textDim() : theme.outline());
-			if (!active) {
-				GuiDraw.roundRect(g, r[0] + 1, r[1] + 1, r[2] - r[0] - 2, r[3] - r[1] - 2, hovered ? theme.header() : theme.panel() | 0xFF000000);
-			}
-			GuiDraw.text(g, font, placeLabel(place), r[0] + 6, r[1] + 4, active ? GuiDraw.textOn(theme.accent()) : theme.headerText(), false);
+			skin.tab(g, font, r[0], r[1], r[2] - r[0], r[3] - r[1], placeLabel(place), null, active, false,
+				Skin.UiState.of(!active && inside(r, mx, my)));
 		}
 	}
 
 	/** Schmale Leiste rechts neben den Karten, nur wenn nicht alle Reihen passen. */
-	private void renderScrollbar(GuiGraphics g, Theme theme, int[] c) {
+	private void renderScrollbar(GuiGraphics g, Skin skin, int[] c) {
 		int rows = rows();
 		int shown = visibleRows();
 		if (rows <= shown) {
 			return;
 		}
-		int x = c[2] + 4;
 		int top = gridTop();
 		int height = shown * (CARD_H + GAP) - GAP;
-		g.fill(x, top, x + 2, top + height, theme.outline());
 		int thumb = Math.max(12, height * shown / rows);
 		int offset = (height - thumb) * scrollRow / Math.max(1, rows - shown);
-		g.fill(x, top + offset, x + 2, top + offset + thumb, theme.accent());
+		skin.scrollbar(g, c[2] + 2, top, 3, height, offset, thumb, Skin.UiState.NORMAL);
 	}
 
 	// ------------------------------------------------------------------ Eingabe

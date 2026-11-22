@@ -13,8 +13,13 @@ import dev.salamiclient.gui.MinigamesScreen;
 import dev.salamiclient.gui.ModSettingsScreen;
 import dev.salamiclient.gui.ModsScreen;
 import dev.salamiclient.gui.SalamiMenuScreen;
+import dev.salamiclient.gui.SalamiWindow;
 import dev.salamiclient.gui.SettingText;
 import dev.salamiclient.gui.TextInput;
+import dev.salamiclient.gui.skin.Icons;
+import dev.salamiclient.gui.skin.Skin;
+import dev.salamiclient.gui.skin.Skins;
+import dev.salamiclient.gui.skin.TextFit;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.modules.client.GuiScaleModule;
@@ -29,7 +34,6 @@ import dev.salamiclient.setting.NumberSetting;
 import dev.salamiclient.setting.Setting;
 import dev.salamiclient.setting.StringListSetting;
 import dev.salamiclient.setting.TextSetting;
-import dev.salamiclient.theme.Theme;
 import dev.salamiclient.util.Keys;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
@@ -57,20 +61,19 @@ import java.util.Set;
  * Zeichnen und Klicken nutzen dieselbe Berechnung, damit beides nie auseinanderläuft.
  */
 public final class ClickGuiScreen extends Screen {
-	private static final int PANEL_WIDTH = 132;
-	private static final int HEADER_HEIGHT = 18;
-	private static final int MODULE_HEIGHT = 15;
+	/** Breite eines Panels – genug für die längsten Modulnamen samt Schalter. */
+	private static final int PANEL_WIDTH = 150;
+	public static final int HEADER_HEIGHT = 18;
+	public static final int MODULE_HEIGHT = 15;
 	private static final int SETTING_HEIGHT = 13;
 	private static final int PADDING = 6;
 	private static final int INDENT = 4;
-	/** Oberkante unter der Knopfleiste. */
-	private static final int TOP = 24;
-	/** Platz unten für die Hinweiszeile: Panels enden darüber und scrollen. */
-	private static final int BOTTOM_MARGIN = 24;
+	/** Höhe der Knöpfe in der Leiste oben ({@link #barTop}). */
+	public static final int BAR_H = 14;
 	/** Abstand zwischen Panels (auch zum Panel darunter, an dem ein Panel endet). */
 	private static final int GAP = 8;
-	/** Gespeicherte Panel-Positionen aus älteren Versionen (ohne Scrollen) werden einmal verworfen. */
-	private static final int LAYOUT_VERSION = 2;
+	/** Gespeicherte Panel-Positionen aus älteren Versionen (ohne Scrollen, schmalere Panels) werden einmal verworfen. */
+	private static final int LAYOUT_VERSION = 3;
 
 	/** Aufgeklappte Module bleiben während der Sitzung aufgeklappt. */
 	private static final Set<String> EXPANDED = new HashSet<>();
@@ -137,6 +140,25 @@ public final class ClickGuiScreen extends Screen {
 			loadPanels();
 		}
 		panels.forEach(this::clamp);
+		if (headersOverlap()) {
+			// gespeicherte Positionen passen nicht in dieses Fenster bzw. diese Menügröße: Standard-Layout
+			defaultLayout();
+			panels.forEach(this::clamp);
+		}
+	}
+
+	/** Überdecken sich Kopfzeilen von Panels (dann ist eins davon nicht mehr zu greifen)? */
+	private boolean headersOverlap() {
+		for (int i = 0; i < panels.size(); i++) {
+			Panel a = panels.get(i);
+			for (int j = i + 1; j < panels.size(); j++) {
+				Panel b = panels.get(j);
+				if (a.x < b.x + PANEL_WIDTH && b.x < a.x + PANEL_WIDTH && a.y < b.y + HEADER_HEIGHT && b.y < a.y + HEADER_HEIGHT) {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	@Override
@@ -149,16 +171,12 @@ public final class ClickGuiScreen extends Screen {
 	@Override
 	//? if >=26.1 {
 	/*public void extractBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-	*///?} else
+		super.extractBackground(graphics, mouseX, mouseY, partialTick);
+	*///?} else {
 	public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-		if (minecraft.level == null) {
-			// ohne Welt (Titelbildschirm, Mod Menu): Panorama dahinter wie in Minecrafts eigenen Menüs
-			//? if >=26.1 {
-			/*super.extractBackground(graphics, mouseX, mouseY, partialTick);
-			*///?} else
-			super.renderBackground(graphics, mouseX, mouseY, partialTick);
-		}
-		graphics.fill(0, 0, width, height, 0xA60A0809);
+		super.renderBackground(graphics, mouseX, mouseY, partialTick);
+	//?}
+		SalamiWindow.backdrop(graphics, width, height, uiScale);
 	}
 
 	@Override
@@ -170,7 +188,7 @@ public final class ClickGuiScreen extends Screen {
 		super.render(graphics, mouseX, mouseY, partialTick);
 	//?}
 		TextInput.sync(this, picker != null && picker.isEditingText());
-		Theme theme = SalamiClient.get().theme();
+		Skin skin = Skins.current();
 		int mx = (int) (mouseX / uiScale);
 		int my = (int) (mouseY / uiScale);
 		lastMouseX = mx;
@@ -180,59 +198,51 @@ public final class ClickGuiScreen extends Screen {
 		graphics.pose().pushMatrix();
 		graphics.pose().scale(uiScale, uiScale);
 		for (Panel panel : panels) {
-			renderPanel(graphics, panel, theme, hover);
+			renderPanel(graphics, skin, panel, hover);
 		}
-		String hint = I18n.get("salami.clickgui.hint");
-		int hintWidth = font.width(hint) + 16;
-		GuiDraw.roundRect(graphics, (uiWidth() - hintWidth) / 2, uiHeight() - 18, hintWidth, 14, 0xB0000000);
-		GuiDraw.centeredText(graphics, font, hint, uiWidth() / 2, uiHeight() - 15, theme.textDim());
-		renderHudButton(graphics, theme, mx, my);
-		renderModsButton(graphics, theme, mx, my);
-		renderConfigsButton(graphics, theme, mx, my);
-		renderCosmeticsButton(graphics, theme, mx, my);
-		renderMinigamesButton(graphics, theme, mx, my);
-		renderScaleControls(graphics, theme, mx, my);
+		SalamiWindow.hint(graphics, font, I18n.get("salami.clickgui.hint"), uiWidth(), uiHeight());
+		boolean overPicker = picker != null && picker.contains(mx, my);
+		int bx = overPicker ? -1 : mx;
+		topButton(graphics, skin, modsButton(), I18n.get("salami.clickgui.mods"), bx, my, Skin.ButtonKind.PRIMARY);
+		topButton(graphics, skin, configsButton(), I18n.get("salami.clickgui.configs"), bx, my, Skin.ButtonKind.SECONDARY);
+		topButton(graphics, skin, cosmeticsButton(), I18n.get("salami.clickgui.cosmetics"), bx, my, Skin.ButtonKind.SECONDARY);
+		topButton(graphics, skin, minigamesButton(), I18n.get("salami.clickgui.minigames"), bx, my, Skin.ButtonKind.SECONDARY);
+		topButton(graphics, skin, hudButton(), I18n.get("salami.clickgui.hud_editor"), bx, my, Skin.ButtonKind.SECONDARY);
+		renderScaleControls(graphics, skin, bx, my);
 		if (picker != null) {
-			picker.render(graphics, font, theme, mx, my);
+			picker.render(graphics, font, mx, my);
 		}
 		graphics.pose().popMatrix();
 
-		Component tooltip = picker != null && picker.contains(mx, my) ? null : tooltipFor(hover);
+		Component tooltip = overPicker ? null : tooltipFor(hover);
 		int tooltipY = mouseY;
 		if (scaleControlAt(mx, my) >= 0) {
 			// unter die Knöpfe, damit die Prozentzahl sichtbar bleibt
 			tooltip = Component.translatable("salami.clickgui.scale.tooltip");
-			tooltipY = Math.round(CONTROL_BOTTOM * uiScale) + 16;
+			tooltipY = Math.round(controlBottom() * uiScale) + 16;
 		}
 		if (tooltip != null) {
 			graphics.setTooltipForNextFrame(font.split(tooltip, 220), mouseX, tooltipY);
 		}
 	}
 
-	private void renderPanel(GuiGraphics g, Panel panel, Theme theme, Hit hover) {
+	private void renderPanel(GuiGraphics g, Skin skin, Panel panel, Hit hover) {
 		clampScroll(panel);
 		List<Row> rows = rows(panel);
 		int right = panel.x + PANEL_WIDTH;
 		int bottom = bottom(panel, rows);
-		int height = bottom - panel.y;
+		Skin.Ink side = skin.ink(Skin.Surface.SIDE);
+		Skin.Ink ink = skin.ink(Skin.Surface.WINDOW);
 
-		// Schatten, Rahmen, Fläche – jeweils mit abgeschrägten Ecken
-		GuiDraw.roundRect(g, panel.x + 2, panel.y + 3, PANEL_WIDTH, height, 0x50000000);
-		GuiDraw.roundRect(g, panel.x, panel.y, PANEL_WIDTH, height, theme.outline());
-		GuiDraw.roundRect(g, panel.x + 1, panel.y + 1, PANEL_WIDTH - 2, height - 2, theme.panel() | 0xFF000000);
+		// Inhalt auf einer Fensterfläche, darüber die Kopfzeile als eigene Fläche (Theke: Kreideschild)
 		if (panel.open) {
-			g.fill(panel.x + 2, panel.y + 1, right - 2, panel.y + 2, theme.header());
-			g.fill(panel.x + 1, panel.y + 2, right - 1, panel.y + HEADER_HEIGHT, theme.header());
-			g.fill(panel.x + 1, panel.y + HEADER_HEIGHT - 1, right - 1, panel.y + HEADER_HEIGHT, theme.accent());
-		} else {
-			GuiDraw.roundRect(g, panel.x + 1, panel.y + 1, PANEL_WIDTH - 2, HEADER_HEIGHT - 2, theme.header());
+			skin.surface(g, Skin.Surface.WINDOW, panel.x + 2, panel.y + HEADER_HEIGHT - 3, PANEL_WIDTH - 4, bottom - panel.y - HEADER_HEIGHT + 3);
 		}
+		skin.surface(g, Skin.Surface.SIDE, panel.x, panel.y, PANEL_WIDTH, HEADER_HEIGHT);
 
 		int textY = panel.y + 5;
-		GuiDraw.text(g, font, I18n.get(panel.category.translationKey()), panel.x + PADDING, textY, theme.headerText(), false);
 		int markerX = right - PADDING - 5;
-		drawChevron(g, markerX, panel.y + (panel.open ? 8 : 7), panel.open, theme.headerText());
-
+		Icons.chevron(g, markerX, panel.y + (panel.open ? 8 : 7), panel.open, side.text());
 		// „3/12“: eingeschaltete von allen Modulen der Kategorie
 		int total = 0;
 		int enabled = 0;
@@ -244,24 +254,25 @@ public final class ClickGuiScreen extends Screen {
 		}
 		String count = enabled + "/" + total;
 		int countX = markerX - 5 - font.width(count);
-		GuiDraw.text(g, font, count, countX, textY, (theme.headerText() & 0x00FFFFFF) | 0x99000000, false);
+		GuiDraw.text(g, font, count, countX, textY, side.dim(), false);
+		TextFit.draw(g, font, I18n.get(panel.category.translationKey()), panel.x + PADDING, textY, countX - 4 - panel.x - PADDING, side.text());
 
 		if (panel.open && rows.isEmpty()) {
-			GuiDraw.text(g, font, I18n.get("salami.clickgui.empty"), panel.x + PADDING, panel.y + HEADER_HEIGHT + 4, theme.textDim(), false);
+			GuiDraw.text(g, font, I18n.get("salami.clickgui.empty"), panel.x + PADDING, panel.y + HEADER_HEIGHT + 4, ink.dim(), false);
 		}
 
 		// Zeilen nur im sichtbaren Teil; was darüber hinausgeht, erreicht das Mausrad
 		int[] body = body(panel, bottom);
-		g.enableScissor(panel.x + 1, body[0], right - 1, body[1]);
+		g.enableScissor(panel.x + 2, body[0], right - 2, body[1]);
 		for (Row row : rows) {
 			if (row.y() + row.height() <= body[0] || row.y() >= body[1]) {
 				continue;
 			}
 			boolean hovered = hover != null && row.equals(hover.row());
 			if (row.isModule()) {
-				renderModuleRow(g, panel, row, theme, hovered);
+				renderModuleRow(g, skin, panel, row, hovered);
 			} else {
-				renderSettingRow(g, panel, row, theme, hovered);
+				renderSettingRow(g, skin, panel, row, hovered);
 			}
 		}
 		g.disableScissor();
@@ -272,115 +283,103 @@ public final class ClickGuiScreen extends Screen {
 			int track = body[1] - body[0];
 			int content = track + max;
 			int thumb = Math.max(8, track * track / content);
-			int thumbY = body[0] + (int) Math.round((track - thumb) * (panel.scroll / max));
-			g.fill(right - 3, body[0], right - 2, body[1], theme.outline());
-			g.fill(right - 4, thumbY, right - 1, thumbY + thumb, theme.accent());
+			int thumbY = (int) Math.round((track - thumb) * (panel.scroll / max));
+			skin.scrollbar(g, right - 6, body[0], 3, track, thumbY, thumb, Skin.UiState.NORMAL);
 		}
 	}
 
-	/** Kleiner Pfeil aus Pixeln: nach unten (aufgeklappt) oder nach rechts (zugeklappt). */
-	private static void drawChevron(GuiGraphics g, int x, int y, boolean down, int color) {
-		if (down) {
-			g.fill(x, y, x + 5, y + 1, color);
-			g.fill(x + 1, y + 1, x + 4, y + 2, color);
-			g.fill(x + 2, y + 2, x + 3, y + 3, color);
-		} else {
-			g.fill(x + 1, y, x + 2, y + 5, color);
-			g.fill(x + 2, y + 1, x + 3, y + 4, color);
-			g.fill(x + 3, y + 2, x + 4, y + 3, color);
-		}
+	private void topButton(GuiGraphics g, Skin skin, int[] b, String label, int mx, int my, Skin.ButtonKind kind) {
+		boolean hovered = mx >= b[0] && mx < b[2] && my >= b[1] && my < b[3];
+		skin.button(g, font, b[0], b[1], b[2] - b[0], b[3] - b[1], label, kind, Skin.UiState.of(hovered));
 	}
 
-	/** Knopf der oberen Leiste; {@code primary} ist vollflächig in der Akzentfarbe. */
-	private void renderTopButton(GuiGraphics g, Theme theme, int[] b, String label, int textInset, boolean hovered, boolean primary) {
-		int width = b[2] - b[0];
-		int height = b[3] - b[1];
-		int fill = primary ? theme.accent() : hovered ? theme.header() : theme.panel() | 0xFF000000;
-		GuiDraw.roundRect(g, b[0], b[1], width, height, primary || hovered ? theme.accent() : theme.outline());
-		GuiDraw.roundRect(g, b[0] + 1, b[1] + 1, width - 2, height - 2, fill);
-		if (primary && hovered) {
-			GuiDraw.roundRect(g, b[0] + 1, b[1] + 1, width - 2, height - 2, 0x30FFFFFF);
-		}
-		GuiDraw.text(g, font, label, b[0] + textInset, b[1] + 3, primary ? GuiDraw.textOn(theme.accent()) : theme.headerText(), false);
+	// ------------------------------------------------------------------ Knopfleiste oben
+
+	/** Oberkante der Knopfleiste (unter der Deko des Hintergrunds); auch für Tests. */
+	public static int barTop() {
+		return Skins.current().backdropTop() + 3;
 	}
 
-	// ------------------------------------------------------------------ HUD-Editor-Knopf
+	/** Oberkante des Standard-Layouts der Panels; auch für Tests. */
+	public static int panelTop() {
+		return top() + 2;
+	}
+
+	/** Oberkante unter der Knopfleiste. */
+	private static int top() {
+		return barTop() + BAR_H + 6;
+	}
+
+	/**
+	 * Passen beide Gruppen der Leiste (links Mods … Minispiele, rechts Größe und HUD-Editor) nicht
+	 * nebeneinander (große Oberfläche, schmales Fenster), rutscht die rechte Gruppe eine Reihe tiefer.
+	 */
+	private boolean twoRows() {
+		return minigamesButton()[2] + 8 > scaleControls()[0][0];
+	}
+
+	/** Oberkante der rechten Gruppe (Größe, HUD-Editor). */
+	private int rightTop() {
+		return barTop() + (twoRows() ? BAR_H + 3 : 0);
+	}
+
+	/** Platz unten für den Hinweis (ein oder mehr Schilder): Panels enden darüber und scrollen. */
+	private int bottomMargin() {
+		return Math.max(24, SalamiWindow.hintHeight(font, I18n.get("salami.clickgui.hint"), uiWidth()));
+	}
+
+	/** Oberkante der Panels im Standard-Layout (unter einer oder zwei Reihen der Leiste). */
+	private int layoutTop() {
+		return top() + (twoRows() ? BAR_H + 3 : 0);
+	}
+
+	/** Linke Kante des HUD-Editor-Knopfs (ganz rechts in der Leiste). */
+	private int hudLeft() {
+		return uiWidth() - (font.width(I18n.get("salami.clickgui.hud_editor")) + 12) - 6;
+	}
 
 	private int[] hudButton() {
-		int w = font.width(I18n.get("salami.clickgui.hud_editor")) + 12;
-		return new int[] {uiWidth() - w - 6, 4, uiWidth() - 6, 18};
+		return new int[] {hudLeft(), rightTop(), uiWidth() - 6, rightTop() + BAR_H};
 	}
-
-	private void renderHudButton(GuiGraphics g, Theme theme, int mouseX, int mouseY) {
-		int[] b = hudButton();
-		boolean hovered = mouseX >= b[0] && mouseX < b[2] && mouseY >= b[1] && mouseY < b[3];
-		renderTopButton(g, theme, b, I18n.get("salami.clickgui.hud_editor"), 6, hovered, false);
-	}
-
-	// ------------------------------------------------------------------ Mods-Knopf (oben links)
 
 	private int[] modsButton() {
 		int w = font.width(I18n.get("salami.clickgui.mods")) + 16;
-		return new int[] {6, 4, 6 + w, 18};
+		return new int[] {6, barTop(), 6 + w, barTop() + BAR_H};
 	}
-
-	private void renderModsButton(GuiGraphics g, Theme theme, int mouseX, int mouseY) {
-		int[] b = modsButton();
-		boolean hovered = mouseX >= b[0] && mouseX < b[2] && mouseY >= b[1] && mouseY < b[3];
-		renderTopButton(g, theme, b, I18n.get("salami.clickgui.mods"), 8, hovered, true);
-	}
-
-	// ------------------------------------------------------------------ Configs-Knopf (neben Mods)
 
 	private int[] configsButton() {
 		int left = modsButton()[2] + 4;
 		int w = font.width(I18n.get("salami.clickgui.configs")) + 12;
-		return new int[] {left, 4, left + w, 18};
+		return new int[] {left, barTop(), left + w, barTop() + BAR_H};
 	}
-
-	private void renderConfigsButton(GuiGraphics g, Theme theme, int mouseX, int mouseY) {
-		int[] b = configsButton();
-		boolean hovered = mouseX >= b[0] && mouseX < b[2] && mouseY >= b[1] && mouseY < b[3];
-		renderTopButton(g, theme, b, I18n.get("salami.clickgui.configs"), 6, hovered, false);
-	}
-
-	// ------------------------------------------------------------------ Cosmetics-Knopf (neben Configs)
 
 	private int[] cosmeticsButton() {
 		int left = configsButton()[2] + 4;
 		int w = font.width(I18n.get("salami.clickgui.cosmetics")) + 12;
-		return new int[] {left, 4, left + w, 18};
+		return new int[] {left, barTop(), left + w, barTop() + BAR_H};
 	}
-
-	private void renderCosmeticsButton(GuiGraphics g, Theme theme, int mouseX, int mouseY) {
-		int[] b = cosmeticsButton();
-		boolean hovered = mouseX >= b[0] && mouseX < b[2] && mouseY >= b[1] && mouseY < b[3];
-		renderTopButton(g, theme, b, I18n.get("salami.clickgui.cosmetics"), 6, hovered, false);
-	}
-
-	// ------------------------------------------------------------------ Minispiele-Knopf (neben Cosmetics)
 
 	private int[] minigamesButton() {
 		int left = cosmeticsButton()[2] + 4;
 		int w = font.width(I18n.get("salami.clickgui.minigames")) + 12;
-		return new int[] {left, 4, left + w, 18};
-	}
-
-	private void renderMinigamesButton(GuiGraphics g, Theme theme, int mouseX, int mouseY) {
-		int[] b = minigamesButton();
-		boolean hovered = mouseX >= b[0] && mouseX < b[2] && mouseY >= b[1] && mouseY < b[3];
-		renderTopButton(g, theme, b, I18n.get("salami.clickgui.minigames"), 6, hovered, false);
+		return new int[] {left, barTop(), left + w, barTop() + BAR_H};
 	}
 
 	// ------------------------------------------------------------------ Größe (− 100 % +)
 
-	private static final int CONTROL_TOP = 4;
-	private static final int CONTROL_BOTTOM = 18;
 	private static final int CONTROL_BUTTON = 14;
+
+	private int controlTop() {
+		return rightTop();
+	}
+
+	private int controlBottom() {
+		return rightTop() + BAR_H;
+	}
 
 	/** Felder links neben dem HUD-Knopf: [−], [Prozent], [+] jeweils als {x0, x1}. */
 	private int[][] scaleControls() {
-		int right = hudButton()[0] - 4;
+		int right = hudLeft() - 4;
 		int plus = right - CONTROL_BUTTON;
 		int label = plus - (font.width("200%") + 8);
 		int minus = label - CONTROL_BUTTON;
@@ -389,7 +388,7 @@ public final class ClickGuiScreen extends Screen {
 
 	/** 0 = kleiner, 1 = Prozentanzeige (zurücksetzen), 2 = größer, -1 = nichts. */
 	private int scaleControlAt(double x, double y) {
-		if (y < CONTROL_TOP || y >= CONTROL_BOTTOM) {
+		if (y < controlTop() || y >= controlBottom()) {
 			return -1;
 		}
 		int[][] controls = scaleControls();
@@ -401,37 +400,20 @@ public final class ClickGuiScreen extends Screen {
 		return -1;
 	}
 
-	private void renderScaleControls(GuiGraphics g, Theme theme, int mouseX, int mouseY) {
+	private void renderScaleControls(GuiGraphics g, Skin skin, int mouseX, int mouseY) {
 		int[][] controls = scaleControls();
 		int hovered = scaleControlAt(mouseX, mouseY);
 		for (int i = 0; i < controls.length; i++) {
 			int x0 = controls[i][0];
 			int x1 = controls[i][1];
-			g.fill(x0, CONTROL_TOP, x1, CONTROL_BOTTOM, theme.outline());
-			g.fill(x0 + (i == 0 ? 1 : 0), CONTROL_TOP + 1, x1 - (i == 2 ? 1 : 0), CONTROL_BOTTOM - 1, hovered == i ? theme.header() : theme.panel() | 0xFF000000);
+			Skin.UiState state = Skin.UiState.of(hovered == i);
 			if (i == 1) {
 				String percent = Math.round(uiScale * 100) + "%";
-				GuiDraw.text(g, font, percent, (x0 + x1 - font.width(percent)) / 2, CONTROL_TOP + 3, theme.headerText(), false);
+				skin.button(g, font, x0 + 1, controlTop(), x1 - x0 - 2, BAR_H, percent, Skin.ButtonKind.SECONDARY, state);
 			} else {
-				drawMagnifier(g, (x0 + x1) / 2 - 5, CONTROL_TOP + 2, i == 2, theme.headerText());
+				skin.iconButton(g, x0, controlTop(), CONTROL_BUTTON, Skin.ButtonKind.SECONDARY, state);
+				Icons.magnifier(g, (x0 + x1) / 2 - 5, controlTop() + 1, i == 2, skin.buttonInk(Skin.ButtonKind.SECONDARY, state));
 			}
-		}
-	}
-
-	/** Pixel-Lupe (10x10) mit − oder + im Glas; (x, y) ist die linke obere Ecke. */
-	private static void drawMagnifier(GuiGraphics g, int x, int y, boolean plus, int color) {
-		// Glas: Ring 7x7 ohne Ecken
-		g.fill(x + 1, y, x + 6, y + 1, color);
-		g.fill(x + 1, y + 6, x + 6, y + 7, color);
-		g.fill(x, y + 1, x + 1, y + 6, color);
-		g.fill(x + 6, y + 1, x + 7, y + 6, color);
-		// Griff schräg nach rechts unten
-		g.fill(x + 6, y + 6, x + 8, y + 8, color);
-		g.fill(x + 8, y + 8, x + 10, y + 10, color);
-		// − bzw. + im Glas
-		g.fill(x + 2, y + 3, x + 5, y + 4, color);
-		if (plus) {
-			g.fill(x + 3, y + 2, x + 4, y + 5, color);
 		}
 	}
 
@@ -448,18 +430,14 @@ public final class ClickGuiScreen extends Screen {
 		rescale();
 	}
 
-	private void renderModuleRow(GuiGraphics g, Panel panel, Row row, Theme theme, boolean hovered) {
+	private void renderModuleRow(GuiGraphics g, Skin skin, Panel panel, Row row, boolean hovered) {
+		Skin.Ink ink = skin.ink(Skin.Surface.WINDOW);
 		Module module = row.module();
-		int left = panel.x + 1;
-		int right = panel.x + PANEL_WIDTH - 1;
+		int left = panel.x + 2;
+		int right = panel.x + PANEL_WIDTH - 2;
 		boolean on = module.isEnabled();
-		if (hovered) {
-			GuiDraw.rounded(g, left + 2, row.y() + 1, right - left - 4, row.height() - 2, 3, theme.hover());
-		}
-		if (on) {
-			// schmaler Akzent-Strich statt eingefärbter Zeile
-			GuiDraw.rounded(g, left + 2, row.y() + 3, 2, row.height() - 6, 1, theme.accent());
-		}
+		boolean overButton = false;
+		int nameRight;
 		boolean hasSettings = false;
 		for (Setting<?> setting : module.settings()) {
 			if (!setting.isHidden()) {
@@ -468,85 +446,83 @@ public final class ClickGuiScreen extends Screen {
 			}
 		}
 		boolean expanded = EXPANDED.contains(module.id());
-		int expanderX = right - PADDING - 4;
-		int nameRight = expanderX - 4;
+		int expanderX = right - PADDING - 3;
+		nameRight = expanderX - 4;
 		if (module.hasScreen()) {
 			int[] b = openButton(panel, row);
 			nameRight = b[0] - 3;
-			boolean overButton = hovered && lastMouseX >= b[0] && lastMouseX < b[2] && lastMouseY >= b[1] && lastMouseY < b[3];
-			GuiDraw.roundRect(g, b[0], b[1], b[2] - b[0], b[3] - b[1], overButton ? theme.accent() : theme.outline());
-			GuiDraw.roundRect(g, b[0] + 1, b[1] + 1, b[2] - b[0] - 2, b[3] - b[1] - 2, overButton ? theme.accent() : theme.panel() | 0xFF000000);
-			GuiDraw.text(g, font, I18n.get("salami.clickgui.open"), b[0] + 4, b[1] + 2,
-				overButton ? GuiDraw.textOn(theme.accent()) : theme.headerText(), false);
+			overButton = hovered && lastMouseX >= b[0] && lastMouseX < b[2] && lastMouseY >= b[1] && lastMouseY < b[3];
 		}
-		String name = font.plainSubstrByWidth(I18n.get(module.translationKey()), nameRight - panel.x - PADDING);
-		GuiDraw.text(g, font, name, panel.x + PADDING + (on ? 2 : 0), row.y() + 4, on ? theme.headerText() : theme.text(), false);
+		skin.row(g, left + 1, row.y(), right - left - 2, row.height(), expanded, Skin.UiState.of(hovered && !overButton));
+		int[] size = skin.toggleSize();
+		skin.toggle(g, left + 4, row.y() + (row.height() - size[1]) / 2, on, Skin.UiState.of(hovered && !overButton));
+		int nameX = left + 4 + size[0] + 4;
+		TextFit.draw(g, font, I18n.get(module.translationKey()), nameX, row.y() + 4, nameRight - nameX, ink.text());
+		if (module.hasScreen()) {
+			int[] b = openButton(panel, row);
+			skin.button(g, font, b[0], b[1], b[2] - b[0], b[3] - b[1], I18n.get("salami.clickgui.open"), Skin.ButtonKind.SECONDARY,
+				Skin.UiState.of(overButton));
+		}
 		if (hasSettings) {
-			drawChevron(g, expanderX, row.y() + (expanded ? 6 : 5), expanded, expanded ? theme.accent() : theme.textDim());
+			Icons.chevron(g, expanderX, row.y() + (expanded ? 6 : 5), expanded, expanded ? ink.accent() : ink.dim());
 		}
 	}
 
 	/** „Öffnen“-Knopf links vom Pfeil, nur bei Modulen mit eigenem Menü: {x0, y0, x1, y1}. */
 	private int[] openButton(Panel panel, Row row) {
-		int right = panel.x + PANEL_WIDTH - 1 - PADDING - 4 - 5;
+		int right = panel.x + PANEL_WIDTH - 2 - PADDING - 3 - 5;
 		int w = font.width(I18n.get("salami.clickgui.open")) + 8;
 		return new int[] {right - w, row.y() + 1, right, row.y() + row.height() - 1};
 	}
 
-	private void renderSettingRow(GuiGraphics g, Panel panel, Row row, Theme theme, boolean hovered) {
+	private void renderSettingRow(GuiGraphics g, Skin skin, Panel panel, Row row, boolean hovered) {
+		Skin.Ink ink = skin.ink(Skin.Surface.WINDOW);
+		Skin.Ink inputInk = skin.ink(Skin.Surface.INPUT);
 		Setting<?> setting = row.setting();
 		int left = panel.x + PADDING + INDENT;
 		int right = panel.x + PANEL_WIDTH - PADDING;
 		int textY = row.y() + 3;
-		// Einstellungen liegen auf einer dunkleren Fläche unter ihrem Modul
-		g.fill(panel.x + 1, row.y(), panel.x + PANEL_WIDTH - 1, row.y() + row.height(), 0x38000000);
-		if (hovered) {
-			g.fill(panel.x + 1, row.y(), panel.x + PANEL_WIDTH - 1, row.y() + row.height(), theme.hover());
-		}
-		g.fill(panel.x + PADDING, row.y(), panel.x + PADDING + 1, row.y() + row.height(), theme.outline());
+		// Einstellungen eingerückt unter ihrem Modul, mit Führungslinie
+		skin.row(g, panel.x + PADDING, row.y(), PANEL_WIDTH - 2 * PADDING + 2, row.height(), false, Skin.UiState.of(hovered));
+		g.fill(panel.x + PADDING + 1, row.y(), panel.x + PADDING + 2, row.y() + row.height(), ink.line());
+		Skin.UiState state = Skin.UiState.of(hovered);
 		boolean chip = false;
 
 		String value;
-		int valueColor = theme.text();
+		int valueColor = ink.text();
 		int valueRight = right;
 
 		if (setting instanceof BoolSetting bool) {
-			// Schalter statt „An/Aus“
 			value = "";
-			int trackY = row.y() + 4;
-			GuiDraw.roundRect(g, right - 12, trackY, 12, 6, bool.isOn() ? theme.accent() : theme.outline());
-			int knobX = bool.isOn() ? right - 5 : right - 11;
-			g.fill(knobX, trackY + 1, knobX + 4, trackY + 5, bool.isOn() ? GuiDraw.textOn(theme.accent()) : theme.textDim());
-			valueRight = right - 15;
+			skin.checkbox(g, right - 9, row.y() + 2, 9, bool.isOn(), state);
+			valueRight = right - 12;
 		} else if (setting instanceof NumberSetting number) {
 			value = number.display();
-			int trackY = row.y() + row.height() - 2;
-			int knob = left + (int) Math.round((right - left) * number.fraction());
-			g.fill(left, trackY, right, trackY + 1, theme.outline());
-			g.fill(left, trackY, knob, trackY + 1, theme.accent());
-			g.fill(Math.max(left, knob - 1), trackY - 1, Math.min(right, knob + 1), trackY + 2, theme.headerText());
+			textY = row.y() + 2;
+			skin.slider(g, left, row.y() + row.height() - 4, right - left, 4, (float) number.fraction(),
+				draggedSlider == number ? Skin.UiState.PRESSED : state);
 		} else if (setting instanceof ModeSetting<?> mode) {
 			value = modeLabel(mode);
+			valueColor = ink.accent();
 		} else if (setting instanceof KeybindSetting keybind) {
 			value = listeningKeybind == keybind ? "..." : keybind.keyName();
 			chip = true;
-			if (listeningKeybind == keybind) {
-				valueColor = theme.accent();
-			}
+			valueColor = listeningKeybind == keybind ? inputInk.accent() : inputInk.text();
 		} else if (setting instanceof ColorSetting color) {
 			value = "";
-			GuiDraw.roundRect(g, right - 10, row.y() + 2, 10, 9, picker != null && picker.setting() == color ? theme.accent() : theme.outline());
-			g.fill(right - 9, row.y() + 3, right - 1, row.y() + 10, color.argb());
+			g.fill(right - 10, row.y() + 2, right, row.y() + 11, color.argb());
+			GuiDraw.outline(g, right - 10, row.y() + 2, 10, 9, picker != null && picker.setting() == color ? ink.accent() : ink.text());
 			valueRight = right - 12;
 		} else if (setting instanceof StringListSetting list) {
 			value = I18n.get("salami.clickgui.entries", list.get().size());
+			valueColor = ink.dim();
 		} else if (setting instanceof ActionSetting action) {
 			value = I18n.get(action.buttonKey());
-			valueColor = theme.accent();
+			valueColor = ink.accent();
 		} else if (setting instanceof TextSetting text) {
 			// Text wird im Einstellungsfenster des Moduls bearbeitet (Klick)
 			value = text.get().isEmpty() ? I18n.get("salami.clickgui.edit_text") : GuiDraw.ellipsize(font, text.get(), (right - left) / 2);
-			valueColor = text.get().isEmpty() ? theme.accent() : theme.text();
+			valueColor = text.get().isEmpty() ? ink.accent() : ink.text();
 		} else {
 			value = String.valueOf(setting.get());
 		}
@@ -554,11 +530,10 @@ public final class ClickGuiScreen extends Screen {
 		int valueWidth = font.width(value);
 		if (chip) {
 			// Taste als kleines Feld
-			GuiDraw.roundRect(g, right - valueWidth - 6, row.y() + 1, valueWidth + 6, row.height() - 2, theme.hover());
+			skin.input(g, right - valueWidth - 6, row.y() + 1, valueWidth + 6, row.height() - 2, listeningKeybind == setting);
 			valueRight = right - 3;
 		}
-		String label = font.plainSubstrByWidth(label(setting), valueRight - valueWidth - left - 4);
-		GuiDraw.text(g, font, label, left, textY, theme.textDim(), false);
+		TextFit.draw(g, font, label(setting), left, textY, valueRight - valueWidth - left - 4, ink.dim());
 		if (!value.isEmpty()) {
 			GuiDraw.text(g, font, value, valueRight - valueWidth, textY, valueColor, false);
 		}
@@ -636,7 +611,7 @@ public final class ClickGuiScreen extends Screen {
 		if (!panel.open) {
 			return natural;
 		}
-		int limit = uiHeight() - BOTTOM_MARGIN;
+		int limit = uiHeight() - bottomMargin();
 		for (Panel other : panels) {
 			boolean sameColumn = other.x < panel.x + PANEL_WIDTH && other.x + PANEL_WIDTH > panel.x;
 			if (other != panel && other != draggedPanel && sameColumn && other.y > panel.y + HEADER_HEIGHT) {
@@ -644,8 +619,13 @@ public final class ClickGuiScreen extends Screen {
 			}
 		}
 		// Mindestens zwei Zeilen, auch wenn das Panel darunter sehr dicht folgt
-		limit = Math.max(limit, panel.y + HEADER_HEIGHT + 2 * MODULE_HEIGHT);
-		return Math.min(natural, limit);
+		limit = Math.max(limit, panel.y + HEADER_HEIGHT + 2 * MODULE_HEIGHT + 2);
+		if (natural <= limit) {
+			return natural;
+		}
+		// gekürzt: nur ganze Modulzeilen zeigen, keine halb abgeschnittene am Rand
+		int whole = Math.max(2, (limit - 2 - panel.y - HEADER_HEIGHT) / MODULE_HEIGHT);
+		return panel.y + HEADER_HEIGHT + whole * MODULE_HEIGHT + 2;
 	}
 
 	/** Bereich der Zeilen {y0, y1} zwischen Kopfzeile und Rand. */
@@ -994,6 +974,10 @@ public final class ClickGuiScreen extends Screen {
 		if (next != uiScale) {
 			uiScale = next;
 			panels.forEach(this::clamp);
+			if (headersOverlap()) {
+				defaultLayout();
+				panels.forEach(this::clamp);
+			}
 		}
 	}
 
@@ -1007,7 +991,9 @@ public final class ClickGuiScreen extends Screen {
 	/** Panel im Bild halten: Kopfzeile und mindestens eine Zeile über der Hinweiszeile. */
 	private void clamp(Panel panel) {
 		panel.x = Math.max(0, Math.min(panel.x, uiWidth() - PANEL_WIDTH));
-		panel.y = Math.max(0, Math.min(panel.y, uiHeight() - BOTTOM_MARGIN - HEADER_HEIGHT - MODULE_HEIGHT));
+		// nicht über die Knopfleiste und die Deko des Hintergrunds (Theke: Markise)
+		int minY = layoutTop() + 2;
+		panel.y = Math.max(minY, Math.min(panel.y, uiHeight() - bottomMargin() - HEADER_HEIGHT - MODULE_HEIGHT));
 	}
 
 	private void loadPanels() {
@@ -1065,11 +1051,11 @@ public final class ClickGuiScreen extends Screen {
 			stacks.get(column).add(panel);
 			used[column] += naturalHeight(panel) + GAP;
 		}
-		int available = uiHeight() - BOTTOM_MARGIN - TOP;
+		int available = uiHeight() - bottomMargin() - layoutTop();
 		for (int column = 0; column < columns; column++) {
 			List<Panel> stack = stacks.get(column);
 			int[] heights = fitHeights(stack, available - (stack.size() - 1) * GAP);
-			int y = TOP + 2;
+			int y = layoutTop() + 2;
 			for (int i = 0; i < stack.size(); i++) {
 				Panel panel = stack.get(i);
 				panel.x = 10 + column * (PANEL_WIDTH + GAP);

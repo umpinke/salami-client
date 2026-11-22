@@ -2,6 +2,10 @@ package dev.salamiclient.gui;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.salamiclient.SalamiClient;
+import dev.salamiclient.gui.skin.Icons;
+import dev.salamiclient.gui.skin.Skin;
+import dev.salamiclient.gui.skin.Skins;
+import dev.salamiclient.gui.skin.TextFit;
 import dev.salamiclient.minigames.Colors;
 import dev.salamiclient.minigames.GameKey;
 import dev.salamiclient.minigames.Highscores;
@@ -41,7 +45,7 @@ import java.util.Random;
  * <p>Tasten: Esc pausiert (im Menü: zurück), R startet neu, M schaltet den Ton, P pausiert.
  */
 public final class MinigamesScreen extends Screen {
-	private static final int HEADER = 22;
+	private static final int HEADER = 24;
 	private static final int PAD = 10;
 	private static final int GAP = 8;
 	private static final int INFO_W = 88;
@@ -317,17 +321,12 @@ public final class MinigamesScreen extends Screen {
 	@Override
 	//? if >=26.1 {
 	/*public void extractBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-	*///?} else
+		super.extractBackground(g, mouseX, mouseY, partialTick);
+	*///?} else {
 	public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-		Theme theme = SalamiClient.get().theme();
-		int base = Colors.opaque(theme.panel());
-		int top = Colors.mix(base, 0xFF000000, 0.45f);
-		int bottom = Colors.mix(base, Colors.opaque(theme.header()), 0.2f);
-		if (minecraft.level != null) {
-			top = Colors.alpha(top, 0.92f);
-			bottom = Colors.alpha(bottom, 0.92f);
-		}
-		g.fillGradient(0, 0, width, height, top, bottom);
+		super.renderBackground(g, mouseX, mouseY, partialTick);
+	//?}
+		SalamiWindow.backdrop(g, width, height, uiScale);
 	}
 
 	@Override
@@ -343,15 +342,16 @@ public final class MinigamesScreen extends Screen {
 		}
 		advance();
 		Theme theme = SalamiClient.get().theme();
+		Skin skin = Skins.current();
 		this.mouseX = mouseX / uiScale;
 		this.mouseY = mouseY / uiScale;
 		buttons.clear();
 		g.pose().pushMatrix();
 		g.pose().scale(uiScale, uiScale);
 		switch (view) {
-			case MENU -> drawMenu(g, theme);
-			case LEADERBOARD -> drawLeaderboard(g, theme);
-			case GAME -> drawGame(g, theme);
+			case MENU -> drawMenu(g, skin, theme);
+			case LEADERBOARD -> drawLeaderboard(g, skin);
+			case GAME -> drawGame(g, skin, theme);
 		}
 		g.pose().popMatrix();
 		if (game != null && view == View.GAME) {
@@ -367,6 +367,11 @@ public final class MinigamesScreen extends Screen {
 
 	private int uiH() {
 		return Math.round(height / uiScale);
+	}
+
+	/** Fenster der Minispiele: fast der ganze Bildschirm unter der Deko des Looks. */
+	private int[] frame() {
+		return SalamiWindow.frame(uiW(), uiH(), 4000, 4000);
 	}
 
 	/** Bildschirmpixel pro UI-Einheit. */
@@ -401,88 +406,61 @@ public final class MinigamesScreen extends Screen {
 	}
 
 	private String fit(String text, int maxWidth) {
-		if (font.width(text) <= maxWidth) {
-			return text;
-		}
-		return font.plainSubstrByWidth(text, Math.max(0, maxWidth - font.width("…"))) + "…";
+		return GuiDraw.ellipsize(font, text, maxWidth);
 	}
 
 	/** Knopf mit Text; liefert die rechte Kante. */
-	private int textButton(GuiGraphics g, Theme theme, int x, int y, String label, Runnable action) {
+	private int textButton(GuiGraphics g, Skin skin, int x, int y, String label, Skin.ButtonKind kind, Runnable action) {
 		int w = font.width(label) + 12;
-		boolean hover = hovered(x, y, x + w, y + 14);
-		g.fill(x, y, x + w, y + 14, hover ? theme.accent() : theme.panel());
-		GuiDraw.outline(g, x, y, w, 14, hover ? theme.accent() : theme.outline());
-		text(g, label, x + 6, y + 3, hover ? 0xFF000000 : theme.headerText());
+		skin.button(g, font, x, y, w, 14, label, kind, Skin.UiState.of(hovered(x, y, x + w, y + 14)));
 		buttons.add(new Button(x, y, x + w, y + 14, action));
 		return x + w;
 	}
 
-	/** Kopfzeile mit Titel, Zurück-Knopf und Ton-Schalter; liefert die x-Position links vom Ton-Schalter. */
-	private int header(GuiGraphics g, Theme theme, String title, String back, Runnable backAction) {
-		int w = uiW();
-		g.fill(0, 0, w, HEADER - 2, theme.header());
-		g.fill(0, HEADER - 2, w, HEADER - 1, theme.outline());
-		int backRight = textButton(g, theme, 4, 4, back, backAction);
-		int muteX = w - 4 - 18;
-		iconButton(g, theme, muteX, 4, highscores().muted() ? Icon.MUTED : Icon.SOUND, this::toggleMute);
-		int titleMax = Math.max(20, 2 * Math.min(w / 2 - backRight - 6, muteX - 6 - w / 2));
-		centered(g, fit(title, titleMax), w / 2, 7, theme.headerText());
+	/**
+	 * Fenster mit Kopfzeile: Zurück, Titel und Ton-Schalter; liefert die x-Position links vom Ton-Schalter.
+	 * Die Kopfzeile ist {@link #HEADER} hoch, darunter eine Linie.
+	 */
+	private int header(GuiGraphics g, Skin skin, String title, String back, Runnable backAction) {
+		int[] f = frame();
+		Skin.Ink ink = skin.ink(Skin.Surface.WINDOW);
+		skin.surface(g, Skin.Surface.WINDOW, f[0], f[1], f[2] - f[0], f[3] - f[1]);
+		int backRight = textButton(g, skin, f[0] + 5, f[1] + 5, back, Skin.ButtonKind.GHOST, backAction);
+		int muteX = f[2] - 6 - 18;
+		iconButton(g, skin, muteX, f[1] + 5, highscores().muted() ? Icon.MUTED : Icon.SOUND, this::toggleMute);
+		int center = (f[0] + f[2]) / 2;
+		int half = Math.min(center - backRight - 6, muteX - 6 - center);
+		float scale = skin.headingWidth(font, title, 1.5f) <= 2 * half ? 1.5f : 1f;
+		String shown = skin.headingWidth(font, title, scale) <= 2 * half ? title : fit(title, Math.max(20, 2 * half - 8));
+		int w = skin.headingWidth(font, shown, scale);
+		skin.heading(g, font, shown, center - w / 2, f[1] + (scale > 1 ? 6 : 8), ink.text(), scale);
+		g.fill(f[0] + PAD - 2, f[1] + HEADER, f[2] - PAD + 2, f[1] + HEADER + 1, ink.text());
 		return muteX - 4;
 	}
 
-	private enum Icon { SOUND, MUTED, PAUSE, PLAY, TROPHY }
-
-	private void iconButton(GuiGraphics g, Theme theme, int x, int y, Icon icon, Runnable action) {
-		boolean hover = hovered(x, y, x + 18, y + 14);
-		g.fill(x, y, x + 18, y + 14, hover ? theme.accent() : theme.panel());
-		GuiDraw.outline(g, x, y, 18, 14, hover ? theme.accent() : theme.outline());
-		drawIcon(g, x + 1, y, icon, hover ? 0xFF000000 : theme.headerText(), theme.warning());
-		buttons.add(new Button(x, y, x + 18, y + 14, action));
+	/** Oberkante des Inhalts unter der Kopfzeile. */
+	private int contentTop() {
+		return frame()[1] + HEADER + 7;
 	}
 
-	private static void drawIcon(GuiGraphics g, int x, int y, Icon icon, int color, int warning) {
+	private enum Icon { SOUND, MUTED, PAUSE, PLAY }
+
+	private void iconButton(GuiGraphics g, Skin skin, int x, int y, Icon icon, Runnable action) {
+		Skin.UiState state = Skin.UiState.of(hovered(x, y, x + 18, y + 14));
+		skin.button(g, font, x, y, 18, 14, "", Skin.ButtonKind.SECONDARY, state);
+		int color = skin.buttonInk(Skin.ButtonKind.SECONDARY, state);
 		switch (icon) {
-			case SOUND, MUTED -> {
-				g.fill(x + 3, y + 5, x + 6, y + 9, color);
-				g.fill(x + 6, y + 4, x + 7, y + 10, color);
-				g.fill(x + 7, y + 3, x + 8, y + 11, color);
-				if (icon == Icon.MUTED) {
-					for (int k = 0; k < 5; k++) {
-						g.fill(x + 10 + k, y + 4 + k, x + 11 + k, y + 5 + k, warning);
-						g.fill(x + 14 - k, y + 4 + k, x + 15 - k, y + 5 + k, warning);
-					}
-				} else {
-					g.fill(x + 10, y + 5, x + 11, y + 9, color);
-					g.fill(x + 12, y + 3, x + 13, y + 11, color);
-				}
-			}
-			case PAUSE -> {
-				g.fill(x + 5, y + 3, x + 7, y + 11, color);
-				g.fill(x + 10, y + 3, x + 12, y + 11, color);
-			}
-			case PLAY -> {
-				for (int k = 0; k < 4; k++) {
-					g.fill(x + 6 + k, y + 3 + k, x + 7 + k, y + 11 - k, color);
-				}
-			}
-			case TROPHY -> {
-				g.fill(x + 3, y + 2, x + 13, y + 3, color);
-				g.fill(x + 4, y + 3, x + 12, y + 7, color);
-				g.fill(x + 5, y + 7, x + 11, y + 8, color);
-				g.fill(x + 1, y + 3, x + 3, y + 4, color);
-				g.fill(x + 1, y + 4, x + 2, y + 6, color);
-				g.fill(x + 13, y + 3, x + 15, y + 4, color);
-				g.fill(x + 14, y + 4, x + 15, y + 6, color);
-				g.fill(x + 7, y + 8, x + 9, y + 10, color);
-				g.fill(x + 5, y + 10, x + 11, y + 12, color);
-			}
+			case SOUND, MUTED -> Icons.speaker(g, x + 3, y + 2, icon == Icon.MUTED, color, skin.ink(Skin.Surface.WINDOW).warning());
+			case PAUSE -> Icons.pause(g, x + 6, y + 3, color);
+			case PLAY -> Icons.play(g, x + 6, y + 3, color);
 		}
+		buttons.add(new Button(x, y, x + 18, y + 14, action));
 	}
 
 	/** Steuerungshinweise unten, bei Platzmangel auf mehrere Zeilen verteilt. */
 	private List<String> hintLines(List<String> parts) {
-		int maxWidth = uiW() - 2 * PAD;
+		int[] f = frame();
+		int maxWidth = f[2] - f[0] - 2 * PAD;
 		String separator = "  ·  ";
 		List<String> lines = new ArrayList<>();
 		StringBuilder line = new StringBuilder();
@@ -501,10 +479,18 @@ public final class MinigamesScreen extends Screen {
 		return lines;
 	}
 
-	private void footer(GuiGraphics g, Theme theme, List<String> lines) {
-		int y = uiH() - 4 - lines.size() * 10;
+	/** Unterkante des Inhalts über den Hinweisen. */
+	private int contentBottom(List<String> hints) {
+		return frame()[3] - 6 - hints.size() * 10 - 4;
+	}
+
+	private void footer(GuiGraphics g, Skin skin, List<String> lines) {
+		int[] f = frame();
+		int color = skin.ink(Skin.Surface.WINDOW).dim();
+		int y = f[3] - 6 - lines.size() * 10;
+		skin.divider(g, f[0] + PAD, y - 4, f[2] - f[0] - 2 * PAD, Skin.Surface.WINDOW);
 		for (String line : lines) {
-			centered(g, line, uiW() / 2, y, theme.textDim());
+			centered(g, line, (f[0] + f[2]) / 2, y, color);
 			y += 10;
 		}
 	}
@@ -519,19 +505,25 @@ public final class MinigamesScreen extends Screen {
 		return new float[] {ox, oy, s};
 	}
 
+	/** Dunkler „Bildschirm“, auf dem die Spiele laufen (Vorschau und Spielfeld). */
+	private static int screenColor(Theme theme) {
+		return Colors.mix(Colors.opaque(theme.panel()), 0xFF000000, 0.5f);
+	}
+
 	// ------------------------------------------------------------------ Menü
 
-	private void drawMenu(GuiGraphics g, Theme theme) {
-		int right = header(g, theme, I18n.get("salami.minigames.title"), I18n.get("salami.mods.back"), this::onClose);
+	private void drawMenu(GuiGraphics g, Skin skin, Theme theme) {
+		int right = header(g, skin, I18n.get("salami.minigames.title"), I18n.get("salami.mods.back"), this::onClose);
 		String board = I18n.get("salami.minigames.leaderboard");
-		textButton(g, theme, right - font.width(board) - 12, 4, board, () -> showLeaderboard(selected));
+		textButton(g, skin, right - font.width(board) - 12, frame()[1] + 5, board, Skin.ButtonKind.SECONDARY, () -> showLeaderboard(selected));
 
 		List<String> hints = hintLines(List.of(I18n.get("salami.minigames.hint.menu"), I18n.get("salami.minigames.controls.mute"),
 			I18n.get("salami.minigames.hint.back")));
+		int[] f = frame();
 		int count = previews.size();
-		int top = HEADER + PAD;
-		int bottom = uiH() - hints.size() * 10 - 8;
-		int availW = uiW() - 2 * PAD;
+		int top = contentTop();
+		int bottom = contentBottom(hints) - 4;
+		int availW = f[2] - f[0] - 2 * PAD;
 		int availH = bottom - top;
 		int cols = (availW - 2 * GAP) / 3 >= 92 ? 3 : 2;
 		int rows = (count + cols - 1) / cols;
@@ -540,79 +532,92 @@ public final class MinigamesScreen extends Screen {
 		lastCols = cols;
 		int gridW = cols * cardW + (cols - 1) * GAP;
 		int gridH = rows * cardH + (rows - 1) * GAP;
-		int x0 = (uiW() - gridW) / 2;
+		int x0 = (f[0] + f[2] - gridW) / 2;
 		int y0 = top + Math.max(0, (availH - gridH) / 2);
 		for (int i = 0; i < count; i++) {
-			card(g, theme, i, x0 + (i % cols) * (cardW + GAP), y0 + (i / cols) * (cardH + GAP), cardW, cardH);
+			card(g, skin, theme, i, x0 + (i % cols) * (cardW + GAP), y0 + (i / cols) * (cardH + GAP), cardW, cardH);
 		}
-		footer(g, theme, hints);
+		footer(g, skin, hints);
 	}
 
-	private void card(GuiGraphics g, Theme theme, int index, int x, int y, int w, int h) {
+	private void card(GuiGraphics g, Skin skin, Theme theme, int index, int x, int y, int w, int h) {
+		Skin.Ink ink = skin.ink(Skin.Surface.CARD);
 		Minigame preview = previews.get(index);
-		boolean active = hovered(x, y, x + w, y + h) || (keyboardNav && selected == index);
-		g.nextStratum();
-		g.fill(x, y, x + w, y + h, theme.panel());
-		int previewBottom = y + h - 26;
-		if (previewBottom - (y + 4) >= 14) {
-			g.fill(x + 4, y + 4, x + w - 4, previewBottom, Colors.mix(Colors.opaque(theme.panel()), 0xFF000000, 0.5f));
-			g.enableScissor(x + 4, y + 4, x + w - 4, previewBottom);
-			drawGameInto(g, theme, preview, x + 7, y + 7, x + w - 7, previewBottom - 3, 0f);
-			g.disableScissor();
-			g.nextStratum();
-		}
-		if (active) {
-			g.fill(x, y, x + w, y + h, theme.hover());
-		}
-		GuiDraw.outline(g, x, y, w, h, active ? theme.accent() : theme.outline());
-		if (active) {
-			GuiDraw.outline(g, x + 1, y + 1, w - 2, h - 2, Colors.alpha(theme.accent(), 0.4f));
-		}
-		text(g, fit(I18n.get(preview.nameKey()), w - 30), x + 6, y + h - 22, theme.headerText());
-		int best = highscores().best(preview.id());
-		String bestText = best > 0 ? I18n.get("salami.minigames.best", best) : I18n.get("salami.minigames.no_best");
-		text(g, fit(bestText, w - 30), x + 6, y + h - 11, best > 0 ? theme.accent() : theme.textDim());
-		buttons.add(new Button(x, y, x + w, y + h, () -> startGame(index)));
-		// Pokal: Bestenliste dieses Spiels
 		int tx = x + w - 22;
 		int ty = y + h - 21;
 		boolean trophyHover = hovered(tx, ty, tx + 18, ty + 14);
-		if (trophyHover) {
-			g.fill(tx, ty, tx + 18, ty + 14, theme.accent());
+		boolean active = (hovered(x, y, x + w, y + h) && !trophyHover) || (keyboardNav && selected == index);
+		g.nextStratum();
+		skin.row(g, x, y, w, h, keyboardNav && selected == index, Skin.UiState.of(active));
+		int previewBottom = y + h - 26;
+		if (previewBottom - (y + 5) >= 14) {
+			g.fill(x + 5, y + 5, x + w - 5, previewBottom, screenColor(theme));
+			g.enableScissor(x + 5, y + 5, x + w - 5, previewBottom);
+			drawGameInto(g, theme, preview, x + 8, y + 8, x + w - 8, previewBottom - 3, 0f);
+			g.disableScissor();
+			g.nextStratum();
 		}
-		drawIcon(g, tx + 1, ty, Icon.TROPHY, trophyHover ? 0xFF000000 : best > 0 ? Colors.GOLD : theme.textDim(), 0);
+		TextFit.draw(g, font, I18n.get(preview.nameKey()), x + 6, y + h - 22, w - 32, active ? ink.accent() : ink.text());
+		int best = highscores().best(preview.id());
+		String bestText = best > 0 ? I18n.get("salami.minigames.best", best) : I18n.get("salami.minigames.no_best");
+		TextFit.draw(g, font, bestText, x + 6, y + h - 11, w - 32, best > 0 ? ink.accent() : ink.dim());
+		buttons.add(new Button(x, y, x + w, y + h, () -> startGame(index)));
+		// Pokal: Bestenliste dieses Spiels
+		Skin.UiState trophyState = Skin.UiState.of(trophyHover);
+		skin.button(g, font, tx, ty, 18, 14, "", trophyHover ? Skin.ButtonKind.SECONDARY : Skin.ButtonKind.GHOST, trophyState);
+		int trophyColor = trophyHover ? skin.buttonInk(Skin.ButtonKind.SECONDARY, trophyState) : best > 0 ? Colors.GOLD : ink.dim();
+		Icons.trophy(g, tx + 3, ty + 1, best > 0 && !trophyHover ? darkGold(ink) : trophyColor);
 		buttons.add(new Button(tx, ty, tx + 18, ty + 14, () -> showLeaderboard(index)));
+	}
+
+	/** Gold, das auf hellen Flächen lesbar bleibt. */
+	private static int darkGold(Skin.Ink ink) {
+		return lightText(ink) ? Colors.GOLD : 0xFFB8860B;
+	}
+
+	/** Gold, Silber, Bronze für Platz 1–3 – auf hellen Flächen dunkler. */
+	private static int medal(int place, Skin.Ink ink) {
+		return lightText(ink) ? MEDALS[place] : new int[] {0xFFB8860B, 0xFF7D8590, 0xFFA0582D}[place];
+	}
+
+	/** Heller Text = dunkle Fläche. */
+	private static boolean lightText(Skin.Ink ink) {
+		int c = ink.text();
+		return ((c >> 16 & 0xFF) * 299 + (c >> 8 & 0xFF) * 587 + (c & 0xFF) * 114) / 1000 > 128;
 	}
 
 	// ------------------------------------------------------------------ Bestenliste
 
-	private void drawLeaderboard(GuiGraphics g, Theme theme) {
-		header(g, theme, I18n.get("salami.minigames.leaderboard"), I18n.get("salami.minigames.menu_back"), this::showMenu);
+	private void drawLeaderboard(GuiGraphics g, Skin skin) {
+		header(g, skin, I18n.get("salami.minigames.leaderboard"), I18n.get("salami.minigames.menu_back"), this::showMenu);
+		Skin.Ink ink = skin.ink(Skin.Surface.CARD);
 		List<String> hints = hintLines(List.of(I18n.get("salami.minigames.hint.leaderboard"), I18n.get("salami.minigames.hint.back")));
-		int top = HEADER + PAD;
-		int bottom = uiH() - hints.size() * 10 - 8;
-		int tabsW = Math.min(130, uiW() / 3);
-		int x0 = PAD;
+		int[] f = frame();
+		int top = contentTop();
+		int bottom = contentBottom(hints) - 4;
+		int tabsW = Math.min(130, (f[2] - f[0]) / 3);
+		int x0 = f[0] + PAD;
+		// Spiele als Liste auf der Seitenfläche
+		int listH = Math.min(bottom - top, previews.size() * 18 + 12);
+		skin.surface(g, Skin.Surface.SIDE, x0, top, tabsW, listH);
+		int inset = 5;
 		for (int i = 0; i < previews.size(); i++) {
-			int y = top + i * 20;
+			int y = top + 6 + i * 18;
 			int index = i;
-			boolean current = i == selected;
-			boolean hover = hovered(x0, y, x0 + tabsW, y + 18);
-			g.fill(x0, y, x0 + tabsW, y + 18, current ? theme.header() : hover ? theme.hover() : theme.panel());
-			if (current) {
-				g.fill(x0, y, x0 + 2, y + 18, theme.accent());
-			}
-			text(g, fit(I18n.get(previews.get(i).nameKey()), tabsW - 12), x0 + 8, y + 5, current ? theme.headerText() : theme.text());
-			buttons.add(new Button(x0, y, x0 + tabsW, y + 18, () -> selected = index));
+			boolean hover = hovered(x0 + inset, y, x0 + tabsW - inset, y + 16);
+			skin.tab(g, font, x0 + inset - 1, y, tabsW - 2 * inset + 2, 16, I18n.get(previews.get(i).nameKey()), null, i == selected, true,
+				Skin.UiState.of(hover));
+			buttons.add(new Button(x0 + inset, y, x0 + tabsW - inset, y + 16, () -> selected = index));
 		}
 
 		int tx0 = x0 + tabsW + GAP;
-		int tx1 = uiW() - PAD;
-		g.fill(tx0, top, tx1, bottom, theme.panel());
-		GuiDraw.outline(g, tx0, top, tx1 - tx0, bottom - top, theme.outline());
+		int tx1 = f[2] - PAD;
+		skin.surface(g, Skin.Surface.CARD, tx0, top, tx1 - tx0, bottom - top);
 		Minigame shown = previews.get(selected);
 		String id = shown.id();
-		centered(g, fit(I18n.get(shown.nameKey()), tx1 - tx0 - 12), (tx0 + tx1) / 2, top + 8, theme.headerText());
+		String name = fit(I18n.get(shown.nameKey()), tx1 - tx0 - 12);
+		int nameW = skin.headingWidth(font, name, 1f);
+		skin.heading(g, font, name, (tx0 + tx1 - nameW) / 2, top + 8, ink.text(), 1f);
 
 		List<Highscores.Entry> entries = highscores().top(id);
 		int dateW = font.width(formatDate("2000-10-20"));
@@ -625,39 +630,37 @@ public final class MinigamesScreen extends Screen {
 		boolean showDate = dateX - 10 - scoreW - nameX >= 50;
 		int scoreRight = showDate ? dateX - 10 : tx1 - 8;
 		int headY = top + 26;
-		text(g, "#", tx0 + 10, headY, theme.textDim());
-		text(g, I18n.get("salami.minigames.column.name"), nameX, headY, theme.textDim());
+		text(g, "#", tx0 + 10, headY, ink.dim());
+		text(g, I18n.get("salami.minigames.column.name"), nameX, headY, ink.dim());
 		String scoreHead = I18n.get("salami.minigames.column.score");
-		text(g, scoreHead, scoreRight - font.width(scoreHead), headY, theme.textDim());
+		text(g, scoreHead, scoreRight - font.width(scoreHead), headY, ink.dim());
 		if (showDate) {
-			text(g, I18n.get("salami.minigames.column.date"), dateX, headY, theme.textDim());
+			text(g, I18n.get("salami.minigames.column.date"), dateX, headY, ink.dim());
 		}
-		g.fill(tx0 + 6, headY + 11, tx1 - 6, headY + 12, theme.outline());
+		g.fill(tx0 + 6, headY + 11, tx1 - 6, headY + 12, ink.text());
 		if (entries.isEmpty()) {
-			centered(g, I18n.get("salami.minigames.empty"), (tx0 + tx1) / 2, headY + 26, theme.textDim());
+			centered(g, I18n.get("salami.minigames.empty"), (tx0 + tx1) / 2, headY + 26, ink.dim());
 		}
 		String me = playerName();
 		for (int i = 0; i < entries.size(); i++) {
 			Highscores.Entry entry = entries.get(i);
 			int y = headY + 17 + i * 15;
-			if (entry.name().equals(me)) {
-				g.fill(tx0 + 4, y - 3, tx1 - 4, y + 11, theme.enabledRow());
-			}
-			text(g, String.valueOf(i + 1), tx0 + 10, y, i < MEDALS.length ? MEDALS[i] : theme.textDim());
+			skin.row(g, tx0 + 4, y - 3, tx1 - tx0 - 8, 14, entry.name().equals(me), Skin.UiState.NORMAL);
+			text(g, String.valueOf(i + 1), tx0 + 10, y, i < MEDALS.length ? medal(i, ink) : ink.dim());
 			String score = String.valueOf(entry.score());
-			text(g, score, scoreRight - font.width(score), y, theme.accent());
-			text(g, fit(displayName(entry.name()), scoreRight - font.width(score) - 8 - nameX), nameX, y, theme.text());
+			text(g, score, scoreRight - font.width(score), y, ink.accent());
+			text(g, fit(displayName(entry.name()), scoreRight - font.width(score) - 8 - nameX), nameX, y, ink.text());
 			if (showDate) {
-				text(g, formatDate(entry.date()), dateX, y, theme.textDim());
+				text(g, formatDate(entry.date()), dateX, y, ink.dim());
 			}
 		}
 		String play = I18n.get("salami.minigames.play");
 		int playW = font.width(play) + 12;
 		int playY = Math.max(headY + 17 + Highscores.MAX_ENTRIES * 15 + 6, bottom - 22);
 		if (playY + 14 <= bottom - 4) {
-			textButton(g, theme, (tx0 + tx1 - playW) / 2, playY, play, () -> startGame(selected));
+			textButton(g, skin, (tx0 + tx1 - playW) / 2, playY, play, Skin.ButtonKind.PRIMARY, () -> startGame(selected));
 		}
-		footer(g, theme, hints);
+		footer(g, skin, hints);
 	}
 
 	private static String displayName(String name) {
@@ -685,10 +688,10 @@ public final class MinigamesScreen extends Screen {
 		return hintLines(parts);
 	}
 
-	private void drawGame(GuiGraphics g, Theme theme) {
-		int right = header(g, theme, I18n.get(game.nameKey()), I18n.get("salami.minigames.menu_back"), this::showMenu);
+	private void drawGame(GuiGraphics g, Skin skin, Theme theme) {
+		int right = header(g, skin, I18n.get(game.nameKey()), I18n.get("salami.minigames.menu_back"), this::showMenu);
 		if (!game.isOver()) {
-			iconButton(g, theme, right - 18, 4, paused ? Icon.PLAY : Icon.PAUSE, () -> {
+			iconButton(g, skin, right - 18, frame()[1] + 5, paused ? Icon.PLAY : Icon.PAUSE, () -> {
 				if (paused) {
 					resume();
 				} else {
@@ -697,63 +700,65 @@ public final class MinigamesScreen extends Screen {
 			});
 		}
 		List<String> hints = gameHints();
-		int top = HEADER + PAD;
-		int bottom = uiH() - hints.size() * 10 - 8;
-		float availW = uiW() - 2 * PAD - INFO_W - GAP;
+		int[] f = frame();
+		int top = contentTop();
+		int bottom = contentBottom(hints) - 4;
+		float availW = f[2] - f[0] - 2 * PAD - INFO_W - GAP;
 		float availH = bottom - top;
 		float s = Math.max(0.1f, Math.min(availW / game.width(), availH / game.height()));
 		float bw = game.width() * s;
 		float bh = game.height() * s;
-		float gx = PAD + (uiW() - 2 * PAD - (INFO_W + GAP + bw)) / 2;
+		float gx = f[0] + PAD + (f[2] - f[0] - 2 * PAD - (INFO_W + GAP + bw)) / 2;
 		boardX = snap(gx + INFO_W + GAP);
 		boardY = snap(top + (availH - bh) / 2);
 		boardScale = s;
 
-		infoPanel(g, theme, Math.round(gx), Math.round(boardY), Math.round(bh));
+		infoPanel(g, skin, Math.round(gx), Math.round(boardY), Math.round(bh));
 
 		g.nextStratum();
-		float frame = 3;
-		MinigameCanvas.fill(g, boardX - frame, boardY - frame, boardX + bw + frame, boardY + bh + frame, theme.outline());
-		MinigameCanvas.fill(g, boardX - frame + 1, boardY - frame + 1, boardX + bw + frame - 1, boardY + bh + frame - 1,
-			Colors.mix(Colors.opaque(theme.panel()), 0xFF000000, 0.5f));
-		g.enableScissor((int) Math.floor(boardX - frame), (int) Math.floor(boardY - frame),
-			(int) Math.ceil(boardX + bw + frame), (int) Math.ceil(boardY + bh + frame));
+		float frameW = 3;
+		Skin.Ink ink = skin.ink(Skin.Surface.WINDOW);
+		MinigameCanvas.fill(g, boardX - frameW, boardY - frameW, boardX + bw + frameW, boardY + bh + frameW, ink.text());
+		MinigameCanvas.fill(g, boardX - frameW + 1, boardY - frameW + 1, boardX + bw + frameW - 1, boardY + bh + frameW - 1, screenColor(theme));
+		g.enableScissor((int) Math.floor(boardX - frameW), (int) Math.floor(boardY - frameW),
+			(int) Math.ceil(boardX + bw + frameW), (int) Math.ceil(boardY + bh + frameW));
 		canvas.begin(g, font, theme, boardX, boardY, s, pixels());
 		game.render(canvas, partial());
 		g.disableScissor();
 
 		g.nextStratum();
 		if (paused || game.overlayReady()) {
-			overlay(g, theme, bw, bh);
+			overlay(g, skin, bw, bh);
 		}
 		updateConfetti(g);
-		footer(g, theme, hints);
+		footer(g, skin, hints);
 	}
 
-	private void infoPanel(GuiGraphics g, Theme theme, int x, int y, int boardHeight) {
+	private void infoPanel(GuiGraphics g, Skin skin, int x, int y, int boardHeight) {
+		Skin.Ink ink = skin.ink(Skin.Surface.CARD);
 		List<Minigame.Stat> stats = game.stats();
 		int h = Math.min(Math.max(boardHeight, 60), 66 + stats.size() * 22);
-		g.fill(x, y, x + INFO_W, y + h, theme.panel());
-		GuiDraw.outline(g, x, y, INFO_W, h, theme.outline());
+		skin.surface(g, Skin.Surface.CARD, x, y, INFO_W, h);
 		int score = game.score();
 		int best = Math.max(bestBefore, highscores().best(game.id()));
-		text(g, I18n.get("salami.minigames.score"), x + 6, y + 6, theme.textDim());
+		boolean beating = score > best && best > 0;
+		text(g, I18n.get("salami.minigames.score"), x + 6, y + 6, ink.dim());
 		String scoreText = String.valueOf(score);
 		float big = font.width(scoreText) * 2 <= INFO_W - 12 ? 2f : 1f;
 		g.pose().pushMatrix();
 		g.pose().translate(x + 6, y + 17);
 		g.pose().scale(big, big);
-		text(g, scoreText, 0, 0, score > best && best > 0 ? Colors.GOLD : theme.headerText());
+		text(g, scoreText, 0, 0, beating ? darkGold(ink) : ink.text());
 		g.pose().popMatrix();
-		text(g, I18n.get("salami.minigames.record"), x + 6, y + 40, theme.textDim());
-		text(g, best > 0 ? String.valueOf(Math.max(best, score)) : "–", x + 6, y + 50, score > best && best > 0 ? Colors.GOLD : theme.accent());
+		text(g, I18n.get("salami.minigames.record"), x + 6, y + 40, ink.dim());
+		text(g, best > 0 ? String.valueOf(Math.max(best, score)) : "–", x + 6, y + 50, beating ? darkGold(ink) : ink.accent());
 		int sy = y + 66;
 		for (Minigame.Stat stat : stats) {
 			if (sy + 20 > y + h) {
 				break;
 			}
-			text(g, fit(I18n.get(stat.labelKey()), INFO_W - 12), x + 6, sy, theme.textDim());
-			text(g, stat.value(), x + 6, sy + 10, theme.text());
+			TextFit.draw(g, font, I18n.get(stat.labelKey()), x + 6, sy, INFO_W - 12, ink.dim());
+			text(g, stat.value(), x + 6, sy + 10, ink.text());
 			sy += 22;
 		}
 	}
@@ -771,7 +776,8 @@ public final class MinigamesScreen extends Screen {
 			new OverlayAction("salami.minigames.to_menu", this::showMenu));
 	}
 
-	private void overlay(GuiGraphics g, Theme theme, float bw, float bh) {
+	private void overlay(GuiGraphics g, Skin skin, float bw, float bh) {
+		Skin.Ink ink = skin.ink(Skin.Surface.POPUP);
 		MinigameCanvas.fill(g, boardX, boardY, boardX + bw, boardY + bh, 0x99000000);
 		List<OverlayAction> actions = overlayActions();
 		boolean over = !paused;
@@ -779,28 +785,29 @@ public final class MinigamesScreen extends Screen {
 		List<Integer> colors = new ArrayList<>();
 		if (over) {
 			lines.add(I18n.get("salami.minigames.result_score", game.score()));
-			colors.add(theme.headerText());
+			colors.add(ink.text());
 			lines.add(I18n.get("salami.minigames.result_best", Math.max(bestBefore, game.score())));
-			colors.add(theme.textDim());
+			colors.add(ink.dim());
 			if (!newRecord && rank >= 0) {
 				lines.add(I18n.get("salami.minigames.rank", rank + 1));
-				colors.add(theme.accent());
+				colors.add(ink.accent());
 			}
 		} else {
 			lines.add(I18n.get("salami.minigames.result_score", game.score()));
-			colors.add(theme.headerText());
+			colors.add(ink.text());
 		}
 		int pw = 168;
 		int ph = 10 + 18 + 6 + lines.size() * 12 + (newRecord && over ? 16 : 0) + 6 + actions.size() * 18 + 6;
 		int cx = Math.round(boardX + bw / 2);
 		int cy = Math.round(boardY + bh / 2);
-		int x0 = Math.max(4, Math.min(uiW() - pw - 4, cx - pw / 2));
-		int y0 = Math.max(HEADER + 2, Math.min(uiH() - ph - 4, cy - ph / 2));
-		g.fill(x0, y0, x0 + pw, y0 + ph, Colors.opaque(theme.panel()));
-		g.fill(x0, y0, x0 + pw, y0 + 3, theme.accent());
-		GuiDraw.outline(g, x0, y0, pw, ph, theme.outline());
+		int[] f = frame();
+		int x0 = Math.max(f[0] + 4, Math.min(f[2] - pw - 4, cx - pw / 2));
+		int y0 = Math.max(f[1] + HEADER + 2, Math.min(f[3] - ph - 4, cy - ph / 2));
+		skin.surface(g, Skin.Surface.POPUP, x0, y0, pw, ph);
 		String title = I18n.get(over ? game.overTitleKey() : "salami.minigames.pause");
-		bigText(g, title, x0 + pw / 2f, y0 + 10, font.width(title) * 2 <= pw - 12 ? 2f : 1f, theme.headerText());
+		float titleScale = skin.headingWidth(font, title, 2f) <= pw - 12 ? 2f : 1f;
+		int titleW = skin.headingWidth(font, title, titleScale);
+		skin.heading(g, font, title, Math.round(x0 + (pw - titleW) / 2f), y0 + 10, ink.text(), titleScale);
 		int y = y0 + 10 + 18 + 6;
 		for (int i = 0; i < lines.size(); i++) {
 			centered(g, lines.get(i), x0 + pw / 2, y, colors.get(i));
@@ -809,7 +816,7 @@ public final class MinigamesScreen extends Screen {
 		if (newRecord && over) {
 			float pulse = 0.5f + 0.5f * (float) Math.sin(System.currentTimeMillis() / 150.0);
 			String record = I18n.get("salami.minigames.new_record");
-			bigText(g, record, x0 + pw / 2f, y + 1, 1f + 0.12f * pulse, Colors.mix(Colors.GOLD, 0xFFFFFFFF, pulse * 0.5f));
+			bigText(g, record, x0 + pw / 2f, y + 1, 1f + 0.12f * pulse, Colors.mix(ink.accent(), darkGold(ink), pulse));
 			y += 16;
 		}
 		y += 6;
@@ -822,9 +829,8 @@ public final class MinigamesScreen extends Screen {
 				overlayIndex = i;
 			}
 			boolean active = overlayIndex == i;
-			g.fill(bx0, y, bx1, y + 15, active ? theme.accent() : theme.header());
-			GuiDraw.outline(g, bx0, y, bx1 - bx0, 15, active ? theme.accent() : theme.outline());
-			centered(g, I18n.get(action.labelKey()), (bx0 + bx1) / 2, y + 4, active ? 0xFF000000 : theme.headerText());
+			skin.button(g, font, bx0, y, bx1 - bx0, 15, I18n.get(action.labelKey()), active ? Skin.ButtonKind.PRIMARY : Skin.ButtonKind.SECONDARY,
+				Skin.UiState.of(hover));
 			buttons.add(new Button(bx0, y, bx1, y + 15, action.action()));
 			y += 18;
 		}

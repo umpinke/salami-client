@@ -12,6 +12,7 @@ import dev.salamiclient.gui.clickgui.ClickGuiScreen;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.ModuleManager;
+import dev.salamiclient.modules.client.GuiScaleModule;
 import dev.salamiclient.modules.client.SalamiThemeModule;
 import dev.salamiclient.modules.misc.AutoReconnectModule;
 import dev.salamiclient.modules.visual.CrosshairModule;
@@ -44,11 +45,10 @@ import java.util.concurrent.CompletableFuture;
  * {@code build/run/clientGameTest/screenshots}.
  */
 public final class SalamiClientGameTest implements FabricClientGameTest {
-	// Layout-Konstanten der ClickGUI (Panel "Client" ist das erste, Standardposition)
+	// Layout der ClickGUI (Panel "Client" ist das erste, Standardposition; die Oberkante hängt vom Look ab)
 	private static final int PANEL_X = 10;
-	private static final int PANEL_Y = 24;
-	private static final int HEADER_HEIGHT = 15;
-	private static final int MODULE_HEIGHT = 14;
+	private static final int HEADER_HEIGHT = ClickGuiScreen.HEADER_HEIGHT;
+	private static final int MODULE_HEIGHT = ClickGuiScreen.MODULE_HEIGHT;
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
@@ -114,18 +114,19 @@ public final class SalamiClientGameTest implements FabricClientGameTest {
 			testPanelScrolling(context);
 
 			// --- Salami-Modus per Linksklick ausschalten (1. Modul im Client-Panel) ---
+			int panelY = context.computeOnClient(c -> ClickGuiScreen.panelTop());
 			boolean themeBefore = context.computeOnClient(c -> modules.get(SalamiThemeModule.class).isEnabled());
-			click(context, PANEL_X + 20, PANEL_Y + HEADER_HEIGHT + 5, InputConstants.MOUSE_BUTTON_LEFT);
+			click(context, PANEL_X + 20, panelY + HEADER_HEIGHT + 5, InputConstants.MOUSE_BUTTON_LEFT);
 			boolean themeAfter = context.computeOnClient(c -> modules.get(SalamiThemeModule.class).isEnabled());
 			check(themeBefore != themeAfter, "Left click on module row did not toggle it");
 			context.takeScreenshot("salami-03-clickgui-default");
 
 			// --- Einstellungen des 2. Moduls per Rechtsklick aufklappen ---
-			click(context, PANEL_X + 20, PANEL_Y + HEADER_HEIGHT + MODULE_HEIGHT + 5, InputConstants.MOUSE_BUTTON_RIGHT);
+			click(context, PANEL_X + 20, panelY + HEADER_HEIGHT + MODULE_HEIGHT + 5, InputConstants.MOUSE_BUTTON_RIGHT);
 			context.takeScreenshot("salami-04-module-settings");
 
 			// Theme wiederherstellen und GUI schließen
-			click(context, PANEL_X + 20, PANEL_Y + HEADER_HEIGHT + 5, InputConstants.MOUSE_BUTTON_LEFT);
+			click(context, PANEL_X + 20, panelY + HEADER_HEIGHT + 5, InputConstants.MOUSE_BUTTON_LEFT);
 			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 			context.waitTick();
 
@@ -209,6 +210,28 @@ public final class SalamiClientGameTest implements FabricClientGameTest {
 		check(context.computeOnClient(c -> c.screen instanceof SalamiMenuScreen), "menu key did not open the Salami menu (German)");
 		context.takeScreenshot("salami-07d-menu-german");
 		context.setScreen(() -> null);
+
+		// Große Menüs (Menügröße 150 %): alles muss auch auf der kleineren Fläche passen
+		GuiScaleModule gui = modules.get(GuiScaleModule.class);
+		boolean guiWasOn = context.computeOnClient(c -> gui.isEnabled());
+		context.runOnClient(c -> {
+			modules.setEnabled(gui, true);
+			((NumberSetting) setting(gui, "clickgui_scale")).set(1.5);
+		});
+		context.setScreen(() -> new SalamiMenuScreen(modules, SalamiClient.get().config()));
+		context.waitTicks(2);
+		context.takeScreenshot("salami-07e-menu-large");
+		context.setScreen(() -> new ModsScreen(modules, null));
+		context.waitTicks(2);
+		context.takeScreenshot("salami-07f-mods-large");
+		context.setScreen(() -> new ClickGuiScreen(modules, SalamiClient.get().config()));
+		context.waitTicks(2);
+		context.takeScreenshot("salami-07g-panels-large");
+		context.setScreen(() -> null);
+		context.runOnClient(c -> {
+			setting(gui, "clickgui_scale").resetAll();
+			modules.setEnabled(gui, guiWasOn);
+		});
 		setLanguage(context, "en_us");
 	}
 
