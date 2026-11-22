@@ -49,15 +49,22 @@ export const designTokens = {
  * Salami-Designsprache: neutrale, warme Flächen mit Haarlinien statt akzentgetöntem Glas.
  * Der Akzent bleibt Hauptaktionen und aktiven Zuständen vorbehalten.
  */
+/**
+ * Die Werte sind CSS-Variablen mit Rückfallwert: jeder Look (themes/looks/<id>/look.css) setzt sie
+ * für sich, und alle Seiten ziehen mit. Deshalb nie durch `hexAlpha`/`mixHex` schicken – das sind
+ * keine Hex-Farben. Für halbtransparente Varianten gibt es `SURFACE.veil`.
+ */
 export const SURFACE = {
-  base: "rgba(255, 255, 255, 0.045)",
-  hover: "rgba(255, 255, 255, 0.08)",
-  raised: "rgba(255, 255, 255, 0.11)",
-  line: "rgba(255, 255, 255, 0.09)",
-  lineStrong: "rgba(255, 255, 255, 0.18)",
-  /** deckend – für Dialoge, Menüs und Tooltips */
-  solid: "#181516",
-  solidRaised: "#221e1f",
+  base: "var(--surface-base, rgba(255, 255, 255, 0.045))",
+  hover: "var(--surface-hover, rgba(255, 255, 255, 0.08))",
+  raised: "var(--surface-raised, rgba(255, 255, 255, 0.11))",
+  line: "var(--surface-line, rgba(255, 255, 255, 0.09))",
+  lineStrong: "var(--surface-line-strong, rgba(255, 255, 255, 0.18))",
+  /** deckend – für Dialoge, Menüs und Tooltips (warm, passend zum Pfefferbraun-Grund) */
+  solid: "var(--surface-solid, #1b1513)",
+  solidRaised: "var(--surface-solid-raised, #261d1a)",
+  /** halbtransparenter Schleier über Inhalten (Laden, gesperrt) */
+  veil: "var(--surface-veil, rgba(27, 21, 19, 0.85))",
 } as const;
 
 const parseHex = (hex: string): [number, number, number] | null => {
@@ -100,8 +107,9 @@ export const getButtonSkin = (variant: ComponentVariant, accentColor: AccentColo
   if (variant === "ghost") {
     return { background: hovered ? SURFACE.hover : "transparent", border: "transparent", color: "#ffffff", shadow: "none" };
   }
+  // Salami-Feinkost: Knöpfe haben eine harte Kante nach unten statt weichem Schein
   if (variant === "secondary" || variant === "flat-secondary") {
-    return { background: hovered ? SURFACE.raised : SURFACE.hover, border: SURFACE.line, color: "#f3f1f1", shadow: "none" };
+    return { background: hovered ? SURFACE.raised : SURFACE.hover, border: SURFACE.line, color: "#f3f1f1", shadow: KANTE_SOFT };
   }
   if (variant === "3d" || variant === "elevated") {
     const fill = hovered ? accentColor.light || accentColor.value : accentColor.value;
@@ -109,7 +117,7 @@ export const getButtonSkin = (variant: ComponentVariant, accentColor: AccentColo
       background: fill,
       border: "transparent",
       color: readableOn(accentColor.value),
-      shadow: `0 10px 24px -12px ${hexAlpha(accentColor.value, 0.9)}`,
+      shadow: kante(accentColor.value),
     };
   }
   const colors = getVariantColors(variant, accentColor);
@@ -117,9 +125,25 @@ export const getButtonSkin = (variant: ComponentVariant, accentColor: AccentColo
     background: hexAlpha(colors.main, hovered ? 0.28 : 0.16),
     border: hexAlpha(colors.main, hovered ? 0.5 : 0.28),
     color: colors.text,
-    shadow: "none",
+    shadow: KANTE_SOFT,
   };
 };
+
+/** Harte Unterkante eines vollen Knopfs (Feinkost-Stil): die Knopffarbe, kräftig abgedunkelt. */
+export const kante = (hex: string, depth = 3): string =>
+  `var(--look-kante, 0 ${depth}px 0 ${mixHex(hex, "#000000", 0.45)})`;
+/** Unterkante für flache Knöpfe und Karten. */
+export const KANTE_SOFT = "var(--look-kante-soft, 0 2px 0 rgba(0, 0, 0, 0.32))";
+
+/**
+ * Kopfband im Salami-Anschnitt (mit der CSS-Klasse `salami-fat-spots` kombinieren). Immer in
+ * Salami-Rot – es ist das Erkennungszeichen, unabhängig von der gewählten Akzentfarbe (mit Grau
+ * sah es sonst aus wie Stein). Der Parameter bleibt für bestehende Aufrufe.
+ */
+export const kopfband = (_accentHex?: string) => ({
+  backgroundColor: `var(--look-band-bg, ${mixHex("#b23a3a", "#2b1d1a", 0.3)})`,
+  borderBottom: `var(--look-band-border, 3px solid ${mixHex("#b23a3a", "#2b1d1a", 0.6)})`,
+});
 
 export const getVariantColors =(variant: ComponentVariant, accentColor: AccentColor): ColorTokens => {
   switch (variant) {
@@ -138,11 +162,12 @@ export const getVariantColors =(variant: ComponentVariant, accentColor: AccentCo
         text: "#fee2e2"
       };
     case "info":
+      // Salami: Hinweise in Fett-Creme statt kaltem Blau
       return {
-        main: "#3b82f6",
-        light: "#60a5fa",
-        dark: "#2563eb",
-        text: "#dbeafe"
+        main: "#d9c2a7",
+        light: "#f3e3d3",
+        dark: "#b39a7f",
+        text: "#f3e3d3"
       };
     case "success":
       return {

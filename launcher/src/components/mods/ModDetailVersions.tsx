@@ -18,12 +18,15 @@ import { useThemeStore } from "../../store/useThemeStore";
 import { ModrinthQuickInstallProfilesModal } from "../modrinth/v2/ModrinthQuickInstallProfilesModal";
 import { ModrinthVersionItemV2 } from "../modrinth/v2/ModrinthVersionItemV2";
 import { ProgressToast } from "../ui/ProgressToast";
-import { installContentToProfile, installContentToTarget } from "../../services/content-service";
+import { installContentToProfile, installContentToTarget, shouldReportInstallError } from "../../services/content-service";
+import { errorText } from "../../utils/error-text";
 import { ContentType, type ContentInstallTarget, type InstallContentPayload } from "../../types/content";
 import { EventType, type EventPayload } from "../../types/events";
 import { useNavigate } from "react-router-dom";
-import { TagBadge } from "../ui/TagBadge";
 import { Select, type SelectOption } from "../ui/Select";
+import { LoadingSpinner } from "../ui/LoadingSpinner";
+import { EmptyState } from "../ui/EmptyState";
+import { KanteButton, PLAIN_CARD, RemovableLabel, SectionHeading, tagLabel } from "../modrinth/v2/FeinkostParts";
 
 interface ModDetailVersionsProps {
   project: UnifiedProjectDetails;
@@ -119,7 +122,7 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
         setVersions(sorted);
       } catch (err) {
         console.error("Failed to load versions:", err);
-        setError(err instanceof Error ? err.message : "Failed to load versions");
+        setError(err instanceof Error ? err.message : t('mod_detail.load_versions_failed'));
       } finally {
         setIsLoading(false);
       }
@@ -165,7 +168,7 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
 
   const loaderOptions: SelectOption[] = [
     { value: "all", label: t('mod_detail.versions.all_loaders') },
-    ...availableLoaders.map(l => ({ value: l, label: l })),
+    ...availableLoaders.map(l => ({ value: l, label: tagLabel(l) })),
   ];
 
   const handleClearFilters = () => {
@@ -200,14 +203,14 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
         const progress = (progressPayload.progress ?? 0) * 100;
 
         toast.custom(
-          () => <ProgressToast message={`Installing ${fileName}`} progress={progress} />,
+          () => <ProgressToast message={t('content.install.installing_file', { name: fileName })} progress={progress} />,
           { id: toastId, duration: Infinity }
         );
       });
 
       // Show initial progress toast
       toast.custom(
-        () => <ProgressToast message={`Installing ${fileName}`} progress={0} />,
+        () => <ProgressToast message={t('content.install.installing_file', { name: fileName })} progress={0} />,
         { id: toastId, duration: Infinity }
       );
 
@@ -302,7 +305,7 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
       setInstallStatus(prev => ({ ...prev, [profile.id]: true }));
     } catch (error) {
       console.error("Installation failed:", error);
-      toast.error(t('mod_detail.install_failed', { error }));
+      if (shouldReportInstallError(error)) toast.error(t('mod_detail.install_failed', { error: errorText(error) }));
     } finally {
       setInstallingProfiles(prev => ({ ...prev, [profile.id]: false }));
     }
@@ -362,7 +365,7 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
         setInstallStatus(prev => ({ ...prev, [profile.id]: true }));
       } catch (error) {
         console.error("Installation failed:", error);
-        toast.error(t('mod_detail.install_failed', { error }));
+        if (shouldReportInstallError(error)) toast.error(t('mod_detail.install_failed', { error: errorText(error) }));
       } finally {
         setInstallingProfiles(prev => ({ ...prev, [profile.id]: false }));
       }
@@ -393,32 +396,21 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Icon icon="svg-spinners:ring-resize" className="w-6 h-6 text-white/50" />
-        <span className="ml-2 text-white/50 font-minecraft">{t('modrinth.loading_versions')}</span>
+        <LoadingSpinner size="md" message={t('modrinth.loading_versions')} />
       </div>
     );
   }
 
   // Error state
   if (error) {
-    return (
-      <div className="text-center py-12">
-        <Icon icon="solar:danger-triangle-bold" className="w-8 h-8 text-red-500 mx-auto mb-2" />
-        <p className="text-red-400 font-minecraft text-sm">{error}</p>
-      </div>
-    );
+    return <EmptyState icon="solar:danger-triangle-bold" message={error} compact fullHeight={false} />;
   }
 
   return (
-    <div className="p-3">
+    <div>
+      <SectionHeading className="mb-3">{t('mod_detail.versions.title')}</SectionHeading>
       {/* Filter Bar */}
-      <div
-        className="mb-4 p-3 rounded-lg border backdrop-blur-sm"
-        style={{
-          backgroundColor: `${accentColor.value}10`,
-          borderColor: `${accentColor.value}30`,
-        }}
-      >
+      <div className="look-card mb-4 p-3" style={PLAIN_CARD}>
         <div className="flex flex-wrap gap-2 items-center">
           {/* Version Type */}
           <Select
@@ -426,7 +418,7 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
             onChange={setVersionTypeFilter}
             options={versionTypeOptions}
             size="sm"
-            className="w-32"
+            className="w-40"
           />
 
           {/* Game Version */}
@@ -435,7 +427,7 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
             onChange={setGameVersionFilter}
             options={gameVersionOptions}
             size="sm"
-            className="w-44"
+            className="w-52"
           />
 
           {/* Loader */}
@@ -445,73 +437,45 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
               onChange={setLoaderFilter}
               options={loaderOptions}
               size="sm"
-              className="w-36"
+              className="w-40"
             />
           )}
 
           {/* Results count */}
           <div className="ml-auto text-xs text-white/50 font-minecraft">
-            {filteredVersions.length} version{filteredVersions.length !== 1 ? "s" : ""}
+            {t('mod_detail.versions.count', { count: filteredVersions.length })}
           </div>
         </div>
 
         {/* Active filters */}
         {hasActiveFilters && (
-          <div className="flex items-center mt-2 gap-2">
-            <div
-              className="flex-1 border rounded-md h-[40px] overflow-x-auto overflow-y-hidden whitespace-nowrap hide-scrollbar"
-              style={{
-                backgroundColor: `${accentColor.value}08`,
-                borderColor: `${accentColor.value}30`,
-              }}
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <KanteButton
+              tone="ghost"
+              size="sm"
+              onClick={handleClearFilters}
+              icon={<Icon icon="solar:trash-bin-trash-bold" className="h-4 w-4" />}
             >
-              <div className="flex items-center gap-1.5 p-2">
-                <TagBadge
-                  variant="destructive"
-                  className="cursor-pointer hover:brightness-110 transition-all flex-shrink-0 flex items-center"
-                  onClick={handleClearFilters}
-                >
-                  <Icon icon="solar:trash-bin-trash-bold" className="w-3 h-3 mr-1.5" />
-                  <span>{t('common.clear_all')}</span>
-                </TagBadge>
+              {t('common.clear_all')}
+            </KanteButton>
 
-                {versionTypeFilter !== "all" && (
-                  <TagBadge variant="filter" className="inline-flex whitespace-nowrap">
-                    {t('mod_detail.type')}: {versionTypeFilter}
-                    <button
-                      onClick={() => setVersionTypeFilter("all")}
-                      className="ml-1.5 text-current opacity-70 hover:opacity-100"
-                    >
-                      <Icon icon="solar:close-circle-bold" className="w-3 h-3" />
-                    </button>
-                  </TagBadge>
-                )}
+            {versionTypeFilter !== "all" && (
+              <RemovableLabel onRemove={() => setVersionTypeFilter("all")}>
+                {t('mod_detail.type')}: {t(`mod_detail.versions.${versionTypeFilter}`, { defaultValue: versionTypeFilter })}
+              </RemovableLabel>
+            )}
 
-                {gameVersionFilter !== "all" && (
-                  <TagBadge variant="filter" className="inline-flex whitespace-nowrap">
-                    {gameVersionFilter}
-                    <button
-                      onClick={() => setGameVersionFilter("all")}
-                      className="ml-1.5 text-current opacity-70 hover:opacity-100"
-                    >
-                      <Icon icon="solar:close-circle-bold" className="w-3 h-3" />
-                    </button>
-                  </TagBadge>
-                )}
+            {gameVersionFilter !== "all" && (
+              <RemovableLabel onRemove={() => setGameVersionFilter("all")}>
+                {gameVersionFilter}
+              </RemovableLabel>
+            )}
 
-                {loaderFilter !== "all" && (
-                  <TagBadge variant="filter" className="inline-flex whitespace-nowrap">
-                    {loaderFilter}
-                    <button
-                      onClick={() => setLoaderFilter("all")}
-                      className="ml-1.5 text-current opacity-70 hover:opacity-100"
-                    >
-                      <Icon icon="solar:close-circle-bold" className="w-3 h-3" />
-                    </button>
-                  </TagBadge>
-                )}
-              </div>
-            </div>
+            {loaderFilter !== "all" && (
+              <RemovableLabel tone="red" onRemove={() => setLoaderFilter("all")}>
+                {tagLabel(loaderFilter)}
+              </RemovableLabel>
+            )}
           </div>
         )}
       </div>
@@ -538,30 +502,17 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
 
           {/* Load More Button */}
           {filteredVersions.length > displayedCount && (
-            <button
+            <KanteButton
               onClick={() => setDisplayedCount(prev => prev + 10)}
-              className="w-full mt-2 py-2 rounded-lg text-xs font-minecraft transition-colors"
-              style={{
-                backgroundColor: `${accentColor.value}15`,
-                borderColor: `${accentColor.value}30`,
-                color: accentColor.value,
-              }}
+              size="sm"
+              className="mt-1 w-full"
             >
-              Load More ({filteredVersions.length - displayedCount} more)
-            </button>
+              {t('content.search.load_more', { remaining: filteredVersions.length - displayedCount })}
+            </KanteButton>
           )}
         </div>
       ) : (
-        <div
-          className="relative overflow-hidden transition-colors duration-150 rounded-md p-4 text-sm text-gray-400 text-center border backdrop-blur-md"
-          style={{
-            borderColor: `${accentColor.value}60`,
-            borderBottomColor: accentColor.value,
-            backgroundColor: `${accentColor.value}15`,
-          }}
-        >
-          No versions match the selected filters.
-        </div>
+        <EmptyState icon="solar:filter-bold" message={t('modrinth.no_versions_match_filters')} compact fullHeight={false} />
       )}
     </div>
   );

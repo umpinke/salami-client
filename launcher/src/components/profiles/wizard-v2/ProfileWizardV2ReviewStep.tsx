@@ -117,7 +117,7 @@ export function ProfileWizardV2ReviewStep({
         {t("profiles.wizard.back")}
       </Button>
       <Button
-        variant="default"
+        variant="3d"
         onClick={() =>
           onImport({
             name: trimmedName,

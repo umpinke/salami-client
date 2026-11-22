@@ -65,10 +65,7 @@ export function SettingsSection({
               style={{ color: accentColor.value }}
             />
           )}
-          <h3
-            className="font-smallcaps text-lg leading-none tracking-wide"
-            style={{ color: accentColor.value }}
-          >
+          <h3 className="font-minecraft text-lg leading-none text-white">
             {title}
           </h3>
         </div>

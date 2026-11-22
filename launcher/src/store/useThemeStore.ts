@@ -3,6 +3,8 @@ import { persist } from "zustand/middleware";
 import { setProfileGroupingPreference } from "../services/launcher-config-service";
 import { ModPlatform } from "../types/unified";
 import type { SupportedLanguage } from "../i18n";
+import { SALAMI_ACCENT } from "../themes/salami/salami-theme";
+import type { LookId } from "../themes/looks/types";
 
 export type AccentColor = {
   name: string;
@@ -15,6 +17,8 @@ export type AccentColor = {
 };
 
 export const ACCENT_COLORS: Record<string, AccentColor> = {
+  // Salami Client: die Hausfarbe zuerst und als Standard
+  salami: { ...SALAMI_ACCENT, isCustom: false },
   cyan: {
     name: "Cyan",
     value: "#00B9E8",
@@ -207,6 +211,9 @@ export const MAX_BORDER_RADIUS = 32;
 
 
 interface ThemeState {
+  /** Gewähltes Erscheinungsbild (themes/looks). null = noch nicht gewählt → Auswahl beim Start. */
+  look: LookId | null;
+  setLook: (look: LookId) => void;
   accentColor: AccentColor;
   setAccentColor: (color: AccentColor) => void;
   setCustomAccentColor: (hexColor: string) => void;
@@ -254,7 +261,9 @@ interface ThemeState {
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set, get) => ({
-      accentColor: ACCENT_COLORS.blue,
+      look: null,
+      setLook: (look) => set({ look }),
+      accentColor: ACCENT_COLORS.salami,
       isBackgroundAnimationEnabled: false,
       showNavLabels: true,
       isDetailViewSidebarOnLeft: true,
@@ -267,7 +276,8 @@ export const useThemeStore = create<ThemeState>()(
       profilesTabActiveGroup: "all",
       profilesTabSortBy: "last_played",
       profilesTabVersionFilters: [],
-      profilesTabLayoutMode: "list",
+      // Salami: Kacheln im Feinkost-Stil als Standard
+      profilesTabLayoutMode: "grid",
       // Global context menu management - defaults
       openContextMenuId: null,
       // Mod source selection - defaults
@@ -460,12 +470,27 @@ export const useThemeStore = create<ThemeState>()(
     }),
     {
       name: "norisk-theme-storage",
-      version: 1,
-      // Salami Client: einmalig von den eckigen NoRisk-Ecken (0) auf abgerundete wechseln
+      version: 3,
       migrate: (persisted, version) => {
-        const state = persisted as Partial<ThemeState>;
+        let state = persisted as Partial<ThemeState>;
+        // Salami Client: einmalig von den eckigen NoRisk-Ecken (0) auf abgerundete wechseln
         if (version < 1 && (state.borderRadius ?? 0) === 0) {
-          return { ...state, borderRadius: DEFAULT_BORDER_RADIUS } as ThemeState;
+          state = { ...state, borderRadius: DEFAULT_BORDER_RADIUS };
+        }
+        // Salami Client: wer noch das alte Standard-Blau hat, bekommt einmalig Salami-Rot –
+        // eine selbst gewählte Farbe bleibt
+        if (version < 2 && state.accentColor?.value?.toLowerCase() === ACCENT_COLORS.blue.value) {
+          state = { ...state, accentColor: ACCENT_COLORS.salami };
+        }
+        // Salami: die neuen Profil-Kacheln einmalig zeigen (die Liste bleibt wählbar)
+        if (version < 2 && state.profilesTabLayoutMode === "list") {
+          state = { ...state, profilesTabLayoutMode: "grid" };
+        }
+        // Salami: mit dem eigenen Design einmalig Salami-Rot für alle, die noch eine Vorgabefarbe
+        // aus der alten (NoRisk-)Palette haben – oft beim Umzug aus dem NoRisk-Launcher mitgekommen.
+        // Selbst gemischte Farben (isCustom) bleiben.
+        if (version < 3 && state.accentColor && !state.accentColor.isCustom) {
+          state = { ...state, accentColor: ACCENT_COLORS.salami };
         }
         return state as ThemeState;
       },

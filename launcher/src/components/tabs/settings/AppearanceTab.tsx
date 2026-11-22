@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { ToggleSwitch } from "../../ui/ToggleSwitch";
 import { SnowEffectToggle } from "../../ui/SnowEffectToggle";
 import { SettingsSection } from "../../ui/settings/SettingsSection";
+import { LookPicker } from "../../looks/LookPicker";
 import { SettingRow } from "../../ui/settings/SettingRow";
 import { ThemeSelector } from "../../ThemeSelector";
 import { SalamiModeCard } from "../../../themes/salami/SalamiModeCard";
@@ -19,6 +20,8 @@ import { Button } from "../../ui/buttons/Button";
 import { Icon } from "@iconify/react";
 
 export function AppearanceTab() {
+  const look = useThemeStore((state) => state.look);
+  const setLook = useThemeStore((state) => state.setLook);
   const { t } = useTranslation();
   const kw = useSettingsKeywords();
   const { saving } = useSettingsConfig();
@@ -49,6 +52,19 @@ export function AppearanceTab() {
 
   return (
     <div className="space-y-6">
+      {/* Salami: der Look des ganzen Launchers – dieselbe Auswahl wie beim ersten Start */}
+      <SettingsSection
+        id="settings-section-look"
+        title={t("salami.look.settings_title")}
+        icon="solar:pallete-2-bold"
+        keywords={kw("salami.look.settings_title", "look", "design", "aussehen", "stil", "style", "salumeria", "werkbank", "theke", "layout")}
+        description={t("salami.look.settings_description")}
+      >
+        <div className="py-3">
+          <LookPicker value={look} onSelect={setLook} size="compact" />
+        </div>
+      </SettingsSection>
+
       <SettingsSection
         id="settings-section-theme"
         title={t("settings.theme.title")}

@@ -102,17 +102,19 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
           loading: i18n.t('auth.loading.browser_sign_in'),
           success: ({ newAccount }) =>
             i18n.t('auth.success.account_added', { username: newAccount.username }),
-          error: (err) => err.message,
+          error: (err) => err?.message || String(err),
         },
         {
+          // Salami: die Anmeldung (mit Zwei-Faktor) dauert oft länger als 50 s, und ein
+          // Fehler muss lesbar lange stehen bleiben
           loading: {
-            duration: 50000,
+            duration: Infinity,
           },
           success: {
-            duration: 1500,
+            duration: 3000,
           },
           error: {
-            duration: 1500,
+            duration: 8000,
           },
         },
       );

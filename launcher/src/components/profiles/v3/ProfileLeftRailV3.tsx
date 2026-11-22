@@ -10,6 +10,8 @@ import type React from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import type { Profile } from "../../../types/profile";
+import { useThemeStore } from "../../../store/useThemeStore";
+import { SURFACE, kante, readableOn } from "../../ui/design-system";
 
 export type NavKey =
   | "mods" | "resourcepacks" | "shaderpacks" | "datapacks" | "nrc"
@@ -17,14 +19,14 @@ export type NavKey =
 
 export const CONTENT_NAV_KEYS: NavKey[] = ["mods", "resourcepacks", "shaderpacks", "datapacks", "nrc"];
 
-interface NavItem {
+export interface NavItem {
   key: NavKey;
   icon: string;
   labelKey: string;
   count?: number;
 }
 
-interface NavGroup {
+export interface NavGroup {
   labelKey: string;
   items: NavItem[];
 }
@@ -35,12 +37,10 @@ interface ProfileLeftRailV3Props {
   onNavChange: (k: NavKey) => void;
 }
 
-export function ProfileLeftRailV3({ profile, activeNavItem, onNavChange }: ProfileLeftRailV3Props) {
-  const { t } = useTranslation();
-
+/** Reiter der Profilseite in zwei Gruppen – auch für Looks mit eigener Profilseite. */
+export function buildProfileNavGroups(profile: Profile): NavGroup[] {
   const modCount = profile.mod_count ?? profile.mods?.length ?? 0;
-
-  const groups: NavGroup[] = [
+  return [
     {
       labelKey: "profiles.tabs.content",
       items: [
@@ -60,15 +60,23 @@ export function ProfileLeftRailV3({ profile, activeNavItem, onNavChange }: Profi
       ],
     },
   ];
+}
+
+export function ProfileLeftRailV3({ profile, activeNavItem, onNavChange }: ProfileLeftRailV3Props) {
+  const { t } = useTranslation();
+  const groups = buildProfileNavGroups(profile);
 
   return (
-    <aside className="w-64 flex-shrink-0 border-l border-white/10 overflow-y-auto no-scrollbar py-4 flex flex-col">
+    <aside
+      className="w-60 flex-shrink-0 border-l overflow-y-auto no-scrollbar py-3 flex flex-col"
+      style={{ borderColor: SURFACE.line }}
+    >
       {groups.map((group, gi) => (
-        <div key={gi} className="mb-5">
-          <div className="px-4 mb-2 text-xs uppercase tracking-wider text-white/60 font-minecraft">
+        <div key={gi} className="mb-4">
+          <div className="px-5 mb-1.5 text-sm text-white/40 font-minecraft">
             {t(group.labelKey)}
           </div>
-          <div className="px-2 space-y-1">
+          <div className="px-3 space-y-1">
             {group.items.map((item) => {
               const active = item.key === activeNavItem;
               return (
@@ -97,19 +105,38 @@ interface NavButtonProps {
   onClick: () => void;
 }
 
-const NavButton: React.FC<NavButtonProps> = ({ icon, label, count, active, onClick }) => (
-  <button
-    onClick={onClick}
-    className={`w-full flex items-center gap-3 px-3 py-2 rounded text-left transition-colors border ${
-      active
-        ? "bg-white/10 text-white border-white/20"
-        : "text-white/60 hover:text-white hover:bg-white/5 border-transparent"
-    }`}
-  >
-    <Icon icon={icon} className="w-5 h-5 flex-shrink-0" />
-    <span className="flex-1 font-minecraft text-sm uppercase tracking-wide truncate">{label}</span>
-    {typeof count === "number" && count > 0 && (
-      <span className="text-xs font-minecraft text-white/45 tabular-nums">{count}</span>
-    )}
-  </button>
-);
+// Salami: aktiver Reiter = volle Akzentfarbe mit harter Unterkante (wie ein Knopf), nicht die graue Pille
+const NavButton: React.FC<NavButtonProps> = ({ icon, label, count, active, onClick }) => {
+  const accent = useThemeStore((s) => s.accentColor);
+  return (
+    <button
+      onClick={onClick}
+      className={`group w-full flex items-center gap-3 px-3 h-9 text-left transition-[background-color,color] duration-150 ${
+        active ? "" : "text-white/65 hover:text-white"
+      }`}
+      style={{
+        borderRadius: "calc(var(--border-radius) * 0.8)",
+        ...(active
+          ? { backgroundColor: accent.value, color: readableOn(accent.value), boxShadow: kante(accent.value) }
+          : {}),
+      }}
+      onMouseEnter={(e) => { if (!active) e.currentTarget.style.backgroundColor = SURFACE.hover; }}
+      onMouseLeave={(e) => { if (!active) e.currentTarget.style.backgroundColor = "transparent"; }}
+    >
+      <Icon icon={icon} className="w-5 h-5 flex-shrink-0" />
+      <span className="flex-1 font-minecraft text-base truncate">{label}</span>
+      {typeof count === "number" && count > 0 && (
+        <span
+          className="min-w-[22px] px-1.5 py-0.5 text-center text-xs font-minecraft tabular-nums leading-none"
+          style={{
+            borderRadius: 999,
+            backgroundColor: active ? "rgba(0,0,0,0.22)" : SURFACE.raised,
+            color: active ? "inherit" : "rgba(255,255,255,0.6)",
+          }}
+        >
+          {count}
+        </span>
+      )}
+    </button>
+  );
+};

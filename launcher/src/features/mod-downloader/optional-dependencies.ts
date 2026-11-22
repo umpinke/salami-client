@@ -8,6 +8,7 @@ import type { PlannedDependency } from "./dependency-plan";
 import { buildInstallPayload } from "./install-payload";
 import { selectBestVersion } from "./version-selection";
 import "./i18n";
+import { errorText } from "../../utils/error-text";
 
 /**
  * Installiert die im Dialog angehakten optionalen Abhängigkeiten – jeweils in der
@@ -43,7 +44,7 @@ export async function installOptionalDependencies(
       await invoke<void>("install_content_to_profile", { payload });
       installed++;
     } catch (error) {
-      toast.error(i18n.t("salami.downloader.optional_failed", { name, error: String(error) }));
+      toast.error(i18n.t("salami.downloader.optional_failed", { name, error: errorText(error) }));
     }
   }
   if (installed > 0) {

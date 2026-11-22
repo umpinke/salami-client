@@ -1,0 +1,1472 @@
+/*
+ * Look "salumeria" – elegantes Feinkost-Etikett: fast schwarzer Grund, Creme, feine Serife,
+ * dünne Linien; Rot (der Akzent des Spielers) nur für die Hauptaktion und den aktiven Zustand.
+ * Alle Regeln hängen an :root[data-look="salumeria"]. Siehe ../CONTRACT.md
+ */
+
+/* ------------------------------------------------------------------ Variablen */
+
+:root[data-look="salumeria"] {
+  --sal-ink: #0f0b0a;
+  --sal-ink-2: #171110;
+  --sal-ink-3: #201816;
+  --sal-paper: #efe4d2;
+  --sal-paper-2: #e2d4bc;
+  --sal-paper-ink: #1a1210;
+  --sal-paper-muted: #6a4a3e;
+  --sal-cream: #f3e7d6;
+  --sal-cream-rgb: 243, 231, 214;
+  --sal-rule: rgba(243, 231, 214, 0.22);
+  --sal-rule-soft: rgba(243, 231, 214, 0.1);
+  --sal-rule-strong: rgba(243, 231, 214, 0.5);
+  --sal-muted: rgba(243, 231, 214, 0.6);
+  --sal-rust: #e3a092;
+  /* dunkles Rot für Schrift auf Papier – bleibt auch bei hellem Akzent lesbar */
+  --sal-red-on-paper: color-mix(in srgb, var(--accent) 78%, #1a0807);
+  /* Schrift und Innenrahmen auf der vollen Akzentfläche (unten für helle Akzente verfeinert) */
+  --sal-on-accent: var(--sal-cream);
+  --sal-on-accent-line: rgba(243, 231, 214, 0.45);
+  --sal-serif: "Cormorant Garamond", "Times New Roman", serif;
+  --sal-sans: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+
+  /* Stellschrauben des Vertrags (Schrift und Radius setzt der Launcher inline am <html>) */
+  --font-minecraft: "Cormorant Garamond", "Times New Roman", serif !important;
+  --font-smallcaps: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif !important;
+  --border-radius: 0px !important;
+  --surface-base: rgba(243, 231, 214, 0.028);
+  --surface-hover: rgba(243, 231, 214, 0.065);
+  --surface-raised: rgba(243, 231, 214, 0.105);
+  --surface-line: rgba(243, 231, 214, 0.17);
+  --surface-line-strong: rgba(243, 231, 214, 0.36);
+  --surface-solid: #151010;
+  --surface-solid-raised: #1f1715;
+  --surface-veil: rgba(15, 11, 10, 0.88);
+  --look-kante: 0 12px 30px -14px rgba(var(--accent-rgb), 0.85);
+  --look-kante-soft: 0 0 0 0 transparent;
+  --look-band-bg: rgba(243, 231, 214, 0.035);
+  --look-band-border: 1px solid rgba(243, 231, 214, 0.22);
+
+  color-scheme: dark;
+}
+
+/*
+ * Wählt der Spieler einen hellen Akzent (Gelb, helles Grün), wäre Creme darauf nicht lesbar:
+ * dann wird die Schrift auf der Akzentfläche dunkel, und das Rot auf Papier wird abgedunkelt.
+ */
+@supports (color: oklch(from red l c h)) {
+  :root[data-look="salumeria"] {
+    --sal-on-accent: oklch(from var(--accent) clamp(0.17, (0.74 - l) * 100, 0.93) 0.03 78);
+    --sal-on-accent-line: oklch(from var(--accent) clamp(0.17, (0.74 - l) * 100, 0.93) 0.03 78 / 0.45);
+    --sal-red-on-paper: oklch(from var(--accent) min(l, 0.46) c h);
+  }
+}
+
+:root[data-look="salumeria"] ::selection {
+  background: var(--sal-cream);
+  color: var(--sal-ink);
+}
+
+/* Knöpfe und Felder erben die Ziffernform nicht von selbst; Tailwinds `tabular-nums` behält sie bei */
+:where(:root[data-look="salumeria"]) :where(button, input, select, textarea) {
+  font-variant-numeric: inherit;
+}
+
+:root[data-look="salumeria"] *,
+:root[data-look="salumeria"] ::before,
+:root[data-look="salumeria"] ::after {
+  --tw-numeric-figure: lining-nums;
+}
+
+/* ------------------------------------------------------------------ Fenster, Grund, Rahmen */
+
+:root[data-look="salumeria"] body {
+  background-color: var(--sal-ink);
+  color: var(--sal-cream);
+  /* Cormorant setzt sonst Mediävalziffern – Versionsnummern wie 1.21.11 wären schwer zu lesen */
+  font-variant-numeric: lining-nums;
+}
+
+:root[data-look="salumeria"] .look-shell {
+  background-color: var(--sal-ink) !important;
+  border-color: transparent !important;
+}
+
+:root[data-look="salumeria"] .sal-backdrop,
+:root[data-look="salumeria"] .sal-backdrop > div {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* leiser Schein in der Akzentfarbe: auf der Startseite hinter dem Porträt, sonst oben rechts */
+:root[data-look="salumeria"] .sal-backdrop__glow {
+  background: radial-gradient(ellipse 70% 62% at 76% 56%, rgba(var(--accent-rgb), 0.11), transparent 70%);
+  transition: opacity 200ms ease;
+}
+
+:root[data-look="salumeria"] .sal-backdrop[data-page="other"] .sal-backdrop__glow {
+  background: radial-gradient(ellipse 60% 46% at 88% 0%, rgba(var(--accent-rgb), 0.07), transparent 70%);
+}
+
+/* Leinen: feine waagerechte und senkrechte Fäden */
+:root[data-look="salumeria"] .sal-backdrop__linen {
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.011) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.007) 0 1px, transparent 1px 3px);
+}
+
+/* dünner Doppelrahmen ums Fenster */
+:root[data-look="salumeria"] .sal-backdrop > .sal-backdrop__frame {
+  inset: 9px;
+  border: 1px solid var(--sal-rule);
+}
+
+:root[data-look="salumeria"] .sal-backdrop__frame::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(var(--sal-cream-rgb), 0.08);
+}
+
+/* Leiste und Inhalt sitzen innerhalb des Rahmens */
+:root[data-look="salumeria"] .look-topbar {
+  height: 70px !important;
+  padding: 16px 22px 0 34px !important;
+}
+
+:root[data-look="salumeria"] .look-content {
+  margin: 0 21px 21px;
+}
+
+/* ------------------------------------------------------------------ Schrift */
+
+:root[data-look="salumeria"] body,
+:root[data-look="salumeria"] body .font-smallcaps {
+  font-family: var(--sal-sans);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+:root[data-look="salumeria"] body :is(h1, h2, h3, h4, h5, h6),
+:root[data-look="salumeria"] body .font-minecraft {
+  font-family: var(--sal-serif);
+  font-weight: 600;
+  letter-spacing: 0.012em;
+  /* Cormorant hat eine niedrige x-Höhe; so wirkt sie neben der Grotesk gleich groß */
+  font-size-adjust: 0.455;
+}
+
+:root[data-look="salumeria"] body p {
+  letter-spacing: 0;
+}
+
+/* Creme statt Reinweiß: die Seiten setzen `text-white` und Abstufungen davon */
+:where(:root[data-look="salumeria"]) body [class~="text-white"],
+:where(:root[data-look="salumeria"]) body [class~="text-white/100"] { color: rgb(var(--sal-cream-rgb)); }
+:where(:root[data-look="salumeria"]) body [class~="text-white/90"] { color: rgba(var(--sal-cream-rgb), 0.93); }
+:where(:root[data-look="salumeria"]) body [class~="text-white/85"] { color: rgba(var(--sal-cream-rgb), 0.89); }
+:where(:root[data-look="salumeria"]) body [class~="text-white/80"] { color: rgba(var(--sal-cream-rgb), 0.85); }
+:where(:root[data-look="salumeria"]) body [class~="text-white/75"] { color: rgba(var(--sal-cream-rgb), 0.8); }
+:where(:root[data-look="salumeria"]) body [class~="text-white/70"] { color: rgba(var(--sal-cream-rgb), 0.76); }
+:where(:root[data-look="salumeria"]) body [class~="text-white/65"] { color: rgba(var(--sal-cream-rgb), 0.71); }
+:where(:root[data-look="salumeria"]) body [class~="text-white/60"] { color: rgba(var(--sal-cream-rgb), 0.67); }
+:where(:root[data-look="salumeria"]) body [class~="text-white/55"] { color: rgba(var(--sal-cream-rgb), 0.62); }
+:where(:root[data-look="salumeria"]) body [class~="text-white/50"] { color: rgba(var(--sal-cream-rgb), 0.58); }
+:where(:root[data-look="salumeria"]) body [class~="text-white/45"] { color: rgba(var(--sal-cream-rgb), 0.53); }
+:where(:root[data-look="salumeria"]) body [class~="text-white/40"] { color: rgba(var(--sal-cream-rgb), 0.48); }
+:where(:root[data-look="salumeria"]) body [class~="text-white/35"] { color: rgba(var(--sal-cream-rgb), 0.43); }
+:where(:root[data-look="salumeria"]) body [class~="text-white/30"] { color: rgba(var(--sal-cream-rgb), 0.38); }
+:where(:root[data-look="salumeria"]) body [class~="text-white/25"] { color: rgba(var(--sal-cream-rgb), 0.32); }
+:where(:root[data-look="salumeria"]) body [class~="text-white/20"] { color: rgba(var(--sal-cream-rgb), 0.26); }
+:where(:root[data-look="salumeria"]) body [class~="hover:text-white"]:hover { color: rgb(var(--sal-cream-rgb)); }
+:where(:root[data-look="salumeria"]) body [class~="hover:text-white/90"]:hover { color: rgba(var(--sal-cream-rgb), 0.93); }
+:where(:root[data-look="salumeria"]) body [class~="hover:text-white/80"]:hover { color: rgba(var(--sal-cream-rgb), 0.85); }
+:where(:root[data-look="salumeria"]) body [class~="hover:text-white/75"]:hover { color: rgba(var(--sal-cream-rgb), 0.8); }
+:where(:root[data-look="salumeria"]) body [class~="hover:text-white/70"]:hover { color: rgba(var(--sal-cream-rgb), 0.76); }
+:where(:root[data-look="salumeria"]) body .group:hover [class~="group-hover:text-white"] { color: rgb(var(--sal-cream-rgb)); }
+
+/* Laufleisten in Creme statt Akzent */
+:root[data-look="salumeria"],
+:root[data-look="salumeria"] .custom-scrollbar {
+  scrollbar-color: rgba(var(--sal-cream-rgb), 0.26) transparent;
+}
+
+:root[data-look="salumeria"] ::-webkit-scrollbar-thumb {
+  background-color: rgba(var(--sal-cream-rgb), 0.24) !important;
+  border-radius: 0 !important;
+}
+
+:root[data-look="salumeria"] ::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(var(--sal-cream-rgb), 0.42) !important;
+}
+
+/* ------------------------------------------------------------------ Leiste oben */
+
+/* Marke: Logo, Name in gesperrten Kapitälchen, darunter die Version */
+:root[data-look="salumeria"] .look-topbar > div:first-child > button:first-child {
+  gap: 12px;
+  background: transparent !important;
+}
+
+:root[data-look="salumeria"] .look-topbar > div:first-child > button:first-child .font-minecraft {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-caps: small-caps;
+  letter-spacing: 0.15em;
+  line-height: 0.9;
+  font-size-adjust: none;
+}
+
+:root[data-look="salumeria"] .look-topbar > div:first-child > button:first-child .font-minecraft + span {
+  font-family: var(--sal-serif);
+  font-size: 12px;
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.42em;
+  color: var(--sal-muted);
+  margin-top: 3px;
+}
+
+/* rechts in der Leiste: ohne Kästen – Zoom, laufende Spiele und Konto als ruhige Zeile */
+:root[data-look="salumeria"] .look-topbar .profile-bar-container {
+  gap: 4px;
+}
+
+:root[data-look="salumeria"] .look-topbar .profile-bar-container > div.rounded-lg {
+  border-color: transparent;
+  background: transparent;
+}
+
+:root[data-look="salumeria"] .look-topbar .profile-bar-container > div.rounded-lg > button {
+  width: 22px;
+}
+
+:root[data-look="salumeria"] .look-topbar .profile-bar-container > div.rounded-lg > button.tabular-nums {
+  width: auto;
+  min-width: 2.3rem;
+}
+
+:root[data-look="salumeria"] .look-topbar .profile-bar-container .look-btn {
+  padding: 0 9px !important;
+}
+
+:root[data-look="salumeria"] .look-topbar .profile-bar-container .look-btn--secondary {
+  border-color: transparent !important;
+}
+
+/* Konto: Kopf im dünnen Rahmen, der Name kursiv */
+:root[data-look="salumeria"] .look-topbar .profile-bar-container .cursor-pointer {
+  gap: 9px;
+  padding-left: 4px;
+  padding-right: 6px;
+  background-color: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  text-shadow: none;
+  filter: none;
+}
+
+:root[data-look="salumeria"] .look-topbar .profile-bar-container .cursor-pointer > span.absolute {
+  display: none;
+}
+
+:root[data-look="salumeria"] .look-topbar .profile-bar-container .cursor-pointer > div.relative {
+  background-color: transparent !important;
+  outline: 1px solid var(--sal-rule);
+  outline-offset: 1px;
+}
+
+:root[data-look="salumeria"] .look-topbar .profile-bar-container .cursor-pointer .truncate {
+  font-family: var(--sal-serif);
+  font-size: 18px;
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: rgba(var(--sal-cream-rgb), 0.72);
+  transition: color 150ms ease;
+}
+
+:root[data-look="salumeria"] .look-topbar .profile-bar-container .cursor-pointer:hover .truncate {
+  color: var(--sal-cream);
+}
+
+:root[data-look="salumeria"] .look-topbar .titlebar-button-borderless {
+  width: 34px;
+}
+
+/* Navigation: reine Schrift, aktiv mit roter Linie und Raute */
+:root[data-look="salumeria"] .sal-nav {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  font-family: var(--sal-serif);
+  font-size: 19px;
+  font-weight: 600;
+  font-variant-caps: small-caps;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+:root[data-look="salumeria"] .sal-nav__item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 1px 6px;
+  line-height: 1;
+  color: var(--sal-muted);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+
+:root[data-look="salumeria"] .sal-nav__item::after {
+  content: "";
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  bottom: 0;
+  height: 1px;
+  background: var(--sal-rule-strong);
+  transform: scaleX(0);
+  transition: transform 150ms ease;
+}
+
+:root[data-look="salumeria"] .sal-nav__item:hover {
+  color: var(--sal-cream);
+}
+
+:root[data-look="salumeria"] .sal-nav__item:hover::after {
+  transform: scaleX(1);
+}
+
+:root[data-look="salumeria"] .sal-nav__item:focus-visible {
+  outline: 1px solid var(--sal-rule-strong);
+  outline-offset: 4px;
+}
+
+:root[data-look="salumeria"] .sal-nav__item--on {
+  color: var(--sal-cream);
+}
+
+:root[data-look="salumeria"] .sal-nav__item--on::after {
+  height: 2px;
+  background: var(--accent);
+  transform: scaleX(1);
+}
+
+:root[data-look="salumeria"] .sal-nav__item--on::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  width: 5px;
+  height: 5px;
+  background: var(--accent);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+@media (max-width: 1399px) {
+  :root[data-look="salumeria"] .sal-nav {
+    gap: 21px;
+    font-size: 18px;
+    letter-spacing: 0.07em;
+  }
+}
+
+@media (max-width: 1239px) {
+  :root[data-look="salumeria"] .sal-nav {
+    gap: 18px;
+    font-size: 17px;
+    letter-spacing: 0.06em;
+  }
+}
+
+@media (max-width: 1079px) {
+  :root[data-look="salumeria"] .sal-nav {
+    gap: 14px;
+    font-size: 16px;
+    letter-spacing: 0.04em;
+  }
+
+  :root[data-look="salumeria"] .look-topbar {
+    padding-left: 28px !important;
+    gap: 8px !important;
+  }
+}
+
+/* ------------------------------------------------------------------ Startseite */
+
+:root[data-look="salumeria"] .sal-play {
+  position: relative;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: minmax(430px, 50%) minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+}
+
+:root[data-look="salumeria"] .sal-play__left {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 0 20px 38px clamp(38px, 4.9vw, 63px);
+}
+
+:root[data-look="salumeria"] .sal-play__hero {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 0;
+}
+
+:root[data-look="salumeria"] .sal-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  font-family: var(--sal-serif);
+  font-size: 15px;
+  font-weight: 500;
+  font-variant-caps: small-caps;
+  letter-spacing: 0.4em;
+  line-height: 1;
+  color: var(--sal-muted);
+}
+
+:root[data-look="salumeria"] .sal-eyebrow::before,
+:root[data-look="salumeria"] .sal-eyebrow::after {
+  content: "";
+  flex: none;
+  width: 40px;
+  height: 1px;
+  background: var(--sal-rule);
+}
+
+:root[data-look="salumeria"] body .sal-play__name {
+  margin: 18px 0 0;
+  max-width: 100%;
+  font-family: var(--sal-serif);
+  font-size: min(var(--sal-name-size, 92px), 12.2vh);
+  font-weight: 600;
+  font-size-adjust: none;
+  line-height: 0.95;
+  letter-spacing: -0.01em;
+  color: var(--sal-cream);
+  overflow-wrap: anywhere;
+  user-select: none;
+}
+
+:root[data-look="salumeria"] .sal-play__name[data-size="lg"] { --sal-name-size: 78px; }
+:root[data-look="salumeria"] .sal-play__name[data-size="md"] { --sal-name-size: 64px; }
+:root[data-look="salumeria"] .sal-play__name[data-size="sm"] { --sal-name-size: 52px; }
+
+:root[data-look="salumeria"] .sal-play__name em {
+  display: block;
+  font-style: italic;
+  font-weight: 500;
+  color: var(--accent);
+}
+
+:root[data-look="salumeria"] .sal-play__spec {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 12px;
+  margin: 16px 0 0;
+  font-family: var(--sal-serif);
+  font-size: 22px;
+  font-style: italic;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--sal-muted);
+}
+
+:root[data-look="salumeria"] .sal-play__spec b {
+  font-style: normal;
+  font-weight: 700;
+  font-variant-caps: small-caps;
+  letter-spacing: 0.06em;
+  color: var(--sal-cream);
+}
+
+:root[data-look="salumeria"] .sal-play__action {
+  margin-top: 34px;
+}
+
+:root[data-look="salumeria"] .sal-play__action .look-play > div > div {
+  gap: 22px;
+}
+
+/* der Start-Knopf: Rot mit dünnem Innenrahmen, gesperrte Kapitälchen */
+:root[data-look="salumeria"] .sal-play__action .look-play .look-btn {
+  flex: 0 0 auto;
+  min-width: 290px;
+  padding: 0 46px 0 34px;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  box-shadow: 0 14px 40px -14px rgba(var(--accent-rgb), 0.8) !important;
+  outline-offset: -6px;
+}
+
+/* läuft das Spiel, wird daraus „Stoppen": umrandet, ohne Schein */
+:root[data-look="salumeria"] .sal-play__action .look-play .look-btn--destructive {
+  box-shadow: none !important;
+  outline: 1px solid rgba(227, 160, 146, 0.3);
+}
+
+:root[data-look="salumeria"] .sal-play__action .look-play .look-btn > span > div {
+  gap: 18px;
+  justify-content: flex-start;
+}
+
+:root[data-look="salumeria"] .sal-play__action .look-play .look-btn > span > div > span:first-child {
+  width: auto;
+  height: auto;
+  background: transparent;
+}
+
+:root[data-look="salumeria"] .sal-play__action .look-play .look-btn > span > div > span:first-child svg {
+  width: 22px;
+  height: 22px;
+}
+
+:root[data-look="salumeria"] .sal-play__action .look-play .look-btn .text-2xl {
+  font-size: 30px;
+  line-height: 1;
+}
+
+:root[data-look="salumeria"] .sal-play__action .look-play .look-btn .text-xs {
+  font-family: var(--sal-serif);
+  font-size: 15px;
+  font-style: italic;
+  font-weight: 500;
+  font-variant-caps: normal;
+  letter-spacing: 0.02em;
+}
+
+/* Profilwahl daneben als kursive Zeile statt als zweiter Knopf */
+:root[data-look="salumeria"] .sal-play__action .look-play button:not(.look-btn) {
+  width: auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 0 3px !important;
+  overflow: visible;
+  background: transparent !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--sal-rule) !important;
+  box-shadow: none !important;
+  outline: 0;
+  color: var(--sal-muted) !important;
+  font-family: var(--sal-serif);
+  font-size: 18px;
+  font-style: italic;
+  font-variant-caps: normal;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  white-space: nowrap;
+  transition: color 150ms ease, border-color 150ms ease;
+}
+
+:root[data-look="salumeria"] .sal-play__action .look-play button:not(.look-btn) > span {
+  display: none;
+}
+
+:root[data-look="salumeria"] .sal-play__action .look-play button:not(.look-btn)::after {
+  content: var(--sal-switch-label, "…");
+}
+
+:root[data-look="salumeria"] .sal-play__action .look-play button:not(.look-btn):not(:disabled):hover {
+  background-color: transparent !important;
+  color: var(--sal-cream) !important;
+  border-bottom-color: var(--sal-rule-strong) !important;
+}
+
+:root[data-look="salumeria"] .sal-play__empty {
+  margin-top: 26px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+:root[data-look="salumeria"] .sal-play__empty p {
+  margin: 0;
+  font-family: var(--sal-serif);
+  font-size: 20px;
+  font-style: italic;
+  color: var(--sal-muted);
+}
+
+:root[data-look="salumeria"] .sal-play__create {
+  height: 68px;
+  padding: 0 44px;
+  font-size: 26px;
+  letter-spacing: 0.18em;
+  cursor: pointer;
+  outline-offset: -6px;
+}
+
+/* zuletzt gespielt: nummerierte Etiketten */
+:root[data-look="salumeria"] .sal-recent {
+  flex: none;
+}
+
+:root[data-look="salumeria"] body .sal-recent__title {
+  margin: 0 0 12px;
+  font-family: var(--sal-serif);
+  font-size: 14px;
+  font-weight: 500;
+  font-size-adjust: none;
+  font-variant-caps: small-caps;
+  letter-spacing: 0.4em;
+  line-height: 1;
+  color: var(--sal-muted);
+}
+
+:root[data-look="salumeria"] .sal-recent__row {
+  display: flex;
+  gap: 14px;
+}
+
+:root[data-look="salumeria"] .sal-ticket {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  width: 164px;
+  padding: 11px 14px 10px;
+  text-align: left;
+  background: var(--sal-paper-2);
+  color: var(--sal-paper-ink);
+  cursor: pointer;
+  box-shadow: 0 10px 22px -12px rgba(0, 0, 0, 0.8);
+  transition: transform 150ms ease, background-color 150ms ease;
+}
+
+:root[data-look="salumeria"] .sal-ticket::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(15, 11, 10, 0.18);
+  pointer-events: none;
+}
+
+:root[data-look="salumeria"] .sal-ticket:hover,
+:root[data-look="salumeria"] .sal-ticket--on {
+  background: var(--sal-paper);
+}
+
+:root[data-look="salumeria"] .sal-ticket:hover {
+  transform: translateY(-2px);
+}
+
+:root[data-look="salumeria"] .sal-ticket:focus-visible {
+  outline: 1px solid var(--sal-cream);
+  outline-offset: 3px;
+}
+
+/* das gewählte Profil trägt eine kleine rote Raute */
+:root[data-look="salumeria"] .sal-ticket--on::before {
+  content: "";
+  position: absolute;
+  top: 13px;
+  right: 13px;
+  width: 6px;
+  height: 6px;
+  background: var(--sal-red-on-paper);
+  transform: rotate(45deg);
+}
+
+:root[data-look="salumeria"] .sal-ticket__no {
+  font-family: var(--sal-serif);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-caps: small-caps;
+  letter-spacing: 0.3em;
+  line-height: 1.1;
+  color: var(--sal-red-on-paper);
+}
+
+:root[data-look="salumeria"] .sal-ticket__name {
+  margin-top: 2px;
+  overflow: hidden;
+  font-family: var(--sal-serif);
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:root[data-look="salumeria"] .sal-ticket__spec {
+  font-family: var(--sal-serif);
+  font-size: 15px;
+  font-style: italic;
+  font-weight: 500;
+  line-height: 1.15;
+  color: var(--sal-paper-muted);
+}
+
+:root[data-look="salumeria"] .sal-ticket:nth-child(n + 4) {
+  display: none;
+}
+
+@media (min-width: 1480px) {
+  :root[data-look="salumeria"] .sal-ticket:nth-child(4) {
+    display: flex;
+  }
+}
+
+/* Porträt: die Spielfigur im Bogenrahmen, darunter das Namensschild */
+:root[data-look="salumeria"] .sal-play__portrait {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding-bottom: 34px;
+}
+
+:root[data-look="salumeria"] .sal-portrait {
+  position: relative;
+  flex: none;
+  height: min(520px, calc(100vh - 242px));
+  aspect-ratio: 10 / 13;
+  --sal-rig-scale: 1.1;
+}
+
+:root[data-look="salumeria"] .sal-cameo {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border: 1px solid var(--sal-rule);
+  border-radius: 999px 999px 0 0 !important;
+  background: radial-gradient(ellipse at 50% 70%, color-mix(in srgb, var(--accent) 17%, #1a100e), #130d0c 70%);
+}
+
+:root[data-look="salumeria"] .sal-cameo::before {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  z-index: 2;
+  border: 1px solid rgba(var(--sal-cream-rgb), 0.12);
+  border-radius: 999px 999px 0 0 !important;
+  pointer-events: none;
+}
+
+:root[data-look="salumeria"] .sal-cameo__rig {
+  position: absolute;
+  left: 50%;
+  bottom: -16px;
+  transform: translateX(-50%) scale(var(--sal-rig-scale));
+  transform-origin: 50% 100%;
+}
+
+:root[data-look="salumeria"] .sal-plaque {
+  position: absolute;
+  left: 50%;
+  bottom: -22px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  width: 78%;
+  padding: 10px 10px 9px;
+  transform: translateX(-50%);
+  text-align: center;
+  background: var(--sal-paper);
+  color: var(--sal-paper-ink);
+  box-shadow: 0 10px 26px -10px rgba(0, 0, 0, 0.8);
+}
+
+:root[data-look="salumeria"] .sal-plaque__name {
+  overflow: hidden;
+  font-family: var(--sal-serif);
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-caps: small-caps;
+  letter-spacing: 0.25em;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* die Sperrung hängt rechts über – so sitzt der Name optisch mittig */
+  padding-left: 0.25em;
+}
+
+:root[data-look="salumeria"] .sal-plaque__line {
+  font-family: var(--sal-serif);
+  font-size: 14px;
+  font-style: italic;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--sal-paper-muted);
+}
+
+@media (max-height: 735px) {
+  :root[data-look="salumeria"] .sal-portrait { --sal-rig-scale: 0.98; }
+  :root[data-look="salumeria"] .sal-play__action { margin-top: 26px; }
+  :root[data-look="salumeria"] .sal-play__left { padding-bottom: 30px; }
+}
+
+@media (max-height: 660px) {
+  :root[data-look="salumeria"] .sal-portrait { --sal-rig-scale: 0.88; }
+}
+
+@media (max-width: 1100px) {
+  :root[data-look="salumeria"] .sal-play__spec { font-size: 19px; }
+  :root[data-look="salumeria"] .sal-ticket { width: 148px; }
+  :root[data-look="salumeria"] .sal-recent__row { gap: 11px; }
+}
+
+/* Online-Zähler unten rechts: kursive Zeile */
+:root[data-look="salumeria"] .look-content .bottom-6.right-8 .font-minecraft {
+  font-size: 16px;
+  font-style: italic;
+  font-weight: 500;
+  font-size-adjust: none;
+}
+
+:root[data-look="salumeria"] .look-content .bottom-6.right-8 .animate-ping {
+  display: none;
+}
+
+:root[data-look="salumeria"] .look-content .bottom-6.right-8 .bg-green-400 {
+  width: 6px;
+  height: 6px;
+  margin: 3px 2px 1px;
+  background-color: #a9c79a;
+  transform: rotate(45deg);
+}
+
+/* ------------------------------------------------------------------ Knöpfe */
+
+:root[data-look="salumeria"] body .look-btn {
+  font-family: var(--sal-serif);
+  font-weight: 600;
+  font-variant-caps: small-caps;
+  letter-spacing: 0.08em;
+  font-size-adjust: 0.455;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, filter 150ms ease;
+}
+
+:root[data-look="salumeria"] .look-btn:focus-visible {
+  outline: 1px solid var(--sal-cream) !important;
+  outline-offset: 3px !important;
+}
+
+/*
+ * Hauptaktion: Rot mit dünnem Innenrahmen. Gilt für `look-btn--primary` und für jede Fläche, die
+ * der Launcher mit der harten Kante (`kante()` → `var(--look-kante, …)` im style) voll im Akzent
+ * füllt – so tragen auch Knöpfe ohne eigenen Ansatzpunkt den Rahmen.
+ */
+:root[data-look="salumeria"] .look-btn--primary,
+:root[data-look="salumeria"] :is(button, a, span)[style*="var(--look-kante,"] {
+  background-color: var(--accent) !important;
+  border-color: transparent !important;
+  color: var(--sal-on-accent) !important;
+  box-shadow: var(--look-kante) !important;
+  outline: 1px solid var(--sal-on-accent-line);
+  outline-offset: -4px;
+  filter: none;
+}
+
+:root[data-look="salumeria"] .look-btn--primary:not(:disabled):hover,
+:root[data-look="salumeria"] :is(button, a)[style*="var(--look-kante,"]:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--accent) 86%, white) !important;
+}
+
+:root[data-look="salumeria"] :is(button, a)[style*="var(--look-kante,"] {
+  font-variant-caps: small-caps;
+  letter-spacing: 0.08em;
+}
+
+/*
+ * In Listen (Karten, die sich beim Überfahren heben) bleibt die Hauptaktion ruhig umrandet und
+ * wird erst rot, wenn die Karte unter dem Zeiger liegt – sonst stünde in jeder Zeile ein roter Knopf.
+ */
+:root[data-look="salumeria"] .look-card[class*="transition"]:not(:hover) .look-btn--primary:not(:focus-visible) {
+  background-color: transparent !important;
+  color: var(--sal-cream) !important;
+  box-shadow: none !important;
+  outline-color: var(--sal-rule-strong);
+  outline-offset: -1px;
+}
+
+/* alles andere: umrandet, ohne Füllung */
+:root[data-look="salumeria"] .look-btn--secondary,
+:root[data-look="salumeria"] .look-btn--accent,
+:root[data-look="salumeria"] .look-btn--info,
+:root[data-look="salumeria"] .look-btn--text,
+:root[data-look="salumeria"] .look-btn--highlight {
+  background-color: transparent !important;
+  border: 1px solid var(--sal-rule) !important;
+  color: rgba(var(--sal-cream-rgb), 0.86) !important;
+  box-shadow: none !important;
+}
+
+:root[data-look="salumeria"] .look-btn--accent,
+:root[data-look="salumeria"] .look-btn--highlight {
+  border-color: var(--sal-rule-strong) !important;
+  color: var(--sal-cream) !important;
+}
+
+:root[data-look="salumeria"] .look-btn--secondary:not(:disabled):hover,
+:root[data-look="salumeria"] .look-btn--accent:not(:disabled):hover,
+:root[data-look="salumeria"] .look-btn--info:not(:disabled):hover,
+:root[data-look="salumeria"] .look-btn--text:not(:disabled):hover,
+:root[data-look="salumeria"] .look-btn--highlight:not(:disabled):hover {
+  background-color: rgba(var(--sal-cream-rgb), 0.07) !important;
+  border-color: var(--sal-rule-strong) !important;
+  color: var(--sal-cream) !important;
+  filter: none;
+}
+
+/* eingeschaltet (Filter offen, im Warenkorb): cremefarben gefüllt wie ein Etikett */
+:root[data-look="salumeria"] .look-btn--active {
+  background-color: var(--sal-paper) !important;
+  border-color: var(--sal-paper) !important;
+  color: var(--sal-paper-ink) !important;
+}
+
+:root[data-look="salumeria"] .look-btn--active:not(:disabled):hover {
+  background-color: #fff6e6 !important;
+  color: var(--sal-paper-ink) !important;
+}
+
+:root[data-look="salumeria"] .look-btn--ghost {
+  background-color: transparent !important;
+  box-shadow: none !important;
+  color: rgba(var(--sal-cream-rgb), 0.76) !important;
+}
+
+:root[data-look="salumeria"] .look-btn--ghost:not(:disabled):hover {
+  background-color: rgba(var(--sal-cream-rgb), 0.07) !important;
+  color: var(--sal-cream) !important;
+}
+
+/* Löschen, Stoppen: umrandet in Rost – Rot bleibt der Hauptaktion */
+:root[data-look="salumeria"] .look-btn--danger,
+:root[data-look="salumeria"] .look-btn--destructive,
+:root[data-look="salumeria"] .look-btn--warning {
+  background-color: transparent !important;
+  border: 1px solid rgba(227, 160, 146, 0.45) !important;
+  color: var(--sal-rust) !important;
+  box-shadow: none !important;
+}
+
+:root[data-look="salumeria"] .look-btn--warning {
+  border-color: rgba(232, 196, 130, 0.45) !important;
+  color: #e8c482 !important;
+}
+
+:root[data-look="salumeria"] .look-btn--danger:not(:disabled):hover,
+:root[data-look="salumeria"] .look-btn--destructive:not(:disabled):hover {
+  background-color: rgba(227, 160, 146, 0.1) !important;
+  border-color: rgba(227, 160, 146, 0.8) !important;
+  filter: none;
+}
+
+:root[data-look="salumeria"] .look-btn--success {
+  background-color: transparent !important;
+  border: 1px solid rgba(169, 199, 154, 0.45) !important;
+  color: #b9d3ab !important;
+  box-shadow: none !important;
+}
+
+/* ------------------------------------------------------------------ Karten, Reiter, Etiketten */
+
+:root[data-look="salumeria"] .look-card {
+  --fk-line-hover: var(--sal-rule-strong) !important;
+  --fk-glow: 0 0 0 0 transparent !important;
+  --shop-hover: var(--sal-rule-strong) !important;
+  --shop-glow: transparent !important;
+  box-shadow: none !important;
+}
+
+/* dasselbe für Karten ohne `look-card`: sie setzen beim Überfahren Akzentrand und -schein inline */
+:root[data-look="salumeria"] [style*="0px 10px 24px -1"] {
+  border-color: var(--sal-rule-strong) !important;
+  box-shadow: none !important;
+}
+
+/* Karten, die sich beim Überfahren heben: Creme-Rand statt Akzentrand und Schein */
+:root[data-look="salumeria"] .look-card[class*="transition"]:hover {
+  border-color: var(--sal-rule-strong) !important;
+}
+
+/* Reiter: Schrift auf einer Linie, aktiv = rote Unterlinie */
+:root[data-look="salumeria"] .look-tabs {
+  gap: 4px;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--sal-rule) !important;
+}
+
+:root[data-look="salumeria"] .look-tabs > button {
+  position: relative;
+  padding: 0 12px;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: 0;
+  font-variant-caps: small-caps;
+  letter-spacing: 0.07em;
+  color: var(--sal-muted) !important;
+  filter: none !important;
+}
+
+:root[data-look="salumeria"] .look-tabs > button:hover {
+  color: var(--sal-cream) !important;
+}
+
+:root[data-look="salumeria"] .look-tabs > button:is([aria-selected="true"], [aria-pressed="true"]) {
+  color: var(--sal-cream) !important;
+}
+
+:root[data-look="salumeria"] .look-tabs > button:is([aria-selected="true"], [aria-pressed="true"])::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: -1px;
+  height: 2px;
+  background: var(--accent);
+}
+
+/* gewählte Umschalter (Ansicht, Werkzeug, Platz): cremefarben gefüllt statt rot */
+:root[data-look="salumeria"] [aria-pressed="true"][style*="var(--look-kante,"] {
+  background-color: var(--sal-paper) !important;
+  color: var(--sal-paper-ink) !important;
+  box-shadow: none !important;
+  outline: 0;
+}
+
+:root[data-look="salumeria"] [aria-pressed="true"][style*="var(--look-kante,"]:not(:disabled):hover {
+  background-color: #fff6e6 !important;
+}
+
+/* Assistent „Neues Profil": Release/Snapshot sind Umschalter aus vollen und unsichtbaren Knöpfen */
+:root[data-look="salumeria"] .look-modal .flex.gap-2 > .look-btn--primary[class*="h-[42px]"]:is(:has(~ .look-btn--ghost), .look-btn--ghost ~ .look-btn--primary) {
+  background-color: var(--sal-paper) !important;
+  color: var(--sal-paper-ink) !important;
+  box-shadow: none !important;
+  outline: 0;
+}
+
+/* nicht gewählte Umschalter derselben Reihe: nur umrandet */
+:root[data-look="salumeria"] [aria-pressed][style*="var(--look-kante"] {
+  font-variant-caps: small-caps;
+  letter-spacing: 0.07em;
+}
+
+:root[data-look="salumeria"] [aria-pressed="false"][style*="var(--look-kante-soft"] {
+  background-color: transparent !important;
+  box-shadow: inset 0 0 0 1px var(--sal-rule) !important;
+}
+
+:root[data-look="salumeria"] [aria-pressed="false"][style*="var(--look-kante-soft"]:hover {
+  box-shadow: inset 0 0 0 1px var(--sal-rule-strong) !important;
+}
+
+/* Reiter ohne eigene Gruppe (Shop): Schrift mit roter Unterlinie */
+:root[data-look="salumeria"] [role="tablist"]:not(.look-tabs) > [role="tab"] {
+  position: relative;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  outline: 0;
+  font-variant-caps: small-caps;
+  letter-spacing: 0.07em;
+  filter: none;
+}
+
+:root[data-look="salumeria"] [role="tablist"]:not(.look-tabs) > [role="tab"][aria-selected="true"] {
+  color: var(--sal-cream) !important;
+  box-shadow: inset 0 -2px 0 var(--accent) !important;
+}
+
+:root[data-look="salumeria"] [role="tablist"]:not(.look-tabs) > [role="tab"]:not([aria-selected="true"]):hover {
+  box-shadow: inset 0 -1px 0 var(--sal-rule-strong) !important;
+}
+
+/* Gruppen-Reiter (Profile): dieselbe Sprache – Schrift, aktiv mit roter Unterlinie */
+:root[data-look="salumeria"] .mb-4 > .flex.flex-wrap > button.font-smallcaps.text-lg.border {
+  padding: 2px 4px 6px;
+  margin-right: 14px;
+  background-color: transparent !important;
+  border-color: transparent !important;
+  font-family: var(--sal-serif);
+  font-weight: 600;
+  font-variant-caps: small-caps;
+  letter-spacing: 0.07em;
+}
+
+:root[data-look="salumeria"] .mb-4 > .flex.flex-wrap > button.font-smallcaps.text-lg.border:not([class*="bg-white"]) {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+:root[data-look="salumeria"] .mb-4 > .flex.flex-wrap > button.font-smallcaps.text-lg.border[class*="bg-white"]:hover {
+  box-shadow: inset 0 -1px 0 var(--sal-rule-strong);
+}
+
+/* Einträge einer Seitenleiste (Profil, Einstellungen): aktiv = rote Linie links statt voller Fläche */
+:root[data-look="salumeria"] button.w-full.text-left[style*="var(--look-kante,"] {
+  background-color: rgba(var(--sal-cream-rgb), 0.06) !important;
+  color: var(--sal-cream) !important;
+  box-shadow: inset 2px 0 0 var(--accent) !important;
+  outline: 0;
+  font-variant-caps: normal;
+  letter-spacing: 0;
+}
+
+:root[data-look="salumeria"] button.w-full.text-left[style*="var(--look-kante,"]:not(:disabled):hover {
+  background-color: rgba(var(--sal-cream-rgb), 0.09) !important;
+}
+
+/* schwebende Leisten mit Akzentrand (Mehrfachauswahl): Creme-Rand, weicher Schatten */
+:root[data-look="salumeria"] div[style*="var(--look-kante,"] {
+  border-color: var(--sal-rule-strong) !important;
+  box-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.75) !important;
+}
+
+/* Schalter: umrandet, eingeschaltet cremefarben gefüllt */
+:root[data-look="salumeria"] label:has(> input.hidden[type="checkbox"]) > div.relative > div.rounded-full {
+  background-color: transparent !important;
+  box-shadow: inset 0 0 0 1px var(--sal-rule-strong);
+}
+
+:root[data-look="salumeria"] label:has(> input.hidden[type="checkbox"]) > div.relative > div.rounded-full > div {
+  background-color: rgba(var(--sal-cream-rgb), 0.6) !important;
+  box-shadow: none !important;
+}
+
+:root[data-look="salumeria"] label:has(> input.hidden[type="checkbox"]:checked) > div.relative > div.rounded-full {
+  background-color: var(--sal-paper) !important;
+  box-shadow: none;
+}
+
+:root[data-look="salumeria"] label:has(> input.hidden[type="checkbox"]:checked) > div.relative > div.rounded-full > div {
+  background-color: var(--sal-ink) !important;
+}
+
+/* runde Marken, die ihre Rundung inline setzen, werden eckig wie alles andere */
+:root[data-look="salumeria"] [style*="border-radius: 999px"] {
+  border-radius: 0 !important;
+}
+
+/* Zähler (ungelesen, gesetzte Filter): cremefarbenes Schildchen statt roter Marke */
+:root[data-look="salumeria"] span.leading-none.justify-center[style*="border-radius: 999px"][style*="background-color: rgb("] {
+  background-color: var(--sal-paper) !important;
+  color: var(--sal-paper-ink) !important;
+  font-weight: 700;
+}
+
+/* gewählte Filter in den Seitenkarten: cremegetönt, Haken in Creme */
+:root[data-look="salumeria"] .look-card button.w-full.border[style*="background-color: rgb"] {
+  background-color: rgba(var(--sal-cream-rgb), 0.09) !important;
+  border-color: var(--sal-rule-strong) !important;
+}
+
+:root[data-look="salumeria"] .look-card button.w-full.border svg[style*="color"] {
+  color: var(--sal-cream) !important;
+}
+
+/* Abschnittsköpfe: dünne Linie statt des roten Strichs */
+:root[data-look="salumeria"] h3 > span.w-5[aria-hidden="true"]:first-child {
+  width: 26px;
+  height: 1px;
+  background-color: var(--sal-rule-strong) !important;
+}
+
+/* Bühne unter den Figuren: ein schlichter Sockelring statt der Salamischeibe */
+:root[data-look="salumeria"] .look-stage > div > div {
+  visibility: hidden;
+}
+
+:root[data-look="salumeria"] .look-stage > div::before,
+:root[data-look="salumeria"] .look-stage > div::after {
+  content: "";
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  top: 6%;
+  height: 70%;
+  border: 1px solid var(--sal-rule);
+  border-radius: 50% !important;
+  background: radial-gradient(closest-side, rgba(var(--sal-cream-rgb), 0.07), rgba(var(--sal-cream-rgb), 0.015));
+}
+
+:root[data-look="salumeria"] .look-stage > div::after {
+  left: 11%;
+  right: 11%;
+  top: 14%;
+  height: 54%;
+  border-color: var(--sal-rule-soft);
+  background: none;
+}
+
+/* Etiketten: cremefarbenes Schildchen mit feinem Innenrand, eckig */
+:root[data-look="salumeria"] body .look-label {
+  position: relative;
+  gap: 6px;
+  padding: 3px 9px 3px 8px;
+  border-radius: 0 !important;
+  background: var(--sal-paper) !important;
+  color: var(--sal-paper-ink) !important;
+  box-shadow: inset 0 0 0 2px var(--sal-paper), inset 0 0 0 3px rgba(15, 11, 10, 0.2) !important;
+  font-size: 13px;
+  font-size-adjust: 0.47;
+  font-variant-caps: small-caps;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  line-height: 1.1;
+}
+
+:root[data-look="salumeria"] body .look-label.text-sm {
+  padding: 4px 11px 4px 10px;
+  font-size: 15.5px;
+}
+
+/* die Lochung des Theken-Etiketts wird zur Raute */
+:root[data-look="salumeria"] .look-label > span:first-child:empty {
+  width: 5px;
+  height: 5px;
+  border-radius: 0 !important;
+  background: var(--sal-red-on-paper) !important;
+  transform: rotate(45deg);
+}
+
+/* zweite Sorte: dunkel mit Creme-Rand statt Rot (deckend – sie liegt auch auf Bildern) */
+:root[data-look="salumeria"] body .look-label--red {
+  background: var(--sal-ink) !important;
+  color: var(--sal-cream) !important;
+  box-shadow: inset 0 0 0 1px var(--sal-rule-strong) !important;
+}
+
+:root[data-look="salumeria"] .look-label--red > span:first-child:empty {
+  background: var(--sal-cream) !important;
+}
+
+:root[data-look="salumeria"] body .look-label--ghost {
+  background: transparent !important;
+  color: var(--sal-muted) !important;
+  box-shadow: inset 0 0 0 1px var(--sal-rule) !important;
+}
+
+:root[data-look="salumeria"] body .look-tag {
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: inset 0 0 0 1px var(--sal-rule);
+  font-variant-caps: small-caps;
+  letter-spacing: 0.08em;
+}
+
+/* ------------------------------------------------------------------ Felder, Dialoge, Menüs */
+
+:root[data-look="salumeria"] .look-input {
+  background-color: rgba(0, 0, 0, 0.28) !important;
+  border-color: var(--sal-rule) !important;
+  box-shadow: none !important;
+}
+
+:root[data-look="salumeria"] .look-input:focus,
+:root[data-look="salumeria"] .look-input:focus-within {
+  border-color: var(--sal-rule-strong) !important;
+}
+
+:root[data-look="salumeria"] .look-modal {
+  border-color: var(--sal-rule-strong) !important;
+  box-shadow: 0 0 0 5px var(--sal-ink), 0 0 0 6px var(--sal-rule), 0 40px 90px -20px #000 !important;
+}
+
+:root[data-look="salumeria"] .look-menu {
+  border-color: var(--sal-rule-strong) !important;
+  box-shadow: 0 24px 60px -16px rgba(0, 0, 0, 0.85) !important;
+}
+
+/* ------------------------------------------------------------------ Kopfband */
+
+/* statt des Salami-Anschnitts: feines Rautengitter und eine Doppellinie am unteren Rand */
+:root[data-look="salumeria"] .salami-fat-spots {
+  background-color: var(--look-band-bg) !important;
+  border-bottom: var(--look-band-border) !important;
+  background-image:
+    linear-gradient(var(--sal-rule), var(--sal-rule)),
+    repeating-linear-gradient(45deg, rgba(var(--sal-cream-rgb), 0.04) 0 1px, transparent 1px 8px),
+    repeating-linear-gradient(-45deg, rgba(var(--sal-cream-rgb), 0.04) 0 1px, transparent 1px 8px);
+  background-size: 100% 1px, auto, auto;
+  background-position: 0 calc(100% - 3px), 0 0, 0 0;
+  background-repeat: no-repeat, repeat, repeat;
+}
+
+/* ------------------------------------------------------------------ Profile */
+
+/* Listen- und Kompaktzeilen (ohne `look-card`): Creme-Rand beim Überfahren, kein Akzentschein */
+:root[data-look="salumeria"] .look-content .group.relative.flex.cursor-pointer.items-center.border.transition-all:hover {
+  border-color: var(--sal-rule-strong) !important;
+  box-shadow: none !important;
+}
+
+/* ihr Start-Knopf (ohne `look-btn`): ruhig umrandet, rot erst unter dem Zeiger */
+:root[data-look="salumeria"] .look-content .group.cursor-pointer.items-center.border > button.font-minecraft.text-white {
+  background-color: transparent !important;
+  box-shadow: none !important;
+  outline: 1px solid var(--sal-rule-strong);
+  outline-offset: -1px;
+  color: var(--sal-cream);
+  font-variant-caps: small-caps;
+  letter-spacing: 0.08em;
+  filter: none;
+  transition: background-color 150ms ease, outline-color 150ms ease;
+}
+
+:root[data-look="salumeria"] .look-content .group.cursor-pointer.items-center.border:hover > button.font-minecraft.text-white,
+:root[data-look="salumeria"] .look-content .group.cursor-pointer.items-center.border > button.font-minecraft.text-white:focus-visible {
+  background-color: var(--accent) !important;
+  color: var(--sal-on-accent);
+  box-shadow: var(--look-kante) !important;
+  outline-color: var(--sal-on-accent-line);
+  outline-offset: -4px;
+}
+
+/* das Kontextmenü liegt in der Karte und würde von deren `overflow-hidden` abgeschnitten */
+:root[data-look="salumeria"] .look-card:has(> .look-menu) {
+  overflow: visible !important;
+  z-index: 30;
+}
+
+/*
+ * Rangfolge der Hauptaktionen: nur die große (Spielen, Erstellen, Installieren im Kopf) steht
+ * dauerhaft in Rot. Kleine Hauptaktionen in Werkzeugzeilen („Mods hinzufügen", „Welt importieren",
+ * „Skin hinzufügen") sind umrandet und werden erst unter dem Zeiger rot. Dialoge und Menüs liegen
+ * außerhalb von `.look-content` und behalten ihre rote Hauptaktion.
+ */
+:root[data-look="salumeria"] .look-content :is(.look-btn--primary, button[style*="var(--look-kante,"], a[style*="var(--look-kante,"]):is(.h-9, .h-8, .h-7, [class*="h-[36px]"], [class*="py-0.5"]):not(:hover):not(:focus-visible):not([aria-pressed]):not([role="tab"]):not(.w-full):not(.look-card[class*="transition"] *) {
+  background-color: transparent !important;
+  color: var(--sal-cream) !important;
+  box-shadow: none !important;
+  outline-color: var(--sal-rule-strong);
+  outline-offset: -1px;
+}
+
+/* ------------------------------------------------------------------ Freunde */
+
+/* gewählter Freund: rote Linie links wie in den Seitenleisten, Fläche in Creme statt Rot */
+:root[data-look="salumeria"] button.w-full.text-left[style*="3px 0px 0px inset"] {
+  background-color: rgba(var(--sal-cream-rgb), 0.06) !important;
+  box-shadow: inset 2px 0 0 var(--accent) !important;
+}
+
+/* eigene Nachrichten: cremegetönt mit Creme-Kante statt rot */
+:root[data-look="salumeria"] .justify-end > div[style*="-3px 0px 0px inset"] {
+  background-color: rgba(var(--sal-cream-rgb), 0.1) !important;
+  box-shadow: inset -2px 0 0 var(--sal-rule-strong) !important;
+}
+
+/* ------------------------------------------------------------------ Einstellungen */
+
+/* Schieberegler: dünne Creme-Spur, der Griff ein cremefarbenes Plättchen */
+:root[data-look="salumeria"] .relative.pt-4.pb-4.cursor-pointer > div.relative.overflow-hidden {
+  background-color: rgba(var(--sal-cream-rgb), 0.05) !important;
+  border-color: var(--sal-rule) !important;
+}
+
+:root[data-look="salumeria"] .relative.pt-4.pb-4.cursor-pointer > div.relative.overflow-hidden > div.absolute {
+  background-color: rgba(var(--sal-cream-rgb), 0.55) !important;
+}
+
+:root[data-look="salumeria"] .relative.pt-4.pb-4.cursor-pointer > div.cursor-grab {
+  background-color: var(--sal-paper) !important;
+  border-color: var(--sal-ink) !important;
+  outline: 1px solid var(--sal-rule-strong);
+}
+
+/* Symbole vor Abschnittstiteln: Creme statt Akzent */
+:root[data-look="salumeria"] .flex.items-center.gap-2.min-w-0 > svg.iconify[style*="color"] {
+  color: rgba(var(--sal-cream-rgb), 0.7) !important;
+}
+
+/* Hinweiskästen: Creme statt kaltem Blau */
+:root[data-look="salumeria"] [class*="bg-blue-"][class*="border-blue-"] {
+  background-color: rgba(var(--sal-cream-rgb), 0.05) !important;
+  border-color: var(--sal-rule) !important;
+}
+
+:root[data-look="salumeria"] [class*="bg-blue-"][class*="border-blue-"] [class*="text-blue-"],
+:root[data-look="salumeria"] [class*="bg-blue-"][class*="border-blue-"][class*="text-blue-"] {
+  color: rgba(var(--sal-cream-rgb), 0.85) !important;
+}
+
+/* ------------------------------------------------------------------ Menüs */
+
+/* Auswahllisten ohne `look-menu` (Sortierung, Filter): deckend, Creme-Rand */
+:root[data-look="salumeria"] .absolute.top-full.z-50[class*="bg-black/90"] {
+  background-color: var(--surface-solid) !important;
+  border-color: var(--sal-rule-strong) !important;
+  box-shadow: 0 24px 60px -16px rgba(0, 0, 0, 0.85);
+  backdrop-filter: none;
+}
+
+/* Aufklapp-Felder der Profilseite (ThemedDropdown, ebenfalls ohne `look-menu`): weicher Schatten statt Kante */
+:root[data-look="salumeria"] .shadow-2xl.border.py-1[style*="14px 30px -12px"] {
+  box-shadow: 0 24px 60px -16px rgba(0, 0, 0, 0.85) !important;
+}
+
+/* in allen Menüs: gewählter oder überfahrener Eintrag cremegetönt, Haken in Creme statt Akzent */
+:root[data-look="salumeria"] :is(.look-menu, .absolute.top-full.z-50[class*="bg-black/90"], .shadow-2xl.border.py-1[style*="14px 30px -12px"]) button.w-full[style*="background-color: rgb"] {
+  background-color: rgba(var(--sal-cream-rgb), 0.09) !important;
+}
+
+:root[data-look="salumeria"] :is(.look-menu, .absolute.top-full.z-50[class*="bg-black/90"], .shadow-2xl.border.py-1[style*="14px 30px -12px"]) svg[style*="color"] {
+  color: var(--sal-cream) !important;
+}
+
+/* Umschalter im Aufklapp-Feld (Releases / Snapshots): gewählt = cremefarben gefüllt */
+:root[data-look="salumeria"] .shadow-2xl.border.py-1[style*="14px 30px -12px"] button[style*="0px 2px 0px"] {
+  background-color: var(--sal-paper) !important;
+  color: var(--sal-paper-ink) !important;
+  box-shadow: none !important;
+}
+
+:root[data-look="salumeria"] .shadow-2xl.border.py-1[style*="14px 30px -12px"] button[style*="0px 2px 0px"] * {
+  color: var(--sal-paper-ink) !important;
+}
+
+/* Kurzhinweise (Tooltip): deckend mit Creme-Rand */
+:root[data-look="salumeria"] body > .fixed.pointer-events-none.border[class*="z-[1100]"] {
+  background-color: var(--surface-solid-raised) !important;
+  border-color: var(--sal-rule-strong) !important;
+}
+
+/* Warnungen und Löschen in Rost: Rot bleibt der Hauptaktion */
+:where(:root[data-look="salumeria"]) body :is([class~="text-red-300"], [class~="text-red-400"], [class~="text-red-500"]) {
+  color: var(--sal-rust);
+}
+
+:root[data-look="salumeria"] [class*="bg-red-"][class*="border-red-"] {
+  background-color: rgba(227, 160, 146, 0.07) !important;
+  border-color: rgba(227, 160, 146, 0.38) !important;
+}
+
+/* ------------------------------------------------------------------ Bewegung */
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-look="salumeria"] .sal-nav__item,
+  :root[data-look="salumeria"] .sal-nav__item::after,
+  :root[data-look="salumeria"] .sal-ticket,
+  :root[data-look="salumeria"] .look-btn,
+  :root[data-look="salumeria"] .sal-backdrop__glow {
+    transition: none !important;
+  }
+
+  :root[data-look="salumeria"] .sal-ticket:hover {
+    transform: none;
+  }
+}

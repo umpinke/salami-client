@@ -23,7 +23,7 @@ export function ProfileDuplicateModal() {
   // Set default name when modal opens
   useEffect(() => {
     if (isModalOpen && sourceProfile) {
-      const defaultName = `${sourceProfile.name} (copy)`;
+      const defaultName = t('profiles.copy_name', { name: sourceProfile.name });
       setNewProfileName(defaultName);
     }
   }, [isModalOpen, sourceProfile]);
@@ -85,7 +85,7 @@ export function ProfileDuplicateModal() {
             {t('common.cancel')}
           </Button>
           <Button
-            variant="default"
+            variant="3d"
             onClick={handleDuplicate}
             disabled={isLoading || !newProfileName.trim()}
             size="md"

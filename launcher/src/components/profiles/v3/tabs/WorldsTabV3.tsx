@@ -34,6 +34,8 @@ import { CopyWorldDialog } from "../../../modals/CopyWorldDialog";
 import { ThemedDropdown, ThemedDropdownItem } from "../shared/ThemedDropdown";
 import { EmptyStateV3 } from "../shared/EmptyStateV3";
 import { FloatingActionBar, type FABActionConfig } from "../shared/FloatingActionBar";
+import { FK_CARD_CLASS, FK_INPUT_CLASS, FK_PRIMARY_BUTTON_CLASS, FK_SOFT_BUTTON_CLASS, fkCardStyle, fkPrimaryStyle, fkThumbStyle } from "../shared/feinkost";
+import { LoadingSpinner } from "../../../ui/LoadingSpinner";
 import { parseErrorMessage } from "../../../../utils/error-utils";
 
 interface WorldsTabV3Props {
@@ -266,7 +268,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
           }),
           {
             loading: t("worlds.copying", { name: displayName }),
-            success: t("worlds.copy_success", { name: params.targetWorldName }),
+            success: t("worlds.copy_success", { source: displayName, target: params.targetWorldName }),
             error: (err) => t("worlds.copy_failed", { error: parseErrorMessage(err) }),
           },
         );
@@ -323,11 +325,24 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
     const doBatchDelete = async () => {
       setIsBatchDeleting(true);
       try {
+        const failed: string[] = [];
         for (const w of targets) {
           try { await WorldService.deleteWorld(profile.id, w.folder_name); }
-          catch (err) { console.error("[V3 Worlds] Delete failed for", w.folder_name, err); }
+          catch (err) {
+            console.error("[V3 Worlds] Delete failed for", w.folder_name, err);
+            failed.push(w.display_name ?? w.folder_name);
+          }
         }
-        toast.success(t("worlds.batch_delete_success", { count: targets.length }));
+        // Salami: nur melden, was wirklich gelöscht wurde
+        if (failed.length === 0) {
+          toast.success(t("worlds.batch_delete_success", { count: targets.length }));
+        } else {
+          toast.error(t("salami.worlds.batch_delete_partial", {
+            deleted: targets.length - failed.length,
+            count: targets.length,
+            failed: failed.join(", "),
+          }));
+        }
         setSelectedIds(new Set());
         await loadData();
       } finally {
@@ -387,21 +402,21 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
   return (
     <div className="flex flex-col min-h-0 flex-1 relative">
       {/* ── Sticky Toolbar ─────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-5 h-12 border-b border-white/5 flex-shrink-0 bg-black/20 sticky top-0 z-10">
+      <div className="flex items-center gap-2 px-5 h-14 border-b border-white/[0.09] flex-shrink-0 sticky top-0 z-10">
         <div className="relative w-64 flex-shrink-0">
           <Icon icon="solar:magnifer-linear" className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t("worlds.search_placeholder")}
-            className="w-full h-8 pl-8 pr-3 rounded-md bg-white/5 border border-white/10 focus:border-white/25 outline-none text-sm text-white placeholder:text-white/30 font-minecraft"
+            className={`w-full h-9 pl-8 pr-3 text-sm ${FK_INPUT_CLASS}`}
           />
         </div>
 
         <div className="relative">
           <button
             onClick={() => setSortMenuOpen(v => !v)}
-            className="h-8 px-2.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-minecraft text-white/70 flex items-center gap-1.5"
+            className={`h-9 px-3 text-sm font-minecraft flex items-center gap-1.5 ${FK_SOFT_BUTTON_CLASS}`}
           >
             <Icon icon="solar:sort-vertical-bold" className="w-3.5 h-3.5" />
             {activeSortLabel}
@@ -426,7 +441,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
         <button
           onClick={handleManualRefresh}
           disabled={loading}
-          className="h-8 px-2.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white disabled:opacity-50 flex items-center transition-colors"
+          className={`h-9 px-2.5 disabled:opacity-50 flex items-center ${FK_SOFT_BUTTON_CLASS}`}
           title={t("profiles.v3.toolbar.refresh")}
         >
           <Icon icon="solar:refresh-bold" className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
@@ -434,7 +449,8 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
 
         <button
           onClick={handleImport}
-          className="h-8 px-3 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 text-emerald-100 text-xs font-minecraft uppercase tracking-wider flex items-center gap-1.5"
+          className={`h-9 px-3.5 text-sm flex items-center gap-1.5 ${FK_PRIMARY_BUTTON_CLASS}`}
+          style={fkPrimaryStyle(accentColor.value)}
         >
           <Icon icon="solar:import-bold" className="w-4 h-4" />
           {t("worlds.import_world")}
@@ -449,7 +465,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
             <div className="flex-1 min-w-0 text-xs font-minecraft text-rose-100 break-words">{error}</div>
             <button
               onClick={() => loadData()}
-              className="flex-shrink-0 h-7 px-2 rounded-md text-[10px] font-minecraft uppercase tracking-wider text-rose-100 hover:bg-rose-500/20 transition-colors"
+              className="flex-shrink-0 h-7 px-2 rounded-md text-xs font-minecraft text-rose-100 hover:bg-rose-500/20 transition-colors"
             >
               {t("profiles.v3.content.retry")}
             </button>
@@ -458,9 +474,8 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
 
         {loading && worlds.length === 0 && servers.length === 0 ? (
           shouldShowLoading ? (
-            <div className="flex items-center justify-center h-40 text-white/40 font-minecraft text-sm animate-in fade-in duration-300">
-              <Icon icon="svg-spinners:ring-resize" className="w-4 h-4 mr-2" />
-              {t("profiles.v3.content.loading")}
+            <div className="flex items-center justify-center h-40 animate-in fade-in duration-300">
+              <LoadingSpinner size="md" shadowDepth="none" message={t("profiles.v3.content.loading")} />
             </div>
           ) : (
             <div className="h-40" />
@@ -558,12 +573,8 @@ const WorldTile: React.FC<WorldTileProps> = ({
 
   return (
     <div
-      style={isSelected ? { backgroundColor: `${accentColor}1a`, borderColor: `${accentColor}66` } : undefined}
-      className={`group relative flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-        isSelected
-          ? ""
-          : "bg-white/[0.03] border-white/10 hover:border-white/20 hover:bg-white/[0.06]"
-      }`}
+      style={fkCardStyle(accentColor, isSelected)}
+      className={`group relative flex items-center gap-3 p-3 ${FK_CARD_CLASS}`}
     >
       <button
         onClick={(e) => { e.stopPropagation(); onToggleSelection(); }}
@@ -581,7 +592,7 @@ const WorldTile: React.FC<WorldTileProps> = ({
       </button>
 
       {/* World Icon */}
-      <div className="relative w-16 h-16 flex-shrink-0 rounded-md bg-white/10 ring-1 ring-white/10 overflow-hidden flex items-center justify-center">
+      <div className="relative w-16 h-16 flex-shrink-0 border-2 overflow-hidden flex items-center justify-center" style={fkThumbStyle}>
         {iconUrl ? (
           <img
             src={iconUrl}
@@ -614,7 +625,7 @@ const WorldTile: React.FC<WorldTileProps> = ({
         </div>
 
         <div className="flex items-center gap-1.5 mt-1 text-[11px] font-minecraft">
-          <span className="inline-flex items-center gap-1 px-1.5 h-5 rounded text-white/70 bg-white/5">
+          <span className="inline-flex items-center gap-1 px-1.5 h-5 rounded text-white/75 bg-white/[0.08]">
             <Icon icon={GAME_MODE_ICONS[gameMode]} className="w-3 h-3" />
             {gameModeLabel}
           </span>
@@ -637,11 +648,10 @@ const WorldTile: React.FC<WorldTileProps> = ({
       <button
         onClick={onPlay}
         disabled={isLaunching}
-        className={`h-8 px-3 rounded-md border flex items-center gap-1.5 flex-shrink-0 transition-colors text-xs font-minecraft uppercase tracking-wider ${
-          isLaunching
-            ? "bg-emerald-500/10 border-emerald-400/20 text-emerald-200/60 cursor-wait"
-            : "bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-400/30 text-emerald-100"
+        className={`h-9 px-3.5 flex items-center gap-1.5 flex-shrink-0 text-sm ${FK_PRIMARY_BUTTON_CLASS} ${
+          isLaunching ? "opacity-60 cursor-wait" : ""
         }`}
+        style={fkPrimaryStyle(accentColor)}
       >
         <Icon
           icon={isLaunching ? "solar:refresh-bold" : "solar:play-bold"}
@@ -699,6 +709,7 @@ const latencyTextColor = (ms: number): string => {
 
 const ServerTile: React.FC<ServerTileProps> = ({ server, pingState, isLaunching, menuOpen, onMenuToggle, onJoin, onReping }) => {
   const { t } = useTranslation();
+  const accent = useThemeStore((s) => s.accentColor.value);
   const name = server.name ?? server.address ?? "—";
   const address = server.address ?? "";
   const isPending = pingState === "pending";
@@ -713,11 +724,12 @@ const ServerTile: React.FC<ServerTileProps> = ({ server, pingState, isLaunching,
 
   return (
     <div
-      className={`group relative flex items-center gap-3 p-3 rounded-lg border transition-colors bg-white/[0.03] border-white/10 hover:border-white/20 hover:bg-white/[0.06] ${
+      style={fkCardStyle(accent)}
+      className={`group relative flex items-center gap-3 p-3 ${FK_CARD_CLASS} ${
         isError ? "opacity-60" : ""
       }`}
     >
-      <div className="relative w-16 h-16 flex-shrink-0 rounded-md bg-white/10 ring-1 ring-white/10 overflow-hidden flex items-center justify-center">
+      <div className="relative w-16 h-16 flex-shrink-0 border-2 overflow-hidden flex items-center justify-center" style={fkThumbStyle}>
         {iconBase64 ? (
           <img
             src={`data:image/png;base64,${iconBase64}`}
@@ -782,13 +794,12 @@ const ServerTile: React.FC<ServerTileProps> = ({ server, pingState, isLaunching,
       <button
         onClick={onJoin}
         disabled={!!isError || isLaunching || !address}
-        className={`h-8 px-3 rounded-md border flex items-center gap-1.5 flex-shrink-0 transition-colors text-xs font-minecraft uppercase tracking-wider ${
+        className={`h-9 px-3.5 flex items-center gap-1.5 flex-shrink-0 text-sm ${
           isError || !address
-            ? "bg-white/5 border-white/10 text-white/30 cursor-not-allowed"
-            : isLaunching
-              ? "bg-emerald-500/10 border-emerald-400/20 text-emerald-200/60 cursor-wait"
-              : "bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-400/30 text-emerald-100"
+            ? `${FK_SOFT_BUTTON_CLASS} font-minecraft opacity-50 cursor-not-allowed`
+            : `${FK_PRIMARY_BUTTON_CLASS} ${isLaunching ? "opacity-60 cursor-wait" : ""}`
         }`}
+        style={isError || !address ? undefined : fkPrimaryStyle(accent)}
       >
         <Icon
           icon={isLaunching ? "solar:refresh-bold" : "solar:login-2-bold"}

@@ -16,6 +16,8 @@ import { Icon } from '@iconify/react';
 import { SearchWithFilters } from '../../ui/SearchWithFilters';
 import { CheckboxV2 } from '../../ui/CheckboxV2';
 import { gsap } from "gsap";
+import { hexAlpha, readableOn, SURFACE } from '../../ui/design-system';
+import { PLAIN_CARD, tagLabel } from './FeinkostParts';
 
 // Re-define UIDynamicFilterGroup if it's specific to the sidebar and not used elsewhere globally
 // For now, assuming it might be defined in the parent or a shared types file if used elsewhere.
@@ -95,35 +97,40 @@ const AccordionItem: React.FC<AccordionItemProps> = ({
   };
 
   return (
-    <div 
-      className={cn(
-        "relative overflow-hidden transition-all duration-300 rounded-lg bg-black/20 border border-white/10 hover:border-white/20"
-      )}
+    <div
+      className="look-card relative overflow-hidden transition-[border-color] duration-200"
+      style={{
+        ...PLAIN_CARD,
+        borderColor: isOpen ? SURFACE.lineStrong : SURFACE.line,
+      }}
     >
       <button
         ref={buttonRef}
         onClick={toggleAccordion}
         className={cn(
-          "w-full px-3 py-2.5 text-left font-smallcaps text-white flex justify-between items-center focus:outline-none transition-colors text-base",
-          isOpen && "border-b border-white/10", 
-          "hover:bg-white/5",
-          "relative z-10"
+          "relative z-10 flex w-full items-center justify-between px-3 py-2.5 text-left font-minecraft text-sm text-white/85 transition-colors duration-150 hover:bg-white/[0.05] hover:text-white focus:outline-none",
         )}
+        style={isOpen ? { borderBottom: `1px solid ${SURFACE.line}` } : undefined}
       >
-        <div className="flex items-center gap-2">
-          <span className="truncate mr-2">{title}</span>
-          {/* {activeCount > 0 && (
-            <div
-              className="flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold"
-              style={{ backgroundColor: accentColor.value }}
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            className="h-[3px] w-3 flex-shrink-0 transition-colors duration-150"
+            style={{ backgroundColor: activeCount > 0 || isOpen ? accentColor.value : SURFACE.lineStrong }}
+            aria-hidden="true"
+          />
+          <span className="truncate">{title}</span>
+          {activeCount > 0 && (
+            <span
+              className="flex h-4 min-w-4 flex-shrink-0 items-center justify-center px-1 text-[10px] leading-none"
+              style={{ backgroundColor: accentColor.value, color: readableOn(accentColor.value), borderRadius: 999 }}
             >
               {activeCount}
-            </div>
-          )} */}
+            </span>
+          )}
         </div>
-        <Icon 
-          icon={isOpen ? "solar:alt-arrow-up-bold" : "solar:alt-arrow-down-bold"} 
-          className="w-4 h-4 flex-shrink-0" 
+        <Icon
+          icon={isOpen ? "solar:alt-arrow-up-bold" : "solar:alt-arrow-down-bold"}
+          className="h-4 w-4 flex-shrink-0 text-white/50"
         />
       </button>
 
@@ -183,12 +190,13 @@ const FilterOption = ({
       ref={buttonRef}
       onClick={handleClick}
       className={cn(
-        "w-full flex items-center justify-between p-1.5 text-sm font-smallcaps transition-colors duration-200 cursor-pointer rounded-md mb-1 bg-black/20 border border-white/10 hover:border-white/20",
-        isSelected ? "text-white" : "text-gray-300 hover:text-white"
+        "mb-1 flex w-full cursor-pointer items-center justify-between border px-2 py-1.5 text-sm transition-colors duration-150",
+        isSelected ? "text-white" : "border-transparent text-white/70 hover:bg-white/[0.06] hover:text-white"
       )}
       style={{
-        backgroundColor: isSelected ? `${accentColor.value}20` : undefined,
-        borderColor: isSelected ? `${accentColor.value}60` : undefined,
+        borderRadius: "calc(var(--border-radius) * 0.6)",
+        backgroundColor: isSelected ? hexAlpha(accentColor.value, 0.18) : undefined,
+        borderColor: isSelected ? hexAlpha(accentColor.value, 0.5) : undefined,
       }}
     >
       <span className="flex items-center flex-grow text-left">
@@ -288,6 +296,10 @@ export const ModrinthFilterSidebarV2: React.FC<ModrinthFilterSidebarV2Props> = (
     {} as Record<string, number>,
   );
 
+  // Modrinth liefert die Gruppenköpfe auf Englisch ("features", "performance impact")
+  const groupTitle = (group: UIDynamicFilterGroup) =>
+    t(`modrinth.filter_groups.${group.headerValue.toLowerCase().replace(/ /g, '_')}`, { defaultValue: group.accordionTitle });
+
   const categoryActiveCount = (categoriesGroup && dynamicGroupCounts[categoriesGroup.headerValue]) || 0;
 
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -320,7 +332,7 @@ export const ModrinthFilterSidebarV2: React.FC<ModrinthFilterSidebarV2Props> = (
         msOverflowStyle: "none",
       }}
     >
-      <div className="">
+      <div className="space-y-2 pb-2">
         <AccordionItem
           title={t('modrinth.game_versions')}
           defaultOpen={totalGameVersionFilters > 0}
@@ -328,14 +340,17 @@ export const ModrinthFilterSidebarV2: React.FC<ModrinthFilterSidebarV2Props> = (
         >
           <div className="space-y-2">
             <div className="relative mb-2">
-              <div className="flex items-center gap-2 bg-black/50 rounded-lg px-3 py-2 border border-white/10 hover:border-white/20 transition-colors mr-1">
+              <div
+                className="mr-1 flex items-center gap-2 border px-3 py-2 transition-colors duration-150 focus-within:border-white/25"
+                style={{ backgroundColor: SURFACE.hover, borderColor: SURFACE.line, borderRadius: "calc(var(--border-radius) * 0.6)" }}
+              >
                 <Icon icon="solar:magnifer-bold" className="w-3 h-3 text-white/50 flex-shrink-0" />
                 <input
                   type="text"
                   placeholder={t('placeholders.search_version')}
                   value={gameVersionSearchTerm}
                   onChange={(e) => onGameVersionSearchTermChange(e.target.value)}
-                  className="bg-transparent text-white placeholder-white/50 font-minecraft text-xs flex-1 outline-none min-w-0"
+                  className="bg-transparent text-white placeholder-white/45 text-xs flex-1 outline-none min-w-0"
                 />
               </div>
             </div>
@@ -352,7 +367,7 @@ export const ModrinthFilterSidebarV2: React.FC<ModrinthFilterSidebarV2Props> = (
               ))}
               
               {displayedGameVersions.length === 0 && (
-                <p className="text-gray-500 italic p-1 text-xs text-center">{t('modrinth.no_matching_versions')}</p>
+                <p className="p-1 text-center text-xs text-white/40">{t('modrinth.no_matching_versions')}</p>
               )}
             </div>
             
@@ -371,7 +386,7 @@ export const ModrinthFilterSidebarV2: React.FC<ModrinthFilterSidebarV2Props> = (
         {projectType !== 'datapack' && (
           <AccordionItem
             key={categoriesGroup?.headerValue || "categories_filter_accordion"} // Use a fallback key
-            title={categoriesGroup?.accordionTitle || t('modrinth.categories')} // Use a fallback title
+            title={t('modrinth.categories')} // Salami: übersetzt statt Modrinths englischem Kopf
             defaultOpen={categoryActiveCount > 0}
             activeCount={categoryActiveCount}
           >
@@ -380,7 +395,7 @@ export const ModrinthFilterSidebarV2: React.FC<ModrinthFilterSidebarV2Props> = (
                 categoriesGroup.options.map(cat => (
                   <FilterOption
                     key={cat.name}
-                    label={cat.name}
+                    label={tagLabel(cat.name)}
                     icon={cat.icon}
                     isSelected={currentSelectedCategories.includes(cat.name)}
                     onClick={() => onCategoryToggle(cat.name)}
@@ -388,8 +403,8 @@ export const ModrinthFilterSidebarV2: React.FC<ModrinthFilterSidebarV2Props> = (
                   />
                 ))
               ) : (
-                <p className="text-xs text-gray-500 italic p-1 text-center">
-                  No category options available.
+                <p className="p-1 text-center text-xs text-white/40">
+                  {t('modrinth.no_categories')}
                 </p>
               )}
             </div>
@@ -407,7 +422,7 @@ export const ModrinthFilterSidebarV2: React.FC<ModrinthFilterSidebarV2Props> = (
               return (
                 <FilterOption
                   key={loader.name}
-                  label={loader.name}
+                  label={tagLabel(loader.name)}
                   icon={fullLoaderData?.icon}
                   isSelected={currentSelectedLoaders.includes(loader.name)}
                   onClick={() => onLoaderToggle(loader.name)}
@@ -415,7 +430,7 @@ export const ModrinthFilterSidebarV2: React.FC<ModrinthFilterSidebarV2Props> = (
                 />
               );
             })}
-            {availableLoaders.length === 0 && <p className="text-gray-500 italic p-1 text-xs text-center">{t('modrinth.no_loaders_for', { type: projectType })}</p>}
+            {availableLoaders.length === 0 && <p className="p-1 text-center text-xs text-white/40">{t('modrinth.no_loaders_for', { type: projectType })}</p>}
           </div>
         </AccordionItem>
 
@@ -423,7 +438,7 @@ export const ModrinthFilterSidebarV2: React.FC<ModrinthFilterSidebarV2Props> = (
         {otherDynamicGroups.map(group => (
           <AccordionItem 
             key={group.headerValue} 
-            title={group.accordionTitle} 
+            title={groupTitle(group)}
             defaultOpen={dynamicGroupCounts[group.headerValue] > 0}
             activeCount={dynamicGroupCounts[group.headerValue]}
           >
@@ -431,14 +446,14 @@ export const ModrinthFilterSidebarV2: React.FC<ModrinthFilterSidebarV2Props> = (
               {group.options.length > 0 ? group.options.map(cat => (
                 <FilterOption
                   key={cat.name}
-                  label={cat.name}
+                  label={tagLabel(cat.name)}
                   icon={cat.icon}
                   isSelected={currentSelectedCategories.includes(cat.name)}
                   onClick={() => onCategoryToggle(cat.name)}
                   accentColor={accentColor}
                 />
               )) : (
-                <p className="text-xs text-gray-500 italic p-1 text-center">{t('modrinth.no_options_for', { title: group.accordionTitle })}</p>
+                <p className="p-1 text-center text-xs text-white/40">{t('modrinth.no_options_for', { title: groupTitle(group) })}</p>
               )}
             </div>
           </AccordionItem>

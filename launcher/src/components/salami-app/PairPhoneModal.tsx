@@ -173,7 +173,7 @@ export function PairPhoneModal({ status, onClose }: PairPhoneModalProps) {
           </div>
 
           <div className="flex-1 min-w-0 text-center sm:text-left space-y-3">
-            <p className="text-xs uppercase tracking-wider text-white/50">{t("salami.app.modal.code")}</p>
+            <p className="text-xs text-white/50">{t("salami.app.modal.code")}</p>
             {code && !expired ? (
               <>
                 <p className="text-5xl leading-none tracking-[0.15em] text-white select-all tabular-nums">
@@ -219,7 +219,7 @@ export function PairPhoneModal({ status, onClose }: PairPhoneModalProps) {
         </button>
 
         <div className="space-y-2">
-          <h4 className="text-xs uppercase tracking-wider text-white/50">{t("salami.app.devices.title")}</h4>
+          <h4 className="text-xs text-white/50">{t("salami.app.devices.title")}</h4>
           {devicesError ? (
             <p className="text-xs text-red-300">{t("salami.app.devices.failed", { error: devicesError })}</p>
           ) : devices === null ? null : devices.length === 0 ? (

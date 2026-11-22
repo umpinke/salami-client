@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
+import { KANTE_SOFT, SURFACE, kante } from "../ui/design-system";
 import { SalamiCapesTab } from "../salami-capes/SalamiCapesTab";
 import { BuddiesSection, EmotesSection, HatsSection, MiniMeSection } from "./CosmeticsSections";
 import "../salami-capes/i18n";
@@ -29,7 +30,7 @@ export function CosmeticsTab() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center gap-2 px-6 pt-5" role="tablist">
+      <div className="flex shrink-0 flex-wrap items-center gap-2 px-6 pt-5" role="tablist">
         {SECTIONS.map((entry) => {
           const active = entry.id === section;
           return (
@@ -40,10 +41,15 @@ export function CosmeticsTab() {
               aria-selected={active}
               onClick={() => setSection(entry.id)}
               className={cn(
-                "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-colors",
-                active ? "hover:brightness-110" : "bg-white/10 hover:bg-white/15",
+                "flex h-9 items-center gap-2 px-4 font-minecraft text-sm transition-[filter,background-color,color] duration-150 active:translate-y-px",
+                active ? "text-white hover:brightness-110" : "text-white/75 hover:text-white",
               )}
-              style={active ? { backgroundColor: accent.value } : undefined}
+              // Salami-Feinkost: aktiver Reiter voll im Akzent mit harter Unterkante, die anderen ruhig
+              style={{
+                backgroundColor: active ? accent.value : SURFACE.hover,
+                boxShadow: active ? kante(accent.value) : KANTE_SOFT,
+                borderRadius: "calc(var(--border-radius) * 0.8)",
+              }}
             >
               <Icon icon={entry.icon} className="h-5 w-5" />
               {t(entry.labelKey)}

@@ -4,6 +4,9 @@ import { useMemo, useState } from "react";
 import { Icon } from "@iconify/react";
 import { isRouteErrorResponse, useNavigate, useRouteError } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useThemeStore } from "../store/useThemeStore";
+import { kante, kopfband } from "./ui/design-system";
+import { SalamiSlice } from "../themes/salami/SalamiSlice";
 
 // Friendly fallback used by `errorElement` on the root route. Replaces the
 // React Router default "Hey developer" screen so users can recover (reload /
@@ -17,14 +20,16 @@ export function RouteErrorBoundary() {
   const { title, message, stack } = useMemo(() => normalizeError(error, t), [error, t]);
 
   const isDev = import.meta.env.DEV;
+  const accent = useThemeStore((state) => state.accentColor.value);
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-6 bg-neutral-950">
-      <div className="w-full max-w-xl rounded-xl border border-white/10 bg-white/[0.03] p-6 shadow-2xl">
+    <div className="min-h-screen w-full flex items-center justify-center p-6" style={{ backgroundColor: "#15100e" }}>
+      <div className="w-full max-w-xl overflow-hidden rounded-xl border border-white/10 bg-white/[0.04] shadow-2xl">
+        {/* Salami: Kopfband im Anschnitt-Muster */}
+        <div className="salami-fat-spots h-3" style={kopfband(accent)} aria-hidden="true" />
+        <div className="p-6">
         <div className="flex items-start gap-4">
-          <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-rose-500/15 border border-rose-400/30 flex items-center justify-center">
-            <Icon icon="solar:danger-triangle-bold" className="w-6 h-6 text-rose-300" />
-          </div>
+          <SalamiSlice size={48} className="flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <h1 className="text-lg text-white font-minecraft normal-case">{title}</h1>
             <p className="mt-1 text-sm text-white/60 font-minecraft normal-case break-words">
@@ -36,21 +41,22 @@ export function RouteErrorBoundary() {
         <div className="mt-5 flex items-center gap-2">
           <button
             onClick={() => { navigate("/play"); }}
-            className="h-9 px-4 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 text-emerald-100 text-xs font-minecraft uppercase tracking-wider flex items-center gap-1.5 transition-colors"
+            className="h-9 px-4 rounded-md text-white text-sm font-minecraft flex items-center gap-1.5 transition-[filter] hover:brightness-110"
+            style={{ backgroundColor: accent, boxShadow: kante(accent) }}
           >
             <Icon icon="solar:home-bold" className="w-4 h-4" />
             {t("errorBoundary.goHome")}
           </button>
           <button
             onClick={() => { window.location.reload(); }}
-            className="h-9 px-4 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-xs font-minecraft uppercase tracking-wider flex items-center gap-1.5 transition-colors"
+            className="h-9 px-4 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-sm font-minecraft flex items-center gap-1.5 transition-colors"
           >
             <Icon icon="solar:refresh-bold" className="w-4 h-4" />
             {t("errorBoundary.reload")}
           </button>
           <button
             onClick={() => { navigate(-1); }}
-            className="h-9 px-4 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-xs font-minecraft uppercase tracking-wider flex items-center gap-1.5 transition-colors"
+            className="h-9 px-4 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-sm font-minecraft flex items-center gap-1.5 transition-colors"
           >
             <Icon icon="solar:arrow-left-linear" className="w-4 h-4" />
             {t("errorBoundary.back")}
@@ -61,7 +67,7 @@ export function RouteErrorBoundary() {
           <div className="mt-5">
             <button
               onClick={() => setDetailsOpen(v => !v)}
-              className="text-[11px] text-white/50 hover:text-white/80 font-minecraft uppercase tracking-wider flex items-center gap-1"
+              className="text-[11px] text-white/50 hover:text-white/80 font-minecraft flex items-center gap-1"
             >
               <Icon
                 icon="solar:alt-arrow-down-linear"
@@ -76,6 +82,7 @@ export function RouteErrorBoundary() {
             )}
           </div>
         )}
+        </div>
       </div>
     </div>
   );
@@ -86,6 +93,13 @@ function normalizeError(
   t: (key: string, opts?: Record<string, unknown>) => string,
 ): { title: string; message: string; stack: string | null } {
   if (isRouteErrorResponse(error)) {
+    if (error.status === 404) {
+      return {
+        title: t("errorBoundary.notFoundTitle"),
+        message: t("errorBoundary.notFoundMessage"),
+        stack: null,
+      };
+    }
     return {
       title: t("errorBoundary.titleRoute", { status: error.status }),
       message: error.statusText || String(error.data ?? ""),

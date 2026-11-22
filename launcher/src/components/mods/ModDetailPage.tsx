@@ -18,6 +18,9 @@ import { ModDetailDescription } from "./ModDetailDescription";
 import { ModDetailVersions } from "./ModDetailVersions";
 import { ModDetailSidebar } from "./ModDetailSidebar";
 import { useThemeStore } from "../../store/useThemeStore";
+import { LoadingSpinner } from "../ui/LoadingSpinner";
+import { EmptyState } from "../ui/EmptyState";
+import { KanteButton } from "../modrinth/v2/FeinkostParts";
 
 // Convert Modrinth project to unified format
 function modrinthToUnified(
@@ -372,7 +375,7 @@ export function ModDetailPage({
         }
       } catch (err) {
         console.error("Failed to load project:", err);
-        setError(err instanceof Error ? err.message : "Failed to load project");
+        setError(err instanceof Error ? err.message : t('mod_detail.load_project_failed'));
       } finally {
         setIsLoading(false);
       }
@@ -403,10 +406,7 @@ export function ModDetailPage({
           </button>
         )}
         <div className="flex-1 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-4">
-            <Icon icon="svg-spinners:ring-resize" className="w-12 h-12 text-white/50" />
-            <span className="text-white/50 font-minecraft">{t('mod_detail.loading_project')}</span>
-          </div>
+          <LoadingSpinner size="lg" message={t('mod_detail.loading_project')} />
         </div>
       </div>
     );
@@ -426,16 +426,16 @@ export function ModDetailPage({
           </button>
         )}
         <div className="flex-1 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-4">
-            <Icon icon="solar:danger-triangle-bold" className="w-12 h-12 text-red-500" />
-            <span className="text-red-400 font-minecraft">{error || t('mod_detail.project_not_found')}</span>
-            <button
-              onClick={handleBack}
-              className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white font-minecraft transition-colors"
-            >
-              {t('mod_detail.go_back')}
-            </button>
-          </div>
+          <EmptyState
+            icon="solar:danger-triangle-bold"
+            message={error || t('mod_detail.project_not_found')}
+            compact
+            action={
+              <KanteButton onClick={handleBack} icon={<Icon icon="solar:arrow-left-bold" className="h-4 w-4" />}>
+                {t('mod_detail.go_back')}
+              </KanteButton>
+            }
+          />
         </div>
       </div>
     );

@@ -72,13 +72,13 @@ export function ModDetailLightbox({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center"
+      className="fixed inset-0 z-50 bg-[rgba(21,16,14,0.94)] flex items-center justify-center"
       onClick={onClose}
     >
       {/* Close Button */}
       <button
         onClick={onClose}
-        className="absolute top-4 right-4 z-10 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+        className="absolute top-4 right-4 z-10 p-2 bg-white/[0.08] hover:bg-white/[0.14] border border-white/10 rounded-[calc(var(--border-radius)*0.8)] text-white shadow-[0_2px_0_rgba(0,0,0,0.32)] transition-colors duration-150"
       >
         <Icon icon="solar:close-circle-bold" className="w-8 h-8" />
       </button>
@@ -90,7 +90,7 @@ export function ModDetailLightbox({
             e.stopPropagation();
             goToPrevious();
           }}
-          className="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-3 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+          className="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-3 bg-white/[0.08] hover:bg-white/[0.14] border border-white/10 rounded-[calc(var(--border-radius)*0.8)] text-white shadow-[0_2px_0_rgba(0,0,0,0.32)] transition-colors duration-150"
         >
           <Icon icon="solar:arrow-left-bold" className="w-6 h-6" />
         </button>
@@ -103,7 +103,7 @@ export function ModDetailLightbox({
             e.stopPropagation();
             goToNext();
           }}
-          className="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-3 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+          className="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-3 bg-white/[0.08] hover:bg-white/[0.14] border border-white/10 rounded-[calc(var(--border-radius)*0.8)] text-white shadow-[0_2px_0_rgba(0,0,0,0.32)] transition-colors duration-150"
         >
           <Icon icon="solar:arrow-right-bold" className="w-6 h-6" />
         </button>
@@ -127,7 +127,7 @@ export function ModDetailLightbox({
       </div>
 
       {/* Bottom Info Bar */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6">
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[rgba(21,16,14,0.9)] to-transparent p-6">
         <div className="max-w-4xl mx-auto">
           {/* Counter */}
           <div className="flex items-center justify-between mb-2">
@@ -172,7 +172,7 @@ export function ModDetailLightbox({
                   }}
                   className={`
                     flex-shrink-0 w-16 h-12 rounded overflow-hidden border-2 transition-all
-                    ${index === currentIndex ? "border-white" : "border-transparent opacity-50 hover:opacity-100"}
+                    ${index === currentIndex ? "border-[#f3e3d3]" : "border-transparent opacity-50 hover:opacity-100"}
                   `}
                 >
                   <img

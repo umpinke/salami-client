@@ -25,6 +25,9 @@ import { setDiscordState } from "../../utils/discordRpc";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { useClipSettingsSync } from "../../hooks/useClipSettingsSync";
 import { isMacOS, supportsClips } from "../../utils/platform";
+import { SURFACE, kante, readableOn } from "../ui/design-system";
+import { LoadingSpinner } from "../ui/LoadingSpinner";
+import { EmptyState } from "../ui/EmptyState";
 
 type SettingsTabId = "general" | "appearance" | "clips" | "advanced" | "debug";
 
@@ -85,6 +88,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
       { id: "interface", label: t("settings.sections.interface") },
     ],
     appearance: [
+      { id: "look", label: t("salami.look.settings_title") },
       { id: "theme", label: t("settings.theme.title") },
       { id: "font", label: t("settings.font.title") },
       { id: "background", label: t("settings.background.title") },
@@ -267,15 +271,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
     if (loading) {
       return (
         <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <Icon
-              icon="svg-spinners:ring-resize"
-              className="w-10 h-10 text-white/70 mx-auto mb-4"
-            />
-            <p className="text-base text-white/70 font-smallcaps">
-              {t("settings.loading")}
-            </p>
-          </div>
+          <LoadingSpinner size="md" shadowDepth="none" message={t("settings.loading")} />
         </div>
       );
     }
@@ -310,13 +306,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
     }
 
     if (!config || !tempConfig) {
-      return (
-        <div className="text-center p-8">
-          <p className="text-base text-white/70 font-smallcaps">
-            {t("settings.error.no_config")}
-          </p>
-        </div>
-      );
+      return <EmptyState icon="solar:settings-bold" message={t("settings.error.no_config")} compact fullHeight={false} />;
     }
 
     const bodyOf: Partial<Record<SettingsTabId, ReactNode>> = {
@@ -375,9 +365,9 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
         />
       }
     >
-      <div className="flex h-full p-4 gap-2">
-        <div className="w-64 flex flex-col flex-shrink-0">
-          <div className="px-1 pb-3">
+      <div className="look-settings flex h-full p-4 gap-2">
+        <div className="look-settings-side w-64 flex flex-col flex-shrink-0">
+          <div className="look-settings-search px-1 pb-3">
             <SearchWithFilters
               placeholder={t("common.search")}
               searchValue={sidebarSearch}
@@ -388,38 +378,34 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
               className="w-full"
             />
           </div>
-          <div ref={sidebarListRef} className="space-y-0 flex-1 overflow-y-auto custom-scrollbar">
+          <div ref={sidebarListRef} className="look-settings-list space-y-0 flex-1 overflow-y-auto custom-scrollbar">
             {tabConfig.map((tab) => {
               const isActive = activeTab === tab.id;
               return (
-                <div key={tab.id}>
+                <div key={tab.id} className="look-settings-entry">
+                  {/* Salami-Feinkost: aktiver Bereich voll im Akzent mit harter Unterkante statt grauer Pille */}
                   <button
+                    data-active={isActive || undefined}
                     className={cn(
-                      "w-full text-left px-3 py-2.5 rounded-lg transition-colors border-0 outline-none flex items-center gap-3",
+                      "look-settings-tab w-full text-left px-3 py-2.5 transition-[background-color,color] duration-150 border-0 outline-none flex items-center gap-3",
                       isActive
                         ? "text-white"
-                        : "bg-transparent text-white/60 hover:bg-white/5 hover:text-white/90",
+                        : "bg-transparent text-white/60 hover:text-white/90",
+                      !isActive && "hover:bg-[rgba(255,255,255,0.08)]",
                     )}
-                    style={isActive ? { backgroundColor: `${accentColor.value}26` } : undefined}
+                    style={
+                      isActive
+                        ? { backgroundColor: accentColor.value, boxShadow: kante(accentColor.value), color: readableOn(accentColor.value) }
+                        : undefined
+                    }
                     onClick={() => selectTab(tab.id)}
                   >
-                    <Icon
-                      icon={tab.icon}
-                      className="w-6 h-6 transition-colors duration-200"
-                      style={{ color: isActive ? accentColor.value : undefined }}
-                    />
-                    <span
-                      className={cn(
-                        "font-smallcaps text-lg transition-colors duration-200",
-                        isActive && "font-medium",
-                      )}
-                    >
-                      {tab.label}
-                    </span>
+                    <Icon icon={tab.icon} className="w-6 h-6 flex-shrink-0" />
+                    <span className="font-minecraft text-base">{tab.label}</span>
                   </button>
 
                   {isActive && !sidebarQuery && tab.children && (
-                    <div className="flex flex-col mt-1 ml-5 border-l border-white/10">
+                    <div className="look-settings-sub flex flex-col mt-2 mb-1 ml-5 border-l" style={{ borderColor: SURFACE.line }}>
                       {tab.children.map((child) => {
                         const childActive = activeSection === child.id;
                         return (
@@ -447,11 +433,11 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
           </div>
         </div>
 
-        <div className="flex items-center">
-          <div className="border-l border-white/10 mx-4 my-3 h-[85%]"></div>
+        <div className="look-settings-divider flex items-center">
+          <div className="border-l mx-4 my-3 h-[85%]" style={{ borderColor: SURFACE.line }}></div>
         </div>
 
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <div className="look-settings-paper flex-1 flex flex-col min-w-0 overflow-hidden">
           <div
             ref={contentRef}
             className="flex-1 py-2 px-5 overflow-y-auto overflow-x-hidden custom-scrollbar min-w-0"

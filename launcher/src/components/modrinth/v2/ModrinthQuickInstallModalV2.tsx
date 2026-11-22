@@ -12,6 +12,10 @@ import { Button } from '../../ui/buttons/Button';
 import { useThemeStore } from '../../../store/useThemeStore'; // For accent color on Installed button
 import { cn } from '../../../lib/utils';
 import { ModrinthQuickProfile } from './ModrinthQuickProfile'; // New import
+import { LoadingSpinner } from '../../ui/LoadingSpinner';
+import { EmptyState } from '../../ui/EmptyState';
+import { hexAlpha, SURFACE } from '../../ui/design-system';
+import { KanteButton, PLAIN_CARD } from './FeinkostParts';
 // Potentially import Profile type if available and not 'any'
 // import type { Profile } from '../../../types/profile';
 import { toast } from 'react-hot-toast';
@@ -153,42 +157,20 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
         </div>
       ) : isLoading ? (
         <div className="flex justify-center items-center py-8">
-          <svg
-            className="animate-spin h-8 w-8 text-blue-500"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            ></circle>
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            ></path>
-          </svg>
-          <span className="ml-3 text-gray-300 font-minecraft">
-            {t('modrinth.finding_compatible_versions')}
-          </span>
+          <LoadingSpinner size="md" message={t('modrinth.finding_compatible_versions')} />
         </div>
       ) : error ? (
-        <div className="text-red-400 text-center py-6 px-6">{error}</div>
+        <EmptyState icon="solar:danger-triangle-bold" message={error} compact fullHeight={false} />
       ) : versions && versions.length > 0 ? (
         <div className="px-6 py-4">
-          <p className="text-gray-300 mb-4 text-xs font-minecraft">
+          <p className="text-white/70 mb-4 text-xs">
             {t('modrinth.quick_install_description')}
           </p>
 
           <div className="mb-1">
             <div 
-              className="max-h-60 overflow-y-auto border custom-scrollbar" 
-              style={{ borderColor: `${accentColor.value}80` }}
+              className="look-card max-h-60 overflow-y-auto custom-scrollbar"
+              style={PLAIN_CARD}
             >
               {profiles.length > 0 ? (
                 [...profiles]
@@ -208,41 +190,38 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
                       <div
                         key={profile.id}
                         className={cn(
-                          "p-3 border-b last:border-b-0 flex justify-between items-center hover:bg-white/10 transition-colors duration-150"
+                          "p-3 border-b last:border-b-0 flex justify-between items-center hover:bg-white/[0.06] transition-colors duration-150"
                         )}
                         style={{
-                          backgroundColor: profile.id === selectedProfileId ? `${accentColor.value}50` : `${accentColor.value}30`,
-                          borderBottomColor: `${accentColor.value}80`,
+                          backgroundColor: profile.id === selectedProfileId ? hexAlpha(accentColor.value, 0.16) : undefined,
+                          borderBottomColor: SURFACE.line,
                         }}
                       >
                         <div className="text-white flex-grow mr-3 min-w-0">
                           <span className="font-medium text-base font-minecraft truncate">{profile.name}</span>
                           {profile.id === selectedProfileId && (
-                            <span className="ml-2 text-xs text-green-400">
+                            <span className="ml-2 text-xs text-[#f3e3d3]">
                               ({t('modrinth.current_profile')})
                             </span>
                           )}
                           {isCompatible && bestVersion && (
-                            <div className="text-xs text-gray-400 mt-0.5 font-minecraft truncate">
+                            <div className="text-xs text-white/50 mt-0.5 truncate">
                               {t('modrinth.version_label', { version: bestVersion.version_number })}
                             </div>
                           )}
                         </div>
 
                         {installingProfiles[profile.id] ? (
-                          <Button
-                            size="xs"
-                            variant="secondary"
+                          <KanteButton
+                            size="sm"
                             disabled
-                            shadowDepth="short"
-                            icon={ <svg /* spinner */ className="animate-spin h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" > <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle> <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path> </svg>}
-                            iconPosition="left"
-                            className="flex-shrink-0"
+                            className="cursor-wait"
+                            icon={<Icon icon="svg-spinners:ring-resize" className="w-3.5 h-3.5" />}
                           >
                             {t('modrinth.installing')}
-                          </Button>
+                          </KanteButton>
                         ) : installStatus[profile.id] && bestVersion && onUninstallClick ? (
-                          <Button
+                          <KanteButton
                             onClick={async () => {
                               if (project && bestVersion) {
                                 try {
@@ -252,65 +231,36 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
                                 }
                               }
                             }}
-                            size="xs"
-                            variant="destructive"
-                            shadowDepth="short"
+                            size="sm"
+                            tone="danger"
                             icon={<Icon icon="solar:trash-bin-trash-bold" className="w-3.5 h-3.5" />}
-                            iconPosition="left"
-                            className="flex-shrink-0"
                           >
                             {t('common.uninstall')}
-                          </Button>
+                          </KanteButton>
                         ) : !isCompatible ? (
-                          <Button
-                            size="xs"
-                            variant="secondary"
+                          <KanteButton
+                            size="sm"
                             disabled
-                            shadowDepth="short"
                             icon={<Icon icon="solar:danger-bold" className="w-3.5 h-3.5" />}
-                            className="flex-shrink-0"
                           >
                             {t('modrinth.not_compatible')}
-                          </Button>
+                          </KanteButton>
                         ) : (
-                          <Button
+                          <KanteButton
                             onClick={() => onInstallToProfile(profile.id)}
                             disabled={installingProfiles[profile.id]}
-                            size="xs"
-                            variant={installingProfiles[profile.id] ? "secondary" : "success"}
-                            shadowDepth="short"
-                            icon={installingProfiles[profile.id] ? 
-                                <svg
-                                    className="animate-spin h-3 w-3 text-white"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    >
-                                    <circle
-                                        className="opacity-25"
-                                        cx="12"
-                                        cy="12"
-                                        r="10"
-                                        stroke="currentColor"
-                                        strokeWidth="4"
-                                    ></circle>
-                                    <path
-                                        className="opacity-75"
-                                        fill="currentColor"
-                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                    ></path>
-                                    </svg> : <Icon icon="solar:download-minimalistic-bold" className="w-3.5 h-3.5" />}
-                            iconPosition="left"
-                            className="flex-shrink-0"
+                            size="sm"
+                            tone="primary"
+                            icon={<Icon icon="solar:download-minimalistic-bold" className="w-3.5 h-3.5" />}
                           >
-                            {installingProfiles[profile.id] ? t('modrinth.installing') : t('modrinth.install')}
-                          </Button>
+                            {t('modrinth.install')}
+                          </KanteButton>
                         )}
                       </div>
                     );
                   })
               ) : (
-                <p className="p-4 text-center text-gray-400">
+                <p className="p-4 text-center text-white/50">
                   {t('modrinth.no_profiles_available')}
                 </p>
               )}
@@ -318,7 +268,7 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
           </div>
         </div>
       ) : (
-        <div className="text-gray-300 text-center py-6 px-6">
+        <div className="text-white/60 text-center py-6 px-6">
           {t('modrinth.no_versions_found')}
         </div>
       )}
@@ -340,31 +290,30 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
 
   if (creationResult === 'success') {
     modalContentLayout = (
-      <div className="p-4 text-center space-y-3">
-        <Icon icon="solar:check-circle-bold" className="w-16 h-16 text-green-500 mx-auto" />
-        <h3 className="text-sm font-semibold text-gray-100">
-          {sourceProfileToCopyId ? t('modrinth.profile_copied_installed') : t('modrinth.profile_created_installed')}
-        </h3>
-        <p className="text-sm text-gray-300 font-minecraft">
-          {t('modrinth.install_success_message', { title: project.title, version: versions?.[0]?.version_number || 'latest', profile: quickProfileName.trim() })}
-          {sourceProfileToCopyId && profiles.find(p => p.id === sourceProfileToCopyId) && (
-            <>
-              <br />
-              {t('modrinth.settings_copied_from', { source: profiles.find(p => p.id === sourceProfileToCopyId)?.name })}
-            </>
-          )}
-        </p>
-      </div>
+      <EmptyState
+        icon="solar:check-circle-bold"
+        compact
+        fullHeight={false}
+        smallDescription
+        message={sourceProfileToCopyId ? t('modrinth.profile_copied_installed') : t('modrinth.profile_created_installed')}
+        description={
+          t('modrinth.install_success_message', { title: project.title, version: versions?.[0]?.version_number || 'latest', profile: quickProfileName.trim() }) +
+          (sourceProfileToCopyId && profiles.find(p => p.id === sourceProfileToCopyId)
+            ? ` ${t('modrinth.settings_copied_from', { source: profiles.find(p => p.id === sourceProfileToCopyId)?.name })}`
+            : '')
+        }
+      />
     );
   } else if (creationResult === 'error') {
     modalContentLayout = (
-      <div className="p-4 text-center space-y-3">
-        <Icon icon="solar:close-circle-bold" className="w-16 h-16 text-red-500 mx-auto" />
-        <h3 className="text-sm font-semibold text-gray-100">{t('modrinth.operation_failed')}</h3>
-        <p className="text-sm text-red-400">
-          {lastCreationErrorMessage || t('modrinth.error_creating_or_installing')}
-        </p>
-      </div>
+      <EmptyState
+        icon="solar:close-circle-bold"
+        compact
+        fullHeight={false}
+        smallDescription
+        message={t('modrinth.operation_failed')}
+        description={lastCreationErrorMessage || t('modrinth.error_creating_or_installing')}
+      />
     );
   } else {
     modalContentLayout = modalContent;
@@ -409,16 +358,15 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
               >
                 {t('modrinth.back_to_profiles')}
               </Button>
-              <Button
-                variant="success"
+              <KanteButton
+                tone="primary"
+                size="lg"
                 onClick={handleCreateAndInstallProfile}
                 disabled={isCreatingProfile || !quickProfileName.trim()}
-                shadowDepth="short"
-                size="sm"
                 icon={isCreatingProfile ? <Icon icon="line-md:loading-twotone-loop" className="w-4 h-4" /> : <Icon icon="solar:ssd-round-bold-duotone" className="w-4 h-4" />}
               >
                 {isCreatingProfile ? (sourceProfileToCopyId ? t('modrinth.copying') : t('modrinth.creating')) : (sourceProfileToCopyId ? t('modrinth.copy_and_install') : t('modrinth.create_and_install'))}
-              </Button>
+              </KanteButton>
             </>
           ) : (
             // Footer for profile list view (or initial loading/error states)

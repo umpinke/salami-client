@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { Icon } from "@iconify/react";
 import { cn } from "../lib/utils";
@@ -20,6 +21,7 @@ const COMMON_FONTS = [
 ];
 
 export function FontSelector({ disabled }: FontSelectorProps) {
+  const { t } = useTranslation();
   const { fontId, setFont, customFamily, setCustomFamily } = useFontStore();
   const presets = Object.values(FONT_PRESETS);
   const isCustom = fontId === CUSTOM_FONT_ID;
@@ -100,7 +102,7 @@ export function FontSelector({ disabled }: FontSelectorProps) {
             className={cn("text-base transition-colors", isCustom ? "text-white" : "text-white/80")}
             style={customFamily ? { fontFamily: `"${customFamily}", sans-serif` } : undefined}
           >
-            {customFamily?.trim() ? customFamily : "Custom"}
+            {customFamily?.trim() ? customFamily : t("settings.font.custom")}
           </span>
           {isCustom && (
             <Icon icon="solar:check-circle-bold" className="w-5 h-5 text-white absolute top-2 right-2" />
@@ -116,11 +118,11 @@ export function FontSelector({ disabled }: FontSelectorProps) {
             options={fonts}
             disabled={disabled}
             allowClear
-            placeholder="Pick or type a font (e.g. Comic Sans MS, Inter)"
+            placeholder={t("settings.font.placeholder")}
             inputStyle={customFamily ? { fontFamily: `"${customFamily}", sans-serif` } : undefined}
             optionStyle={(f) => ({ fontFamily: `"${f}", sans-serif` })}
           />
-          <span className="text-xs text-white/40 font-minecraft">{fonts.length} fonts available</span>
+          <span className="text-xs text-white/40 font-minecraft">{t("settings.font.available", { count: fonts.length })}</span>
         </div>
       )}
     </div>

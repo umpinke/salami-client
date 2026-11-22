@@ -20,6 +20,8 @@ import {
   ThemedDropdownDivider,
   ThemedDropdownItem,
 } from "../profiles/v3/shared/ThemedDropdown";
+import { FK_CARD_CLASS, fkCardStyle } from "../profiles/v3/shared/feinkost";
+import { DeliLabel } from "../../themes/salami/SalamiStage";
 
 export interface SyncPackCardProps {
   pack: SyncPack;
@@ -95,25 +97,22 @@ export function SyncPackCard({
   const isEmpty =
     pack.targets.length === 0 && pack.mods.length === 0 && jars.length === 0;
 
-  const summary = [
+  // Salami: Zusammenfassung als Feinkost-Etiketten statt „a  |  b“
+  const summaryParts = [
     pack.targets.length > 0 &&
       t("syncPacks.targetCount", { count: pack.targets.length }),
     pack.mods.length > 0 && t("syncPacks.modCount", { count: pack.mods.length }),
     jars.length > 0 && t("syncPacks.drop.localJars", { count: jars.length }),
-  ]
-    .filter(Boolean)
-    .join("  |  ");
+  ].filter((part): part is string => Boolean(part));
 
   return (
     <div
-      className="group overflow-hidden rounded-lg border bg-black/20 transition-all duration-200"
-      style={{
-        borderColor: inUse ? `${accentColor.value}45` : "rgba(255,255,255,0.1)",
-      }}
+      className={`group overflow-hidden ${FK_CARD_CLASS}`}
+      style={fkCardStyle(accentColor.value, false, inUse)}
     >
       <div
         onClick={() => setExpandedPack(isOpen ? null : pack.id)}
-        className="group/head flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-white/[0.03]"
+        className="group/head flex cursor-pointer items-center gap-3.5 px-4 py-3"
       >
         <Tooltip
           content={t("syncPacks.changeIcon")}
@@ -159,16 +158,19 @@ export function SyncPackCard({
             position="top"
             wrapperClassName="min-w-0 max-w-full"
           >
-            <h3
-              className="w-full truncate font-minecraft text-lg normal-case text-white"
-              style={{ textShadow: "0 2px 4px rgba(0,0,0,0.7)" }}
-            >
+            <h3 className="w-full truncate font-minecraft text-xl leading-tight normal-case text-white">
               {pack.name}
             </h3>
           </Tooltip>
           )}
-          <div className="truncate font-minecraft text-xs text-white/45">
-            {isEmpty ? t("syncPacks.targets.empty") : summary}
+          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
+            {isEmpty ? (
+              <span className="text-sm text-white/45">{t("syncPacks.targets.empty")}</span>
+            ) : (
+              summaryParts.map((part) => (
+                <DeliLabel key={part} size="sm">{part}</DeliLabel>
+              ))
+            )}
           </div>
         </div>
 
@@ -249,9 +251,9 @@ export function SyncPackCard({
       </div>
 
       {isOpen && (
-        <div className="border-t border-white/[0.07]">
+        <div className="border-t border-white/[0.09]">
           {!isEmpty && (
-            <div className="space-y-2 p-2">
+            <div className="space-y-2 p-3">
               {pack.targets.map((target) => (
                 <SyncPackRow
                   key={target.id}

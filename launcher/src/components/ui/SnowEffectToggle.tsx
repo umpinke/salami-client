@@ -1,6 +1,7 @@
 "use client";
 
 import { Icon } from "@iconify/react";
+import { useTranslation } from "react-i18next";
 import { ToggleSwitch } from "./ToggleSwitch";
 import { useSnowEffectStore } from "../../store/snow-effect-store";
 import { SimpleTooltip } from "./Tooltip";
@@ -21,11 +22,12 @@ export function SnowEffectToggle({
   className,
   variant = "full",
 }: SnowEffectToggleProps) {
+  const { t } = useTranslation();
   const { isEnabled, toggleSnowEffect } = useSnowEffectStore();
 
   if (variant === "compact") {
     return (
-      <SimpleTooltip content={isEnabled ? "Snow Effect: On" : "Snow Effect: Off"}>
+      <SimpleTooltip content={isEnabled ? t('settings.background.snow_on') : t('settings.background.snow_off')}>
         <div className={cn("flex items-center gap-2", className)}>
           <Icon
             icon="solar:snowflake-bold"
@@ -50,7 +52,7 @@ export function SnowEffectToggle({
     <div className={cn("flex items-center gap-2", className)}>
       {showLabel && (
         <span className="text-sm text-white/70 font-minecraft">
-          Snow Effect
+          {t('settings.background.snow')}
         </span>
       )}
       <ToggleSwitch

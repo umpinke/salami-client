@@ -7,7 +7,7 @@ import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 import { IconButton } from "./buttons/IconButton";
-import { mixHex, SURFACE } from "./design-system";
+import { kopfband, mixHex, SURFACE } from "./design-system";
 
 interface ModalProps {
   title: string;
@@ -120,18 +120,20 @@ export function Modal({
     >
       <div
         className={cn(
-          "relative flex flex-col w-full rounded-lg overflow-hidden max-h-[90vh]",
+          "look-modal relative flex flex-col w-full rounded-lg overflow-hidden max-h-[90vh]",
           getBorderClasses(),
           variant === "3d" ? "shadow-2xl" : "",
           widthClasses[width],
           className,
         )}
         style={{
-          backgroundColor: mixHex(SURFACE.solid, accentColor.value, 0.05),
+          backgroundColor: SURFACE.solid,
           borderColor: SURFACE.line,
           boxShadow: getBoxShadow(),
         }}
       >
+        {/* Salami: schmales Kopfband im Anschnitt-Muster über jedem Dialog */}
+        <div className="salami-fat-spots h-2.5 flex-shrink-0" style={kopfband(accentColor.value)} aria-hidden="true" />
         <div
           ref={headerRef}
           className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0"
@@ -147,7 +149,7 @@ export function Modal({
               </span>
             )}
             <div className="flex flex-col">
-              <h2 className="text-lg font-smallcaps text-white">
+              <h2 className="text-lg font-minecraft text-white">
                 {title}
               </h2>
               {titleSubtitle && <div className="mt-0.5">{titleSubtitle}</div>}

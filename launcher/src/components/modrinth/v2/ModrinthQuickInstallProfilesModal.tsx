@@ -11,7 +11,9 @@ import { useThemeStore } from '../../../store/useThemeStore';
 import { SearchWithFilters } from '../../ui/SearchWithFilters';
 import type { DropdownOption } from '../../ui/CustomDropdown';
 import { ModrinthQuickProfile } from './ModrinthQuickProfile';
-import { ActionButton } from '../../ui/ActionButton';
+import { EmptyState } from '../../ui/EmptyState';
+import { hexAlpha, SURFACE } from '../../ui/design-system';
+import { cardSurface, KanteButton } from './FeinkostParts';
 import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { loaderIconSrc } from "../../../lib/loader-icons";
@@ -324,38 +326,37 @@ export function ModrinthQuickInstallProfilesModal({
             />
 
             {/* Footer buttons for quick profile view */}
-            <div className="flex justify-between items-center mt-6 pt-4 border-t border-white/10">
-              <button
+            <div className="flex justify-between items-center mt-6 pt-4 border-t" style={{ borderColor: SURFACE.line }}>
+              <KanteButton
+                tone="ghost"
                 onClick={() => {
                   console.log('⬅️ Switching back to profile list view');
                   switchToProfileListView();
                 }}
-                className="flex items-center gap-2 px-4 py-2 text-white/70 hover:text-white transition-colors duration-200 text-base font-smallcaps"
+                icon={<Icon icon="solar:arrow-left-linear" className="w-4 h-4" />}
               >
-                <Icon icon="solar:arrow-left-linear" className="w-4 h-4" />
-                <span>{t('modrinth.back_to_profiles')}</span>
-              </button>
+                {t('modrinth.back_to_profiles')}
+              </KanteButton>
 
-              <ActionButton
-                icon={isCreatingProfile ? "solar:refresh-bold" : "solar:play-bold-duotone"}
-                label={isCreatingProfile ? t('modrinth.creating') : t('modrinth.create_and_install')}
-                variant="primary"
-                size="md"
-                className="py-[0.29em]"
-                iconClassName={isCreatingProfile ? "animate-spin" : ""}
+              <KanteButton
+                tone="primary"
+                size="lg"
+                icon={<Icon icon={isCreatingProfile ? "solar:refresh-bold" : "solar:play-bold-duotone"} className={isCreatingProfile ? "h-5 w-5 animate-spin" : "h-5 w-5"} />}
                 disabled={!quickProfileName.trim() || isCreatingProfile}
                 onClick={() => {
                   console.log('✅ Creating profile and installing');
                   handleCreateAndInstallProfile();
                 }}
-              />
+              >
+                {isCreatingProfile ? t('modrinth.creating') : t('modrinth.create_and_install')}
+              </KanteButton>
             </div>
           </div>
         ) : (
           <>
             {/* Version info (placed above search) */}
             {version && (
-              <p className="text-gray-400 text-xs text-center font-minecraft mb-4 -mt-2">
+              <p className="text-white/55 text-xs text-center mb-4 -mt-2">
                 {t('modrinth.will_install_version', { version: version.version_number, title: project.title })}
               </p>
             )}
@@ -376,33 +377,30 @@ export function ModrinthQuickInstallProfilesModal({
                   />
                 </div>
                 {onInstallToNewProfile && (
-                  <ActionButton
-                    icon="solar:add-folder-line-duotone"
-                    label={t('profiles.new_profile')}
-                    variant="primary"
-                    size="md"
-                    className="py-[0.29em]"
+                  <KanteButton
+                    className="h-10"
+                    icon={<Icon icon="solar:add-folder-line-duotone" className="h-4 w-4" />}
                     onClick={() => {
                       console.log('🆕 Switching to quick profile creation view');
                       switchToQuickProfileView();
                     }}
-                  />
+                  >
+                    {t('profiles.new_profile')}
+                  </KanteButton>
                 )}
               </div>
             </div>
 
         {processedProfiles.length === 0 ? (
-          <div className="text-center py-8 min-h-[400px] flex flex-col justify-center">
-            <Icon icon="solar:folder-error-bold" className="mx-auto mb-4 text-4xl text-white/30" />
-            <h3 className="text-sm font-smallcaps text-white/50 mb-2">
-              {profiles.length === 0 ? t('modrinth.no_profiles_available') : t('modrinth.no_profiles_found')}
-            </h3>
-            <p className="text-white/40 text-sm lowercase">
-              {profiles.length === 0
-                ? t('modrinth.create_profile_first')
-                : t('modrinth.adjust_search_filters')
-              }
-            </p>
+          <div className="min-h-[400px] flex flex-col justify-center">
+            <EmptyState
+              icon="solar:folder-error-bold"
+              message={profiles.length === 0 ? t('modrinth.no_profiles_available') : t('modrinth.no_profiles_found')}
+              description={profiles.length === 0 ? t('modrinth.create_profile_first') : t('modrinth.adjust_search_filters')}
+              smallDescription
+              compact
+              fullHeight={false}
+            />
           </div>
         ) : (
           <div className="min-h-[400px]">
@@ -411,12 +409,27 @@ export function ModrinthQuickInstallProfilesModal({
                 <button
                   key={profile.id}
                   onClick={() => handleProfileCardClick(profile)}
-                  className="group relative flex items-center gap-4 p-4 rounded-lg bg-black/20 border border-white/10 hover:border-white/30 transition-all duration-200 cursor-pointer"
+                  className="look-card group relative flex items-center gap-4 p-3.5 transition-[transform,border-color,box-shadow,background-color] duration-200 cursor-pointer hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+                  style={cardSurface(accentColor.value, false)}
+                  onMouseEnter={(e) => {
+                    const s = cardSurface(accentColor.value, true, false);
+                    e.currentTarget.style.borderColor = hexAlpha(accentColor.value, 0.55);
+                    e.currentTarget.style.boxShadow = String(s.boxShadow);
+                    e.currentTarget.style.backgroundColor = String(s.backgroundColor);
+                  }}
+                  onMouseLeave={(e) => {
+                    const s = cardSurface(accentColor.value, false);
+                    e.currentTarget.style.borderColor = SURFACE.line;
+                    e.currentTarget.style.boxShadow = String(s.boxShadow);
+                    e.currentTarget.style.backgroundColor = String(s.backgroundColor);
+                  }}
                 >
-                {/* Profile Icon */}
-                <div className="relative w-16 h-16 flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden border-2 transition-all duration-200 group-hover:border-white/30"
+                {/* Profile Icon – Creme-Rahmen wie auf der Profil-Kachel */}
+                <div className="relative w-14 h-14 flex-shrink-0 flex items-center justify-center overflow-hidden border-2"
                   style={{
-                    borderColor: 'transparent',
+                    borderColor: '#f3e3d3',
+                    backgroundColor: SURFACE.solid,
+                    borderRadius: 'calc(var(--border-radius) * 0.8)',
                   }}
                 >
                   <ProfileIconV2 profile={profile} size="md" className="w-full h-full" />
@@ -480,34 +493,36 @@ export function ModrinthQuickInstallProfilesModal({
                   if (isUninstalling) {
                     // Show uninstalling button with spinner
                     return (
-                      <button
+                      <KanteButton
+                        tone="danger"
                         disabled
-                        className="flex-shrink-0 px-3 py-1 text-base font-smallcaps rounded-lg border transition-all duration-200 flex items-center gap-2 bg-red-900/30 text-red-300 cursor-wait border-red-700/30"
+                        className="cursor-wait"
+                        icon={<Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />}
                       >
-                        <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
-                        <span>{t('modrinth.uninstalling')}</span>
-                      </button>
+                        {t('modrinth.uninstalling')}
+                      </KanteButton>
                     );
                   } else if (canUninstall) {
                     // Show uninstall button for installed content (compatible with ModrinthInstallModalV2)
                     return (
-                      <button
+                      <KanteButton
+                        tone="danger"
                         onClick={(e) => {
                           e.stopPropagation();
                           console.log('🗑️ Starting uninstallation for:', profile.name);
                           handleUninstallClick(profile);
                         }}
                         disabled={isInstalling || isUninstalling}
-                        className="flex-shrink-0 px-3 py-1 text-base font-smallcaps rounded-lg border transition-all duration-200 hover:scale-105 flex items-center gap-2 bg-red-900/30 hover:bg-red-800/40 text-red-300 hover:text-red-200 border-red-700/30 hover:border-red-600/40"
+                        icon={<Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" />}
                       >
-                        <Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" />
-                        <span>{t('common.uninstall')}</span>
-                      </button>
+                        {t('common.uninstall')}
+                      </KanteButton>
                     );
                   } else {
                     // Show install button (original logic)
                     return (
-                      <button
+                      <KanteButton
+                        tone={isInstalled ? "done" : isInstalling ? "secondary" : "primary"}
                         onClick={(e) => {
                           e.stopPropagation();
                           if (!isInstalling && !isInstalled) {
@@ -518,52 +533,16 @@ export function ModrinthQuickInstallProfilesModal({
                           }
                         }}
                         disabled={isInstalling || isInstalled}
-                        className={`flex-shrink-0 px-3 py-1 text-base font-smallcaps rounded-lg border transition-all duration-200 flex items-center gap-2 ${
-                          isInstalled
-                            ? 'cursor-default'
-                            : isInstalling
-                            ? 'bg-black/30 text-white/70 cursor-wait border-white/10'
-                            : 'bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border-white/10 hover:border-white/20 hover:scale-105'
-                        }`}
-                        style={
-                          isInstalled
-                            ? {
-                                backgroundColor: 'transparent',
-                                border: 'none',
-                                color: accentColor.value,
-                              }
-                            : undefined
+                        className={isInstalling ? "cursor-wait" : undefined}
+                        icon={
+                          <Icon
+                            icon={isInstalled ? "solar:check-circle-bold" : isInstalling ? "svg-spinners:ring-resize" : "solar:download-minimalistic-bold"}
+                            className="w-4 h-4"
+                          />
                         }
-                        onMouseEnter={(e) => {
-                          if (isInstalled) {
-                            e.currentTarget.style.backgroundColor = `${accentColor.value}20`;
-                            e.currentTarget.style.textShadow = `0 0 8px ${accentColor.value}40`;
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (isInstalled) {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                            e.currentTarget.style.textShadow = 'none';
-                          }
-                        }}
                       >
-                        {isInstalled ? (
-                          <>
-                            <Icon icon="solar:check-circle-bold" className="w-4 h-4" />
-                            <span>{t('modrinth.installed')}</span>
-                          </>
-                        ) : isInstalling ? (
-                          <>
-                            <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
-                            <span>{t('modrinth.installing')}</span>
-                          </>
-                        ) : (
-                          <>
-                            <Icon icon="solar:download-bold" className="w-4 h-4" />
-                            <span>{t('modrinth.install')}</span>
-                          </>
-                        )}
-                      </button>
+                        {isInstalled ? t('modrinth.installed') : isInstalling ? t('modrinth.installing') : t('modrinth.install')}
+                      </KanteButton>
                     );
                   }
                 })()}
@@ -574,16 +553,15 @@ export function ModrinthQuickInstallProfilesModal({
             )}
 
             {/* Footer buttons for profile list view */}
-            <div className="flex justify-end items-center mt-6 pt-4 border-t border-white/10">
-              <button
+            <div className="flex justify-end items-center mt-6 pt-4 border-t" style={{ borderColor: SURFACE.line }}>
+              <KanteButton
                 onClick={() => {
                   console.log('❌ Closing modal');
                   onClose();
                 }}
-                className="flex items-center gap-2 px-4 py-2 text-white/70 hover:text-white transition-colors duration-200 text-xs font-smallcaps"
               >
-                <span>{t('common.close')}</span>
-              </button>
+                {t('common.close')}
+              </KanteButton>
             </div>
           </>
         )}

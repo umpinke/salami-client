@@ -1,7 +1,10 @@
 "use client";
 
 import type React from "react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
+import { SURFACE, KANTE_SOFT, hexAlpha } from "../../../../ui/design-system";
+import { SALAMI_COLORS } from "../../../../../themes/salami/salami-theme";
+import { PixelIcon } from "../../../../../themes/salami/PixelIcon";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { useThemeStore } from "../../../../../store/useThemeStore";
@@ -103,13 +106,21 @@ export function ContentTile({
   const versionButtonRef = useRef<HTMLButtonElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
+  // Salami: Karte im Feinkost-Stil – warme Fläche mit Haarlinie, beim Hover Akzent-Rahmen + leichter Schein
+  const [hovered, setHovered] = useState(false);
+  const lifted = hovered && !isSelected;
   return (
     <div
-      style={isSelected ? { backgroundColor: `${accentColor.value}1a`, borderColor: `${accentColor.value}66` } : undefined}
-      className={`group relative flex items-center gap-4 p-3 rounded-lg border transition-colors ${
-        isSelected
-          ? ""
-          : `bg-black/20 border-white/10 hover:border-white/20 hover:bg-black/30 ${!enabled ? "opacity-55" : ""}`
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        backgroundColor: isSelected ? hexAlpha(accentColor.value, 0.12) : lifted ? SURFACE.hover : SURFACE.base,
+        borderColor: isSelected || lifted ? hexAlpha(accentColor.value, 0.55) : SURFACE.line,
+        borderRadius: "var(--border-radius)",
+        boxShadow: lifted ? `0 10px 24px -14px ${hexAlpha(accentColor.value, 0.6)}` : undefined,
+      }}
+      className={`group relative flex items-center gap-4 p-3 border transition-[background-color,border-color,box-shadow,opacity] duration-150 ${
+        !enabled && !isSelected ? "opacity-55" : ""
       }`}
     >
       {/* Selection checkbox (on-hover, or permanent when selectMode aktiv) */}
@@ -124,11 +135,14 @@ export function ContentTile({
 
       {/* Icon + optionales NoRisk-Warn-Icon */}
       <div className="relative w-14 h-14 flex-shrink-0">
-        <div className="w-full h-full rounded-lg bg-white/5 ring-1 ring-white/10 flex items-center justify-center overflow-hidden">
+        <div
+          className="w-full h-full flex items-center justify-center overflow-hidden border-2"
+          style={{ backgroundColor: SURFACE.solid, borderColor: SURFACE.lineStrong, borderRadius: "calc(var(--border-radius) * 0.8)" }}
+        >
           {iconUrl ? (
             <img src={iconUrl} alt="" className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
           ) : (
-            <Icon icon="solar:bolt-bold-duotone" className="w-6 h-6 text-white/50" />
+            <PixelIcon name="mods" className="w-6 h-6 text-white/35" />
           )}
         </div>
       </div>
@@ -177,14 +191,24 @@ export function ContentTile({
               /* Fixed h-5 verhindert dass die Chip 1-2px hoeher wird sobald ein
                  Update-Dot/Switch-Spinner reinkommt (inline-block Baseline-Quirk
                  vom Tooltip-Wrapper). Sonst shifted Identity vertikal. */
-              className={`inline-flex items-center gap-1 h-5 max-w-full truncate px-1.5 rounded transition-colors ${
+              /* Salami: Version als kleines Feinkost-Etikett (DeliLabel sm) */
+              className={`${!versionText && !isSwitchable && !isSwitchingVersion ? "hidden" : "inline-flex"} items-center gap-1.5 h-5 max-w-full truncate pl-1.5 pr-2 leading-none transition-[filter] ${
                 isSwitchingVersion
-                  ? "text-amber-200 bg-amber-400/10 cursor-wait"
+                  ? "cursor-wait"
                   : isSwitchable
-                    ? "text-white/70 hover:text-white hover:bg-white/5 cursor-pointer"
-                    : "text-white/45 cursor-default"
+                    ? "cursor-pointer hover:brightness-105"
+                    : "cursor-default opacity-75"
               }`}
+              style={{
+                background: SALAMI_COLORS.fat,
+                color: SALAMI_COLORS.pepper,
+                borderRadius: "4px 10px 10px 4px",
+                boxShadow: "0 2px 0 rgba(0,0,0,0.35)",
+              }}
             >
+              {!isSwitchingVersion && !updateAvailable && (
+                <span className="h-1.5 w-1.5 flex-shrink-0" style={{ borderRadius: 999, background: SALAMI_COLORS.casing }} />
+              )}
               {isSwitchingVersion && (
                 <Icon icon="svg-spinners:ring-resize" className="w-3 h-3 flex-shrink-0" />
               )}
@@ -200,7 +224,7 @@ export function ContentTile({
                 return (
                   <span
                     className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                      active ? "bg-amber-400 animate-pulse" : "bg-white/30"
+                      active ? "bg-amber-500 animate-pulse" : "bg-black/25"
                     }`}
                   />
                 );
@@ -222,7 +246,7 @@ export function ContentTile({
           </div>
 
           {item.file_size > 0 && (
-            <span className="text-white/30 flex-shrink-0">{formatFileSize(item.file_size)}</span>
+            <span className="text-white/40 flex-shrink-0">{formatFileSize(item.file_size)}</span>
           )}
         </div>
       </div>
@@ -233,7 +257,8 @@ export function ContentTile({
           <button
             onClick={(e) => { e.stopPropagation(); if (!quickUpdateDisabled && !isQuickUpdating) onQuickUpdate(); }}
             disabled={quickUpdateDisabled || isQuickUpdating}
-            className={`h-8 w-8 rounded-md border flex items-center justify-center flex-shrink-0 transition-colors ${
+            style={{ borderRadius: "calc(var(--border-radius) * 0.8)", boxShadow: KANTE_SOFT }}
+            className={`h-8 w-8 border flex items-center justify-center flex-shrink-0 transition-[background-color,color,transform] active:translate-y-px ${
               isQuickUpdating
                 ? "bg-amber-400/20 border-amber-400/40 text-amber-200 cursor-wait"
                 : quickUpdateDisabled

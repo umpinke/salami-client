@@ -6,6 +6,8 @@ import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../store/useThemeStore";
 import { handleIconImgLoad } from "../profiles/IconPicker";
 import { BLOCK_ICONS } from "../../data/block-icons";
+import { SURFACE } from "../ui/design-system";
+import { SALAMI_COLORS } from "../../themes/salami/salami-theme";
 
 function fallbackBlockUrl(packId: string): string {
   let hash = 2166136261;
@@ -40,14 +42,16 @@ export function SyncPackIcon({
 
   useEffect(() => setFailed(false), [src]);
 
-  const box = size === "sm" ? "h-8 w-8" : "h-11 w-11";
+  const box = size === "sm" ? "h-8 w-8 border-2" : "h-12 w-12 border-[3px]";
 
+  // Salami: Bild im Creme-Rahmen wie das Profilbild der Kachel
   return (
     <div
-      className={`${box} flex flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border ${className}`}
+      className={`${box} flex flex-shrink-0 items-center justify-center overflow-hidden ${className}`}
       style={{
-        backgroundColor: `${accentColor.value}1a`,
-        borderColor: `${accentColor.value}4d`,
+        backgroundColor: SURFACE.solid,
+        borderColor: SALAMI_COLORS.fat,
+        borderRadius: "calc(var(--border-radius) * 0.8)",
       }}
     >
       {failed ? (

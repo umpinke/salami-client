@@ -8,6 +8,14 @@ import { builtinCapeImage, saveCape, type SalamiCape } from "../../services/sala
 import { Cape3D } from "./Cape3D";
 import { EDITOR_AREAS, TEXTURE_HEIGHT, TEXTURE_WIDTH, areaAt } from "./cape-layout";
 import "./i18n";
+import { errorText } from "../../utils/error-text";
+import { KANTE_SOFT, SURFACE, kante, kopfband, readableOn } from "../ui/design-system";
+
+/** Salami-Feinkost: Nebenknöpfe neutral mit weicher Unterkante, beim Drücken 1px nach unten. */
+const SOFT_BUTTON_WIDE =
+  "flex flex-1 items-center justify-center gap-1.5 py-2 text-sm text-white transition-[filter] duration-150 hover:brightness-125 active:translate-y-px";
+const SOFT_BUTTON_SMALL = "px-2.5 py-1 text-xs text-white transition-[filter] duration-150 hover:brightness-125 active:translate-y-px";
+const SOFT_BUTTON_STYLE = { backgroundColor: SURFACE.hover, boxShadow: KANTE_SOFT } as const;
 
 /** Neues Cape (`cape` leer) oder ein vorhandenes bearbeiten. */
 export interface CapeEditorTarget {
@@ -324,7 +332,7 @@ export function CapeEditor({ target, onClose, onSaved }: CapeEditorProps) {
       const cape = await saveCape(target.cape?.id ?? null, name, toDataUrl());
       onSaved(cape);
     } catch (error) {
-      toast.error(t("salami.capes.error", { error: error instanceof Error ? error.message : String(error) }));
+      toast.error(t("salami.capes.error", { error: errorText(error) }));
     } finally {
       setSaving(false);
     }
@@ -338,28 +346,39 @@ export function CapeEditor({ target, onClose, onSaved }: CapeEditorProps) {
   ];
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-6 backdrop-blur-sm">
-      <div className="flex max-h-full w-full max-w-[1180px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#1d1412] shadow-2xl">
-        <header className="flex items-center gap-3 border-b border-white/10 px-5 py-3">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 p-6">
+      {/* Salami-Feinkost: deckender Dialog mit Kopfband wie `Modal`, Knöpfe mit harter Unterkante */}
+      <div
+        className="flex max-h-full w-full max-w-[1180px] flex-col overflow-hidden rounded-2xl border shadow-2xl"
+        style={{ backgroundColor: SURFACE.solid, borderColor: SURFACE.line }}
+      >
+        <div className="salami-fat-spots h-2.5 flex-shrink-0" style={kopfband(accent.value)} aria-hidden="true" />
+        <header className="flex items-center gap-3 border-b px-5 py-3" style={{ borderColor: SURFACE.line }}>
           <Icon icon="solar:pen-new-square-bold" className="h-6 w-6" style={{ color: accent.value }} />
-          <h2 className="text-lg font-semibold text-white">{t("salami.capes.editor.title")}</h2>
+          <h2 className="font-minecraft text-lg normal-case tracking-normal text-white">{t("salami.capes.editor.title")}</h2>
           <input
             value={name}
             maxLength={40}
             onChange={(e) => setName(e.target.value)}
             aria-label={t("salami.capes.editor.name")}
-            className="ml-2 w-56 rounded-lg bg-black/40 px-3 py-1.5 text-sm text-white outline-none focus:ring-2 focus:ring-white/20"
+            className="ml-2 w-56 rounded-lg border bg-black/40 px-3 py-1.5 text-sm text-white outline-none focus:border-white/30"
+            style={{ borderColor: SURFACE.line }}
           />
           <div className="ml-auto flex gap-2">
-            <button type="button" onClick={onClose} className="rounded-xl bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15">
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-9 px-4 font-minecraft text-sm text-white transition-[filter] duration-150 hover:brightness-125 active:translate-y-px"
+              style={{ backgroundColor: SURFACE.hover, boxShadow: KANTE_SOFT }}
+            >
               {t("salami.capes.editor.cancel")}
             </button>
             <button
               type="button"
               disabled={saving}
               onClick={() => void save()}
-              className="rounded-xl px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50"
-              style={{ backgroundColor: accent.value }}
+              className="h-9 px-4 font-minecraft text-sm transition-[filter] duration-150 hover:brightness-110 active:translate-y-px disabled:opacity-50"
+              style={{ backgroundColor: accent.value, color: readableOn(accent.value), boxShadow: kante(accent.value) }}
             >
               {t("salami.capes.editor.save")}
             </button>
@@ -392,7 +411,7 @@ export function CapeEditor({ target, onClose, onSaved }: CapeEditorProps) {
           </div>
 
           <aside className="flex w-[300px] shrink-0 flex-col gap-4">
-            <div className="h-[220px] overflow-hidden rounded-xl border border-white/10 bg-black/30">
+            <div className="h-[220px] overflow-hidden rounded-xl border bg-black/30" style={{ borderColor: SURFACE.line }}>
               {preview && <Cape3D src={preview} className="h-full w-full" />}
             </div>
 
@@ -406,10 +425,14 @@ export function CapeEditor({ target, onClose, onSaved }: CapeEditorProps) {
                   aria-pressed={tool === item.id}
                   onClick={() => setTool(item.id)}
                   className={cn(
-                    "flex h-11 items-center justify-center rounded-xl text-white transition-colors",
-                    tool === item.id ? "" : "bg-white/5 hover:bg-white/10",
+                    "flex h-11 items-center justify-center text-white transition-[filter] duration-150 active:translate-y-px",
+                    tool === item.id ? "" : "hover:brightness-125",
                   )}
-                  style={tool === item.id ? { backgroundColor: `${accent.value}aa` } : undefined}
+                  style={
+                    tool === item.id
+                      ? { backgroundColor: accent.value, boxShadow: kante(accent.value) }
+                      : { backgroundColor: SURFACE.hover, boxShadow: KANTE_SOFT }
+                  }
                 >
                   <Icon icon={item.icon} className="h-5 w-5" />
                 </button>
@@ -454,20 +477,20 @@ export function CapeEditor({ target, onClose, onSaved }: CapeEditorProps) {
             </div>
 
             <div className="flex gap-2">
-              <button type="button" onClick={undo} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/5 py-2 text-sm text-white hover:bg-white/10">
+              <button type="button" onClick={undo} className={SOFT_BUTTON_WIDE} style={SOFT_BUTTON_STYLE}>
                 <Icon icon="solar:undo-left-round-bold" className="h-4 w-4" />
                 {t("salami.capes.editor.undo")}
               </button>
-              <button type="button" onClick={clear} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/5 py-2 text-sm text-white hover:bg-white/10">
+              <button type="button" onClick={clear} className={SOFT_BUTTON_WIDE} style={SOFT_BUTTON_STYLE}>
                 <Icon icon="solar:trash-bin-minimalistic-bold" className="h-4 w-4" />
                 {t("salami.capes.editor.clear")}
               </button>
             </div>
 
             <div>
-              <div className="mb-1.5 text-xs uppercase tracking-wider text-white/50">{t("salami.capes.editor.start_from")}</div>
+              <div className="mb-1.5 font-minecraft text-xs text-white/55">{t("salami.capes.editor.start_from")}</div>
               <div className="flex flex-wrap gap-1.5">
-                <button type="button" onClick={() => void loadFrom(null)} className="rounded-lg bg-white/5 px-2.5 py-1 text-xs text-white hover:bg-white/10">
+                <button type="button" onClick={() => void loadFrom(null)} className={SOFT_BUTTON_SMALL} style={SOFT_BUTTON_STYLE}>
                   {t("salami.capes.editor.blank")}
                 </button>
                 {STARTERS.map((starter) => (
@@ -475,7 +498,8 @@ export function CapeEditor({ target, onClose, onSaved }: CapeEditorProps) {
                     key={starter}
                     type="button"
                     onClick={() => void loadFrom(builtinCapeImage(starter))}
-                    className="rounded-lg bg-white/5 px-2.5 py-1 text-xs text-white hover:bg-white/10"
+                    className={SOFT_BUTTON_SMALL}
+                    style={SOFT_BUTTON_STYLE}
                   >
                     {t(`salami.capes.${starter}`)}
                   </button>

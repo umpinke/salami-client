@@ -72,7 +72,7 @@ export function BrowseTab({
         })
         .catch(err => {
           console.error(`Failed to fetch profile ${profileId}:`, err);
-          setError(`Failed to load profile: ${parseErrorMessage(err)}`);
+          setError(t('profiles.errors.load_profile_failed', { error: parseErrorMessage(err) }));
           setCurrentProfile(null);
         })
         .finally(() => {
@@ -233,7 +233,7 @@ export function BrowseTab({
                     <div className="w-px h-4 bg-white/30"></div>
                     <div className="text-white/50 flex items-center gap-1">
                       <Icon icon="solar:folder-bold" className="w-3 h-3" />
-                      <span className="uppercase text-xs tracking-wide">
+                      <span className="text-xs">
                         {currentProfile.group}
                       </span>
                     </div>

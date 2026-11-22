@@ -327,7 +327,7 @@ export function SymlinkSettingsTab({
               onClick={openFolderPickerAndConfigure}
               variant="default"
               size="lg"
-              className="w-full lowercase"
+              className="w-full"
             >
               <span className="flex items-center gap-2">
                 <Icon icon="solar:folder-bold" className="w-5 h-5" />
@@ -339,7 +339,7 @@ export function SymlinkSettingsTab({
               onClick={openFilePickerAndConfigure}
               variant="default"
               size="lg"
-              className="w-full lowercase"
+              className="w-full"
             >
               <span className="flex items-center gap-2">
                 <Icon icon="solar:file-bold" className="w-5 h-5" />

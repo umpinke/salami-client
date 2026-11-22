@@ -439,7 +439,7 @@ export function ProfileWizardV2Step3({
             </Button>
 
             <Button
-                variant="success"
+                variant="3d"
                 onClick={handleCreate}
                 disabled={
                     creating ||
@@ -464,7 +464,7 @@ export function ProfileWizardV2Step3({
 
     return (
         <Modal
-            title={t('profiles.wizard.step3Title')}
+            title={t('profiles.wizard.step1Title')}
             onClose={onClose}
             width="lg"
             footer={renderFooter()}

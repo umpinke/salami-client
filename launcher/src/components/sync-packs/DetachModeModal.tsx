@@ -55,7 +55,7 @@ export function DetachModeModal({
             {t("common.cancel")}
           </Button>
           <Button
-            variant="default"
+            variant="3d"
             size="md"
             onClick={() => onConfirm(mode)}
             disabled={busy}

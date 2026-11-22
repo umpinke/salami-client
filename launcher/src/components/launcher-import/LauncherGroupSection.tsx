@@ -1,6 +1,7 @@
 "use client";
 
 import { Icon } from "@iconify/react";
+import { FK_CARD_CLASS, fkCardStyle } from "../profiles/v3/shared/feinkost";
 import { useTranslation } from "react-i18next";
 
 import { CheckboxV2 } from "../ui/CheckboxV2";
@@ -57,10 +58,8 @@ export function LauncherGroupSection({
 
   return (
     <div
-      className="overflow-hidden rounded-lg border bg-black/20 transition-colors"
-      style={{
-        borderColor: selectedHere > 0 ? `${accentColor.value}45` : "rgba(255,255,255,0.1)",
-      }}
+      className={`overflow-hidden ${FK_CARD_CLASS}`}
+      style={fkCardStyle(accentColor.value, false, selectedHere > 0)}
     >
       <div
         onClick={onToggleCollapsed}
@@ -91,7 +90,7 @@ export function LauncherGroupSection({
             {launcher.displayName}
           </span>
           {!launcher.autoDetected && (
-            <span className="ml-2 font-minecraft text-[10px] uppercase tracking-wider text-white/35">
+            <span className="ml-2 font-minecraft text-xs text-white/45">
               {t("profiles.launcherImport.added_by_you")}
             </span>
           )}
@@ -139,7 +138,7 @@ export function LauncherGroupSection({
               </span>
               <button
                 onClick={onRetry}
-                className="flex-shrink-0 px-2 py-1 font-minecraft text-[10px] uppercase tracking-wider text-white/45 transition-colors hover:text-white"
+                className="flex-shrink-0 px-2 py-1 font-minecraft text-xs text-white/55 transition-colors hover:text-white"
               >
                 {t("profiles.launcherImport.retry")}
               </button>

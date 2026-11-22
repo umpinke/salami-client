@@ -26,6 +26,15 @@ import { useTranslation } from "react-i18next";
 import { usePinnedProfilesStore } from "../../store/usePinnedProfilesStore";
 import { setDiscordState } from "../../utils/discordRpc";
 import { parseErrorMessage } from "../../utils/error-utils";
+import { SURFACE, kante, readableOn } from "../ui/design-system";
+import { DeliLabel } from "../../themes/salami/SalamiStage";
+
+// Salami: die drei Ansichten der Profilseite (Knopfreihe statt Durchschalt-Knopf)
+const LAYOUT_OPTIONS: { mode: "list" | "grid" | "compact"; icon: string; titleKey: string }[] = [
+  { mode: "grid", icon: "solar:widget-bold", titleKey: "profiles.layout.switchToGrid" },
+  { mode: "list", icon: "solar:list-bold", titleKey: "profiles.layout.switchToList" },
+  { mode: "compact", icon: "solar:widget-4-bold", titleKey: "profiles.layout.switchToCompact" },
+];
 
 // A vertical virtualizer row: a version-section divider header, or a row of up to N cards.
 type VirtualRow =
@@ -68,6 +77,7 @@ export function ProfilesTabV2() {
   const sortBy = profilesTabSortBy;
   const selectedVersions = profilesTabVersionFilters;
   const layoutMode = profilesTabLayoutMode;
+  const accentColor = useThemeStore((state) => state.accentColor);
 
   // Action buttons configuration
   const actionButtons: ActionButton[] = [
@@ -153,11 +163,11 @@ export function ProfilesTabV2() {
   // Create groups array with default groups + dynamic groups
   const createGroups = (): GroupTab[] => {
     const defaultGroups: GroupTab[] = [
-      { id: "all", name: "All", count: getFilteredCountForGroup("all") },
+      { id: "all", name: t('profiles.groups.all'), count: getFilteredCountForGroup("all") },
       { id: "nrc", name: BRAND.shortName, count: getFilteredCountForGroup("nrc") },
-      { id: "server", name: "SERVER", count: getFilteredCountForGroup("server") },
-      { id: "modpacks", name: "MODPACKS", count: getFilteredCountForGroup("modpacks") },
-    ];
+      { id: "server", name: t('profiles.groups.server'), count: getFilteredCountForGroup("server") },
+      { id: "modpacks", name: t('profiles.groups.modpacks'), count: getFilteredCountForGroup("modpacks") },
+    ].filter((group) => group.id === "all" || group.count > 0 || group.id === activeGroup); // no empty buttons
 
     // Get unique profile groups and convert to GroupTab format
     const uniqueGroups = getUniqueProfileGroups();
@@ -168,7 +178,8 @@ export function ProfilesTabV2() {
       )
       .map(group => ({
         id: group, // group is already lowercase from getUniqueProfileGroups
-        name: group, // group is already lowercase from getUniqueProfileGroups
+        // Show the group as the player typed it (the id stays lowercase for matching)
+        name: profiles.find(p => p.group?.toLowerCase() === group)?.group?.trim() || group,
         count: getFilteredCountForGroup(group), // Use the updated function
       }));
 
@@ -254,7 +265,7 @@ export function ProfilesTabV2() {
   };
 
   // Columns per layout mode (also used by the virtual grid).
-  const columnCount = layoutMode === "grid" ? 2 : layoutMode === "compact" ? 3 : 1;
+  const columnCount = layoutMode === "grid" ? 3 : layoutMode === "compact" ? 3 : 1;
 
   // Filter -> sort (memoized; avoids re-running on unrelated re-renders like hover).
   const filteredProfiles = useMemo(
@@ -342,7 +353,7 @@ export function ProfilesTabV2() {
     return out;
   }, [sortedProfiles, selectedVersions, columnCount]);
 
-  const gridColsClass = columnCount === 3 ? "grid-cols-3" : columnCount === 2 ? "grid-cols-2" : "grid-cols-1";
+  const gridColsClass = columnCount === 3 ? "grid-cols-3" : "grid-cols-1";
 
   if (loading) {
     return <LoadingState message={t('profiles.loadingProfiles')} />;
@@ -387,7 +398,7 @@ export function ProfilesTabV2() {
       />
 
       {/* Search & Filter Header */}
-      <div className="mb-6 pb-4 border-b border-white/10">
+      <div className="mb-5 pb-4 border-b" style={{ borderColor: SURFACE.line }}>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 flex-1">
             <SearchWithFilters
@@ -415,31 +426,52 @@ export function ProfilesTabV2() {
               }
             />
 
-                         {/* Layout Toggle Button - Right next to SearchWithFilters */}
-                         <button
-              onClick={() => {
-                const nextMode = layoutMode === "list" ? "grid" : layoutMode === "grid" ? "compact" : "list";
-                setProfilesTabLayoutMode(nextMode);
-              }}
-              className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-smallcaps text-base transition-all duration-200 min-h-[2.5rem]"
-              title={
-                layoutMode === "list"
-                  ? t('profiles.layout.switchToGrid')
-                  : layoutMode === "grid"
-                  ? t('profiles.layout.switchToCompact')
-                  : t('profiles.layout.switchToList')
-              }
+            {/* Salami: Ansicht als drei Knöpfe (aktiv = Akzent mit Unterkante) statt eines Durchschalt-Knopfs */}
+            <div
+              className="flex flex-shrink-0 items-center gap-1 border p-1"
+              style={{ backgroundColor: SURFACE.base, borderColor: SURFACE.line, borderRadius: "var(--border-radius)" }}
             >
-              <div className="w-4 h-8 flex items-center justify-center">
-                <Icon 
-                  icon="solar:list-bold"
-                  className="w-8 h-8"
-                />
-              </div>
-            </button>
+              {LAYOUT_OPTIONS.map((option) => {
+                const active = layoutMode === option.mode;
+                return (
+                  <button
+                    key={option.mode}
+                    type="button"
+                    onClick={() => setProfilesTabLayoutMode(option.mode)}
+                    aria-pressed={active}
+                    title={t(option.titleKey)}
+                    className={`flex h-9 w-10 items-center justify-center transition-[background-color,color,transform] duration-150 active:translate-y-px ${
+                      active ? "" : "text-white/55 hover:bg-white/[0.08] hover:text-white"
+                    }`}
+                    style={{
+                      borderRadius: "calc(var(--border-radius) * 0.7)",
+                      ...(active
+                        ? { backgroundColor: accentColor.value, color: readableOn(accentColor.value), boxShadow: kante(accentColor.value, 2) }
+                        : {}),
+                    }}
+                  >
+                    <Icon icon={option.icon} className="h-5 w-5" />
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          
-          <ActionButtons actions={actionButtons} />
+
+          <button
+            type="button"
+            onClick={actionButtons[0].onClick}
+            title={actionButtons[0].tooltip}
+            className="flex h-11 flex-shrink-0 items-center gap-2 px-5 font-minecraft text-lg transition-[filter,transform] duration-150 hover:brightness-110 active:translate-y-px"
+            style={{
+              backgroundColor: accentColor.value,
+              color: readableOn(accentColor.value),
+              borderRadius: "var(--border-radius)",
+              boxShadow: kante(accentColor.value),
+            }}
+          >
+            <Icon icon="solar:add-circle-bold" className="h-5 w-5" />
+            {actionButtons[0].label}
+          </button>
         </div>
       </div>
 
@@ -456,11 +488,9 @@ export function ProfilesTabV2() {
               if (row.type === "header") {
                 return (
                   // Version divider header, e.g. "── 26.1 ──────────────"
-                  <div className="flex items-center gap-3 mb-3">
+                  <div className="flex items-center gap-3 mb-3 mt-1">
                     <div className="h-px w-6 bg-white/10" />
-                    <span className="font-smallcaps text-base text-white/60 whitespace-nowrap">
-                      {row.version}
-                    </span>
+                    <DeliLabel>Minecraft {row.version}</DeliLabel>
                     <div className="h-px flex-1 bg-white/10" />
                   </div>
                 );

@@ -27,6 +27,8 @@ import { MacCapturePermissions } from "../../clips/MacCapturePermissions";
 import { GamePicker } from "../../clips/GamePicker";
 import { useClipsStore } from "../../../store/clips-store";
 import { useSettingsModalStore } from "../../../store/settings-modal-store";
+import { SURFACE, hexAlpha } from "../../ui/design-system";
+import { DeliLabel } from "../../../themes/salami/SalamiStage";
 import {
   getCaptureStatus,
   getEncoderCapabilities,
@@ -986,14 +988,15 @@ function ChoiceCard({
       aria-pressed={selected}
       className={cn(
         "flex flex-col gap-1.5 rounded-lg border text-left transition-all duration-200",
-        "bg-black/20 border-white/10 hover:border-white/20 hover:bg-black/30",
-        disabled && "cursor-not-allowed opacity-40 hover:border-white/10 hover:bg-black/20",
+        !selected && !disabled && "hover:border-white/20",
+        disabled && "cursor-not-allowed opacity-40",
         className,
       )}
+      // Salami-Feinkost: ruhige Fläche, gewählt mit Akzent-Rand
       style={
         selected
-          ? { backgroundColor: `${accentColor.value}20`, borderColor: `${accentColor.value}80` }
-          : undefined
+          ? { backgroundColor: hexAlpha(accentColor.value, 0.12), borderColor: accentColor.value }
+          : { backgroundColor: SURFACE.base, borderColor: SURFACE.line }
       }
     >
       {children}
@@ -1013,9 +1016,10 @@ function SelectedMark() {
 }
 
 function Chip({ children }: { children: React.ReactNode }) {
+  // Salami: Etikett wie an der Feinkosttheke
   return (
-    <span className="rounded border border-white/10 bg-black/30 px-1.5 py-0.5 font-minecraft text-xs text-white/70">
-      {children}
+    <span className="inline-flex whitespace-nowrap">
+      <DeliLabel size="sm">{children}</DeliLabel>
     </span>
   );
 }

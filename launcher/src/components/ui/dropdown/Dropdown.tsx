@@ -266,7 +266,7 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
         className={cn(
           "fixed font-smallcaps z-[1001] overflow-hidden",
           radiusClass,
-          "text-white transition-all duration-200",
+          "look-menu text-white transition-all duration-200",
           "border shadow-[0_12px_32px_rgba(0,0,0,0.45)]",
           animationState === "entering" && animationClasses.entering,
           animationState === "entered" && animationClasses.entered,
@@ -277,7 +277,7 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
           top: `${dropdownTop}px`,
           left: `${dropdownLeft}px`,
           width: `${width}px`,
-          backgroundColor: mixHex(SURFACE.solid, colors.main, 0.05),
+          backgroundColor: SURFACE.solid,
           borderColor: SURFACE.line,
           boxShadow: "0 24px 60px -16px rgba(0,0,0,0.75)",
           ...createRadiusStyle(borderRadius),

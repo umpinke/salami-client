@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { ContentInstallTarget, UninstallContentPayload, ToggleContentPayload, InstallContentPayload, InstallLocalContentPayload, SwitchContentVersionPayload, ToggleModUpdatesPayload, BulkToggleModUpdatesPayload } from '../types/content';
 import { addContentToSyncPack, removeContentFromSyncPack } from './sync-pack-service';
 import i18n from '../i18n/i18n';
+import { toast } from 'react-hot-toast';
 import { runInstallPreflight, type PreflightMode } from '../features/mod-downloader/install-preflight';
 import { installOptionalDependencies } from '../features/mod-downloader/optional-dependencies';
 
@@ -112,6 +113,50 @@ export async function installContentToProfile(
   }
 }
 
+/** The player closed the dependency dialog: not an error, nothing to report. */
+export class InstallCancelledError extends Error {
+  constructor() {
+    super(i18n.t('salami.downloader.cancelled'));
+    this.name = 'InstallCancelledError';
+  }
+}
+
+const REPORTED = Symbol('install-error-reported');
+
+/**
+ * Whether a caller's catch block should still show an error toast: not for a cancelled
+ * dependency dialog, and not when {@link withInstallToast} already showed this error.
+ */
+export function shouldReportInstallError(error: unknown): boolean {
+  if (error instanceof InstallCancelledError) return false;
+  return !(error && typeof error === 'object' && (error as Record<symbol, unknown>)[REPORTED]);
+}
+
+/**
+ * Like `toast.promise` for installs, but a cancelled dependency dialog just closes the loading
+ * toast instead of turning it into a red "Installation fehlgeschlagen: Installation abgebrochen".
+ * Rethrows, so the caller skips its success steps.
+ */
+export async function withInstallToast<T>(
+  promise: Promise<T>,
+  messages: { loading: string; success: string; error: (err: any) => string },
+): Promise<T> {
+  const id = toast.loading(messages.loading);
+  try {
+    const result = await promise;
+    toast.success(messages.success, { id });
+    return result;
+  } catch (err) {
+    if (err instanceof InstallCancelledError) {
+      toast.dismiss(id);
+    } else {
+      toast.error(messages.error(err), { id });
+      if (err && typeof err === 'object') (err as Record<symbol, unknown>)[REPORTED] = true;
+    }
+    throw err;
+  }
+}
+
 export async function installContentToTarget(
   payload: InstallContentPayload,
   target?: ContentInstallTarget,
@@ -123,7 +168,7 @@ export async function installContentToTarget(
   // Salami: Abhängigkeits-Vorschau (Pflicht/optional/Konflikte) vor der Installation
   const preflight = await runInstallPreflight(payload, options?.preflight ?? 'full');
   if (!preflight.proceed) {
-    throw new Error(i18n.t('salami.downloader.cancelled'));
+    throw new InstallCancelledError();
   }
   await installContentToProfile(payload);
   if (preflight.optional.length > 0) {

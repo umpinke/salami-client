@@ -9,6 +9,8 @@ import { Icon } from "@iconify/react";
 import { ModPlatform } from "../../types/unified";
 import { sanitizeRichHtml } from "../../utils/html-sanitize";
 import { rehypeStrictSanitize } from "../../utils/rehype-strict-sanitize";
+import { EmptyState } from "../ui/EmptyState";
+import { PLAIN_CARD, SectionHeading } from "../modrinth/v2/FeinkostParts";
 
 interface ModDetailDescriptionProps {
   body: string;
@@ -20,24 +22,16 @@ export function ModDetailDescription({ body, source }: ModDetailDescriptionProps
 
   if (!body || body.trim().length === 0) {
     return (
-      <div className="bg-black/20 rounded-lg p-4 border border-white/10">
-        <h2 className="text-lg font-minecraft text-white flex items-center gap-2 mb-4 normal-case">
-          <Icon icon="solar:document-text-bold" className="w-5 h-5" />
-          {t('mod_detail.description')}
-        </h2>
-        <p className="text-white/50 font-minecraft text-center py-8">
-          {t('mod_detail.no_description')}
-        </p>
+      <div className="look-card p-5" style={PLAIN_CARD}>
+        <SectionHeading className="mb-2">{t('mod_detail.description')}</SectionHeading>
+        <EmptyState icon="solar:document-text-bold" message={t('mod_detail.no_description')} compact fullHeight={false} />
       </div>
     );
   }
 
   return (
-    <div className="bg-black/20 rounded-lg p-4 border border-white/10">
-      <h2 className="text-lg font-minecraft text-white flex items-center gap-2 mb-4 normal-case">
-        <Icon icon="solar:document-text-bold" className="w-5 h-5" />
-        {t('mod_detail.description')}
-      </h2>
+    <div className="look-card p-5" style={PLAIN_CARD}>
+      <SectionHeading className="mb-4">{t('mod_detail.description')}</SectionHeading>
 
       <div>
         {source === ModPlatform.CurseForge ? (

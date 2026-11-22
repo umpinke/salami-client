@@ -7,22 +7,35 @@ interface IconCacheState {
   modrinthIcons: Record<string, string | null>;
   curseforgeIcons: Record<string, string | null>;
   archiveIcons: Record<string, string | null>;
+  /** Project names ("Sodium", not "sodium-fabric-0.9.3+mc26.3.jar"), fetched with the icons. */
+  modrinthTitles: Record<string, string | null>;
+  curseforgeTitles: Record<string, string | null>;
 
   mergeModrinthIcons: (patch: Record<string, string | null>) => void;
   mergeCurseforgeIcons: (patch: Record<string, string | null>) => void;
   mergeArchiveIcons: (patch: Record<string, string | null>) => void;
+  mergeModrinthTitles: (patch: Record<string, string | null>) => void;
+  mergeCurseforgeTitles: (patch: Record<string, string | null>) => void;
 }
 
 export const useIconCacheStore = create<IconCacheState>((set) => ({
   modrinthIcons: {},
   curseforgeIcons: {},
   archiveIcons: {},
+  modrinthTitles: {},
+  curseforgeTitles: {},
 
   mergeModrinthIcons: (patch) =>
     set((state) => ({ modrinthIcons: { ...state.modrinthIcons, ...patch } })),
 
   mergeCurseforgeIcons: (patch) =>
     set((state) => ({ curseforgeIcons: { ...state.curseforgeIcons, ...patch } })),
+
+  mergeModrinthTitles: (patch) =>
+    set((state) => ({ modrinthTitles: { ...state.modrinthTitles, ...patch } })),
+
+  mergeCurseforgeTitles: (patch) =>
+    set((state) => ({ curseforgeTitles: { ...state.curseforgeTitles, ...patch } })),
 
   mergeArchiveIcons: (patch) =>
     set((state) => {

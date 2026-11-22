@@ -54,7 +54,7 @@ export function WindowSettingsTab({
   }, [isBackgroundAnimationEnabled]);
 
   const resolutionPresets = [
-    { width: 854, height: 480, label: "Default" },
+    { width: 854, height: 480, label: t('profiles.settings.resolutionDefault') },
     { width: 1280, height: 720, label: "720p" },
     { width: 1920, height: 1080, label: "1080p" },
     { width: 2560, height: 1440, label: "1440p" },
@@ -170,7 +170,7 @@ export function WindowSettingsTab({
                       editedProfile.settings?.resolution?.height ===
                         preset.height
                       ? "bg-accent/20 border-accent text-white"
-                      : "bg-black/20 hover:bg-black/30 border-white/10 text-white/80",
+                      : "bg-white/[0.045] hover:bg-white/[0.08] border-white/[0.09] text-white/80",
                   )}
                   onClick={() => handlePresetClick(preset)}
                 >

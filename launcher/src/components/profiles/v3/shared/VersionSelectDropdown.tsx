@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { useThemeStore } from "../../../../store/useThemeStore";
 import type { UnifiedVersion } from "../../../../types/unified";
 import { ThemedDropdown, ThemedDropdownHeader } from "./ThemedDropdown";
+import { SURFACE } from "../../../ui/design-system";
 
 export interface VersionSelectDropdownProps {
   open: boolean;
@@ -65,13 +66,13 @@ export function VersionSelectDropdown({
           disabled={latestOption.selected}
           onMouseEnter={(event) => {
             if (!latestOption.selected)
-              event.currentTarget.style.backgroundColor = `${accentColor.value}40`;
+              event.currentTarget.style.backgroundColor = SURFACE.raised;
           }}
           onMouseLeave={(event) => {
             if (!latestOption.selected)
               event.currentTarget.style.backgroundColor = "transparent";
           }}
-          className={`w-full flex items-center gap-2 border-b border-white/10 px-3 py-1.5 text-xs font-minecraft text-left transition-colors ${
+          className={`w-full flex items-center gap-2 border-b border-white/[0.09] px-3 py-1.5 text-xs font-minecraft text-left transition-colors ${
             latestOption.selected
               ? "text-white/40 cursor-default"
               : "text-white/85 hover:text-white cursor-pointer"
@@ -135,7 +136,7 @@ export function VersionSelectDropdown({
               disabled={isCurrent}
               onMouseEnter={(event) => {
                 if (!isCurrent)
-                  event.currentTarget.style.backgroundColor = `${accentColor.value}40`;
+                  event.currentTarget.style.backgroundColor = SURFACE.raised;
               }}
               onMouseLeave={(event) => {
                 if (!isCurrent)

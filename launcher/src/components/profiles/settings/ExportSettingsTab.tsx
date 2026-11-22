@@ -19,6 +19,18 @@ import gsap from "gsap";
 import { listen } from "@tauri-apps/api/event";
 import { EventType, type EventPayload } from "../../../types/events";
 import { parseErrorMessage } from "../../../utils/error-utils";
+import i18n from "../../../i18n/i18n";
+
+// Export progress comes as English text from the backend (export_utils.rs).
+function translateExportMessage(message: string): string {
+  let m = message.match(/^Starting export of (\d+) files\.\.\.$/);
+  if (m) return i18n.t("export.progress.starting", { count: Number(m[1]) });
+  m = message.match(/^Exporting files\.\.\. (\d+)\/(\d+)$/);
+  if (m) return i18n.t("export.progress.files", { done: m[1], total: m[2] });
+  m = message.match(/^Export completed! (\d+) files exported\.$/);
+  if (m) return i18n.t("export.progress.done", { count: Number(m[1]) });
+  return message;
+}
 
 const EXPORT_FORMATS: {
   value: ExportPackFormat;
@@ -116,16 +128,17 @@ export function ExportSettingsTab({
 
       // Only handle events for this profile
       if (payload.target_id === profile.id && payload.event_type === EventType.ExportingProfile) {
-        setExportMessage(payload.message);
-        
+        const exportMessage = translateExportMessage(payload.message);
+        setExportMessage(exportMessage);
+
         if (payload.progress !== null) {
           const progressPercent = Math.round(payload.progress * 100);
           setExportProgress(progressPercent);
-          
+
           // Update the existing loading toast with progress
           if (exportToastIdRef.current) {
             toast.loading(
-              `${payload.message} (${progressPercent}%)`,
+              `${exportMessage} (${progressPercent}%)`,
               { id: exportToastIdRef.current }
             );
           }
@@ -493,7 +506,7 @@ export function ExportSettingsTab({
 
             <div className="mt-6 pt-4 border-t border-white/10">
               <Button
-                variant="default"
+                variant="3d"
                 onClick={handleExport}
                 disabled={
                   isExporting || !exportFilename.trim() || isLoadingDirectory

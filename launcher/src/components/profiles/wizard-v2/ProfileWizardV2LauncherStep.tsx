@@ -50,7 +50,7 @@ function TextAction({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`px-2 py-1 font-minecraft text-[10px] uppercase tracking-wider text-white/45 transition-colors hover:text-white disabled:opacity-25 ${
+      className={`px-2 py-1 font-minecraft text-xs text-white/55 transition-colors hover:text-white disabled:opacity-25 ${
         hidden ? "invisible" : ""
       }`}
     >
@@ -157,7 +157,7 @@ export function ProfileWizardV2LauncherStep({
       </Button>
 
       <Button
-        variant="default"
+        variant="3d"
         onClick={() => onImport(selectedInstances)}
         disabled={busy || count === 0}
         size="md"

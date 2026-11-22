@@ -8,6 +8,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Modal } from "../../ui/Modal";
 import { Button } from "../../ui/buttons/Button";
 import { StatusMessage } from "../../ui/StatusMessage";
+import { EmptyState } from "../../ui/EmptyState";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { Card } from "../../ui/Card";
 import { SearchWithFilters } from "../../ui/SearchWithFilters";
@@ -43,7 +44,7 @@ function NrcCompatibleTooltipContent() {
       <div className="text-sm text-white">{t('profiles.wizard.nrcCompatible')}</div>
       <div className="flex items-start gap-2">
         <Icon icon="solar:lightbulb-bold" className="text-yellow-400 text-base flex-shrink-0" />
-        <div className="text-gray-300 text-xs italic">
+        <div className="text-white/70 text-xs italic">
           {t('profiles.wizard.nrcFeaturesAvailable')}
         </div>
       </div>
@@ -278,7 +279,7 @@ export function ProfileWizardV2({
             ].map(type => (
               <Button
                 key={type.key}
-                variant={selectedVersionType === type.key ? "flat" : "ghost"}
+                variant={selectedVersionType === type.key ? "3d" : "ghost"}
                 size="sm"
                 onClick={() => setSelectedVersionType(type.key as any)}
                 icon={<Icon icon={type.icon} className="w-4 h-4" />}
@@ -297,15 +298,17 @@ export function ProfileWizardV2({
             return (
               <div
                 key={version.id}
-                className={`relative p-4 cursor-pointer transition-all duration-200 border-2 rounded-lg ${
+                className={`relative p-4 cursor-pointer transition-all duration-200 border-2 ${
                   selectedVersion === version.id
-                    ? "border-current bg-current/10 hover:bg-current/15"
-                    : "border-transparent bg-black/20 hover:bg-black/30"
+                    ? ""
+                    : "border-transparent bg-white/[0.045] hover:bg-white/[0.08]"
                 }`}
-                style={selectedVersion === version.id ? {
-                  borderColor: accentColor.value,
-                  color: accentColor.value
-                } : {}}
+                style={{
+                  borderRadius: "var(--border-radius)",
+                  ...(selectedVersion === version.id
+                    ? { borderColor: accentColor.value, backgroundColor: `${accentColor.value}24`, boxShadow: `0 3px 0 ${accentColor.value}66` }
+                    : {}),
+                }}
                 onClick={() => setSelectedVersion(version.id)}
               >
                 {/* NRC Compatibility Star */}
@@ -332,10 +335,12 @@ export function ProfileWizardV2({
         </div>
 
         {filteredVersions.length === 0 && !loading && (
-          <div className="col-span-3 text-center py-8">
-            <Icon icon="solar:magnifer-bold" className="w-12 h-12 text-white/50 mx-auto mb-2" />
-            <p className="text-xs font-smallcaps text-white/70">{t('profiles.wizard.noVersionsFound')}</p>
-          </div>
+          <EmptyState
+            icon="solar:magnifer-bold"
+            message={t('profiles.wizard.noVersionsFound')}
+            compact
+            fullHeight={false}
+          />
         )}
       </div>
     );
@@ -354,7 +359,7 @@ export function ProfileWizardV2({
         </Button>
       )}
       <Button
-        variant="default"
+        variant="3d"
         onClick={handleStep1Next}
         disabled={loading || !selectedVersion}
         size="md"
@@ -468,7 +473,7 @@ export function ProfileWizardV2({
   // Default: Show Step 1
   return (
     <Modal
-      title={t('profiles.wizard.step1Title')}
+      title={t('profiles.wizard.step2Title')}
       onClose={onClose}
       width="lg"
       footer={renderFooter()}

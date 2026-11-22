@@ -7,6 +7,7 @@ import { Tooltip } from "../ui/Tooltip";
 import { useIsTruncated } from "../../hooks/useIsTruncated";
 import { CheckboxV2 } from "../ui/CheckboxV2";
 import { useThemeStore } from "../../store/useThemeStore";
+import { FK_CARD_CLASS, FK_SOFT_BUTTON_CLASS, fkCardStyle, fkThumbStyle } from "../profiles/v3/shared/feinkost";
 
 import type { SyncTargetKind } from "../../types/syncPacks";
 
@@ -92,7 +93,7 @@ export function RowAction({
       onClick={handleClick}
       disabled={disabled}
       aria-label={label}
-      className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border border-white/10 bg-black/40 text-white/45 opacity-0 transition-all duration-200 hover:border-white/20 hover:bg-black/60 disabled:opacity-30 group-hover/row:opacity-100 ${
+      className={`flex h-8 w-8 flex-shrink-0 items-center justify-center opacity-0 disabled:opacity-30 group-hover/row:opacity-100 ${FK_SOFT_BUTTON_CLASS} ${
         danger ? "hover:!text-red-400" : "hover:!text-white"
       }`}
     >
@@ -102,7 +103,7 @@ export function RowAction({
     <button
       onClick={handleClick}
       disabled={disabled}
-      className={`flex-shrink-0 px-2 py-1 text-[10px] font-minecraft uppercase tracking-wider text-white/0 transition-colors group-hover/row:text-white/30 disabled:opacity-30 ${
+      className={`flex-shrink-0 px-2 py-1 text-xs font-minecraft text-white/0 transition-colors group-hover/row:text-white/45 disabled:opacity-30 ${
         danger ? "hover:!text-red-400" : "hover:!text-white"
       }`}
     >
@@ -155,19 +156,8 @@ export function SyncPackRow({
   return (
     <div
       onClick={onClick}
-      style={
-        selected
-          ? {
-              backgroundColor: `${accentColor.value}1a`,
-              borderColor: `${accentColor.value}66`,
-            }
-          : undefined
-      }
-      className={`group/row flex items-center gap-4 rounded-lg border p-3 transition-colors ${
-        selected
-          ? ""
-          : "border-white/10 bg-black/20 hover:border-white/20 hover:bg-black/30"
-      } ${onClick ? "cursor-pointer" : ""} ${dimmed ? "opacity-55" : ""}`}
+      style={fkCardStyle(accentColor.value, !!selected)}
+      className={`group/row flex items-center gap-4 p-3 ${FK_CARD_CLASS} ${onClick ? "cursor-pointer" : ""} ${dimmed ? "opacity-55" : ""}`}
     >
       {selectable && (
         <div
@@ -183,7 +173,7 @@ export function SyncPackRow({
           />
         </div>
       )}
-      <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/5 ring-1 ring-white/10">
+      <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center overflow-hidden border-2" style={fkThumbStyle}>
         {iconUrl ? (
           <img
             src={iconUrl}
@@ -196,7 +186,7 @@ export function SyncPackRow({
         ) : icon ? (
           <Icon icon={icon} className="h-6 w-6 text-white/50" />
         ) : (
-          <span className="font-minecraft text-lg uppercase text-white/30">
+          <span className="font-minecraft text-lg text-white/30">
             {fallbackLetter ?? "?"}
           </span>
         )}
@@ -223,7 +213,7 @@ export function SyncPackRow({
           >
             <div
               ref={subtitleFit.ref}
-              className="mt-1 w-full truncate font-minecraft text-xs text-white/60"
+              className="mt-1 w-full truncate text-xs text-white/55"
             >
               {subtitle}
             </div>

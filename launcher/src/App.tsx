@@ -12,6 +12,8 @@ import { ThemeInitializer } from "./components/ThemeInitializer";
 import { ScrollbarProvider } from "./components/ui/ScrollbarProvider";
 import { GlobalToaster } from "./components/ui/GlobalToaster";
 import { type Event as TauriEvent, listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
+import { useImportConfirmStore } from "./store/import-confirm-store";
 import { toast } from "react-hot-toast";
 import {
   type EventPayload as FrontendEventPayload,
@@ -23,6 +25,8 @@ import { CurseForgeManualDownloadsModal } from "./components/modals/CurseForgeMa
 import { ImportPackConfirmModal } from "./components/modals/ImportPackConfirmModal";
 import { DragDropOverlay } from "./components/ui/DragDropOverlay";
 import { SalamiModeSync } from "./themes/salami/SalamiModeSync";
+import { LookSync } from "./themes/looks/LookSync";
+import { LookChooser } from "./components/looks/LookChooser";
 import { UiScaleSync } from "./components/UiScaleSync";
 import { MacCapturePermissionMonitor } from "./components/clips/MacCapturePermissionMonitor";
 import { GlobalModalPortal } from "./components/ui/GlobalModalPortal";
@@ -165,7 +169,7 @@ export function App() {
                   exitPayload,
               );
               if (!exitPayload.success) {
-                const crashMsg = `Minecraft crashed (Exit Code: ${exitPayload.exit_code ?? "N/A"}). See crash report for details.`;
+                const crashMsg = t('app.minecraft_crashed', { code: exitPayload.exit_code ?? "?" });
                 toast.error(crashMsg, { duration: 10000 });
                 openCrashModal(exitPayload);
               }
@@ -184,6 +188,24 @@ export function App() {
       unlisten.then((f) => f());
     };
   }, [openCrashModal]);
+
+  // Salami: a .salamipack double-clicked in Explorer gets the same preview and confirmation as
+  // a dragged-in one. Asked once on start (the file may have opened the launcher) and on every
+  // notice from the backend; taking the pending pack clears it, so each file opens once.
+  useEffect(() => {
+    const openPending = () => {
+      invoke<string | null>("salami_take_pending_pack")
+        .then((path) => {
+          if (path) void useImportConfirmStore.getState().requestImport(path);
+        })
+        .catch((error) => console.warn("[App.tsx] Could not check for an opened pack:", error));
+    };
+    openPending();
+    const unlisten = listen("salami-pack-open", openPending);
+    return () => {
+      unlisten.then((f) => f());
+    };
+  }, []);
 
   // Listen for navigation events from other windows (e.g., log window)
   useEffect(() => {
@@ -309,6 +331,8 @@ export function App() {
     <div className="flex flex-col h-screen w-screen overflow-hidden">
         <ThemeInitializer />
         <SalamiModeSync />
+        <LookSync />
+        <LookChooser />
         <UiScaleSync />
         <ScrollbarProvider />
         <GlobalToaster />

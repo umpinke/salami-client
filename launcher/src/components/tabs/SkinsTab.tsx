@@ -24,6 +24,10 @@ import { AddSkinModal } from "../modals/AddSkinModal";
 import { cn } from "../../lib/utils";
 import { useSkinPreview } from "../../hooks/useSkinPreview";
 import { parseErrorMessage } from "../../utils/error-utils";
+import { KANTE_SOFT, SURFACE, hexAlpha, kante } from "../ui/design-system";
+import { LoadingSpinner } from "../ui/LoadingSpinner";
+import { EmptyState } from "../ui/EmptyState";
+import { DeliLabel, SalamiStage } from "../../themes/salami/SalamiStage";
 
 function useDelayedFlag(active: boolean, delayMs: number): boolean {
   const [shown, setShown] = useState(false);
@@ -42,6 +46,38 @@ function useDelayedFlag(active: boolean, delayMs: number): boolean {
 
 const PREVIEW_WIDTH = 176;
 const PREVIEW_HEIGHT = 280;
+/** Salami: Bühne unter der Figur wie auf der Startseite – Breite und Abstand der Füße zum Bildrand. */
+const STAGE_WIDTH = 150;
+const STAGE_FEET_FROM_BOTTOM = 40;
+
+/** Karte im Feinkost-Stil: ruhige Fläche, beim Hover 2px hoch, Rand und Schein im Akzent. */
+function cardStyle(accent: string, hovered: boolean, highlighted = false): React.CSSProperties {
+  return {
+    backgroundColor: SURFACE.base,
+    borderColor: hovered ? hexAlpha(accent, 0.55) : highlighted ? hexAlpha(accent, 0.35) : SURFACE.line,
+    borderRadius: "var(--border-radius)",
+    transform: hovered ? "translateY(-2px)" : undefined,
+    boxShadow: hovered ? `0 10px 24px -12px ${hexAlpha(accent, 0.6)}` : undefined,
+  };
+}
+
+/** Salamischeibe, auf der die Figur steht; liegt hinter dem Bild, die Füße auf der Schnittfläche. */
+function SkinStage({ dim = false }: { dim?: boolean }) {
+  // Mitte der Schnittfläche liegt bei der halben gestauchten Höhe (siehe SalamiStage)
+  const faceCenter = Math.round(STAGE_WIDTH * 0.26) / 2;
+  const stageHeight = Math.round(STAGE_WIDTH * 0.26) + 14;
+  return (
+    <div
+      className={cn(
+        "pointer-events-none absolute left-1/2 -translate-x-1/2 transition-opacity duration-200",
+        dim && "opacity-40 group-hover:opacity-70",
+      )}
+      style={{ bottom: STAGE_FEET_FROM_BOTTOM + faceCenter - stageHeight }}
+    >
+      <SalamiStage width={STAGE_WIDTH} />
+    </div>
+  );
+}
 
 const SkinPreview = memo(
   ({
@@ -103,11 +139,10 @@ const SkinPreview = memo(
         key={skin.id}
         style={{
           ...animationStyle,
-          backgroundColor: isHovered ? `${accentColor.value}20` : undefined,
-          borderColor: isHovered ? `${accentColor.value}60` : undefined,
+          ...cardStyle(accentColor.value, isHovered && !isDisabled, isApplied),
         }}
         className={cn(
-          "relative flex flex-col gap-3 p-4 rounded-lg bg-black/20 border border-white/10 hover:border-white/20 transition-all duration-200 cursor-pointer",
+          "group relative flex flex-col gap-3 border px-4 pb-4 pt-3 transition-all duration-200 cursor-pointer",
           animationClasses,
           isDisabled ? "opacity-60 pointer-events-none" : ""
         )}
@@ -116,7 +151,7 @@ const SkinPreview = memo(
         onMouseLeave={() => setIsHovered(false)}
       >
         {/* Action buttons - top right */}
-        <div className="absolute top-3 right-3 z-20 flex flex-col gap-1">
+        <div className="absolute top-2 right-2 z-20 flex flex-col gap-1">
           {onEditSkin && (
             <button
               onClick={(event) => {
@@ -124,7 +159,8 @@ const SkinPreview = memo(
                 event.stopPropagation();
                 onEditSkin(skin, event);
               }}
-              className="w-8 h-8 flex items-center justify-center bg-black/30 hover:bg-black/50 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded transition-all duration-200"
+              className="w-7 h-7 flex items-center justify-center bg-black/30 hover:bg-black/50 text-white/70 hover:text-white transition-colors duration-150"
+              style={{ borderRadius: "calc(var(--border-radius) * 0.6)" }}
               title={t('skins.editProperties')}
               disabled={isDisabled}
             >
@@ -139,7 +175,8 @@ const SkinPreview = memo(
                 event.stopPropagation();
                 onDeleteSkin(skin.id, skin.name, event);
               }}
-              className="w-8 h-8 flex items-center justify-center bg-black/30 hover:bg-red-700/80 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded transition-all duration-200"
+              className="w-7 h-7 flex items-center justify-center bg-black/30 hover:bg-red-700/80 text-white/70 hover:text-white transition-colors duration-150"
+              style={{ borderRadius: "calc(var(--border-radius) * 0.6)" }}
               title={t('skins.deleteSkin')}
               disabled={isDisabled}
             >
@@ -153,40 +190,34 @@ const SkinPreview = memo(
 
         {/* Skin content */}
         <div className="flex flex-col items-center gap-3 relative z-10 w-full">
-          {/* Skin Image */}
+          {/* Skin Image: die Figur steht auf einer Salamischeibe */}
           <div
-            className="relative flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden border border-transparent transition-all duration-300 ease-out"
+            className="relative flex-shrink-0 flex items-center justify-center"
             style={{
               width: `${PREVIEW_WIDTH}px`,
               height: `${PREVIEW_HEIGHT}px`,
             }}
           >
+            <SkinStage />
             {isRenderLoading && canShowSpinner ? (
-              <div className="flex flex-col items-center justify-center space-y-2">
-                <div className="w-8 h-8 border-4 border-t-transparent border-[var(--accent)] rounded-full animate-spin"></div>
-                <p className="font-smallcaps text-xs text-white/70">{t('skins.loading')}</p>
-              </div>
+              <LoadingSpinner size="sm" shadowDepth="none" message={t('skins.loading')} className="relative" />
             ) : !isRenderLoading ? (
               <SkinViewer
                 skinUrl={previewUrl}
                 width={PREVIEW_WIDTH}
                 height={PREVIEW_HEIGHT}
                 fill
-                className="rounded-sm block"
+                className="relative rounded-sm block"
               />
             ) : null}
 
             {/* Applying overlay */}
             {isDisabled && (
-              <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-lg">
-                <Icon
-                  icon="svg-spinners:ring-resize"
-                  className="w-8 h-8 mb-1"
-                  style={{ color: accentColor.value }}
-                />
-                <span className="font-smallcaps text-xs text-white">
-                  {t('skins.applying')}
-                </span>
+              <div
+                className="absolute inset-0 flex flex-col items-center justify-center"
+                style={{ backgroundColor: SURFACE.veil, borderRadius: "var(--border-radius)" }}
+              >
+                <LoadingSpinner size="sm" shadowDepth="none" message={t('skins.applying')} />
               </div>
             )}
           </div>
@@ -195,33 +226,21 @@ const SkinPreview = memo(
           <div className="flex-grow min-w-0 w-full text-center">
             {/* Skin Name */}
             <h3
-              className="font-minecraft text-white text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case mb-1"
+              className="font-minecraft text-white text-lg leading-tight whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case mb-2"
               title={skin.name}
             >
               {skin.name}
             </h3>
 
-            {/* Skin Variant & Applied Status */}
-            <div className="flex items-center justify-center gap-2 text-xs font-minecraft">
-              <div className="text-white/60 flex items-center gap-1">
-                <Icon
-                  icon="solar:palette-bold"
-                  className="w-3 h-3 text-white/50"
-                />
-                <span>{skin.variant === "slim" ? t('skins.slim') : t('skins.classic')}</span>
-              </div>
-
+            {/* Salami: Modell und Status als Etiketten */}
+            <div className="flex flex-wrap items-center justify-center gap-1.5">
+              <DeliLabel size="sm">
+                {skin.variant === "slim" ? t('skins.slim') : t('skins.classic')}
+              </DeliLabel>
               {isApplied && (
-                <>
-                  <div className="w-px h-3 bg-white/30"></div>
-                  <div className="text-green-400 flex items-center gap-1">
-                    <Icon
-                      icon="solar:check-circle-bold"
-                      className="w-3 h-3"
-                    />
-                    <span>{t('skins.applied')}</span>
-                  </div>
-                </>
+                <DeliLabel size="sm" tone="red">
+                  {t('skins.applied')}
+                </DeliLabel>
               )}
             </div>
           </div>
@@ -250,9 +269,14 @@ const AddSkinCard = memo(
     return (
       <div
         key={`add-skin-${index}`}
-        style={animationStyle}
+        style={{
+          ...animationStyle,
+          ...cardStyle(accentColor.value, isHovered),
+          backgroundColor: isHovered ? SURFACE.base : "transparent",
+          borderColor: isHovered ? hexAlpha(accentColor.value, 0.55) : SURFACE.lineStrong,
+        }}
         className={cn(
-          "relative flex flex-col gap-3 p-4 rounded-lg bg-black/20 border border-dashed border-white/10 hover:border-white/30 transition-all duration-200 cursor-pointer",
+          "group relative flex flex-col gap-3 border border-dashed px-4 pb-4 pt-3 transition-all duration-200 cursor-pointer",
           animationClasses
         )}
         onClick={onClick}
@@ -261,28 +285,34 @@ const AddSkinCard = memo(
       >
         {/* Skin content */}
         <div className="flex flex-col items-center gap-3 relative z-10 w-full">
-          {/* Skin Image */}
+          {/* Skin Image: leere Bühne mit Schattenriss */}
           <div
-            className="relative flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden border border-transparent transition-all duration-300 ease-out"
+            className="relative flex-shrink-0 flex items-center justify-center"
             style={{
               width: `${PREVIEW_WIDTH}px`,
               height: `${PREVIEW_HEIGHT}px`,
             }}
           >
+            <SkinStage dim />
             <SkinViewer
               skinUrl="/skins/default_skin_full.png"
               width={140}
               height={280}
-              className="rounded-sm block opacity-70 hover:opacity-100 transition-opacity"
+              className="relative rounded-sm block opacity-50 group-hover:opacity-80 transition-opacity duration-200"
             />
 
             {/* Plus icon overlay */}
             <div className="absolute inset-0 flex items-center justify-center">
-              <Icon
-                icon="solar:add-circle-bold"
-                className="w-12 h-12 text-white/70 hover:text-white transition-colors"
-                style={{ color: isHovered ? accentColor.value : undefined }}
-              />
+              <span
+                className="flex h-12 w-12 items-center justify-center text-white transition-[background-color] duration-200"
+                style={{
+                  backgroundColor: isHovered ? accentColor.value : SURFACE.raised,
+                  boxShadow: isHovered ? kante(accentColor.value) : KANTE_SOFT,
+                  borderRadius: "calc(var(--border-radius) * 0.8)",
+                }}
+              >
+                <Icon icon="solar:add-circle-bold" className="w-7 h-7" />
+              </span>
             </div>
           </div>
 
@@ -290,22 +320,17 @@ const AddSkinCard = memo(
           <div className="flex-grow min-w-0 w-full text-center">
             {/* Skin Name */}
             <h3
-              className="font-minecraft text-white text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case mb-1"
+              className="font-minecraft text-white text-lg leading-tight whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case mb-2"
               title={t('skins.addNewSkin')}
             >
               {t('skins.addNewSkin')}
             </h3>
 
             {/* Description */}
-            <div className="flex items-center justify-center gap-2 text-xs font-minecraft">
-              <div className="text-white/60 flex items-center gap-1">
-                <Icon
-                  icon="solar:upload-bold"
-                  className="w-3 h-3 text-white/50"
-                />
-                <span>{t('skins.uploadOrImport')}</span>
-              </div>
-            </div>
+            <p className="text-xs leading-snug text-white/55">
+              <Icon icon="solar:upload-bold" className="mr-1 inline-block w-3.5 h-3.5 -mt-0.5 align-middle" />
+              {t('skins.uploadOrImport')}
+            </p>
           </div>
         </div>
       </div>
@@ -578,17 +603,17 @@ export function SkinsTab() {
 
   // Add skin button
   const addSkinButton = (
-    <button
+    <Button
+      variant="3d"
+      size="xs"
       onClick={() => startEditSkin(null)}
-      className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-smallcaps text-base transition-all duration-200"
       title={t('skins.addSkin')}
       disabled={!activeAccount}
+      icon={<Icon icon="solar:add-circle-bold" className="w-4 h-4" />}
+      className="text-sm"
     >
-      <div className="w-4 h-4 flex items-center justify-center">
-        <Icon icon="solar:add-circle-bold" className="w-4 h-4" />
-      </div>
-      <span>{t('skins.addSkin')}</span>
-    </button>
+      {t('skins.addSkin')}
+    </Button>
   );
 
   return (
@@ -598,7 +623,7 @@ export function SkinsTab() {
             and the add button already gated, the bar is a row of dead controls
             above an empty page. */}
         {activeAccount && (
-          <div className="mb-6 pb-4 border-b border-white/10">
+          <div className="mb-6 pb-4 border-b" style={{ borderColor: SURFACE.line }}>
             <div className="flex items-center gap-4">
               <div className="flex-1">
                 <SearchWithFilters
@@ -620,9 +645,7 @@ export function SkinsTab() {
         {/* Content */}
         <div className={activeAccount ? "space-y-8" : "h-full"}>
         {accountLoading ? (
-          <p className="text-white/70 font-smallcaps text-sm text-center py-4">
-            {t('skins.loadingAccount')}
-          </p>
+          <LoadingSpinner size="md" shadowDepth="none" message={t('skins.loadingAccount')} className="py-10" />
         ) : !activeAccount ? (
           // Signed out wins over the error banner, and any error rides along
           // above it. The other way round the tab was a dead end: the banner
@@ -654,9 +677,7 @@ export function SkinsTab() {
           <>
             <div className="space-y-5 text-center">
               {localSkinsLoading ? (
-                <p className="text-white/70 font-smallcaps text-sm text-center py-4">
-                  {t('skins.loadingSkins')}
-                </p>
+                <LoadingSpinner size="md" shadowDepth="none" message={t('skins.loadingSkins')} className="py-10" />
               ) : localSkinsError ? (
                 <StatusMessage
                   type="error"
@@ -667,9 +688,12 @@ export function SkinsTab() {
                 localSkins.length > 0 &&
                 filteredSkins.length === 0 &&
                 !localSkinsError ? (
-                <p className="text-white/70 italic font-smallcaps text-xs">
-                  {t('skins.noSkinsMatchSearch')}
-                </p>
+                <EmptyState
+                  icon="solar:magnifer-bold"
+                  message={t('skins.noSkinsMatchSearch')}
+                  compact
+                  fullHeight={false}
+                />
               ) : (
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
                   <AddSkinCard

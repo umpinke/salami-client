@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
+import i18n from "../../i18n/i18n";
 import { toast } from "react-hot-toast";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
@@ -32,6 +33,9 @@ import { ClipThumbnail } from "./ClipThumbnail";
 import { RenameClipModal } from "./RenameClipModal";
 import { VerticalExport } from "./VerticalExport";
 import { parseErrorMessage } from "../../utils/error-utils";
+import { LoadingSpinner } from "../ui/LoadingSpinner";
+import { SURFACE, hexAlpha, kante } from "../ui/design-system";
+import { DeliLabel } from "../../themes/salami/SalamiStage";
 
 export type ClipSort = "newest" | "oldest" | "largest";
 
@@ -143,7 +147,7 @@ export function ClipGallery({
     async (clip: ClipEntry) => {
       const sure = await confirm({
         title: t("clips.gallery.delete"),
-        message: t("clips.gallery.delete_message", { name: clip.name }),
+        message: t("clips.gallery.delete_message", { name: clipTitle(clip, t) }),
         confirmText: t("clips.gallery.delete_confirm"),
         cancelText: t("clips.gallery.cancel"),
         type: "danger",
@@ -172,7 +176,7 @@ export function ClipGallery({
     const matching = clips.filter((clip) => {
       if (favouritesOnly && !clip.favourite) return false;
       if (game && clip.game !== game) return false;
-      return !needle || clip.name.toLowerCase().includes(needle);
+      return !needle || clip.name.toLowerCase().includes(needle) || clipTitle(clip, t).toLowerCase().includes(needle);
     });
 
     return [...matching].sort((a, b) => {
@@ -188,11 +192,7 @@ export function ClipGallery({
   }, [clips, search, sort, favouritesOnly, game]);
 
   if (clips === null || shown === null) {
-    return (
-      <p className="text-white/70 font-smallcaps text-sm text-center py-4">
-        {t("clips.gallery.loading")}
-      </p>
-    );
+    return <LoadingSpinner size="md" shadowDepth="none" message={t("clips.gallery.loading")} className="py-10" />;
   }
 
   if (clips.length === 0) {
@@ -233,7 +233,7 @@ export function ClipGallery({
         />
       )}
 
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
+      <div className="look-clip-grid grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
         {shown.map((clip, index) => (
           <ClipCard
             key={clip.path}
@@ -326,14 +326,18 @@ function ClipCard({
   return (
     <div
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-lg bg-black/20 border border-white/10 hover:border-white/20 transition-all duration-200",
+        "look-clip-card group relative flex flex-col overflow-hidden border transition-all duration-200",
         animated && "animate-in fade-in duration-500 fill-mode-both",
         busy && "pointer-events-none",
       )}
+      // Salami-Feinkost: Karte wie die Profil-Kachel – beim Hover 2px hoch, Rand und Schein im Akzent
       style={{
         animationDelay: animated ? `${Math.min(index, 24) * 0.04}s` : undefined,
-        backgroundColor: hovered ? `${accentColor.value}20` : undefined,
-        borderColor: hovered ? `${accentColor.value}60` : undefined,
+        backgroundColor: SURFACE.base,
+        borderColor: hovered ? hexAlpha(accentColor.value, 0.55) : SURFACE.line,
+        borderRadius: "var(--border-radius)",
+        transform: hovered ? "translateY(-2px)" : undefined,
+        boxShadow: hovered ? `0 10px 24px -12px ${hexAlpha(accentColor.value, 0.6)}` : undefined,
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -341,25 +345,30 @@ function ClipCard({
       <button
         type="button"
         onClick={onPlay}
-        className="relative block w-full focus:outline-none"
+        className="no-radius relative block w-full focus:outline-none"
         aria-label={t("clips.gallery.play")}
       >
         <ClipThumbnail clip={clip} onStored={onThumbnail} />
-        <span className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-          <Icon icon="solar:play-bold" className="w-12 h-12 text-white" />
+        <span className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+          <span
+            className="flex h-12 w-12 items-center justify-center text-white"
+            style={{
+              backgroundColor: accentColor.value,
+              boxShadow: kante(accentColor.value),
+              borderRadius: "calc(var(--border-radius) * 0.8)",
+            }}
+          >
+            <Icon icon="solar:play-bold" className="w-6 h-6" />
+          </span>
         </span>
         {clip.durationSeconds !== null && (
-          <span className="pointer-events-none absolute bottom-2 right-2 rounded bg-black/60 border border-white/10 px-1.5 py-0.5 font-minecraft text-xs text-white/80">
-            {formatLength(clip.durationSeconds)}
+          <span className="pointer-events-none absolute bottom-2 right-2">
+            <DeliLabel size="sm">{formatLength(clip.durationSeconds)}</DeliLabel>
           </span>
         )}
         {busy && (
-          <span className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-            <Icon
-              icon="svg-spinners:ring-resize"
-              className="w-8 h-8"
-              style={{ color: accentColor.value }}
-            />
+          <span className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: SURFACE.veil }}>
+            <LoadingSpinner size="sm" shadowDepth="none" />
           </span>
         )}
       </button>
@@ -390,11 +399,14 @@ function ClipCard({
         />
       </div>
 
-      <div className="flex flex-col gap-1 px-3 py-2.5 min-w-0">
-        <span className="font-minecraft text-base text-white whitespace-nowrap overflow-hidden text-ellipsis normal-case">
-          {clip.name}
+      <div className="look-clip-caption flex flex-col gap-1 px-3 py-2.5 min-w-0">
+        <span
+          className="look-clip-title font-minecraft text-lg leading-tight text-white whitespace-nowrap overflow-hidden text-ellipsis normal-case"
+          title={clipTitle(clip, t)}
+        >
+          {clipTitle(clip, t)}
         </span>
-        <div className="flex items-center gap-2 text-xs font-minecraft text-white/60 min-w-0">
+        <div className="look-clip-meta flex items-center gap-2 text-xs text-white/55 min-w-0">
           {clip.game && (
             <>
               <span className="truncate">{clip.game}</span>
@@ -491,7 +503,7 @@ function ClipPlayer({
 
   return (
     <Modal
-      title={clip.name}
+      title={clipTitle(clip, t)}
       titleIcon={<Icon icon="solar:videocamera-record-bold" className="w-5 h-5" />}
       titleSubtitle={
         <span className="font-minecraft text-xs text-white/60">
@@ -564,18 +576,22 @@ function StorageBar({
 
   return (
     <div className="flex items-center gap-4 px-1">
-      <span className="font-smallcaps text-base text-white/70 whitespace-nowrap">
+      <span className="font-minecraft text-base text-white/80 whitespace-nowrap">
         {filtered
           ? t("clips.gallery.count_filtered", { shown, count })
           : t("clips.gallery.count", { count })}
       </span>
       {!unlimited && (
-        <div className="flex-1 h-1.5 rounded-full bg-black/40 border border-white/10 overflow-hidden">
+        <div
+          className="flex-1 h-2 overflow-hidden border"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.35)", borderColor: SURFACE.line, borderRadius: 999 }}
+        >
           <div
-            className={cn("h-full rounded-full transition-all duration-300", crowded && "bg-yellow-400")}
+            className={cn("h-full transition-all duration-300", crowded && "bg-yellow-400")}
             style={{
               width: `${Math.max(2, ratio * 100)}%`,
               backgroundColor: crowded ? undefined : accentColor.value,
+              borderRadius: 999,
             }}
           />
         </div>
@@ -599,6 +615,23 @@ function formatBytes(bytes: number): string {
   if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
   if (bytes >= 1024 ** 2) return `${Math.round(bytes / 1024 ** 2)} MB`;
   return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+/**
+ * Salami: automatisch benannte Clips heißen auf der Platte „<Unix-Zeit>_clip“ – angezeigt wird
+ * stattdessen kurz „Clip vom Sa. 00:58“ (ältere: „Clip vom 14.11.“), damit der Titel in die Karte
+ * passt; Datum und Uhrzeit stehen ohnehin darunter. Selbst umbenannte Clips behalten ihren Namen.
+ */
+function clipTitle(clip: { name: string; createdAt: number }, t: Translate): string {
+  const auto = /^(\d{9,11})_clip$/.exec(clip.name);
+  if (!auto) return clip.name;
+  const seconds = Number(auto[1]) || clip.createdAt;
+  const recent = Date.now() / 1000 - seconds < 6 * 86_400;
+  const when = new Date(seconds * 1000).toLocaleString(
+    i18n.language,
+    recent ? { weekday: "short", hour: "2-digit", minute: "2-digit" } : { day: "numeric", month: "short" },
+  );
+  return t("clips.gallery.auto_title", { when });
 }
 
 function formatWhen(unixSeconds: number, t: Translate): string {

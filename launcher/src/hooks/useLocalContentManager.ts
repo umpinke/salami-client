@@ -19,6 +19,7 @@ import { contentCacheKey, useContentCacheStore } from '../store/content-cache-st
 import { archiveIconKey, useIconCacheStore } from '../store/icon-cache-store';
 import { useProjectIcons } from './useProjectIcons';
 import type { ProjectIconRef } from './useProjectIcons';
+import { errorText } from "../utils/error-text";
 
 // Base type for content items managed by this hook - maps to ProfileLocalContentItem
 // We'll use ProfileLocalContentItem directly or ensure T extends it.
@@ -33,6 +34,21 @@ export interface LocalContentItem extends ProfileLocalContentItem {
 
 // Enum for the types of content this hook can manage (used for UI/logic, maps to NrContentType for backend)
 export type LocalContentType = 'ShaderPack' | 'ResourcePack' | 'DataPack' | 'Mod' | 'NoRiskMod';
+
+// Translated singular/plural name of a content type for toasts ("4 Shader-Pakete", never "4 ShaderPacks").
+const CONTENT_TYPE_LABEL_KEYS: Record<LocalContentType, [string, string]> = {
+  Mod: ['profiles.content.mod', 'profiles.content.mods'],
+  ResourcePack: ['profiles.content.resourcePack', 'profiles.content.resourcePacks'],
+  ShaderPack: ['profiles.content.shaderPack', 'profiles.content.shaderPacks'],
+  DataPack: ['profiles.content.dataPack', 'profiles.content.dataPacks'],
+  NoRiskMod: ['profiles.content.noriskMod', 'profiles.content.noriskMods'],
+};
+
+function contentTypeLabel(type: LocalContentType, count: number): string {
+  const keys = CONTENT_TYPE_LABEL_KEYS[type];
+  if (!keys) return i18n.t('content_manager.update_result.items');
+  return i18n.t(count === 1 ? keys[0] : keys[1]);
+}
 
 interface UseLocalContentManagerProps<T extends LocalContentItem> {
   profile?: Profile;
@@ -166,7 +182,7 @@ function createUninstallPayload<T extends LocalContentItem>(
     }
   } else if (uiContentType === 'ResourcePack' || uiContentType === 'ShaderPack' || uiContentType === 'DataPack') {
     if (!item.path) {
-      toast.error(i18n.t('content_manager.errors.content_missing_path_uninstall', { type: uiContentType, filename: item.filename }));
+      toast.error(i18n.t('content_manager.errors.content_missing_path_uninstall', { type: contentTypeLabel(uiContentType, 1), filename: item.filename }));
       return null;
     }
     return { profile_id: profileId, file_path: item.path };
@@ -236,7 +252,7 @@ function createTogglePayload<T extends LocalContentItem>(
     if (item.path) {
       return { ...payloadBase, file_path: item.path };
     } else {
-      toast.error(i18n.t('content_manager.errors.path_missing_toggle', { type: uiContentType, filename: item.filename }));
+      toast.error(i18n.t('content_manager.errors.path_missing_toggle', { type: contentTypeLabel(uiContentType, 1), filename: item.filename }));
       return null;
     }
   }
@@ -363,6 +379,8 @@ export function useLocalContentManager<T extends LocalContentItem>({
   useEffect(() => {
     onRefreshRequiredRef.current = onRefreshRequired;
   }, [onRefreshRequired]);
+  const getDisplayFileNameRef = useRef(getDisplayFileName);
+  getDisplayFileNameRef.current = getDisplayFileName;
 
   const fetchBasicInfo = useCallback(async (behaviour: CacheBehaviour = 'stale_while_revalidate'): Promise<void> => {
     if (!profile?.id) {
@@ -411,7 +429,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
         const previous = previousByPath.get(item.path);
         return {
           ...item,
-          filename: item.filename || getDisplayFileName(item),
+          filename: item.filename || getDisplayFileNameRef.current(item),
           modrinth_info: item.modrinth_info ?? previous?.modrinth_info ?? null,
           curseforge_info: item.curseforge_info ?? previous?.curseforge_info ?? null,
         };
@@ -432,7 +450,8 @@ export function useLocalContentManager<T extends LocalContentItem>({
     } finally {
       setIsInitialLoadingState(false);
     }
-  }, [profile?.id, contentType, getDisplayFileName]);
+    // getDisplayFileName changes when project names arrive; that must not reload the list.
+  }, [profile?.id, contentType]);
 
   const fetchData = useCallback(async (initialFetch = true): Promise<void> => {
     if (profile?.id) {
@@ -470,13 +489,14 @@ export function useLocalContentManager<T extends LocalContentItem>({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [activeDropdownId]);
 
+  // Also when the icon is known: the same request brings the project name for the list.
   useProjectIcons(
     (items ?? []).flatMap<ProjectIconRef>((item) => {
       const platform = getItemPlatform(item);
-      if (platform === 'modrinth' && item.modrinth_info?.project_id && !item.modrinth_info.icon_url) {
+      if (platform === 'modrinth' && item.modrinth_info?.project_id) {
         return [{ platform: 'modrinth', projectId: item.modrinth_info.project_id }];
       }
-      if (platform === 'curseforge' && item.curseforge_info?.project_id && !item.curseforge_info.icon_url) {
+      if (platform === 'curseforge' && item.curseforge_info?.project_id) {
         return [{ platform: 'curseforge', projectId: item.curseforge_info.project_id }];
       }
       return [];
@@ -618,7 +638,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
       return targets.length - result.failed;
     } catch (error) {
       console.error(`[${contentType}] batch toggle failed:`, error);
-      toast.error(i18n.t('content_manager.errors.toggle_failed'));
+      toast.error(i18n.t('content_manager.errors.batch_toggle_failed', { errors: errorText(error) }));
       return 0;
     }
   }, [profile, items, selectedItemIds, contentType]);
@@ -959,7 +979,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
     } catch (error) {
       const errorMsg = parseErrorMessage(error);
       console.error(`Error checking for ${contentType} updates:`, errorMsg);
-      setContentUpdateError(`Error checking for ${contentType} updates: ${errorMsg}`);
+      setContentUpdateError(i18n.t('content_manager.errors.update_check_failed', { type: contentTypeLabel(contentType, 2), error: errorMsg }));
       setContentUpdates({});
     } finally {
       setIsCheckingUpdates(false);
@@ -1180,7 +1200,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
     setItemsBeingUpdated(new Set(itemsToUpdateWithDetails.map(({ item }) => item.filename)));
 
     const toastId = toast.loading(
-      i18n.t('content_manager.loading.updating_bulk', { total: totalCount, type: contentType })
+      i18n.t('content_manager.loading.updating_bulk', { total: totalCount, type: contentTypeLabel(contentType, totalCount) })
     );
 
     let succeededCount = 0;
@@ -1221,7 +1241,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
         toast.error(message, { id: toastId, duration: 2000 });
       }
     } else {
-      toast.success(i18n.t('content_manager.success.updated_all', { count: succeededCount, type: contentType }), { id: toastId, duration: 700 });
+      toast.success(i18n.t('content_manager.success.updated_all', { count: succeededCount, type: contentTypeLabel(contentType, succeededCount) }), { id: toastId, duration: 700 });
     }
   }, [profile, items, contentUpdates, contentType, getDisplayFileName, buildSwitchedItem, applySwitchedItems, setItemsBeingUpdated, setContentUpdateError]);
 
@@ -1305,7 +1325,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
       {
         loading: i18n.t(newUpdatesEnabled ? 'content_manager.loading.enabling_update_checks' : 'content_manager.loading.disabling_update_checks', { name: getDisplayFileName(item) }),
         success: i18n.t(newUpdatesEnabled ? 'content_manager.success.toggle_updates_enabled' : 'content_manager.success.toggle_updates_disabled', { name: getDisplayFileName(item) }),
-        error: (err) => i18n.t('content_manager.errors.toggle_update_checks_failed', { error: err.message?.toString() || 'Unknown error' }),
+        error: (err) => i18n.t('content_manager.errors.toggle_update_checks_failed', { error: err.message?.toString() || i18n.t('common.unknown_error') }),
       },
       {
         success: {
@@ -1336,7 +1356,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
       return;
     }
 
-    const itemLabel = i18n.t(selectedItems.length === 1 ? 'content_manager.update_result.item' : 'content_manager.update_result.items');
+    const itemLabel = contentTypeLabel(contentType, selectedItems.length);
 
     const promiseAction = async () => {
       // Filter out items without valid IDs and prepare bulk update payload
@@ -1373,7 +1393,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
       {
         loading: i18n.t(updatesEnabled ? 'content_manager.loading.enabling_update_checks_batch' : 'content_manager.loading.disabling_update_checks_batch', { count: selectedItems.length, itemLabel }),
         success: i18n.t(updatesEnabled ? 'content_manager.success.batch_toggle_updates_enabled' : 'content_manager.success.batch_toggle_updates_disabled', { count: selectedItems.length, itemLabel }),
-        error: (err) => i18n.t('content_manager.errors.toggle_update_checks_failed', { error: err.message || 'Unknown error' }),
+        error: (err) => i18n.t('content_manager.errors.toggle_update_checks_failed', { error: err.message || i18n.t('common.unknown_error') }),
       },
       {
         success: {
@@ -1387,7 +1407,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
       }
     });
 
-  }, [profile, selectedItemIds, items]);
+  }, [profile, selectedItemIds, items, contentType]);
 
   return {
     items,

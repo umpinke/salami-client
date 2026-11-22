@@ -156,7 +156,7 @@ export function AddPresetSourceModal({
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="mb-3 flex flex-shrink-0 items-center gap-3">
             <div className="min-w-0">
-              <div className="font-minecraft text-[11px] uppercase tracking-wider text-white/40">
+              <div className="font-minecraft text-sm text-white/55">
                 {t("syncPacks.seed.fromProfile")}
               </div>
               {isFolder && (
@@ -170,7 +170,7 @@ export function AddPresetSourceModal({
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t("syncPacks.seed.searchPlaceholder")}
               disabled={isLoading}
-              className="ml-auto w-[260px] rounded border border-white/10 bg-black/30 px-3 py-2 font-minecraft text-sm text-white/80 outline-none transition-colors placeholder:text-white/25 focus:border-white/25 disabled:opacity-40"
+              className="ml-auto w-[260px] rounded border border-white/[0.12] bg-white/[0.045] px-3 py-2 text-sm text-white/80 outline-none transition-colors placeholder:text-white/25 focus:border-white/25 disabled:opacity-40"
             />
           </div>
 
@@ -250,7 +250,7 @@ export function AddPresetSourceModal({
                               borderColor: `${accentColor.value}59`,
                               backgroundColor: `${accentColor.value}1a`,
                             }}
-                            className="flex-shrink-0 rounded border px-1.5 py-0.5 font-minecraft text-[10px] uppercase tracking-wider"
+                            className="flex-shrink-0 rounded border px-1.5 py-0.5 font-minecraft text-[11px]"
                           >
                             {t("syncPacks.seed.currentProfile")}
                           </span>

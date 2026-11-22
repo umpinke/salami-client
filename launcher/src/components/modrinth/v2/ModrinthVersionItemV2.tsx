@@ -10,9 +10,10 @@ import type { UnifiedVersion } from "../../../types/unified";
 import type { AccentColor } from "../../../store/useThemeStore";
 import type { ContentInstallStatus } from "../../../types/profile";
 import { Icon } from "@iconify/react";
-import { ActionButton } from "../../ui/ActionButton";
-import { TagBadge } from "../../ui/TagBadge";
 import { gsap } from "gsap";
+import { SURFACE } from "../../ui/design-system";
+import { DeliLabel } from "../../../themes/salami/SalamiStage";
+import { KanteButton, QuietTag, tagLabel } from "./FeinkostParts";
 import { useIsFirstRender } from "../../../hooks/useIsFirstRender";
 
 interface ModrinthVersionItemV2Props {
@@ -255,6 +256,7 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
       selectedProfileId &&
       (versionStatus?.is_installed ||
         versionStatus?.is_included_in_norisk_pack);
+    const MAX_GAME_VERSIONS = 4;
 
     return (
       <div
@@ -262,36 +264,35 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
         key={version.id}
         onMouseEnter={handleMouseEnterLocal}
         onMouseLeave={handleMouseLeaveLocal}
-        className={cn(
-          "relative overflow-hidden transition-colors duration-150 rounded-md backdrop-blur-sm",
-          "border",
-          showInstallBorder &&
-            versionStatus?.is_installed &&
-            "border-l-green-500 border-l-4",
-          showInstallBorder &&
-            !versionStatus?.is_installed &&
-            versionStatus?.is_included_in_norisk_pack &&
-            "border-l-blue-500 border-l-4",
-        )}
+        className="relative overflow-hidden transition-colors duration-150"
         style={{
-          backgroundColor: `${accentColor.value}08`,
-          borderColor: `${accentColor.value}20`,
+          backgroundColor: isHovered ? SURFACE.hover : SURFACE.base,
+          border: `1px solid ${isHovered ? SURFACE.lineStrong : SURFACE.line}`,
+          borderRadius: "calc(var(--border-radius) * 0.8)",
         }}
       >
-        <div className="relative z-10 p-2.5">
+        {/* Installiert / im Pack: Streifen in Akzent bzw. Creme statt Grün/Blau */}
+        {showInstallBorder && (
+          <span
+            className="absolute bottom-0 left-0 top-0 w-[3px]"
+            style={{ backgroundColor: versionStatus?.is_installed ? accentColor.value : "#f3e3d3" }}
+            aria-hidden="true"
+          />
+        )}
+        <div className="relative z-10 p-2.5 pl-3">
           <div className="flex flex-col space-y-2">
             <div className="flex justify-between items-baseline gap-2">
               <div className="flex-shrink min-w-0 flex items-center gap-2">
                 <div className="min-w-0">
-                  <h5 className="text-gray-100 text-sm font-minecraft normal-case truncate">
+                  <h5 className="text-white text-sm font-minecraft normal-case tracking-normal truncate">
                     {version.name}
                   </h5>
-                  <p className="text-gray-400 text-xs font-minecraft normal-case truncate">
+                  <p className="text-white/45 text-xs normal-case truncate">
                     {version.version_number}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center space-x-2 text-[10px] text-gray-400 font-minecraft flex-shrink-0">
+              <div className="flex items-center space-x-2 text-[11px] text-white/45 font-minecraft flex-shrink-0">
                 {" "}
                 <span className="flex items-center">
                   <Icon
@@ -315,61 +316,53 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
                 {selectedProfileId &&
                   versionStatus?.is_installed &&
                   versionStatus?.is_enabled !== false && (
-                    <TagBadge variant="success" className="flex-shrink-0">
-                      <Icon
-                        icon="solar:check-circle-bold"
-                        className="w-3 h-3 mr-0.5"
-                      />
+                    <DeliLabel size="sm">
+                      <Icon icon="solar:check-circle-bold" className="h-3 w-3" />
                       {t('common.installed')}
-                    </TagBadge>
+                    </DeliLabel>
                   )}
                 {selectedProfileId &&
                   versionStatus?.is_installed &&
                   versionStatus?.is_enabled === false && (
-                    <TagBadge variant="inactive" className="flex-shrink-0">
-                      <Icon
-                        icon="solar:close-circle-bold"
-                        className="w-3 h-3 mr-0.5"
-                      />
+                    <QuietTag>
+                      <Icon icon="solar:close-circle-bold" className="h-3 w-3" />
                       {t('common.disabled')}
-                    </TagBadge>
+                    </QuietTag>
                   )}
                 {selectedProfileId &&
                   versionStatus?.is_included_in_norisk_pack && (
-                    <TagBadge
-                      variant={versionStatus?.is_enabled ? "info" : "inactive"}
-                      className="flex-shrink-0"
-                    >
-                      <Icon
-                        icon="solar:bolt-circle-bold"
-                        className="w-3 h-3 mr-0.5"
-                      />
-                      {t('modrinth.in_norisk_pack')}
-                    </TagBadge>
+                    <span style={{ opacity: versionStatus?.is_enabled ? 1 : 0.5 }}>
+                      <DeliLabel size="sm" tone="red">
+                        <Icon icon="solar:bolt-circle-bold" className="h-3 w-3" />
+                        {t('modrinth.in_norisk_pack')}
+                      </DeliLabel>
+                    </span>
                   )}
-                <TagBadge className="flex-shrink-0">
-                  {version.release_type}
-                </TagBadge>
-                {version.game_versions.length > 0 &&
-                  version.game_versions.slice(0, 5).map((gv) => (
-                    <TagBadge key={`gv-${version.id}-${gv}`} variant="default">
-                      {gv}
-                    </TagBadge>
-                  ))}
-                {version.game_versions.length > 5 && (
-                  <TagBadge variant="default">...</TagBadge>
-                )}
+                <QuietTag className={version.release_type !== "release" ? "text-[#f3e3d3]" : undefined}>
+                  {t(`mod_detail.versions.${version.release_type}`, { defaultValue: version.release_type })}
+                </QuietTag>
                 {version.loaders.length > 0 &&
                   version.loaders.map((loader) => (
-                    <TagBadge
-                      key={`loader-${version.id}-${loader}`}
-                      variant="default"
-                    >
-                      {loader}
-                    </TagBadge>
+                    <DeliLabel key={`loader-${version.id}-${loader}`} size="sm" tone="red">
+                      {tagLabel(loader)}
+                    </DeliLabel>
                   ))}
+                {version.game_versions.length > 0 &&
+                  version.game_versions.slice(0, MAX_GAME_VERSIONS).map((gv) => (
+                    <DeliLabel key={`gv-${version.id}-${gv}`} size="sm">
+                      {gv}
+                    </DeliLabel>
+                  ))}
+                {version.game_versions.length > MAX_GAME_VERSIONS && (
+                  <span
+                    className="font-minecraft text-xs text-white/45"
+                    title={version.game_versions.slice(MAX_GAME_VERSIONS).join(", ")}
+                  >
+                    {t('mod_detail.more_categories', { count: version.game_versions.length - MAX_GAME_VERSIONS })}
+                  </span>
+                )}
               </div>
-              <div className="flex gap-1 flex-shrink-0">
+              <div className="flex gap-1.5 flex-shrink-0">
                 {" "}
                 {selectedProfileId &&
                   ((versionStatus?.is_installed &&
@@ -379,45 +372,59 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
                     (versionStatus?.is_included_in_norisk_pack &&
                       versionStatus?.norisk_pack_item_details &&
                       onToggleEnableClick)) && (
-                    <ActionButton
-                      onClick={handleToggleEnableButtonClick}
+                    <KanteButton
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleEnableButtonClick();
+                      }}
                       size="sm"
-                      variant={
-                        versionStatus.is_enabled ? "highlight" : "secondary"
-                      }
-                      label={versionStatus.is_enabled ? t('common.active') : t('common.disabled')}
+                      active={!!versionStatus.is_enabled}
                       className="min-w-[80px]"
-                      icon="solar:settings-bold"
-                    />
+                      icon={<Icon icon={versionStatus.is_enabled ? "solar:check-circle-bold" : "solar:close-circle-bold"} className="h-3.5 w-3.5" />}
+                    >
+                      {versionStatus.is_enabled ? t('common.active') : t('common.disabled')}
+                    </KanteButton>
                   )}
                 {selectedProfileId &&
                   versionStatus?.is_installed &&
                   !isModpack &&
                   onDeleteClick && (
-                    <ActionButton
-                      onClick={handleDeleteButtonClick}
+                    <KanteButton
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteButtonClick();
+                      }}
                       size="sm"
-                      variant="destructive"
-                      label={t('common.delete')}
+                      tone="danger"
                       className="min-w-[80px]"
-                      icon="solar:trash-bin-minimalistic-bold"
-                    />
+                      icon={<Icon icon="solar:trash-bin-minimalistic-bold" className="h-3.5 w-3.5" />}
+                    >
+                      {t('common.delete')}
+                    </KanteButton>
                   )}
                 {(!selectedProfileId || !versionStatus?.is_installed) && (
-                  <ActionButton
-                    onClick={handleButtonClick}
+                  <KanteButton
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleButtonClick();
+                    }}
                     size="sm"
-                    variant={buttonVariant}
+                    tone={buttonVariant === "primary" ? "primary" : "secondary"}
                     disabled={buttonDisabled || isInstalling}
                     className="min-w-[80px]"
                     icon={
-                      isInstalling || isInstallingModpackVersion
-                        ? "solar:refresh-bold"
-                        : "solar:download-minimalistic-bold"
+                      <Icon
+                        icon={
+                          isInstalling || isInstallingModpackVersion
+                            ? "solar:refresh-bold"
+                            : "solar:download-minimalistic-bold"
+                        }
+                        className={cn("h-3.5 w-3.5", (isInstalling || isInstallingModpackVersion) && "animate-spin-slow")}
+                      />
                     }
-                    iconClassName={(isInstalling || isInstallingModpackVersion) ? "animate-spin-slow" : ""}
-                    label={buttonText}
-                  />
+                  >
+                    {buttonText}
+                  </KanteButton>
                 )}
               </div>
             </div>

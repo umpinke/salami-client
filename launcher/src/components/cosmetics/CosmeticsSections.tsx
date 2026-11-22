@@ -18,6 +18,9 @@ import {
   type CosmeticsCatalog,
 } from "../../services/salami-cosmetics-service";
 import "../salami-capes/i18n";
+import { KANTE_SOFT, SURFACE, kante } from "../ui/design-system";
+import { LoadingSpinner } from "../ui/LoadingSpinner";
+import { SHOP_CARD_CLASS, SHOP_WELL, ShopPreviewCard, shopCardStyle } from "../salami-capes/shop-style";
 
 /** Vorschaubilder werden doppelt so groß gerendert, wie sie auf der Karte stehen. */
 const THUMB_PIXELS = 192;
@@ -80,21 +83,18 @@ function Card({ label, note, active, icon, snapshot, onHover, onPick }: CardProp
       onFocus={() => onHover(true)}
       onBlur={() => onHover(false)}
       aria-pressed={active}
-      className={cn(
-        "flex flex-col items-center gap-2 rounded-2xl border p-3 text-center transition-colors focus:outline-none",
-        active ? "bg-white/10" : "border-white/10 bg-black/25 hover:bg-white/5",
-      )}
-      style={active ? { borderColor: accent.value, boxShadow: `0 0 0 1px ${accent.value}` } : undefined}
+      className={cn("flex flex-col items-center gap-2 p-3 text-center focus:outline-none", SHOP_CARD_CLASS)}
+      style={shopCardStyle(accent.value, active)}
     >
-      <div className="flex h-24 w-24 items-center justify-center rounded-lg" style={SPOTLIGHT}>
+      <div className="flex h-[104px] w-full items-center justify-center" style={{ borderRadius: SHOP_WELL.borderRadius, ...SPOTLIGHT }}>
         {image ? (
           <img src={image} alt="" className="h-24 w-24" draggable={false} />
         ) : (
           <Icon icon={icon} className="h-8 w-8 text-white/40" />
         )}
       </div>
-      <span className="max-w-[124px] truncate text-sm text-white">{label}</span>
-      {note && <span className="-mt-1 max-w-[124px] truncate text-xs text-white/50">{note}</span>}
+      <span className="max-w-full truncate font-minecraft text-sm text-white">{label}</span>
+      {note && <span className="-mt-1 max-w-full truncate text-xs text-white/50">{note}</span>}
     </button>
   );
 }
@@ -120,38 +120,43 @@ function Layout({ viewer, title, details, subtitle, above, offline = false, load
   const skin = useActiveSkinTexture();
   return (
     <div className="flex h-full gap-6 overflow-hidden p-6">
-      <aside className="flex w-[280px] shrink-0 flex-col gap-3">
-        <div className="relative h-[340px] overflow-hidden rounded-2xl border border-white/10" style={SPOTLIGHT}>
-          <CosmeticsViewer
-            textureUrl={skin.textureUrl}
-            variant={skin.variant}
-            className="h-full w-full"
-            unsupportedFallback={
-              <div className="flex h-full items-center justify-center text-white/40">
-                <Icon icon={icon} className="h-12 w-12" />
-              </div>
-            }
-            {...viewer}
-          />
-        </div>
-        <div className="px-1">
-          <div className="text-lg font-semibold text-white">{title}</div>
+      <aside className="custom-scrollbar flex w-[280px] shrink-0 flex-col gap-3 overflow-y-auto">
+        <ShopPreviewCard
+          viewerStyle={SPOTLIGHT}
+          viewer={
+            <CosmeticsViewer
+              textureUrl={skin.textureUrl}
+              variant={skin.variant}
+              className="h-full w-full"
+              unsupportedFallback={
+                <div className="flex h-full items-center justify-center text-white/40">
+                  <Icon icon={icon} className="h-12 w-12" />
+                </div>
+              }
+              {...viewer}
+            />
+          }
+        >
+          <div className="font-minecraft text-xl leading-tight text-white">{title}</div>
           {details}
           <p className="mt-2 text-xs leading-relaxed text-white/55">{t("salami.cosmetics.preview_hint")}</p>
-        </div>
+        </ShopPreviewCard>
       </aside>
 
       <section className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
         <p className="text-sm text-white/70">{subtitle}</p>
         {offline && (
-          <p className="mt-3 flex items-start gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs leading-relaxed text-white/65">
+          <p
+            className="mt-3 flex items-start gap-2 border px-3 py-2 text-xs leading-relaxed text-white/65"
+            style={{ backgroundColor: SURFACE.base, borderColor: SURFACE.line, borderRadius: "var(--border-radius)" }}
+          >
             <Icon icon="solar:cloud-cross-bold" className="mt-0.5 h-4 w-4 shrink-0" />
             {t("salami.cosmetics.offline")}
           </p>
         )}
         {!loading && above}
         {loading ? (
-          <p className="mt-6 text-sm text-white/55">{t("salami.cosmetics.loading")}</p>
+          <LoadingSpinner size="md" shadowDepth="none" message={t("salami.cosmetics.loading")} className="mt-10" />
         ) : (
           <div className="mt-5 grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">{children}</div>
         )}
@@ -253,10 +258,13 @@ export function BuddiesSection() {
                 aria-pressed={active}
                 onClick={() => setPlace(item)}
                 className={cn(
-                  "rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors focus:outline-none",
-                  active ? "hover:brightness-110" : "bg-white/10 hover:bg-white/15",
+                  "h-8 px-3 font-minecraft text-xs transition-[filter,color] duration-150 focus:outline-none active:translate-y-px",
+                  active ? "text-white hover:brightness-110" : "text-white/75 hover:text-white",
                 )}
-                style={active ? { backgroundColor: accent.value } : undefined}
+                style={{
+                  backgroundColor: active ? accent.value : SURFACE.hover,
+                  boxShadow: active ? kante(accent.value, 2) : KANTE_SOFT,
+                }}
               >
                 {t(`salami.cosmetics.buddies.place.${item}`)}
               </button>

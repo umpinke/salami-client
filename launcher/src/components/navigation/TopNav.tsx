@@ -1,4 +1,5 @@
 import { Icon } from "@iconify/react";
+import { PixelIcon, hasPixelIcon } from "../../themes/salami/PixelIcon";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 import { hexAlpha, readableOn, SURFACE } from "../ui/design-system";
@@ -29,7 +30,7 @@ export function TopNav({ items, activeItem, onItemClick }: TopNavProps) {
   return (
     <nav
       aria-label="Navigation"
-      className="flex items-center gap-1 border p-1"
+      className="look-nav flex items-center gap-1 border p-1"
       style={{
         backgroundColor: SURFACE.base,
         borderColor: SURFACE.line,
@@ -64,7 +65,12 @@ export function TopNav({ items, activeItem, onItemClick }: TopNavProps) {
                   : undefined
               }
             >
-              {(active || !showLabels) && <Icon icon={item.icon} className="h-[18px] w-[18px] flex-shrink-0" />}
+              {(active || !showLabels) &&
+                (hasPixelIcon(item.id) ? (
+                  <PixelIcon name={item.id} className="h-[16px] w-[16px] flex-shrink-0" />
+                ) : (
+                  <Icon icon={item.icon} className="h-[18px] w-[18px] flex-shrink-0" />
+                ))}
               {showLabels && <span className="font-minecraft">{item.label}</span>}
             </button>
           );

@@ -21,7 +21,7 @@ function NrcLoaderCompatibleTooltipContent() {
       <div className="text-sm text-white">{t('profiles.wizard.nrcLoaderCompatible')}</div>
       <div className="flex items-start gap-2">
         <Icon icon="solar:lightbulb-bold" className="text-yellow-400 text-base flex-shrink-0" />
-        <div className="text-gray-300 text-xs italic">
+        <div className="text-white/70 text-xs italic">
           {t('profiles.wizard.nrcLoaderFeatures')}
         </div>
       </div>
@@ -431,7 +431,7 @@ export function ProfileWizardV2Step2({
       </Button>
 
       <Button
-        variant="default"
+        variant="3d"
         onClick={handleNext}
         disabled={loading || loadingVersions || (selectedLoader !== "vanilla" && !selectedLoaderVersion)}
         size="md"
@@ -446,7 +446,7 @@ export function ProfileWizardV2Step2({
 
   return (
     <Modal
-      title={t('profiles.wizard.step2Title')}
+      title={t('profiles.wizard.step3Title')}
       onClose={onClose}
       width="lg"
       footer={renderFooter()}

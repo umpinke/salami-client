@@ -207,7 +207,7 @@ export function useGlobalDragAndDrop() {
                   if (successful.length > 0) {
                     console.log(`[DragDrop Hook ${instanceId}] World import completed: ${successful.length} successful, ${failed.length} failed`);
                     toast.success(
-                      i18n.t('dragdrop.worlds_imported_success', { count: successful.length }) + (failed.length > 0 ? ` ${failed.length} failed.` : ''),
+                      i18n.t('dragdrop.worlds_imported_success', { count: successful.length }) + (failed.length > 0 ? ` ${i18n.t('dragdrop.some_failed', { count: failed.length })}` : ''),
                       { id: loadingToastId, duration: 4000 }
                     );
                     // Trigger refresh of worlds list
@@ -216,7 +216,7 @@ export function useGlobalDragAndDrop() {
                     console.error(`[DragDrop Hook ${instanceId}] All world imports failed`);
                     const errorMsg = failed.length > 0 && failed[0].error instanceof Error
                       ? failed[0].error.message
-                      : 'Failed to import worlds';
+                      : i18n.t('common.unknown_error');
                     toast.error(
                       i18n.t('dragdrop.worlds_import_failed', { error: errorMsg }),
                       { id: loadingToastId }

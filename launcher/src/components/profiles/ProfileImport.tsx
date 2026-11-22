@@ -61,7 +61,7 @@ export function ProfileImport({
   const renderFooter = () => (
     <div className="flex justify-end">
       <Button
-        variant="default"
+        variant="3d"
         onClick={handleImport}
         disabled={isImporting}
         icon={<Icon icon="solar:upload-bold" className="w-5 h-5 text-white" />}
@@ -116,7 +116,8 @@ export function ProfileImport({
                   >
                     <Icon
                       icon="solar:file-bold"
-                      className="w-5 h-5 text-blue-400"
+                      className="w-5 h-5"
+                      style={{ color: accentColor.value }}
                     />
                   </div>
                   <span>{t('profiles.format_mrpack')}</span>

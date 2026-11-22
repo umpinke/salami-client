@@ -56,7 +56,7 @@ export function GameVersionPickerV3({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t("profiles.v3.chips.gameVersion.search")}
-            className="w-full h-7 pl-7 pr-2 rounded bg-white/5 border border-white/10 focus:border-white/25 outline-none text-xs text-white placeholder:text-white/30 font-minecraft"
+            className="w-full h-8 pl-7 pr-2 rounded bg-white/[0.06] border border-white/[0.12] focus:border-white/25 outline-none text-sm text-white placeholder:text-white/35"
           />
         </div>
       </div>
@@ -69,15 +69,15 @@ export function GameVersionPickerV3({
             <button
               key={seg}
               onClick={() => setShowSnapshots(seg === "snapshot")}
-              style={active ? { backgroundColor: `${accent.value}33`, color: accent.light } : undefined}
+              style={active ? { backgroundColor: accent.value, color: "#fff", boxShadow: `0 2px 0 rgba(0,0,0,0.35)` } : undefined}
               onMouseEnter={(e) => {
-                if (!active) e.currentTarget.style.backgroundColor = `${accent.value}1a`;
+                if (!active) e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.08)";
               }}
               onMouseLeave={(e) => {
                 if (!active) e.currentTarget.style.backgroundColor = "transparent";
               }}
-              className={`flex-1 h-6 rounded text-[10px] uppercase tracking-wider font-minecraft transition-colors ${
-                active ? "" : "text-white/50"
+              className={`flex-1 h-7 rounded text-xs font-minecraft transition-colors ${
+                active ? "" : "text-white/55 hover:text-white"
               }`}
             >
               {seg === "release"

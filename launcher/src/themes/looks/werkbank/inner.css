@@ -1,0 +1,1352 @@
+/*
+ * Look „Pixel-Werkbank“ – Innenseiten: Profil als Inventar-Fenster mit Kreativ-Reitern
+ * (WerkbankProfileDetail), Inhalte als Slot-Zeilen wie im Rezeptbuch (WerkbankContentItem) und der
+ * Mod-Browser als Kreativ-Inventar (WerkbankSearchCard). Alles nur unter :root[data-look="werkbank"].
+ * Siehe ../CONTRACT.md
+ */
+
+:root[data-look="werkbank"] {
+  /* Gegenstands-Tooltip und Erfahrungsleiste wie im Spiel */
+  --wb-tip-bg: #160a1c;
+  --wb-tip-edge: linear-gradient(#5a22d8, #2a0e70);
+  --wb-tip-grey: #a8a8a8;
+  --wb-tip-blue: #8c8cff;
+  --wb-xp-text: #80ff20;
+  /* Kante der hinteren Reiter */
+  --wb-tab-hi: #4a382f;
+}
+
+/* ═════════════════════════ Profil: Inventar-Fenster ═════════════════════════ */
+
+:root[data-look="werkbank"] .wb-pd {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 20px 8px;
+}
+
+/* ── Reiter auf der Oberkante ── */
+:root[data-look="werkbank"] .wb-pd__tabs {
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  height: 44px;
+}
+
+:root[data-look="werkbank"] .wb-pd__back {
+  flex-shrink: 0;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  margin-top: -4px;
+  padding: 0 12px 0 10px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--wb-fat);
+  background: var(--wb-stone);
+  border: 2px solid #000;
+  box-shadow: var(--wb-bevel-stone);
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.55);
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+:root[data-look="werkbank"] .wb-pd__back:hover {
+  border-color: #fff;
+  background: #675046;
+}
+
+:root[data-look="werkbank"] .wb-pd__back-icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+:root[data-look="werkbank"] .wb-pd__back-label {
+  white-space: nowrap;
+}
+
+/* wird es eng, bleibt vom Zurück-Knopf nur der Pfeil (Name als Hinweis) */
+:root[data-look="werkbank"] .wb-pd__tabs--noback .wb-pd__back-label {
+  max-width: 0;
+  margin-left: -8px;
+  overflow: hidden;
+}
+
+:root[data-look="werkbank"] .wb-pd__tabs--noback .wb-pd__back {
+  padding: 0 10px;
+}
+
+:root[data-look="werkbank"] .wb-pd__tabrow {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+:root[data-look="werkbank"] .wb-pd__tabgap {
+  flex: 1 1 8px;
+  min-width: 8px;
+}
+
+:root[data-look="werkbank"] .wb-pd-tab {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 9px 3px;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--wb-dim);
+  background: var(--wb-panel-dark);
+  border: 3px solid #000;
+  border-bottom: 0;
+  box-shadow: inset 3px 3px 0 var(--wb-tab-hi), inset -3px 0 0 var(--wb-lo);
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6);
+  transition: color 0.15s, background-color 0.15s;
+}
+
+:root[data-look="werkbank"] .wb-pd-tab:hover {
+  color: #fff;
+  background: #35251f;
+}
+
+:root[data-look="werkbank"] .wb-pd-tab:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: -5px;
+}
+
+/* der gewählte Reiter steht vorn und geht nahtlos in die Tafel über */
+:root[data-look="werkbank"] .wb-pd-tab--on,
+:root[data-look="werkbank"] .wb-pd-tab--on:hover {
+  z-index: 3;
+  height: 48px;
+  margin-bottom: -6px;
+  padding-bottom: 6px;
+  color: #fff;
+  background: var(--wb-panel);
+  box-shadow: inset 3px 3px 0 var(--wb-hi), inset -3px 0 0 var(--wb-lo);
+}
+
+:root[data-look="werkbank"] .wb-pd-tab__item {
+  position: relative;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+}
+
+:root[data-look="werkbank"] .wb-pd-tab:has(.wb-pd-tab__count) .wb-pd-tab__item {
+  margin-right: 8px;
+}
+
+:root[data-look="werkbank"] .wb-pd-tab__icon {
+  display: block;
+  width: 18px;
+  height: 18px;
+  filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.6));
+}
+
+:root[data-look="werkbank"] .wb-pd-tab--on .wb-pd-tab__icon {
+  color: var(--wb-acc-hi);
+  filter: drop-shadow(2px 2px 0 #000);
+}
+
+/* passen nicht alle Namen in die Zeile, tragen die hinteren Reiter nur ihr Symbol (Name als Hinweis) */
+:root[data-look="werkbank"] .wb-pd__tabrow--compact .wb-pd-tab:not(.wb-pd-tab--on) .wb-pd-tab__label {
+  max-width: 0;
+  margin-left: -7px;
+  overflow: hidden;
+}
+
+:root[data-look="werkbank"] .wb-pd__tabrow--compact .wb-pd-tab:not(.wb-pd-tab--on) {
+  padding: 0 11px 3px;
+}
+
+/* Stapelzahl wie an einem Gegenstand */
+:root[data-look="werkbank"] .wb-pd-tab__count {
+  position: absolute;
+  left: calc(100% - 6px);
+  bottom: -5px;
+  font-size: 12px;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 2px 2px 0 #3f3f3f;
+}
+
+/* ── die Tafel ── */
+:root[data-look="werkbank"] .wb-pd__panel {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 16px 14px;
+  background: var(--wb-panel);
+  border: 3px solid #000;
+  box-shadow: var(--wb-bevel), var(--wb-drop);
+}
+
+:root[data-look="werkbank"] .wb-pd__head {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  grid-template-areas: "icon info lore arrow result";
+  align-items: center;
+  column-gap: 18px;
+  row-gap: 10px;
+}
+
+/* das Profilbild im großen Slot; das Loader-Abzeichen bleibt an seiner Ecke */
+:root[data-look="werkbank"] .wb-pd__icon {
+  grid-area: icon;
+  align-self: start;
+  display: grid;
+  place-items: center;
+  width: 104px;
+  height: 104px;
+  background: var(--wb-slot);
+  box-shadow: var(--wb-inset);
+}
+
+:root[data-look="werkbank"] .wb-pd__icon .look-profile-icon {
+  width: 80px !important;
+  height: 80px !important;
+  border: 2px solid #000 !important;
+  background-color: #120c0a !important;
+  image-rendering: pixelated;
+}
+
+:root[data-look="werkbank"] .wb-pd__icon .look-profile-icon img {
+  image-rendering: pixelated;
+}
+
+:root[data-look="werkbank"] .wb-pd__info {
+  grid-area: info;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+:root[data-look="werkbank"] .wb-pd__name {
+  margin: 0;
+  padding: 0 4px 4px 0;
+  color: #fff;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+:root[data-look="werkbank"] .wb-pd__name--lg { font-size: 32px; text-shadow: 3px 3px 0 #000; }
+:root[data-look="werkbank"] .wb-pd__name--md { font-size: 26px; text-shadow: 3px 3px 0 #000; }
+:root[data-look="werkbank"] .wb-pd__name--sm { font-size: 21px; text-shadow: 2px 2px 0 #000; }
+
+:root[data-look="werkbank"] .wb-pd__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Spielzeit als Erfahrungsleiste: Stufe grün über der Leiste, wie im Spiel */
+:root[data-look="werkbank"] .wb-xp {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding-top: 13px;
+}
+
+:root[data-look="werkbank"] .wb-xp__bar {
+  position: relative;
+  flex: 0 0 182px;
+  height: 12px;
+  background: #1a1410;
+  border: 2px solid #000;
+}
+
+:root[data-look="werkbank"] .wb-xp__fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(#b6ff6a 0 34%, #7ed420 34% 70%, #4f9a10 70%);
+}
+
+/* Kerben der Leiste */
+:root[data-look="werkbank"] .wb-xp__bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, transparent 0 16px, rgba(0, 0, 0, 0.6) 16px 18px);
+  pointer-events: none;
+}
+
+:root[data-look="werkbank"] .wb-xp__lvl {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 1px);
+  transform: translateX(-50%);
+  font-size: 14px;
+  line-height: 1;
+  color: var(--wb-xp-text);
+  text-shadow: -2px 0 0 #000, 2px 0 0 #000, 0 -2px 0 #000, 0 2px 0 #000;
+}
+
+:root[data-look="werkbank"] .wb-xp[data-empty] .wb-xp__lvl {
+  color: #8fa77a;
+}
+
+:root[data-look="werkbank"] .wb-xp__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--wb-fat);
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6);
+}
+
+:root[data-look="werkbank"] .wb-xp__label {
+  color: var(--wb-dim);
+}
+
+/* Kennzahlen als Gegenstands-Tooltip: dunkel, violetter Rand, Name weiß, Zeilen grau */
+:root[data-look="werkbank"] .wb-pd__lore {
+  grid-area: lore;
+  align-self: center;
+  min-width: 0;
+  max-width: 250px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 9px 11px 8px;
+  background: var(--wb-tip-bg);
+  border: 2px solid;
+  border-image: var(--wb-tip-edge) 1;
+  box-shadow: 0 0 0 2px #0b040e, var(--wb-drop);
+}
+
+:root[data-look="werkbank"] .wb-pd__lore-title {
+  font-size: 14px;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 2px 2px 0 #3f3f3f;
+}
+
+:root[data-look="werkbank"] .wb-pd__lore dd {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--wb-tip-grey);
+  text-shadow: 1px 1px 0 #2a2a2a;
+}
+
+:root[data-look="werkbank"] .wb-pd__lore-icon {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  color: #7c7c7c;
+}
+
+:root[data-look="werkbank"] .wb-pd__lore-key {
+  flex-shrink: 0;
+}
+
+:root[data-look="werkbank"] .wb-pd__lore-val {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #e6e6e6;
+}
+
+:root[data-look="werkbank"] .wb-pd__lore dd.wb-pd__lore-mod,
+:root[data-look="werkbank"] .wb-pd__lore-mod .wb-pd__lore-icon {
+  color: var(--wb-tip-blue);
+}
+
+/* Werkbank-Pfeil: Zutaten → Ergebnis */
+:root[data-look="werkbank"] .wb-pd__arrow {
+  grid-area: arrow;
+  width: 44px;
+  height: 30px;
+  color: var(--wb-stone-hi);
+  filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.55));
+}
+
+/* Ergebnis-Slot: der große Start-Knopf, darunter die Werkzeuge */
+:root[data-look="werkbank"] .wb-pd__result {
+  grid-area: result;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 264px;
+}
+
+:root[data-look="werkbank"] .wb-pd__launch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  height: 66px;
+  min-width: 0;
+  padding: 0 16px;
+  color: #fff;
+  background: var(--wb-acc);
+  border: 3px solid #000;
+  box-shadow: inset 4px 4px 0 var(--wb-acc-hi), inset -4px -6px 0 var(--wb-acc-lo);
+  text-shadow: 3px 3px 0 var(--wb-acc-ink);
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+:root[data-look="werkbank"] .wb-pd__launch:hover {
+  border-color: #fff;
+  background: color-mix(in srgb, var(--wb-acc) 86%, #fff);
+}
+
+:root[data-look="werkbank"] .wb-pd__launch:active {
+  box-shadow: inset 4px 6px 0 rgba(0, 0, 0, 0.4), inset -3px -3px 0 rgba(255, 255, 255, 0.14);
+}
+
+:root[data-look="werkbank"] .wb-pd__launch[data-running] {
+  background: #8a2222;
+  box-shadow: inset 4px 4px 0 #c44a44, inset -4px -6px 0 #4f1010;
+  text-shadow: 3px 3px 0 #2c0808;
+}
+
+:root[data-look="werkbank"] .wb-pd__launch-icon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  filter: drop-shadow(3px 3px 0 var(--wb-acc-ink));
+}
+
+:root[data-look="werkbank"] .wb-pd__launch[data-running] .wb-pd__launch-icon {
+  filter: drop-shadow(3px 3px 0 #2c0808);
+}
+
+:root[data-look="werkbank"] .wb-pd__stop {
+  display: block;
+  width: 22px;
+  height: 22px;
+  margin: 3px;
+  background: #fff;
+}
+
+:root[data-look="werkbank"] .wb-pd__launch-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+:root[data-look="werkbank"] .wb-pd__launch-label {
+  font-size: 30px;
+  line-height: 1;
+}
+
+:root[data-look="werkbank"] .wb-pd__launch-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 168px;
+  font-size: 11px;
+  line-height: 1;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.55);
+}
+
+:root[data-look="werkbank"] .wb-pd__launch-status > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:root[data-look="werkbank"] .wb-pd__tools {
+  display: flex;
+  gap: 4px;
+}
+
+:root[data-look="werkbank"] .wb-pd__tool-wrap {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+:root[data-look="werkbank"] .wb-pd__tool {
+  flex: 1 1 0;
+  min-width: 0;
+  width: 100%;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  color: var(--wb-fat);
+  background: var(--wb-stone);
+  border: 2px solid #000;
+  box-shadow: var(--wb-bevel-stone);
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+:root[data-look="werkbank"] .wb-pd__tool:hover,
+:root[data-look="werkbank"] .wb-pd__tool:has(button:hover) {
+  border-color: #fff;
+  background: #675046;
+}
+
+:root[data-look="werkbank"] .wb-pd__tool-icon {
+  width: 16px;
+  height: 16px;
+  filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.55));
+}
+
+/* der fertige „Mehr“-Knopf füllt seinen Slot */
+:root[data-look="werkbank"] .wb-pd__more > .relative,
+:root[data-look="werkbank"] .wb-pd__more > .relative > .inline-flex {
+  width: 100%;
+  height: 100%;
+}
+
+:root[data-look="werkbank"] .wb-pd__more > .relative > .inline-flex > button {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  color: var(--wb-fat) !important;
+  background: transparent !important;
+}
+
+:root[data-look="werkbank"] .wb-pd__more > .relative > .inline-flex > button svg {
+  width: 18px;
+  height: 18px;
+  filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.55));
+}
+
+/* ── das Inventar mit dem Inhalt des Reiters ── */
+:root[data-look="werkbank"] .wb-pd__inv {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-top: 14px;
+  background: var(--wb-panel-dark);
+  border: 2px solid #000;
+  box-shadow: var(--wb-inset);
+}
+
+:root[data-look="werkbank"] .wb-pd__inv > * {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Screenshots und Konsole: eine dunkle Vertiefung */
+:root[data-look="werkbank"] .wb-pd__inv--well {
+  background: #120c0a;
+  box-shadow: var(--wb-inset);
+}
+
+:root[data-look="werkbank"] .wb-pd__inv .look-content-toolbar {
+  padding: 10px 14px 9px;
+  border-color: #000 !important;
+  border-bottom-width: 2px;
+  box-shadow: 0 2px 0 rgba(255, 255, 255, 0.05);
+}
+
+:root[data-look="werkbank"] .wb-pd__inv .look-content-scroll {
+  padding: 10px 10px 12px 12px;
+}
+
+/* ═════════════════════════ Inhalt: Slot-Zeilen wie im Rezeptbuch ═════════════════════════ */
+
+:root[data-look="werkbank"] .wb-ci {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  height: 58px;
+  padding: 4px 6px 4px 4px;
+  color: var(--wb-fat);
+  border: 2px solid transparent;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+
+:root[data-look="werkbank"] .wb-ci:hover {
+  background: rgba(255, 255, 255, 0.045);
+}
+
+/* ausgewählt: der weiße Auswahlrahmen der Hotbar */
+:root[data-look="werkbank"] .wb-ci[data-selected] {
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+:root[data-look="werkbank"] .wb-ci__slot-wrap {
+  flex-shrink: 0;
+}
+
+:root[data-look="werkbank"] .wb-ci__slot {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  background: var(--wb-slot);
+  box-shadow: var(--wb-inset-sm);
+}
+
+:root[data-look="werkbank"] .wb-ci__slot img {
+  width: 34px;
+  height: 34px;
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+
+/* Slot-Licht beim Überfahren wie im Spiel */
+:root[data-look="werkbank"] .wb-ci:hover .wb-ci__slot::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  background: rgba(255, 255, 255, 0.2);
+  pointer-events: none;
+}
+
+:root[data-look="werkbank"] .wb-ci__noicon {
+  width: 20px;
+  height: 20px;
+  color: var(--wb-stone-hi);
+}
+
+/* ausgeschaltet: der Gegenstand liegt ausgegraut im Slot */
+:root[data-look="werkbank"] .wb-ci[data-off] .wb-ci__slot img,
+:root[data-look="werkbank"] .wb-ci[data-off] .wb-ci__noicon {
+  filter: grayscale(1) brightness(0.6);
+  opacity: 0.6;
+}
+
+:root[data-look="werkbank"] .wb-ci__busy {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+:root[data-look="werkbank"] .wb-ci__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+:root[data-look="werkbank"] .wb-ci__name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+:root[data-look="werkbank"] .wb-ci__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.15;
+  color: #fff;
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6);
+}
+
+:root[data-look="werkbank"] button.wb-ci__name:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+:root[data-look="werkbank"] .wb-ci[data-off] .wb-ci__name {
+  color: var(--wb-dim);
+}
+
+:root[data-look="werkbank"] .wb-ci__mark {
+  flex-shrink: 0;
+  color: var(--wb-dim);
+}
+
+:root[data-look="werkbank"] .wb-ci__mark--pack {
+  color: #b48cff;
+}
+
+:root[data-look="werkbank"] .wb-ci__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* Version als kleiner Auswahlknopf (öffnet die Versionsliste) */
+:root[data-look="werkbank"] .wb-ci__version {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+  height: 20px;
+  padding: 0 7px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--wb-tip-grey);
+  background: #120c0a;
+  border: 2px solid #000;
+  box-shadow: inset 1px 1px 0 var(--wb-slot-lo), inset -1px -1px 0 var(--wb-slot-hi);
+}
+
+:root[data-look="werkbank"] .wb-ci__version[data-switchable]:hover {
+  color: #fff;
+  border-color: #fff;
+}
+
+:root[data-look="werkbank"] .wb-ci__version:disabled {
+  cursor: default;
+}
+
+/* Update da: ein gelbes Pixel vor der Version */
+:root[data-look="werkbank"] .wb-ci__version[data-update]::before {
+  content: "";
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  background: #e3c245;
+  box-shadow: 1px 1px 0 #000;
+}
+
+:root[data-look="werkbank"] .wb-ci__caret {
+  flex-shrink: 0;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid currentColor;
+}
+
+:root[data-look="werkbank"] .wb-ci__size {
+  flex-shrink: 0;
+  color: color-mix(in srgb, var(--wb-dim) 75%, transparent);
+}
+
+:root[data-look="werkbank"] .wb-ci__update {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: #3f7a2a;
+  border: 2px solid #000;
+  box-shadow: inset 2px 2px 0 #6fb04f, inset -2px -3px 0 #204314;
+  transition: border-color 0.12s;
+}
+
+:root[data-look="werkbank"] .wb-ci__update:hover:not(:disabled) {
+  border-color: #fff;
+}
+
+:root[data-look="werkbank"] .wb-ci__update:disabled {
+  filter: saturate(0) brightness(0.75);
+  cursor: not-allowed;
+}
+
+/* „AN/AUS“ wie in den Spiel-Optionen */
+:root[data-look="werkbank"] .wb-ci__toggle {
+  flex-shrink: 0;
+  min-width: 52px;
+  height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+  line-height: 1;
+  color: #c3f07a;
+  background: var(--wb-stone);
+  border: 2px solid #000;
+  box-shadow: var(--wb-bevel-stone);
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.65);
+  transition: border-color 0.12s, background-color 0.12s;
+}
+
+:root[data-look="werkbank"] .wb-ci__toggle[aria-checked="false"] {
+  color: #ff9a8a;
+  background: #43322b;
+  box-shadow: inset 2px 2px 0 #5a463d, inset -2px -3px 0 #2a1d18;
+}
+
+:root[data-look="werkbank"] .wb-ci__toggle:hover:not(:disabled) {
+  border-color: #fff;
+}
+
+:root[data-look="werkbank"] .wb-ci__toggle:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+/* Auswählen und Menü erscheinen beim Überfahren */
+:root[data-look="werkbank"] .wb-ci__tools {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+:root[data-look="werkbank"] .wb-ci:hover .wb-ci__tools,
+:root[data-look="werkbank"] .wb-ci:focus-within .wb-ci__tools,
+:root[data-look="werkbank"] .wb-ci[data-selected] .wb-ci__tools,
+:root[data-look="werkbank"] .wb-ci[data-select-mode] .wb-ci__tools,
+:root[data-look="werkbank"] .wb-ci[data-menu] .wb-ci__tools {
+  opacity: 1;
+}
+
+:root[data-look="werkbank"] .wb-ci__menu {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  color: var(--wb-dim);
+  border: 2px solid transparent;
+}
+
+:root[data-look="werkbank"] .wb-ci__menu:hover,
+:root[data-look="werkbank"] .wb-ci[data-menu] .wb-ci__menu {
+  color: #fff;
+  background: var(--wb-stone);
+  border-color: #000;
+  box-shadow: var(--wb-bevel-stone);
+}
+
+/* Inhalt des Gegenstands-Tooltips (das Schildchen selbst kommt aus look.css) */
+:root[data-look="werkbank"] .wb-mctip {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  text-align: left;
+}
+
+:root[data-look="werkbank"] .wb-mctip__name {
+  font-size: 13px;
+  line-height: 1.1;
+  color: #fff;
+  text-shadow: 2px 2px 0 #3f3f3f;
+}
+
+:root[data-look="werkbank"] .wb-mctip__line {
+  font-size: 11px;
+  line-height: 1.15;
+  color: var(--wb-tip-grey);
+  text-shadow: 1px 1px 0 #2a2a2a;
+}
+
+:root[data-look="werkbank"] .wb-mctip__line--off {
+  color: #ff7b6b;
+}
+
+:root[data-look="werkbank"] .wb-mctip__source {
+  font-size: 11px;
+  line-height: 1.15;
+  color: var(--wb-tip-blue);
+  text-shadow: 1px 1px 0 #15153f;
+}
+
+/* ═════════════════════════ Mod-Browser: Kreativ-Inventar ═════════════════════════ */
+
+:root[data-look="werkbank"] .modrinth-search-v2 {
+  gap: 14px;
+  padding: 0 4px 4px 0;
+}
+
+/* die Tafel mit Suche und Ergebnissen; die Inhaltsarten hängen als Reiter an ihrer Oberkante */
+:root[data-look="werkbank"] .modrinth-search-v2 > .left-content-area {
+  position: relative;
+  min-height: 0;
+  margin-top: 44px;
+  padding: 14px 6px 6px 14px;
+  overflow: visible;
+  background: var(--wb-panel);
+  border: 3px solid #000;
+  box-shadow: var(--wb-bevel), var(--wb-drop);
+}
+
+:root[data-look="werkbank"] .modrinth-search-v2 .look-search-types {
+  position: absolute;
+  top: -47px;
+  left: -3px;
+  right: -3px;
+  z-index: 2;
+  height: 44px;
+  margin: 0 !important;
+  flex-wrap: nowrap !important;
+  align-items: flex-end !important;
+  gap: 12px !important;
+}
+
+:root[data-look="werkbank"] .modrinth-search-v2 .look-search-types > .look-tabs {
+  height: 100%;
+  min-width: 0;
+  padding: 0 !important;
+  gap: 4px !important;
+  flex-wrap: nowrap !important;
+  align-items: flex-end !important;
+  overflow: visible;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+:root[data-look="werkbank"] .modrinth-search-v2 .look-search-types [role="tab"] {
+  flex-shrink: 0;
+  height: 38px !important;
+  padding: 0 13px 3px !important;
+  font-size: 13px !important;
+  white-space: nowrap;
+  color: var(--wb-dim) !important;
+  background: var(--wb-panel-dark) !important;
+  border: 3px solid #000 !important;
+  border-bottom: 0 !important;
+  box-shadow: inset 3px 3px 0 var(--wb-tab-hi), inset -3px 0 0 var(--wb-lo) !important;
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6);
+  filter: none !important;
+}
+
+:root[data-look="werkbank"] .modrinth-search-v2 .look-search-types [role="tab"]:hover {
+  color: #fff !important;
+  background: #35251f !important;
+}
+
+:root[data-look="werkbank"] .modrinth-search-v2 .look-search-types [role="tab"][aria-selected="true"] {
+  position: relative;
+  z-index: 3;
+  height: 48px !important;
+  margin-bottom: -6px;
+  padding-bottom: 6px !important;
+  color: #fff !important;
+  background: var(--wb-panel) !important;
+  box-shadow: inset 3px 3px 0 var(--wb-hi), inset -3px 0 0 var(--wb-lo) !important;
+}
+
+/* Quelle: zwei kleine Steinknöpfe über der Tafel, die gewählte mit weißem Auswahlrahmen */
+:root[data-look="werkbank"] .modrinth-search-v2 .look-search-types > .look-tabs:not([role="tablist"]) {
+  align-self: center;
+  height: auto;
+  margin-top: -6px !important;
+  gap: 4px !important;
+}
+
+:root[data-look="werkbank"] .modrinth-search-v2 .look-search-types > .look-tabs:not([role="tablist"]) button {
+  height: 32px !important;
+  padding: 0 10px !important;
+  font-size: 12px;
+  color: var(--wb-dim) !important;
+  background: var(--wb-panel-dark) !important;
+  border: 2px solid #000 !important;
+  box-shadow: inset 2px 2px 0 var(--wb-tab-hi), inset -2px -2px 0 var(--wb-lo) !important;
+}
+
+:root[data-look="werkbank"] .modrinth-search-v2 .look-search-types > .look-tabs:not([role="tablist"]) button:hover {
+  color: #fff !important;
+}
+
+:root[data-look="werkbank"] .modrinth-search-v2 .look-search-types > .look-tabs:not([role="tablist"]) button[aria-pressed="true"] {
+  color: #fff !important;
+  background: var(--wb-stone) !important;
+  border-color: #fff !important;
+  box-shadow: var(--wb-bevel-stone) !important;
+}
+
+:root[data-look="werkbank"] .modrinth-search-v2 .look-search-bar {
+  margin-right: 8px;
+  margin-bottom: 12px;
+}
+
+:root[data-look="werkbank"] .modrinth-search-v2 .search-results-area {
+  padding-right: 4px;
+}
+
+/* ── Ergebnisse: große Slots im Raster ── */
+:root[data-look="werkbank"] .wb-creative {
+  padding: 2px 4px 10px 0;
+}
+
+:root[data-look="werkbank"] .wb-sc-cell {
+  height: 100%;
+}
+
+:root[data-look="werkbank"] .wb-sc {
+  position: relative;
+  height: 100%;
+  min-height: 176px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 11px 11px 10px;
+  background: #241915;
+  border: 2px solid transparent;
+  box-shadow: var(--wb-inset);
+  cursor: pointer;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+
+:root[data-look="werkbank"] .wb-sc:hover {
+  background: #3b2c26;
+  border-color: #fff;
+}
+
+:root[data-look="werkbank"] .wb-sc:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+}
+
+:root[data-look="werkbank"] .wb-sc__top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+:root[data-look="werkbank"] .wb-sc__slot {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  background: #120c0a;
+  border: 2px solid #000;
+}
+
+:root[data-look="werkbank"] .wb-sc__slot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+
+:root[data-look="werkbank"] .wb-sc__initial {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: 22px;
+  line-height: 1;
+  color: #fff;
+  background: var(--wb-acc);
+  box-shadow: inset 3px 3px 0 var(--wb-acc-hi), inset -3px -3px 0 var(--wb-acc-lo);
+  text-shadow: 2px 2px 0 var(--wb-acc-ink);
+}
+
+:root[data-look="werkbank"] .wb-sc__title {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  padding-top: 2px;
+}
+
+:root[data-look="werkbank"] .wb-sc__name {
+  max-width: 100%;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+  font-size: 15px;
+  line-height: 1.12;
+  color: #fff;
+  text-shadow: 2px 2px 0 #000;
+}
+
+:root[data-look="werkbank"] .wb-sc__author {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  font-size: 11px;
+  line-height: 1.1;
+  color: var(--wb-dim);
+}
+
+:root[data-look="werkbank"] .wb-sc__author:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+:root[data-look="werkbank"] .wb-sc__flag {
+  align-self: flex-start;
+  padding: 3px 6px 2px;
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+  color: #fff;
+  background: var(--wb-acc);
+  border: 2px solid #000;
+  box-shadow: inset 1px 1px 0 var(--wb-acc-hi), inset -1px -1px 0 var(--wb-acc-lo);
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
+}
+
+:root[data-look="werkbank"] .wb-sc__flag--done {
+  background: #3f7a2a;
+  box-shadow: inset 1px 1px 0 #6fb04f, inset -1px -1px 0 #204314;
+}
+
+/* Beschreibung grau wie die Zeilen eines Gegenstands-Tooltips, Kategorien blau wie der Mod-Name */
+:root[data-look="werkbank"] .wb-sc__desc {
+  margin: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--wb-tip-grey);
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
+}
+
+:root[data-look="werkbank"] .wb-sc__cats {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 1.1;
+  color: var(--wb-tip-blue);
+}
+
+/* reicht die Breite nicht (lange Wörter wie „Installieren“), rutschen die Knöpfe in eine eigene Zeile */
+:root[data-look="werkbank"] .wb-sc__bottom {
+  margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+:root[data-look="werkbank"] .wb-sc__downloads {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--wb-xp);
+  text-shadow: 2px 2px 0 #1d2a08;
+}
+
+:root[data-look="werkbank"] .wb-sc__dl-icon {
+  flex-shrink: 0;
+  width: 11px;
+  height: 11px;
+}
+
+:root[data-look="werkbank"] .wb-sc__actions {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+:root[data-look="werkbank"] .wb-sc__actions .look-btn {
+  height: 28px !important;
+  min-width: 28px;
+  padding: 0 6px !important;
+}
+
+:root[data-look="werkbank"] .wb-sc__install {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 9px;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  color: #fff;
+  background: var(--wb-acc);
+  border: 2px solid #000;
+  box-shadow: var(--wb-bevel-acc);
+  text-shadow: 2px 2px 0 var(--wb-acc-ink);
+  transition: border-color 0.12s, background-color 0.12s;
+}
+
+:root[data-look="werkbank"] .wb-sc__install:hover:not(:disabled) {
+  border-color: #fff;
+  background: color-mix(in srgb, var(--wb-acc) 86%, #fff);
+}
+
+:root[data-look="werkbank"] .wb-sc__install[data-done] {
+  background: #3f7a2a;
+  box-shadow: inset 2px 2px 0 #6fb04f, inset -2px -3px 0 #204314;
+  text-shadow: 2px 2px 0 #13280b;
+  cursor: default;
+}
+
+:root[data-look="werkbank"] .wb-sc__install:disabled:not([data-done]) {
+  opacity: 0.8;
+  cursor: wait;
+}
+
+/* ── Filter als Seitentafel der Werkbank ── */
+/* feste Breite: im schmalen Seitenblatt würde ein Viertel die Überschriften abschneiden */
+:root[data-look="werkbank"] .modrinth-search-v2 .filters-sidebar {
+  width: 15rem;
+  max-width: 15rem;
+  height: auto !important;
+  margin-top: 44px;
+  padding: 8px;
+  background: var(--wb-panel);
+  border: 3px solid #000;
+  box-shadow: var(--wb-bevel), var(--wb-drop);
+}
+
+:root[data-look="werkbank"] .modrinth-search-v2 .filters-sidebar .look-card {
+  background-color: var(--wb-stone) !important;
+  box-shadow: var(--wb-bevel-stone) !important;
+}
+
+:root[data-look="werkbank"] .modrinth-search-v2 .filters-sidebar .look-card > button {
+  color: var(--wb-fat);
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.55);
+}
+
+:root[data-look="werkbank"] .modrinth-search-v2 .filters-sidebar .look-card > button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* aufgeklappt: die Auswahl liegt in einer dunklen Vertiefung */
+:root[data-look="werkbank"] .modrinth-search-v2 .filters-sidebar .look-card > button + div > div {
+  margin: 0 3px 3px;
+  background: #241915;
+  box-shadow: var(--wb-inset-sm);
+}
+
+/* ═════════════════════════ Kleinere Fenster ═════════════════════════ */
+
+@media (max-width: 1179px) {
+  :root[data-look="werkbank"] .wb-pd {
+    padding: 6px 12px 6px;
+  }
+
+  :root[data-look="werkbank"] .wb-pd__head {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "icon info result"
+      "icon lore result";
+    column-gap: 16px;
+  }
+
+  :root[data-look="werkbank"] .wb-pd__arrow {
+    display: none;
+  }
+
+  /* der Tooltip wird zur Zeile unter dem Namen */
+  :root[data-look="werkbank"] .wb-pd__lore {
+    align-self: start;
+    justify-self: start;
+    max-width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    padding: 6px 9px 5px;
+  }
+
+  :root[data-look="werkbank"] .wb-pd__lore-title {
+    display: none;
+  }
+
+  :root[data-look="werkbank"] .wb-pd__result {
+    width: 240px;
+  }
+
+  :root[data-look="werkbank"] .wb-pd__icon {
+    width: 92px;
+    height: 92px;
+  }
+
+  :root[data-look="werkbank"] .wb-pd__icon .look-profile-icon {
+    width: 72px !important;
+    height: 72px !important;
+  }
+
+  :root[data-look="werkbank"] .wb-pd__name--lg { font-size: 28px; }
+  :root[data-look="werkbank"] .wb-pd__name--md { font-size: 23px; }
+  :root[data-look="werkbank"] .wb-pd__name--sm { font-size: 19px; }
+
+  /* Quelle nur mit Logo (Name als Hinweis), die Reiter etwas schmaler – passt auch ins Seitenblatt */
+  :root[data-look="werkbank"] .modrinth-search-v2 .look-search-types > .look-tabs:not([role="tablist"]) button span {
+    display: none;
+  }
+
+  :root[data-look="werkbank"] .modrinth-search-v2 .look-search-types [role="tab"] {
+    padding: 0 9px 3px !important;
+    font-size: 12px !important;
+  }
+
+  :root[data-look="werkbank"] .modrinth-search-v2 .look-search-types [role="tab"][aria-selected="true"] {
+    padding-bottom: 6px !important;
+  }
+}
+
+@media (max-height: 739px) {
+  :root[data-look="werkbank"] .wb-pd__panel {
+    padding: 12px 14px 12px;
+  }
+
+  :root[data-look="werkbank"] .wb-pd__inv {
+    margin-top: 12px;
+  }
+
+  :root[data-look="werkbank"] .wb-pd__launch {
+    height: 58px;
+  }
+
+  :root[data-look="werkbank"] .wb-pd__tool {
+    height: 34px;
+  }
+
+  :root[data-look="werkbank"] .wb-ci {
+    height: 54px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-look="werkbank"] :is(.wb-pd-tab, .wb-pd__back, .wb-pd__launch, .wb-pd__tool, .wb-ci, .wb-ci__toggle, .wb-ci__tools, .wb-ci__update, .wb-sc, .wb-sc__install) {
+    transition: none;
+  }
+}

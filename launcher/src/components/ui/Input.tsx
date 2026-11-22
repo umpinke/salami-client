@@ -40,7 +40,7 @@ export const SearchStyleInput = forwardRef<HTMLInputElement, SearchStyleInputPro
 
     return (
       <div className="w-full">
-        <div className="flex items-center gap-2 bg-black/50 rounded-lg px-4 py-3 border border-white/10 hover:border-white/20 transition-colors">
+        <div className="flex items-center gap-2 bg-white/[0.045] rounded-lg px-4 py-3 border border-white/[0.09] hover:border-white/20 transition-colors">
           {icon && (
             <Icon icon={icon} className="w-4 h-4 text-white/50 flex-shrink-0" />
           )}
@@ -82,7 +82,7 @@ export const SearchStyleTextArea = forwardRef<HTMLTextAreaElement, SearchStyleTe
   ({ className, placeholder = "Enter text...", icon, error, minHeight = "100px", ...props }, ref) => {
     return (
       <div className="w-full">
-        <div className="flex items-start gap-2 bg-black/50 rounded-lg px-4 py-3 border border-white/10 hover:border-white/20 transition-colors">
+        <div className="flex items-start gap-2 bg-white/[0.045] rounded-lg px-4 py-3 border border-white/[0.09] hover:border-white/20 transition-colors">
           {icon && (
             <Icon icon={icon} className="w-4 h-4 text-white/50 flex-shrink-0 mt-1" />
           )}
@@ -187,7 +187,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="w-full">        <div
           ref={containerRef}          className={cn(
-            "relative overflow-hidden backdrop-blur-md",
+            "look-input relative overflow-hidden",
             getBorderClasses(),
             radiusClass,
             error ? "border-red-500" : "",

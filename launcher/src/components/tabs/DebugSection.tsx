@@ -27,6 +27,9 @@ import { Select } from "../ui/Select";
 import { useSettingsConfig } from "./settings/settings-context";
 import { LOG_LEVELS, type LogLevel } from "../../types/launcherConfig";
 import { logError } from '../../utils/logging-utils';
+import { SURFACE } from "../ui/design-system";
+import { LoadingSpinner } from "../ui/LoadingSpinner";
+import { EmptyState } from "../ui/EmptyState";
 
 export type DebugTab = "launcher" | "minecraft" | "process" | "crashes" | "testing";
 
@@ -120,14 +123,14 @@ function LogFileSection({ id, title, icon, crash, loader }: LogFileSectionProps)
   return (
     <SettingsSection id={`settings-section-${id}`} title={title} icon={icon}>
       <div className="py-2">
-        <div className="bg-black/20 rounded-lg border border-white/10 overflow-hidden">
+        <div
+          className="rounded-lg border overflow-hidden"
+          style={{ backgroundColor: SURFACE.base, borderColor: SURFACE.line }}
+        >
           {loading ? (
-            <div className="p-8 text-center text-white/50">
-              <Icon icon="svg-spinners:ring-resize" className="w-6 h-6 mx-auto mb-2" />
-              {t("common.loading")}
-            </div>
+            <LoadingSpinner size="sm" shadowDepth="none" message={t("common.loading")} className="p-8" />
           ) : files.length === 0 ? (
-            <div className="p-8 text-center text-white/50 font-minecraft">{t("debug.no_files")}</div>
+            <EmptyState icon="solar:document-text-bold" message={t("debug.no_files")} compact fullHeight={false} />
           ) : (
             <div className="divide-y divide-white/10">
               {files.map((file, i) => (
@@ -245,7 +248,7 @@ function TestingPanel() {
       setBackups(result);
     } catch (e) {
       logError(`Failed to list profile backups: ${e}`);
-      toast.error(t("settings.backups.load_failed", { error: String(e) }));
+      toast.error(t("settings.backups.load_failed", { error: getErrorMessage(e) }));
     }
     setLoadingBackups(false);
   }
@@ -272,7 +275,7 @@ function TestingPanel() {
       toast.success(t("settings.backups.restored", { count: backup.profile_count, date }));
     } catch (e) {
       logError(`Failed to restore profile backup: ${e}`);
-      toast.error(t("settings.backups.restore_failed", { error: String(e) }));
+      toast.error(t("settings.backups.restore_failed", { error: getErrorMessage(e) }));
     }
     setRestoringPath(null);
   }
@@ -285,7 +288,7 @@ function TestingPanel() {
       toast.success(t("debug.testing.keepset_result", { count: result.length }));
     } catch (e) {
       logError(`Failed to list expected cache filenames: ${e}`);
-      toast.error(t("debug.testing.failed", { error: String(e) }));
+      toast.error(t("debug.testing.failed", { error: getErrorMessage(e) }));
     }
     setLoading(false);
   }
@@ -303,7 +306,7 @@ function TestingPanel() {
       }
     } catch (e) {
       logError(`Failed to clean mod_cache: ${e}`);
-      toast.error(t("debug.testing.failed", { error: String(e) }));
+      toast.error(t("debug.testing.failed", { error: getErrorMessage(e) }));
     }
     setCleaning(false);
   }
@@ -336,13 +339,15 @@ function TestingPanel() {
       );
     } catch (e) {
       logError(`Failed to clear the content cache: ${e}`);
-      toast.error(t("debug.testing.failed", { error: String(e) }));
+      toast.error(t("debug.testing.failed", { error: getErrorMessage(e) }));
     }
     setClearingCache(false);
   }
 
   return (
     <div className="space-y-3">
+      {/* Salami: die Keep-Set-Liste ist ein Entwickler-Werkzeug – nur im Dev-Build */}
+      {import.meta.env.DEV && (<>
       <div className="bg-black/20 rounded-lg border border-white/10 px-4 py-3 flex items-center gap-3">
         <Icon icon="solar:database-bold" className="w-5 h-5 text-amber-300 shrink-0" />
         <div className="flex-1 min-w-0">
@@ -384,6 +389,7 @@ function TestingPanel() {
           )}
         </div>
       )}
+      </>)}
 
       <div className="bg-black/20 rounded-lg border border-white/10 px-4 py-3 flex items-center gap-3">
         <Icon icon="solar:trash-bin-trash-bold" className="w-5 h-5 text-red-300 shrink-0" />
@@ -397,7 +403,7 @@ function TestingPanel() {
           onClick={runCleanModCache}
           disabled={cleaning}
           className="px-3 py-2 rounded-md bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-200 font-minecraft text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
-          title="Run clean_mod_cache_command"
+          title={t("debug.testing.clean_desc")}
         >
           {cleaning ? (
             <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
@@ -420,7 +426,7 @@ function TestingPanel() {
           onClick={runClearContentCache}
           disabled={clearingCache}
           className="px-3 py-2 rounded-md bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-200 font-minecraft text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
-          title="Run clear_content_cache_command"
+          title={t("debug.testing.clear_cache_desc")}
         >
           {clearingCache ? (
             <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
@@ -468,7 +474,7 @@ function TestingPanel() {
           onClick={loadBackups}
           disabled={loadingBackups}
           className="px-3 py-2 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-200 font-minecraft text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
-          title="Run list_profile_backups"
+          title={t("settings.backups.description")}
         >
           {loadingBackups ? (
             <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />

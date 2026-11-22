@@ -133,7 +133,7 @@ export function MainLaunchButton({
   };
 
   const renderLaunchButtonContent = () => {
-    const actionText = isButtonLaunching ? "Stop" : "Launch";
+    const actionText = isButtonLaunching ? t("launch.action.stop") : t("launch.action.play");
 
     let statusSubText: string | null | undefined = null;
     let statusColorClass = "opacity-85";
@@ -142,7 +142,7 @@ export function MainLaunchButton({
       statusSubText = buttonStatusMessage;
       statusColorClass = "text-green-400";
     } else if (isButtonLaunching) {
-      statusSubText = buttonStatusMessage || "Launching...";
+      statusSubText = buttonStatusMessage || t("launch.launching");
       statusColorClass =
         buttonStatusMessage
           ? "opacity-90 text-white"
@@ -190,7 +190,7 @@ export function MainLaunchButton({
 
   return (
     <div
-      className={cn("relative flex flex-col justify-center", className)}
+      className={cn("look-play relative flex flex-col justify-center", className)}
       style={{ maxWidth }}
     >
       <div className="flex flex-col gap-3">

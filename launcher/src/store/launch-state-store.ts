@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import i18n from "../i18n/i18n";
 
 export enum LaunchState {
   IDLE = "idle",
@@ -216,7 +217,7 @@ export const useLaunchStateStore = create<LaunchStateStore>((set, get) => ({
           [profileId]: {
             ...currentProfile,
             isButtonLaunching: true,
-            buttonStatusMessage: "Starting profile...",
+            buttonStatusMessage: i18n.t("launch.launching"),
             error: null,
             launchState: LaunchState.LAUNCHING,
           },

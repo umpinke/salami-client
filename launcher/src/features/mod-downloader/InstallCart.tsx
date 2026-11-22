@@ -3,7 +3,9 @@ import { useTranslation } from "react-i18next";
 import { toast } from "react-hot-toast";
 import { Icon } from "@iconify/react";
 import { Modal } from "../../components/ui/Modal";
-import { Button } from "../../components/ui/buttons/Button";
+import { EmptyState } from "../../components/ui/EmptyState";
+import { SURFACE } from "../../components/ui/design-system";
+import { ICON_WELL, KanteButton, PLAIN_CARD, projectTypeKey } from "../../components/modrinth/v2/FeinkostParts";
 import { useProfileStore } from "../../store/profile-store";
 import type { Profile } from "../../types/profile";
 import { installCart } from "./cart-install";
@@ -23,15 +25,18 @@ export function InstallCart({ profiles }: { profiles: Profile[] }) {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="absolute bottom-6 right-6 z-20 flex items-center gap-2 rounded-lg px-4 py-3 font-minecraft text-xl lowercase text-white shadow-lg transition-transform hover:scale-105"
-        style={{ background: "var(--accent)", boxShadow: "0 6px 20px var(--accent-shadow)" }}
-      >
-        <Icon icon="solar:cart-large-2-bold" className="w-6 h-6" />
-        {t("salami.downloader.cart.open", { count: items.length })}
-      </button>
+      {/* Feinkost: Warenkorb-Knopf mit harter Unterkante statt Leuchtschein */}
+      <div className="absolute bottom-6 right-6 z-20">
+        <KanteButton
+          tone="primary"
+          size="lg"
+          onClick={() => setOpen(true)}
+          className="h-12 px-5 text-lg"
+          icon={<Icon icon="solar:cart-large-2-bold" className="w-6 h-6" />}
+        >
+          {t("salami.downloader.cart.open", { count: items.length })}
+        </KanteButton>
+      </div>
       {open && <InstallCartModal profiles={profiles} onClose={() => setOpen(false)} />}
     </>
   );
@@ -82,20 +87,27 @@ function InstallCartModal({ profiles, onClose }: { profiles: Profile[]; onClose:
       width="md"
       footer={
         <div className="flex items-center justify-between gap-3 w-full">
-          <Button variant="ghost" disabled={busy || items.length === 0} onClick={clear}>
+          <KanteButton tone="ghost" disabled={busy || items.length === 0} onClick={clear}>
             {t("salami.downloader.cart.clear")}
-          </Button>
-          <Button variant="success" disabled={busy || items.length === 0 || !profile} onClick={installAll}>
+          </KanteButton>
+          <KanteButton
+            tone="primary"
+            size="lg"
+            disabled={busy || items.length === 0 || !profile}
+            onClick={installAll}
+            icon={<Icon icon={busy ? "solar:refresh-bold" : "solar:download-minimalistic-bold"} className={busy ? "h-5 w-5 animate-spin-slow" : "h-5 w-5"} />}
+          >
             {busy ? progress : t("salami.downloader.cart.install_all", { count: items.length })}
-          </Button>
+          </KanteButton>
         </div>
       }
     >
-      <div className="space-y-4 p-1">
+      <div className="space-y-4 px-5 py-4">
         <label className="block">
-          <span className="font-minecraft text-xl lowercase text-white/80">{t("salami.downloader.cart.profile")}</span>
+          <span className="font-minecraft text-sm text-white/80">{t("salami.downloader.cart.profile")}</span>
           <select
-            className="mt-1 w-full rounded-md bg-black/40 border border-white/15 px-3 py-2 text-white"
+            className="mt-1.5 w-full border px-3 py-2 text-white outline-none focus:border-white/30"
+            style={{ backgroundColor: SURFACE.solidRaised, borderColor: SURFACE.lineStrong, borderRadius: "calc(var(--border-radius) * 0.7)" }}
             value={profileId}
             disabled={busy}
             onChange={(e) => setProfileId(e.target.value)}
@@ -109,31 +121,37 @@ function InstallCartModal({ profiles, onClose }: { profiles: Profile[]; onClose:
         </label>
 
         {items.length === 0 ? (
-          <p className="text-sm text-white/60">{t("salami.downloader.cart.empty")}</p>
+          <EmptyState icon="solar:cart-large-2-bold" message={t("salami.downloader.cart.empty")} compact fullHeight={false} />
         ) : (
-          <ul className="space-y-1 max-h-80 overflow-y-auto custom-scrollbar">
+          <ul className="space-y-1.5 max-h-80 overflow-y-auto custom-scrollbar">
             {items.map((item) => (
-              <li key={item.key} className="flex items-center gap-3 rounded-md bg-black/25 px-2 py-1.5">
+              <li key={item.key} className="flex items-center gap-3 px-2 py-1.5" style={PLAIN_CARD}>
                 {item.iconUrl ? (
-                  <img src={item.iconUrl} alt="" className="w-8 h-8 rounded" />
+                  <img src={item.iconUrl} alt="" className="w-8 h-8" style={{ borderRadius: "calc(var(--border-radius) * 0.5)" }} />
                 ) : (
-                  <Icon icon="solar:box-bold" className="w-8 h-8 text-white/40" />
+                  <span
+                    className="flex h-8 w-8 items-center justify-center"
+                    style={{ backgroundColor: ICON_WELL, borderRadius: "calc(var(--border-radius) * 0.5)" }}
+                  >
+                    <Icon icon="solar:box-bold" className="w-5 h-5 text-[#f3e3d3]/50" />
+                  </span>
                 )}
                 <div className="flex-1 min-w-0">
-                  <div className="truncate text-white">{item.title}</div>
+                  <div className="truncate font-minecraft text-white">{item.title}</div>
                   <div className="text-xs text-white/50">
-                    {item.source} · {item.projectType}
+                    {item.source} · {projectTypeKey(item.projectType) ? t(projectTypeKey(item.projectType)!) : item.projectType}
                   </div>
                 </div>
-                <button
-                  type="button"
+                <KanteButton
+                  iconOnly
+                  size="sm"
+                  tone="ghost"
                   disabled={busy}
                   onClick={() => remove(item.key)}
-                  className="text-white/50 hover:text-red-400 disabled:opacity-40"
+                  className="hover:text-[#f4b2a6]"
                   aria-label="remove"
-                >
-                  <Icon icon="solar:trash-bin-trash-bold" className="w-5 h-5" />
-                </button>
+                  icon={<Icon icon="solar:trash-bin-trash-bold" className="w-5 h-5" />}
+                />
               </li>
             ))}
           </ul>

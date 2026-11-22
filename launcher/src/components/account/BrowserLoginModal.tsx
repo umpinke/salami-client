@@ -12,6 +12,19 @@ interface BrowserLoginModalProps {
   onCancel: () => Promise<void>;
 }
 
+// The backend's status texts are English; show each login step in the UI language.
+const LOGIN_STEP_KEYS: Partial<Record<EventType, string>> = {
+  [EventType.AccountLoginStarted]: "auth.startingLoginProcess",
+  [EventType.AccountLoginWaitingForBrowser]: "auth.login_step.waiting_for_browser",
+  [EventType.AccountLoginExchangingToken]: "auth.login_step.exchanging_token",
+  [EventType.AccountLoginExchangingXboxToken]: "auth.login_step.xbox",
+  [EventType.AccountLoginExchangingXstsToken]: "auth.login_step.xbox",
+  [EventType.AccountLoginGettingMinecraftToken]: "auth.login_step.minecraft",
+  [EventType.AccountLoginCheckingEntitlements]: "auth.login_step.entitlements",
+  [EventType.AccountLoginFetchingProfile]: "auth.login_step.profile",
+  [EventType.AccountLoginCompleted]: "auth.login_step.completed",
+};
+
 /**
  * Progress surface for the browser-based sign-in flow. Lives in its own file
  * because both the account manager and the launch-time login prompt open it.
@@ -46,7 +59,8 @@ export function BrowserLoginModal({ onCancel }: BrowserLoginModalProps) {
         payload.event_type === EventType.AccountLoginCompleted
       ) {
         setError(null); // Clear error on successful progress
-        setLoginStatus(payload.message);
+        const stepKey = LOGIN_STEP_KEYS[payload.event_type as EventType];
+        setLoginStatus(stepKey ? t(stepKey) : payload.message);
         if (payload.progress !== null) {
           setProgress(payload.progress);
         }

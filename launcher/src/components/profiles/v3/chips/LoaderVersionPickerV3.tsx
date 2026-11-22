@@ -60,7 +60,7 @@ export function LoaderVersionPickerV3({
 
   return (
     <div className="flex flex-col">
-      <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.15em] text-white/40 font-minecraft border-b border-white/10">
+      <div className="px-3 py-1.5 text-xs text-white/45 font-minecraft border-b border-white/[0.09]">
         {t("profiles.v3.chips.loaderVersion.header", { loader })}
       </div>
 
@@ -95,7 +95,7 @@ export function LoaderVersionPickerV3({
                 </span>
                 {isCurrent && sourceKey && (
                   <span
-                    className="text-[9px] uppercase tracking-[0.1em] font-minecraft px-1.5 py-0.5 rounded"
+                    className="text-[10px] font-minecraft px-1.5 py-0.5 rounded"
                     style={{
                       backgroundColor: `${accent.value}22`,
                       color: accent.light,

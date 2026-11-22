@@ -1,0 +1,1338 @@
+/* Look "werkbank" (Pixel-Werkbank) – Variablen und Regeln nur unter :root[data-look="werkbank"].
+   Siehe ../CONTRACT.md. Minecraft pur: gefaste Pixel-Rahmen wie im Inventar (schwarzer Umriss,
+   hell oben/links, dunkel unten/rechts), Slots als dunkle Vertiefungen, die Pixel-Schrift überall,
+   keine Rundungen, kein Weichzeichner, keine weichen Schatten. */
+
+/* ───────────────────────── 1. Stellschrauben ───────────────────────── */
+
+:root[data-look="werkbank"] {
+  /* Palette der Werkbank */
+  --wb-bg: #1a1210;
+  --wb-panel: #3a2a24;
+  --wb-panel-dark: #2a1d18;
+  --wb-hi: #6b4f43;
+  --wb-lo: #120c0a;
+  --wb-slot: #1d1411;
+  --wb-slot-hi: #4d3830;
+  --wb-slot-lo: #0b0706;
+  --wb-stone: #5a463d;
+  --wb-stone-hi: #7f6658;
+  --wb-stone-lo: #33261f;
+  --wb-fat: #f3e3d3;
+  --wb-dim: #b8a594;
+  --wb-xp: #c3f07a;
+  --wb-acc: var(--accent, #b23a3a);
+  --wb-acc-hi: color-mix(in srgb, var(--wb-acc) 74%, #ffd2bd);
+  --wb-acc-lo: color-mix(in srgb, var(--wb-acc) 58%, #000);
+  --wb-acc-ink: color-mix(in srgb, var(--wb-acc) 30%, #000);
+
+  /* Fasen */
+  --wb-bevel: inset 3px 3px 0 var(--wb-hi), inset -3px -3px 0 var(--wb-lo);
+  --wb-bevel-sm: inset 2px 2px 0 var(--wb-hi), inset -2px -2px 0 var(--wb-lo);
+  --wb-inset: inset 3px 3px 0 var(--wb-slot-lo), inset -3px -3px 0 var(--wb-slot-hi);
+  --wb-inset-sm: inset 2px 2px 0 var(--wb-slot-lo), inset -2px -2px 0 var(--wb-slot-hi);
+  --wb-bevel-acc: inset 2px 2px 0 var(--wb-acc-hi), inset -2px -3px 0 var(--wb-acc-lo);
+  --wb-bevel-stone: inset 2px 2px 0 var(--wb-stone-hi), inset -2px -3px 0 var(--wb-stone-lo);
+  --wb-drop: 4px 4px 0 rgba(0, 0, 0, 0.45);
+
+  /* Vertrag: Schrift, Ecken, Flächen, Kanten, Kopfband */
+  --font-minecraft: "MinecraftTen", "Fredoka", sans-serif !important;
+  --font-smallcaps: "MinecraftTen", "Fredoka", sans-serif !important;
+  --border-radius: 0px !important;
+  /* deckend statt durchscheinend: im Spiel ist jede Fläche ein fester Block */
+  --surface-base: #2f221d;
+  --surface-hover: #43322b;
+  --surface-raised: #4f3c34;
+  --surface-line: rgba(0, 0, 0, 0.82);
+  --surface-line-strong: rgba(243, 227, 211, 0.42);
+  --surface-solid: #3a2a24;
+  --surface-solid-raised: #4a372f;
+  --surface-veil: rgba(26, 18, 16, 0.9);
+  --look-kante: inset 2px 2px 0 rgba(255, 255, 255, 0.26), inset -2px -3px 0 rgba(0, 0, 0, 0.4), 0 0 0 2px #000;
+  --look-kante-soft: inset 1px 1px 0 rgba(255, 255, 255, 0.1), inset -1px -2px 0 rgba(0, 0, 0, 0.42);
+  --look-band-bg: color-mix(in srgb, #b23a3a 70%, #1a1210);
+  --look-band-border: 3px solid #000;
+
+  --scrollbar-track-color: #120c0a;
+  --scrollbar-thumb-color: var(--wb-stone);
+  --scrollbar-thumb-hover-color: var(--wb-stone-hi);
+
+  font-synthesis: none;
+}
+
+/* ───────────────────────── 2. Grundton: Schrift, Ecken, kein Weichzeichner ───────────────────────── */
+
+:root[data-look="werkbank"] body,
+:root[data-look="werkbank"] .font-minecraft,
+:root[data-look="werkbank"] .font-smallcaps,
+:root[data-look="werkbank"] .font-sans,
+:root[data-look="werkbank"] :is(h1, h2, h3, h4, h5, h6, button, input, textarea, select) {
+  font-family: "MinecraftTen", "Fredoka", sans-serif;
+  font-weight: 400 !important;
+  letter-spacing: 0 !important;
+}
+
+:root[data-look="werkbank"] :is(b, strong, .font-medium, .font-semibold, .font-bold, .font-extrabold) {
+  font-weight: 400 !important;
+}
+
+:root[data-look="werkbank"] body {
+  color: var(--wb-fat);
+  -webkit-font-smoothing: none;
+}
+
+/* Die Pixel-Schrift läuft rund 15 % breiter als die Standardschrift: die üblichen Schriftgrade
+   eine Stufe kleiner, damit Zeilen und Knöpfe wie gewohnt passen. */
+:root[data-look="werkbank"] .text-xs { font-size: 11px; }
+:root[data-look="werkbank"] .text-sm { font-size: 13px; }
+:root[data-look="werkbank"] .text-base { font-size: 15px; }
+:root[data-look="werkbank"] .text-lg { font-size: 16px; }
+:root[data-look="werkbank"] .text-xl { font-size: 18px; }
+:root[data-look="werkbank"] .text-2xl { font-size: 21px; }
+:root[data-look="werkbank"] .text-3xl { font-size: 26px; }
+:root[data-look="werkbank"] .text-4xl { font-size: 31px; }
+
+/* harter Schlagschatten wie im Spiel – nur auf Titeln und Knopftexten, Fließtext bleibt ruhig */
+:root[data-look="werkbank"] :is(h1, h2, h3, h4, h5, h6),
+:root[data-look="werkbank"] .font-minecraft {
+  text-shadow: 0.1em 0.1em 0 rgba(0, 0, 0, 0.7);
+}
+
+:root[data-look="werkbank"] :is(.text-shadow, .text-shadow-sm, .text-shadow-lg) {
+  text-shadow: 0.1em 0.1em 0 rgba(0, 0, 0, 0.8);
+}
+
+:root[data-look="werkbank"] *,
+:root[data-look="werkbank"] *::before,
+:root[data-look="werkbank"] *::after {
+  border-radius: 0 !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+/* weiche Schatten der Hilfsklassen entfallen; Rahmen und Fasen kommen von den Regeln unten */
+:root[data-look="werkbank"] :where(.shadow-sm, .shadow, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl, .drop-shadow, .drop-shadow-md, .drop-shadow-lg, .drop-shadow-xl) {
+  box-shadow: none !important;
+}
+
+:root[data-look="werkbank"] ::selection {
+  background: var(--wb-acc);
+  color: #fff;
+}
+
+:root[data-look="werkbank"] :focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-ring-offset-shadow: 0 0 #0000;
+}
+
+/* Eingaben zeigen den Fokus an ihrem Rahmen (weißer Rand), nicht zusätzlich am Text */
+:root[data-look="werkbank"] :is(input, textarea):focus-visible {
+  outline: none;
+}
+
+/* Rollbalken: dunkle Rinne, ein gefaster Steinblock als Griff. Die Standardregeln setzen
+   scrollbar-width/-color – damit zeichnet der Browser seine eigenen schmalen Balken; hier zurück
+   auf „auto“, damit die Pixel-Balken unten greifen. */
+:root[data-look="werkbank"] *:not(.no-scrollbar):not(.scrollbar-hover) {
+  scrollbar-width: auto;
+  scrollbar-color: auto;
+}
+
+:root[data-look="werkbank"] ::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+:root[data-look="werkbank"] ::-webkit-scrollbar-track {
+  background-color: #120c0a;
+  border: 2px solid #000;
+  box-shadow: none;
+}
+
+:root[data-look="werkbank"] ::-webkit-scrollbar-thumb,
+:root[data-look="werkbank"] ::-webkit-scrollbar-thumb:hover,
+:root[data-look="werkbank"] ::-webkit-scrollbar-thumb:active {
+  background-color: var(--wb-stone);
+  border: 2px solid #000;
+  box-shadow: inset 2px 2px 0 var(--wb-stone-hi), inset -2px -2px 0 var(--wb-stone-lo);
+  transform: none;
+}
+
+:root[data-look="werkbank"] ::-webkit-scrollbar-thumb:hover {
+  background-color: var(--wb-stone-hi);
+}
+
+:root[data-look="werkbank"] ::-webkit-scrollbar-corner {
+  background: #120c0a;
+}
+
+/* ───────────────────────── 3. Fenster, Leiste, Hotbar-Zeile ───────────────────────── */
+
+:root[data-look="werkbank"] .look-shell {
+  background-color: var(--wb-bg) !important;
+  border-color: #000 !important;
+}
+
+:root[data-look="werkbank"] .wb-backdrop {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  image-rendering: pixelated;
+  background:
+    linear-gradient(rgba(26, 18, 16, 0.8), rgba(26, 18, 16, 0.92)),
+    repeating-conic-gradient(#33231c 0 25%, #241813 0 50%) 0 0 / 32px 32px;
+}
+
+/* eigenes Hintergrundbild des Spielers: sichtbar lassen, nur abdunkeln */
+:root[data-look="werkbank"] .wb-backdrop--media {
+  background:
+    linear-gradient(rgba(26, 18, 16, 0.55), rgba(26, 18, 16, 0.72)),
+    repeating-conic-gradient(rgba(0, 0, 0, 0.18) 0 25%, transparent 0 50%) 0 0 / 32px 32px;
+}
+
+:root[data-look="werkbank"] .look-topbar {
+  margin: 14px 20px 0;
+  background-color: var(--wb-panel);
+  border: 3px solid #000;
+  box-shadow: var(--wb-bevel);
+  padding-left: 12px;
+  padding-right: 8px;
+}
+
+:root[data-look="werkbank"] .look-nav-row {
+  display: flex;
+  justify-content: center;
+  padding: 6px 12px 14px;
+}
+
+/* Teile der Leiste: Zoom als Vertiefung, Konto als Steinknopf, Fensterknöpfe mit harten Kanten */
+:root[data-look="werkbank"] .look-topbar .profile-bar-container > .border {
+  background: var(--wb-slot) !important;
+  border-color: #000 !important;
+  box-shadow: var(--wb-inset-sm);
+}
+
+:root[data-look="werkbank"] .look-topbar .profile-bar-container .cursor-pointer.border {
+  background-color: var(--wb-stone) !important;
+  border: 2px solid #000 !important;
+  box-shadow: var(--wb-bevel-stone) !important;
+}
+
+:root[data-look="werkbank"] .look-topbar .profile-bar-container .cursor-pointer.border:hover {
+  border-color: #fff !important;
+  filter: none !important;
+}
+
+:root[data-look="werkbank"] .look-topbar .profile-bar-container .cursor-pointer.border > .absolute {
+  display: none;
+}
+
+:root[data-look="werkbank"] .look-topbar .titlebar-button-borderless svg {
+  shape-rendering: crispEdges;
+  stroke-width: 1.5;
+}
+
+/* ───────────────────────── 4. Hotbar ───────────────────────── */
+
+:root[data-look="werkbank"] .wb-hotbar {
+  display: flex;
+  max-width: 100%;
+  padding: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 3px solid #000;
+}
+
+:root[data-look="werkbank"] .wb-hb {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 92px;
+  height: 64px;
+  min-width: 0;
+  padding: 6px 2px 0;
+  color: var(--wb-dim);
+  font-size: 12px;
+  line-height: 1;
+  background: var(--wb-panel-dark);
+  box-shadow: inset 3px 3px 0 var(--wb-slot-hi), inset -3px -3px 0 var(--wb-slot-lo);
+  transition: color 0.15s, background-color 0.15s;
+}
+
+:root[data-look="werkbank"] .wb-hotbar--icons .wb-hb {
+  width: 64px;
+  padding-top: 0;
+}
+
+:root[data-look="werkbank"] .wb-hb:hover {
+  color: #fff;
+  background: #35251f;
+}
+
+:root[data-look="werkbank"] .wb-hb:focus-visible {
+  outline: 3px solid var(--wb-dim);
+  outline-offset: -2px;
+  z-index: 1;
+}
+
+:root[data-look="werkbank"] .wb-hb--on,
+:root[data-look="werkbank"] .wb-hb--on:hover,
+:root[data-look="werkbank"] .wb-hb--on:focus-visible {
+  color: #fff;
+  background: #3f2b24;
+  outline: 4px solid #fff;
+  outline-offset: -2px;
+  z-index: 2;
+}
+
+:root[data-look="werkbank"] .wb-hb__num {
+  position: absolute;
+  top: 5px;
+  left: 7px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.34);
+}
+
+:root[data-look="werkbank"] .wb-hb--on .wb-hb__num {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+:root[data-look="werkbank"] .wb-hb__item {
+  position: relative;
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+
+:root[data-look="werkbank"] .wb-hb__icon {
+  display: block;
+  width: 24px;
+  height: 24px;
+  filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.55));
+}
+
+:root[data-look="werkbank"] .wb-hb--on .wb-hb__icon {
+  color: var(--wb-acc-hi);
+  filter: drop-shadow(3px 3px 0 #000);
+}
+
+/* Stapelzahl wie an einem Gegenstand: ungelesene Nachrichten und offene Anfragen */
+:root[data-look="werkbank"] .wb-hb__count {
+  position: absolute;
+  right: -13px;
+  bottom: -2px;
+  font-size: 13px;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 2px 2px 0 #3f3f3f, 0 0 0 #000;
+}
+
+:root[data-look="werkbank"] .wb-hb__label {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: clip;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.8);
+}
+
+/* „42 Salami-Spieler online“ in der Leiste, im Grün der Erfahrungsanzeige */
+:root[data-look="werkbank"] .look-topbar > .h-full[data-tauri-drag-region] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+:root[data-look="werkbank"] .wb-online {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--wb-xp);
+  text-shadow: 2px 2px 0 #1d2a08;
+}
+
+:root[data-look="werkbank"] .wb-online__dot {
+  width: 8px;
+  height: 8px;
+  background: var(--wb-xp);
+  box-shadow: 2px 2px 0 #1d2a08;
+}
+
+:root[data-look="werkbank"] .wb-online__short {
+  display: none;
+}
+
+/* der Zähler der Startseite (unten rechts) steht in diesem Look in der Leiste */
+:root[data-look="werkbank"] .look-content .absolute.bottom-6.right-8.z-20 {
+  display: none;
+}
+
+/* ───────────────────────── 5. Bausteine: Tafel, Slot ───────────────────────── */
+
+:root[data-look="werkbank"] .wb-panel {
+  background: var(--wb-panel);
+  border: 3px solid #000;
+  box-shadow: var(--wb-bevel);
+}
+
+:root[data-look="werkbank"] .wb-panel__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--wb-dim);
+  text-shadow: 2px 2px 0 #000;
+}
+
+:root[data-look="werkbank"] .wb-slot {
+  background: var(--wb-slot);
+  box-shadow: var(--wb-inset);
+}
+
+/* ───────────────────────── 6. Startseite ───────────────────────── */
+
+:root[data-look="werkbank"] .wb-play {
+  position: relative;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: minmax(400px, 46%) 1fr;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+:root[data-look="werkbank"] .wb-play__main {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 24px;
+  min-width: 0;
+  padding: 8px 20px 8px 56px;
+}
+
+:root[data-look="werkbank"] .wb-eyebrow {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--wb-dim);
+  text-shadow: 2px 2px 0 #000;
+}
+
+:root[data-look="werkbank"] .wb-title {
+  margin: 10px 0 0 -4px;
+  color: var(--wb-fat);
+  line-height: 1;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  padding: 0 8px 8px 0;
+}
+
+:root[data-look="werkbank"] .wb-title--xl { font-size: 76px; text-shadow: 6px 6px 0 #000; }
+:root[data-look="werkbank"] .wb-title--lg { font-size: 60px; text-shadow: 5px 5px 0 #000; }
+:root[data-look="werkbank"] .wb-title--md { font-size: 44px; text-shadow: 4px 4px 0 #000; }
+:root[data-look="werkbank"] .wb-title--sm { font-size: 34px; text-shadow: 3px 3px 0 #000; }
+
+:root[data-look="werkbank"] .wb-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+:root[data-look="werkbank"] .wb-chip {
+  font-size: 15px !important;
+  padding: 9px 12px 7px !important;
+}
+
+/* Start-Knopf */
+:root[data-look="werkbank"] .wb-launch {
+  width: 100%;
+}
+
+:root[data-look="werkbank"] .wb-noprofile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+:root[data-look="werkbank"] .wb-noprofile__hint {
+  margin: 0;
+  font-size: 14px;
+  color: var(--wb-dim);
+}
+
+:root[data-look="werkbank"] .wb-create {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  width: 100%;
+  max-width: 420px;
+  height: 84px;
+  font-size: 26px;
+  border-width: 3px !important;
+  box-shadow: inset 4px 4px 0 var(--wb-acc-hi), inset -4px -6px 0 var(--wb-acc-lo) !important;
+  text-shadow: 3px 3px 0 var(--wb-acc-ink);
+}
+
+:root[data-look="werkbank"] .wb-create__plus {
+  font-size: 34px;
+  line-height: 1;
+}
+
+/* Inventar „Zuletzt gespielt“ */
+:root[data-look="werkbank"] .wb-inv {
+  width: 100%;
+  max-width: 420px;
+  padding: 14px 16px 16px;
+}
+
+:root[data-look="werkbank"] .wb-inv__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 48px);
+  gap: 6px;
+}
+
+:root[data-look="werkbank"] .wb-inv__slot {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+}
+
+:root[data-look="werkbank"] button.wb-inv__slot:hover {
+  background: #3b2c26;
+}
+
+:root[data-look="werkbank"] .wb-inv__slot--on,
+:root[data-look="werkbank"] .wb-inv__slot--on:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 0;
+  z-index: 1;
+}
+
+:root[data-look="werkbank"] .wb-item {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+
+:root[data-look="werkbank"] .wb-item--image {
+  border: 2px solid #000;
+  background: #120c0a;
+  overflow: hidden;
+}
+
+:root[data-look="werkbank"] .wb-item--image img {
+  image-rendering: pixelated;
+}
+
+:root[data-look="werkbank"] .wb-item--block {
+  border: 2px solid #000;
+  background: var(--wb-item);
+  box-shadow:
+    inset 3px 3px 0 color-mix(in srgb, var(--wb-item) 68%, #fff),
+    inset -3px -3px 0 color-mix(in srgb, var(--wb-item) 58%, #000);
+  color: #fff;
+  font-size: 15px;
+  line-height: 1;
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6);
+}
+
+/* Schildchen am Slot – dunkel mit violettem Rand wie die Gegenstands-Tooltips im Spiel */
+:root[data-look="werkbank"] .wb-tip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  z-index: 30;
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  transform: translateX(-50%);
+  padding: 7px 9px 6px;
+  white-space: nowrap;
+  text-align: left;
+  pointer-events: none;
+  background: #160a1c;
+  border: 2px solid #3b1689;
+  box-shadow: 0 0 0 2px #0b040e;
+}
+
+:root[data-look="werkbank"] button.wb-inv__slot:hover .wb-tip,
+:root[data-look="werkbank"] button.wb-inv__slot:focus-visible .wb-tip {
+  display: flex;
+}
+
+:root[data-look="werkbank"] .wb-tip__name {
+  font-size: 14px;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 2px 2px 0 #3f3f3f;
+}
+
+:root[data-look="werkbank"] .wb-tip__meta {
+  font-size: 12px;
+  line-height: 1;
+  color: #a8a8a8;
+  text-shadow: 1px 1px 0 #2a2a2a;
+}
+
+/* Bühne: die Figur steht auf einem Salami-Block */
+:root[data-look="werkbank"] .wb-play__side {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+  padding: 18px 20px 4px 0;
+}
+
+:root[data-look="werkbank"] .wb-stage {
+  position: relative;
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  margin-right: -110px;
+  /* Platz für den Teil des Blocks, der unter dem Bild der Figur herausschaut */
+  padding-bottom: 58px;
+}
+
+:root[data-look="werkbank"] .wb-stage__figure {
+  position: relative;
+  flex: 0 1 450px;
+  min-height: 0;
+  aspect-ratio: 1 / 2;
+}
+
+:root[data-look="werkbank"] .wb-rig,
+:root[data-look="werkbank"] .wb-rig > div {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+:root[data-look="werkbank"] .wb-rig img {
+  filter: drop-shadow(8px 8px 0 rgba(0, 0, 0, 0.45)) !important;
+}
+
+:root[data-look="werkbank"] .wb-nametag {
+  position: absolute;
+  left: 50%;
+  top: -10px;
+  z-index: 3;
+  transform: translateX(-50%);
+  max-width: 260px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 6px 12px 4px;
+  font-size: 18px;
+  line-height: 1;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+:root[data-look="werkbank"] .wb-rig {
+  position: relative;
+  z-index: 2;
+}
+
+/* die Figur füllt ihr Bild nicht ganz: die Füße stehen bei etwa 88 % der Höhe – dort liegt die
+   Oberseite des Blocks */
+:root[data-look="werkbank"] .wb-block {
+  position: absolute;
+  left: 50%;
+  top: 83.5%;
+  z-index: 1;
+  width: 240px;
+  height: 112px;
+  margin-left: -120px;
+}
+
+:root[data-look="werkbank"] .wb-block__top {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 36px;
+  border: 3px solid #000;
+  transform: skewX(-30deg);
+  transform-origin: bottom;
+  background-color: var(--wb-acc);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='30' shape-rendering='crispEdges'%3E%3Cg fill='%23f3e3d3'%3E%3Crect x='6' y='6' width='12' height='6'/%3E%3Crect x='30' y='12' width='6' height='6'/%3E%3Crect x='18' y='18' width='6' height='6'/%3E%3Crect x='42' y='0' width='6' height='6'/%3E%3C/g%3E%3Crect x='24' y='0' width='6' height='6' fill='%23000' fill-opacity='.22'/%3E%3Crect x='0' y='24' width='6' height='6' fill='%23000' fill-opacity='.22'/%3E%3C/svg%3E");
+  background-size: 48px 30px;
+}
+
+:root[data-look="werkbank"] .wb-block__front {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 36px;
+  bottom: 0;
+  border: 3px solid #000;
+  border-top: 0;
+  background-color: var(--wb-acc-lo);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='36' shape-rendering='crispEdges'%3E%3Cg fill='%23f3e3d3' fill-opacity='.5'%3E%3Crect x='6' y='6' width='6' height='6'/%3E%3Crect x='30' y='18' width='12' height='6'/%3E%3Crect x='18' y='24' width='6' height='6'/%3E%3C/g%3E%3Cg fill='%23000' fill-opacity='.2'%3E%3Crect x='36' y='0' width='6' height='6'/%3E%3Crect x='0' y='18' width='6' height='6'/%3E%3Crect x='24' y='12' width='6' height='6'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 48px 36px;
+  box-shadow: inset 0 -10px 0 rgba(0, 0, 0, 0.3), inset 0 4px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* Freunde-Tafel */
+:root[data-look="werkbank"] .wb-friends {
+  position: relative;
+  z-index: 3;
+  flex: 0 0 210px;
+  align-self: flex-start;
+  width: 210px;
+  padding: 12px 12px 10px 14px;
+}
+
+:root[data-look="werkbank"] .wb-friends .wb-panel__title {
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+:root[data-look="werkbank"] .wb-friends__count {
+  color: var(--wb-xp);
+  text-shadow: 2px 2px 0 #1d2a08;
+}
+
+:root[data-look="werkbank"] .wb-friends__list {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  text-align: left;
+}
+
+:root[data-look="werkbank"] .wb-fr {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--wb-fat);
+}
+
+:root[data-look="werkbank"] .wb-friends__list:hover .wb-fr__name {
+  color: #fff;
+}
+
+:root[data-look="werkbank"] .wb-fr--off {
+  color: var(--wb-dim);
+}
+
+:root[data-look="werkbank"] .wb-fr__head {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border: 2px solid #000;
+  background: var(--wb-slot);
+  overflow: hidden;
+}
+
+:root[data-look="werkbank"] .wb-fr__head img {
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+:root[data-look="werkbank"] .wb-fr--off .wb-fr__head img {
+  filter: grayscale(0.7) brightness(0.8);
+}
+
+:root[data-look="werkbank"] .wb-fr__nohead {
+  width: 12px;
+  height: 12px;
+  color: var(--wb-dim);
+}
+
+:root[data-look="werkbank"] .wb-fr__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  line-height: 1.5;
+}
+
+:root[data-look="werkbank"] .wb-fr__dot {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #000;
+  background: #666;
+}
+
+:root[data-look="werkbank"] .wb-fr__dot--game { background: #7bd34a; }
+:root[data-look="werkbank"] .wb-fr__dot--launcher { background: #e3c245; }
+
+:root[data-look="werkbank"] .wb-friends__more {
+  padding: 5px 2px 0;
+  font-size: 12px;
+  color: var(--wb-dim);
+}
+
+/* ───────────────────────── 7. Gemeinsame Bausteine ───────────────────────── */
+
+/* Knöpfe: gefaste Minecraft-Knöpfe, beim Überfahren wird der Umriss weiß */
+:root[data-look="werkbank"] .look-btn {
+  border: 2px solid #000 !important;
+  text-shadow: 0.1em 0.1em 0 rgba(0, 0, 0, 0.55);
+  transition: filter 0.15s, border-color 0.15s, background-color 0.15s !important;
+}
+
+:root[data-look="werkbank"] .look-btn:not(:disabled):hover {
+  border-color: #fff !important;
+}
+
+:root[data-look="werkbank"] .look-btn--primary {
+  background-color: var(--wb-acc) !important;
+  box-shadow: var(--wb-bevel-acc) !important;
+}
+
+:root[data-look="werkbank"] .look-btn--primary:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--wb-acc) 86%, #fff) !important;
+}
+
+:root[data-look="werkbank"] .look-btn--accent {
+  background-color: color-mix(in srgb, var(--wb-acc) 46%, var(--wb-panel-dark)) !important;
+  box-shadow:
+    inset 2px 2px 0 color-mix(in srgb, var(--wb-acc) 60%, var(--wb-hi)),
+    inset -2px -3px 0 color-mix(in srgb, var(--wb-acc) 24%, #000) !important;
+  color: #fff !important;
+}
+
+:root[data-look="werkbank"] .look-btn--secondary {
+  background-color: var(--wb-stone) !important;
+  box-shadow: var(--wb-bevel-stone) !important;
+  color: var(--wb-fat) !important;
+}
+
+:root[data-look="werkbank"] .look-btn--secondary:not(:disabled):hover {
+  background-color: #675046 !important;
+}
+
+:root[data-look="werkbank"] :is(.look-btn--ghost, .look-btn--text, .look-btn--highlight) {
+  border: 2px solid transparent !important;
+  box-shadow: none !important;
+}
+
+:root[data-look="werkbank"] :is(.look-btn--ghost, .look-btn--text, .look-btn--highlight):not(:disabled):hover {
+  border-color: #000 !important;
+  background-color: var(--wb-stone) !important;
+  box-shadow: var(--wb-bevel-stone) !important;
+}
+
+:root[data-look="werkbank"] :is(.look-btn--danger, .look-btn--destructive) {
+  background-color: #8a2222 !important;
+  box-shadow: inset 2px 2px 0 #c44a44, inset -2px -3px 0 #4f1010 !important;
+  color: #fff !important;
+}
+
+:root[data-look="werkbank"] .look-btn--warning {
+  background-color: #8a6414 !important;
+  box-shadow: inset 2px 2px 0 #c79a3a, inset -2px -3px 0 #4d3608 !important;
+  color: #fff !important;
+}
+
+:root[data-look="werkbank"] .look-btn--success {
+  background-color: #3f7a2a !important;
+  box-shadow: inset 2px 2px 0 #6fb04f, inset -2px -3px 0 #204314 !important;
+  color: #fff !important;
+}
+
+:root[data-look="werkbank"] .look-btn--info {
+  background-color: var(--wb-stone) !important;
+  box-shadow: var(--wb-bevel-stone) !important;
+  color: var(--wb-fat) !important;
+}
+
+/* gedrückt: die Fase kehrt sich um */
+:root[data-look="werkbank"] .look-btn--active,
+:root[data-look="werkbank"] .look-btn:not(:disabled):not(.look-btn--ghost):active {
+  box-shadow: inset 2px 3px 0 rgba(0, 0, 0, 0.45), inset -2px -2px 0 rgba(255, 255, 255, 0.14) !important;
+}
+
+:root[data-look="werkbank"] .look-btn:disabled {
+  filter: saturate(0.5);
+}
+
+/* der große Start-Knopf */
+:root[data-look="werkbank"] .look-play .look-btn {
+  border-width: 3px !important;
+  box-shadow: inset 4px 4px 0 var(--wb-acc-hi), inset -4px -6px 0 var(--wb-acc-lo) !important;
+  text-shadow: 3px 3px 0 var(--wb-acc-ink);
+}
+
+:root[data-look="werkbank"] .look-play :is(.look-btn--danger, .look-btn--destructive) {
+  box-shadow: inset 4px 4px 0 #c44a44, inset -4px -6px 0 #4f1010 !important;
+  text-shadow: 3px 3px 0 #2c0808;
+}
+
+:root[data-look="werkbank"] .look-play .look-btn ~ button {
+  margin-left: -3px !important;
+}
+
+/* Dreieck (Start) bzw. Quadrat (Stopp) als Pixel statt des runden Symbols */
+:root[data-look="werkbank"] .look-play .look-btn .rounded-full {
+  width: 28px;
+  height: 34px;
+  background: none !important;
+}
+
+:root[data-look="werkbank"] .look-play .look-btn .rounded-full > svg {
+  display: none;
+}
+
+:root[data-look="werkbank"] .look-play .look-btn .rounded-full::before {
+  content: "";
+  width: 24px;
+  height: 32px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 8' preserveAspectRatio='none' shape-rendering='crispEdges' fill='%23fff'%3E%3Crect x='0' y='0' width='1' height='8'/%3E%3Crect x='1' y='1' width='1' height='6'/%3E%3Crect x='2' y='2' width='1' height='4'/%3E%3Crect x='3' y='3' width='1' height='2'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  filter: drop-shadow(3px 3px 0 var(--wb-acc-ink));
+}
+
+:root[data-look="werkbank"] .look-play :is(.look-btn--danger, .look-btn--destructive) .rounded-full::before {
+  width: 22px;
+  height: 22px;
+  background: #fff;
+  filter: drop-shadow(3px 3px 0 #2c0808);
+}
+
+:root[data-look="werkbank"] .look-play .look-btn .text-2xl {
+  font-size: 38px;
+  line-height: 1;
+}
+
+:root[data-look="werkbank"] .look-play .look-btn .gap-3 {
+  gap: 16px;
+}
+
+/* Statuszeile unter „Spielen“: auf dem roten Knopf lesbar, ohne Schlagschatten */
+:root[data-look="werkbank"] .look-play .look-btn .text-xs {
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.55);
+}
+
+:root[data-look="werkbank"] .look-play .look-btn .text-red-400 {
+  color: #ffe1d6;
+}
+
+:root[data-look="werkbank"] .look-play .look-btn .text-green-400 {
+  color: #dcffc4;
+}
+
+/* Karten und Tafeln */
+:root[data-look="werkbank"] .look-card {
+  background-color: var(--wb-panel) !important;
+  border: 2px solid #000 !important;
+  box-shadow: var(--wb-bevel-sm) !important;
+}
+
+:root[data-look="werkbank"] :is(a, button, [role="button"], .cursor-pointer).look-card:hover {
+  border-color: #fff !important;
+  transform: none !important;
+}
+
+/* gewählte Karte (Shop, Auswahllisten): der weiße Auswahlrahmen der Hotbar */
+:root[data-look="werkbank"] .look-card[aria-pressed="true"],
+:root[data-look="werkbank"] .look-card[aria-selected="true"],
+:root[data-look="werkbank"] .look-card[style*="--shop-line: #"] {
+  border-color: #fff !important;
+  background-color: #4a372f !important;
+}
+
+/* ein offenes Menü darf aus seiner Karte herausragen (sonst schneidet die Karte es ab) */
+:root[data-look="werkbank"] .look-card:has(.look-menu) {
+  overflow: visible !important;
+  z-index: 40;
+}
+
+/* Reiter: eine dunkle Rinne, darin gefaste Knöpfe */
+:root[data-look="werkbank"] .look-tabs {
+  background-color: var(--wb-slot) !important;
+  box-shadow: var(--wb-inset-sm) !important;
+}
+
+/* Etiketten: Slot-Schildchen */
+:root[data-look="werkbank"] .look-label {
+  background: var(--wb-slot) !important;
+  color: var(--wb-fat) !important;
+  border: 0 !important;
+  box-shadow: var(--wb-inset-sm) !important;
+  text-shadow: 0.1em 0.1em 0 rgba(0, 0, 0, 0.6);
+}
+
+:root[data-look="werkbank"] .look-label--ghost {
+  color: var(--wb-fat) !important;
+}
+
+:root[data-look="werkbank"] .look-label--red {
+  background: var(--wb-acc) !important;
+  color: #fff !important;
+  box-shadow: inset 2px 2px 0 var(--wb-acc-hi), inset -2px -2px 0 var(--wb-acc-lo), 0 0 0 2px #000 !important;
+}
+
+/* die Lochung des Feinkost-Etiketts entfällt – ein Slot hat keine Öse */
+:root[data-look="werkbank"] .look-label > span:first-child:empty {
+  display: none;
+}
+
+:root[data-look="werkbank"] .look-label.text-sm {
+  font-size: 12px;
+}
+
+:root[data-look="werkbank"] .look-tag {
+  background: var(--wb-slot) !important;
+  box-shadow: inset 1px 1px 0 var(--wb-slot-lo), inset -1px -1px 0 var(--wb-slot-hi);
+  color: var(--wb-dim) !important;
+  padding: 3px 6px 2px !important;
+}
+
+/* Eingabefelder: dunkle Vertiefung, mit Fokus weiß umrandet wie im Spiel */
+:root[data-look="werkbank"] .look-input {
+  background-color: #120c0a !important;
+  border: 2px solid #000 !important;
+  box-shadow: var(--wb-inset-sm) !important;
+}
+
+:root[data-look="werkbank"] .look-input:focus-within,
+:root[data-look="werkbank"] input.look-input:focus,
+:root[data-look="werkbank"] textarea.look-input:focus {
+  border-color: #fff !important;
+}
+
+:root[data-look="werkbank"] .look-input > div {
+  transform: none !important;
+}
+
+/* Eingaben, die selbst der sichtbare Kasten sind (eigener Rahmen, kein Ansatzpunkt) */
+:root[data-look="werkbank"] :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="password"], input[type="url"], textarea, select).border {
+  background-color: #120c0a !important;
+  border: 2px solid #000 !important;
+  box-shadow: var(--wb-inset-sm) !important;
+}
+
+:root[data-look="werkbank"] :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="password"], input[type="url"], textarea, select).border:focus {
+  border-color: #fff !important;
+}
+
+/* … und Kästen, die ein durchsichtiges Eingabefeld umschließen (Profilname, Gruppe, Pfade) */
+:root[data-look="werkbank"] .border[class*="bg-white/"]:has(> input, > textarea) {
+  background-color: #120c0a !important;
+  border: 2px solid #000 !important;
+  box-shadow: var(--wb-inset-sm) !important;
+}
+
+:root[data-look="werkbank"] .border[class*="bg-white/"]:has(> input, > textarea):focus-within {
+  border-color: #fff !important;
+}
+
+/* Dialoge und Menüs: Inventar-Tafeln */
+:root[data-look="werkbank"] .look-modal {
+  background-color: var(--wb-panel) !important;
+  border: 3px solid #000 !important;
+  box-shadow: 8px 8px 0 rgba(0, 0, 0, 0.5) !important;
+}
+
+:root[data-look="werkbank"] .look-modal::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  box-shadow: var(--wb-bevel);
+}
+
+:root[data-look="werkbank"] .look-menu {
+  background-color: var(--wb-panel) !important;
+  border: 2px solid #000 !important;
+  box-shadow: var(--wb-bevel-sm), var(--wb-drop) !important;
+}
+
+/* Flächen ohne eigenen Ansatzpunkt (Zeilen, Kacheln, kleine Kästen): eine feine Fase */
+:root[data-look="werkbank"] [style*="background-color: var(--surface-base"],
+:root[data-look="werkbank"] [style*="background-color: var(--surface-hover"],
+:root[data-look="werkbank"] [style*="background-color: var(--surface-raised"] {
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.07), inset -2px -2px 0 rgba(0, 0, 0, 0.32);
+}
+
+/* Hinweis-Schildchen beim Überfahren: dunkel mit violettem Rand wie die Gegenstands-Tooltips */
+:root[data-look="werkbank"] body > .fixed.pointer-events-none.font-minecraft[class*="z-[1100]"] {
+  background-color: #160a1c !important;
+  border: 2px solid #3b1689 !important;
+  box-shadow: 0 0 0 2px #0b040e !important;
+  color: #fff !important;
+  text-shadow: 0.1em 0.1em 0 #3f3f3f;
+}
+
+/* Meldungen (Toasts): feste Tafel wie die Fortschritts-Meldungen im Spiel, über der Hotbar */
+:root[data-look="werkbank"] div[class*="go"].font-smallcaps.tracking-wider.text-shadow-sm {
+  background-color: var(--wb-panel-dark) !important;
+  border: 2px solid #000 !important;
+  box-shadow: var(--wb-bevel-sm), var(--wb-drop) !important;
+  color: var(--wb-fat) !important;
+  font-size: 13px;
+}
+
+:root[data-look="werkbank"] div[style*="z-index: 9999"][style*="position: fixed"] {
+  bottom: 112px !important;
+}
+
+/* Gruppen-Reiter der Profilseite: gefaste Knöpfe */
+:root[data-look="werkbank"] .look-content .mb-4 > .flex.flex-wrap > button.border:not(.border-dashed) {
+  border: 2px solid #000 !important;
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.14), inset -2px -3px 0 rgba(0, 0, 0, 0.4);
+}
+
+:root[data-look="werkbank"] .look-content .mb-4 > .flex.flex-wrap > button.border:not(.border-dashed):hover {
+  border-color: #fff !important;
+}
+
+/* das Schließen-Kreuz der Dialoge füllt seinen Knopf */
+:root[data-look="werkbank"] .look-modal > .flex.items-center.justify-between > .flex > button > span > svg:not([class*="w-"]) {
+  width: 100%;
+  height: 100%;
+}
+
+/* Bühne der Skins: aus der runden Salamischeibe wird ein Salami-Block */
+:root[data-look="werkbank"] .look-stage {
+  position: relative;
+}
+
+:root[data-look="werkbank"] .look-stage > * {
+  display: none;
+}
+
+:root[data-look="werkbank"] .look-stage::before,
+:root[data-look="werkbank"] .look-stage::after {
+  content: "";
+  position: absolute;
+  left: 9%;
+  right: 13%;
+  border: 2px solid #000;
+  image-rendering: pixelated;
+}
+
+:root[data-look="werkbank"] .look-stage::before {
+  top: 8%;
+  height: 46%;
+  transform: skewX(-30deg);
+  transform-origin: bottom;
+  background-color: var(--wb-acc);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='20' shape-rendering='crispEdges'%3E%3Cg fill='%23f3e3d3'%3E%3Crect x='4' y='4' width='8' height='4'/%3E%3Crect x='20' y='8' width='4' height='4'/%3E%3Crect x='12' y='12' width='4' height='4'/%3E%3Crect x='28' y='0' width='4' height='4'/%3E%3C/g%3E%3Crect x='16' y='0' width='4' height='4' fill='%23000' fill-opacity='.22'/%3E%3Crect x='0' y='16' width='4' height='4' fill='%23000' fill-opacity='.22'/%3E%3C/svg%3E");
+  background-size: 32px 20px;
+}
+
+:root[data-look="werkbank"] .look-stage::after {
+  top: 54%;
+  bottom: 0;
+  border-top: 0;
+  background-color: var(--wb-acc-lo);
+  box-shadow: inset 0 -5px 0 rgba(0, 0, 0, 0.3);
+}
+
+/* ── Seiten: was ohne Ansatzpunkt nachgezogen werden muss ── */
+
+/* Auswahlfelder (Select ohne Ansatzpunkt): ein Steinknopf, innen etwas schmaler gepolstert,
+   damit „Alle Spielversionen“ in der breiten Schrift ganz passt */
+:root[data-look="werkbank"] button.font-smallcaps.text-shadow-sm.border.justify-between {
+  padding-left: 12px;
+  padding-right: 10px;
+  background-color: var(--wb-stone) !important;
+  border: 2px solid #000 !important;
+  box-shadow: var(--wb-bevel-stone) !important;
+}
+
+:root[data-look="werkbank"] button.font-smallcaps.text-shadow-sm.border.justify-between:hover {
+  border-color: #fff !important;
+}
+
+/* Look-Auswahl (Einstellungen): Karten mit hartem Rahmen, die gewählte mit weißem Auswahlrahmen */
+:root[data-look="werkbank"] button[aria-pressed].group.overflow-hidden.text-left {
+  background-color: var(--wb-panel-dark) !important;
+  border: 2px solid #000 !important;
+  box-shadow: var(--wb-drop) !important;
+  transform: none !important;
+}
+
+:root[data-look="werkbank"] button[aria-pressed="true"].group.overflow-hidden.text-left,
+:root[data-look="werkbank"] button[aria-pressed].group.overflow-hidden.text-left:hover {
+  border-color: #fff !important;
+}
+
+/* Einstellungen: Farbfelder als gefaste Blöcke statt mit weichem Schatten */
+:root[data-look="werkbank"] .look-modal button.w-12.h-12.cursor-pointer {
+  box-shadow: inset 3px 3px 0 rgba(255, 255, 255, 0.3), inset -3px -3px 0 rgba(0, 0, 0, 0.3), 0 0 0 2px #000 !important;
+  transform: none !important;
+}
+
+/* Clips: die Kacheln etwas breiter, damit „Spiel | Zeit | Größe“ in der breiten Schrift passt */
+:root[data-look="werkbank"] .grid[class*="minmax(220px,1fr)"] {
+  grid-template-columns: repeat(auto-fill, minmax(256px, 1fr));
+}
+
+/* Freunde: schmale Seitenleiste – Feld und Knopf rücken zusammen, der Platzhalter bleibt lesbar */
+:root[data-look="werkbank"] .look-content aside > form {
+  gap: 6px;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+:root[data-look="werkbank"] .look-content aside > form > label {
+  padding-left: 8px;
+  padding-right: 6px;
+  gap: 6px;
+  background: #120c0a;
+  border: 2px solid #000 !important;
+  box-shadow: var(--wb-inset-sm);
+}
+
+:root[data-look="werkbank"] .look-content aside > form > label:focus-within {
+  border-color: #fff !important;
+}
+
+:root[data-look="werkbank"] .look-content aside > form > button {
+  padding-left: 9px;
+  padding-right: 9px;
+}
+
+/* Shop: Bildfelder als Slots statt mit weichem Lichtkegel; lange Namen dürfen umbrechen */
+:root[data-look="werkbank"] [style*="radial-gradient(at 50% 35%"],
+:root[data-look="werkbank"] [style*="background-color: rgba(0, 0, 0, 0.28)"] {
+  background: var(--wb-slot) !important;
+  box-shadow: var(--wb-inset-sm);
+}
+
+:root[data-look="werkbank"] .look-card > span.truncate.font-minecraft {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.2;
+  min-height: 2.4em;
+}
+
+/* Profil: die Reiter der Seitenleiste eine Stufe kleiner, damit „Ressourcenpakete“ ganz passt */
+:root[data-look="werkbank"] .look-content aside.w-60 button .text-base {
+  font-size: 13px;
+}
+
+/* schlichte Felder ohne Ansatzpunkt (Freund hinzufügen, Nachricht schreiben): dunkle Vertiefung */
+:root[data-look="werkbank"] .border[class*="bg-black/25"],
+:root[data-look="werkbank"] .border[class*="bg-black/30"] {
+  background-color: #120c0a;
+  border-color: #000 !important;
+  box-shadow: var(--wb-inset-sm);
+}
+
+/* Kopfband: Salami im Pixelraster */
+:root[data-look="werkbank"] .salami-fat-spots {
+  image-rendering: pixelated;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='24' shape-rendering='crispEdges'%3E%3Cg fill='%23f3e3d3'%3E%3Crect x='4' y='4' width='8' height='4' fill-opacity='.5'/%3E%3Crect x='28' y='12' width='4' height='4' fill-opacity='.45'/%3E%3Crect x='40' y='4' width='4' height='4' fill-opacity='.3'/%3E%3Crect x='16' y='16' width='4' height='4' fill-opacity='.3'/%3E%3C/g%3E%3Cg fill='%23000'%3E%3Crect x='20' y='0' width='4' height='4' fill-opacity='.22'/%3E%3Crect x='36' y='20' width='4' height='4' fill-opacity='.22'/%3E%3Crect x='0' y='16' width='4' height='4' fill-opacity='.18'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 48px 24px;
+}
+
+/* ───────────────────────── 8. Kleinere Fenster ───────────────────────── */
+
+@media (max-width: 1179px) {
+  :root[data-look="werkbank"] .wb-online__long {
+    display: none;
+  }
+
+  :root[data-look="werkbank"] .wb-online__short {
+    display: inline;
+  }
+
+  :root[data-look="werkbank"] .look-topbar {
+    margin: 10px 12px 0;
+  }
+
+  :root[data-look="werkbank"] .wb-play__main {
+    padding-left: 36px;
+  }
+
+  :root[data-look="werkbank"] .wb-stage {
+    margin-right: 0;
+  }
+
+  :root[data-look="werkbank"] .wb-friends {
+    flex-basis: 190px;
+    width: 190px;
+  }
+
+  :root[data-look="werkbank"] .wb-hb {
+    width: 84px;
+  }
+
+  :root[data-look="werkbank"] .wb-title--xl { font-size: 64px; text-shadow: 5px 5px 0 #000; }
+  :root[data-look="werkbank"] .wb-title--lg { font-size: 50px; text-shadow: 4px 4px 0 #000; }
+  :root[data-look="werkbank"] .wb-title--md { font-size: 38px; text-shadow: 3px 3px 0 #000; }
+  :root[data-look="werkbank"] .wb-title--sm { font-size: 30px; text-shadow: 3px 3px 0 #000; }
+}
+
+@media (max-height: 739px) {
+  :root[data-look="werkbank"] .look-topbar {
+    margin-top: 8px;
+    height: 54px;
+  }
+
+  :root[data-look="werkbank"] .look-nav-row {
+    padding: 4px 12px 10px;
+  }
+
+  :root[data-look="werkbank"] div[style*="z-index: 9999"][style*="position: fixed"] {
+    bottom: 96px !important;
+  }
+
+  :root[data-look="werkbank"] .wb-hb {
+    height: 56px;
+    gap: 4px;
+  }
+
+  :root[data-look="werkbank"] .wb-play__main {
+    gap: 16px;
+  }
+
+  :root[data-look="werkbank"] .wb-block {
+    width: 200px;
+    height: 96px;
+    margin-left: -100px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-look="werkbank"] .look-btn,
+  :root[data-look="werkbank"] .wb-hb {
+    transition: none !important;
+  }
+}

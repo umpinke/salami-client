@@ -1,8 +1,9 @@
 import motdParser from "@sfirew/minecraft-motd-parser";
 import { sanitizeMotdHtml } from "./html-sanitize";
+import i18n from "../i18n/i18n";
 
-const EMPTY_MOTD_HTML = '<span class="text-white/50">No description</span>';
-const INVALID_MOTD_HTML = '<span class="text-red-400">Invalid MOTD format</span>';
+const emptyMotdHtml = () => `<span class="text-white/50">${escapeHtml(i18n.t("worlds.motd_empty"))}</span>`;
+const invalidMotdHtml = () => `<span class="text-red-400">${escapeHtml(i18n.t("worlds.motd_invalid"))}</span>`;
 
 function escapeHtml(text: string): string {
   return text
@@ -71,17 +72,17 @@ function renderPlainTextFallback(motd: unknown, normalized: unknown): string | n
  * @returns HTML string with formatted text
  */
 export function parseMotdToHtml(motd: any): string {
-  if (!motd) return EMPTY_MOTD_HTML;
+  if (!motd) return emptyMotdHtml();
 
   const normalized =
     typeof motd === "object" && motd != null ? normalizeMotdInput(motd) : motd;
 
   try {
     const html = motdParser.autoToHTML(normalized as string | object);
-    if (!html) return EMPTY_MOTD_HTML;
+    if (!html) return emptyMotdHtml();
     return sanitizeMotdHtml(html);
   } catch (err) {
     console.error("Failed to parse MOTD:", err);
-    return renderPlainTextFallback(motd, normalized) ?? INVALID_MOTD_HTML;
+    return renderPlainTextFallback(motd, normalized) ?? invalidMotdHtml();
   }
 }

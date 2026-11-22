@@ -24,6 +24,7 @@ import {
 } from "../../../../services/log-service";
 import { useDelayedTrue } from "../../../../hooks/useDelayedTrue";
 import { ThemedDropdown, ThemedDropdownItem } from "../shared/ThemedDropdown";
+import { LoadingSpinner } from "../../../ui/LoadingSpinner";
 import { parseErrorMessage } from "../../../../utils/error-utils";
 import {
   LevelChips,
@@ -282,17 +283,15 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
         )}
 
         {isLoadingList && logFiles.length === 0 && !error ? (
-          <div className="flex h-full items-center justify-center text-sm text-white/40">
-            <Icon icon="svg-spinners:ring-resize" className="mr-2 h-4 w-4" />
-            {t("profiles.v3.content.loading")}
+          <div className="flex h-full items-center justify-center">
+            <LoadingSpinner size="md" shadowDepth="none" message={t("profiles.v3.content.loading")} />
           </div>
         ) : logFiles.length === 0 && !isLoadingList ? (
           <LogEmptyState title={t("profiles.v3.logs.emptyFiles")} hint={t("profiles.v3.logs.emptyFilesHint")} />
         ) : isLoadingContent && parsedLines.length === 0 ? (
           shouldShowLoading ? (
-            <div className="flex h-full items-center justify-center text-sm text-white/40">
-              <Icon icon="svg-spinners:ring-resize" className="mr-2 h-4 w-4" />
-              {t("profiles.v3.content.loading")}
+            <div className="flex h-full items-center justify-center">
+              <LoadingSpinner size="md" shadowDepth="none" message={t("profiles.v3.content.loading")} />
             </div>
           ) : null
         ) : visibleLines.length === 0 ? (

@@ -38,10 +38,4 @@ export const SalamiAppService = {
 };
 
 /** Fehlertext aus einem Tauri-Befehl (CommandError kommt als Objekt mit `message`). */
-export function errorText(error: unknown): string {
-  let text: string;
-  if (typeof error === "string") text = error;
-  else if (error && typeof error === "object" && "message" in error) text = String((error as { message: unknown }).message);
-  else text = String(error);
-  return text.replace(/^Other error: /, "");
-}
+export { errorText } from "../../utils/error-text";

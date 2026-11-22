@@ -1,0 +1,1295 @@
+/*
+ * Look „Feinkost-Theke“ – Variablen und Regeln nur unter :root[data-look="theke"]. Siehe ../CONTRACT.md
+ *
+ * Aufbau: 1 Variablen · 2 Fenster, Markise, Leiste · 3 Schilder-Navigation · 4 Startseite ·
+ * 5 gemeinsame Bausteine (Knöpfe, Karten, Etiketten, Reiter, Felder, Dialoge, Menüs) · 6 Seiten
+ */
+
+/* ───────────────────────── 1 Variablen ───────────────────────── */
+
+:root[data-look="theke"] {
+  /* Hausfarben der Theke (fest – die Markise bleibt rot-creme, egal welcher Akzent gewählt ist) */
+  --theke-red: #b23a3a;
+  --theke-red-dark: #8a2a2a;
+  --theke-fat: #f3e3d3;
+  --theke-paper: #f4ead9;
+  --theke-pepper: #2b1d1a;
+  --theke-ink: #7a5a4a;
+  --theke-wood: #5a3a28;
+  --theke-wood-dark: #3d2619;
+  --theke-wood-light: #7a5238;
+  --theke-chalk: #23302b;
+  --theke-chalk-text: #e9efe6;
+  --theke-rail: #9b8571;
+  --theke-board: #c89a63;
+  --theke-board-dark: #a77a46;
+  --theke-display: var(--font-minecraft), sans-serif;
+
+  /* Maße von Markise und Schilderstange (bei niedrigen Fenstern kleiner, siehe unten) */
+  --theke-top: 60px;
+  --theke-stripe: 48px;
+  --theke-scallop: 17px;
+  --theke-nav: 78px;
+  --theke-rail-y: 22px;
+  --theke-string: 12px;
+  --theke-sign-h: 34px;
+  --theke-sign-drop: 4px;
+
+  /* Flächen: dunkle Pfeffer-Tafeln auf der Holzwand, helleres Holz beim Überfahren */
+  --surface-base: rgba(24, 14, 11, 0.6);
+  --surface-hover: rgba(74, 47, 34, 0.82);
+  --surface-raised: rgba(98, 64, 45, 0.9);
+  --surface-line: rgba(168, 122, 86, 0.42);
+  --surface-line-strong: rgba(214, 172, 132, 0.55);
+  --surface-solid: #2a1a15;
+  --surface-solid-raised: #3b2519;
+  --surface-veil: rgba(33, 20, 16, 0.9);
+
+  /* Knöpfe: kräftige harte Unterkante */
+  --look-kante: 0 4px 0 color-mix(in srgb, var(--accent) 55%, black);
+  --look-kante-soft: 0 3px 0 rgba(0, 0, 0, 0.42);
+
+  /* Kopfband: ein Streifen Markise */
+  --look-band-bg: var(--theke-red);
+  --look-band-border: 3px solid rgba(0, 0, 0, 0.28);
+
+  /* Schrift auf Akzentflächen (eigene Bausteine setzen den genauen Wert inline) */
+  --theke-on-accent: #fff;
+}
+
+@supports (color: oklch(from red l c h)) {
+  :root[data-look="theke"] {
+    --theke-on-accent: oklch(from var(--accent) clamp(0.16, (0.7 - l) * 1000, 1) 0.012 60);
+  }
+}
+
+/* Schrift: rund und freundlich. Nur solange der Spieler keine andere Schrift gewählt hat. */
+:root[data-look="theke"]:not([data-font]),
+:root[data-look="theke"][data-font="salami"] {
+  --font-minecraft: "Fredoka", sans-serif !important;
+  --font-smallcaps: "Fredoka", sans-serif !important;
+  /* Schaufenster-Schrift für große Namen: Ladenschild, Profilname, Stempel, Dialogtitel */
+  --theke-display: "MinecraftTen", "Fredoka", sans-serif;
+}
+
+@media (max-height: 720px) {
+  :root[data-look="theke"] {
+    --theke-top: 52px;
+    --theke-stripe: 40px;
+    --theke-scallop: 13px;
+    --theke-nav: 62px;
+    --theke-rail-y: 16px;
+    --theke-string: 9px;
+    --theke-sign-h: 30px;
+    --theke-sign-drop: 3px;
+  }
+}
+
+:root[data-look="theke"] ::selection {
+  background: var(--theke-red);
+  color: var(--theke-fat);
+}
+
+/* ───────────────────── 2 Fenster, Markise, Leiste ───────────────────── */
+
+:root[data-look="theke"] .look-shell {
+  background-color: #2a1912 !important;
+  border-color: rgba(0, 0, 0, 0.5) !important;
+}
+
+:root[data-look="theke"] .theke-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Holzwand: senkrechte Bretter */
+:root[data-look="theke"] .theke-wall {
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.2) 0 2px, transparent 2px 160px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.014) 0 80px, transparent 80px 320px),
+    linear-gradient(180deg, #3b2418, #2a1912);
+}
+
+/* eigenes Hintergrundbild des Spielers: nur die Fugen bleiben, das Bild scheint durch */
+:root[data-look="theke"] .theke-backdrop.has-media .theke-wall {
+  background: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.2) 0 2px, transparent 2px 160px);
+}
+
+/* Markise: Streifen über die ganze Breite, darunter die Bogenkante */
+:root[data-look="theke"] .theke-awning {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: var(--theke-top);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 38%, rgba(0, 0, 0, 0.14)),
+    repeating-linear-gradient(
+      90deg,
+      var(--theke-red) 0 var(--theke-stripe),
+      var(--theke-fat) var(--theke-stripe) calc(var(--theke-stripe) * 2)
+    );
+  box-shadow: 0 5px 0 rgba(0, 0, 0, 0.28);
+}
+
+:root[data-look="theke"] .theke-awning::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: var(--theke-scallop);
+  background:
+    radial-gradient(
+        circle at calc(var(--theke-stripe) / 2) 0,
+        var(--theke-red) calc(var(--theke-stripe) / 2 - 1.5px),
+        transparent calc(var(--theke-stripe) / 2 - 0.5px)
+      )
+      0 0 / calc(var(--theke-stripe) * 2) var(--theke-scallop) repeat-x,
+    radial-gradient(
+        circle at calc(var(--theke-stripe) * 1.5) 0,
+        var(--theke-fat) calc(var(--theke-stripe) / 2 - 1.5px),
+        transparent calc(var(--theke-stripe) / 2 - 0.5px)
+      )
+      0 0 / calc(var(--theke-stripe) * 2) var(--theke-scallop) repeat-x;
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.3));
+}
+
+/* Schatten der Markise auf der Wand */
+:root[data-look="theke"] .theke-awning-shade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--theke-top);
+  height: 70px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0));
+}
+
+/* Leiste: Logo links und Konto/Fenster rechts sitzen als dunkle Schilder auf der Markise */
+:root[data-look="theke"] .look-topbar {
+  height: var(--theke-top) !important;
+}
+
+:root[data-look="theke"] .look-topbar > div:first-child,
+:root[data-look="theke"] .look-topbar > div:nth-child(3) {
+  width: fit-content;
+  max-width: 100%;
+  padding: 2px 5px;
+  background: var(--theke-pepper);
+  border: 2px solid var(--theke-fat);
+  border-radius: 12px;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
+}
+
+:root[data-look="theke"] .look-topbar > div:first-child {
+  justify-self: start;
+}
+
+:root[data-look="theke"] .look-topbar > div:nth-child(3) {
+  justify-self: end;
+}
+
+/* Ladenschild in der Mitte der Markise */
+:root[data-look="theke"] .look-topbar > div:nth-child(2) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+:root[data-look="theke"] .look-topbar > div:nth-child(2)::before {
+  content: "Salami Client";
+  padding: 5px 22px 6px;
+  background: var(--theke-pepper);
+  color: var(--theke-fat);
+  border: 3px solid var(--theke-fat);
+  border-radius: 10px;
+  box-shadow: 0 5px 0 rgba(0, 0, 0, 0.35);
+  font-family: var(--theke-display);
+  font-size: 22px;
+  line-height: 1.15;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* der Name steht schon auf dem Ladenschild – links bleiben Logo und Versionsnummer */
+:root[data-look="theke"] .look-topbar > div:first-child > button:first-child > span > span:first-child {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  :root[data-look="theke"] .look-topbar > div:nth-child(2)::before {
+    display: none;
+  }
+}
+
+@media (max-height: 720px) {
+  :root[data-look="theke"] .look-topbar > div:nth-child(2)::before {
+    padding: 3px 18px 4px;
+    font-size: 19px;
+  }
+}
+
+/* ───────────────────── 3 Schilder-Navigation ───────────────────── */
+
+:root[data-look="theke"] .look-nav-row {
+  height: var(--theke-nav);
+}
+
+:root[data-look="theke"] .theke-nav {
+  position: relative;
+  height: 100%;
+}
+
+:root[data-look="theke"] .theke-rail {
+  position: absolute;
+  left: clamp(16px, 3vw, 40px);
+  right: clamp(16px, 3vw, 40px);
+  top: var(--theke-rail-y);
+  height: 5px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #bda991, var(--theke-rail) 55%, #7d6853);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+}
+
+/* Halterungen der Stange */
+:root[data-look="theke"] .theke-rail::before,
+:root[data-look="theke"] .theke-rail::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  width: 9px;
+  height: 13px;
+  border-radius: 3px;
+  background: #6f5c4a;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+}
+
+:root[data-look="theke"] .theke-rail::before {
+  left: -3px;
+}
+
+:root[data-look="theke"] .theke-rail::after {
+  right: -3px;
+}
+
+:root[data-look="theke"] .theke-signs {
+  position: absolute;
+  left: clamp(34px, 4.6vw, 60px);
+  right: clamp(34px, 4.6vw, 60px);
+  top: calc(var(--theke-rail-y) + 3px);
+  display: flex;
+  gap: clamp(8px, 1.1vw, 14px);
+}
+
+:root[data-look="theke"] .theke-sign {
+  position: relative;
+  flex: none;
+  padding: var(--theke-string) 0 0;
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  outline: none;
+}
+
+/* die zwei Schnüre, an denen die Tafel hängt */
+:root[data-look="theke"] .theke-sign::before,
+:root[data-look="theke"] .theke-sign::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: calc(var(--theke-string) + 5px);
+  background: var(--theke-rail);
+  transition: height 0.18s ease;
+}
+
+:root[data-look="theke"] .theke-sign::before {
+  left: 16px;
+}
+
+:root[data-look="theke"] .theke-sign::after {
+  right: 16px;
+}
+
+:root[data-look="theke"] .theke-sign-board {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: var(--theke-sign-h);
+  padding: 0 clamp(10px, 1.2vw, 16px);
+  background: var(--theke-chalk);
+  color: var(--theke-chalk-text);
+  border: 3px solid var(--theke-wood);
+  border-radius: 6px;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.38);
+  font-family: "Fredoka", sans-serif;
+  font-size: clamp(14px, 1.3vw, 16.5px);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  rotate: -1.5deg;
+  transform-origin: 50% 0;
+  transition:
+    rotate 0.18s ease,
+    translate 0.18s ease,
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+:root[data-look="theke"] .theke-sign:nth-child(even) .theke-sign-board {
+  rotate: 1.5deg;
+}
+
+:root[data-look="theke"] .theke-sign:hover .theke-sign-board {
+  rotate: 0deg;
+  background: #2e4038;
+  color: #fff;
+}
+
+:root[data-look="theke"] .theke-sign:focus-visible .theke-sign-board {
+  outline: 2px solid var(--theke-fat);
+  outline-offset: 2px;
+}
+
+:root[data-look="theke"] .theke-sign.is-active .theke-sign-board {
+  background: var(--accent);
+  color: var(--theke-on-accent, #fff);
+  border-color: var(--theke-fat);
+  rotate: 0deg;
+  translate: 0 var(--theke-sign-drop);
+}
+
+:root[data-look="theke"] .theke-sign.is-active::before,
+:root[data-look="theke"] .theke-sign.is-active::after {
+  height: calc(var(--theke-string) + 5px + var(--theke-sign-drop));
+}
+
+:root[data-look="theke"] .theke-sign-icon {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-look="theke"] .theke-sign-board,
+  :root[data-look="theke"] .theke-sign::before,
+  :root[data-look="theke"] .theke-sign::after {
+    transition: none;
+  }
+}
+
+/* ───────────────────────── 4 Startseite ───────────────────────── */
+
+:root[data-look="theke"] .theke-play {
+  --theke-counter: 176px;
+  --theke-rig-scale: 0.94;
+  --theke-stamp-size: 148px;
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  color: var(--theke-pepper);
+}
+
+@media (max-height: 720px) {
+  :root[data-look="theke"] .theke-play {
+    --theke-counter: 150px;
+    --theke-rig-scale: 0.84;
+    --theke-stamp-size: 128px;
+  }
+}
+
+/* hohes, aber schmales Fenster: mehr Theke, größere Figur */
+@media (min-height: 900px) and (max-width: 1499px) {
+  :root[data-look="theke"] .theke-play {
+    --theke-counter: 230px;
+    --theke-rig-scale: 1.15;
+    --theke-stamp-size: 160px;
+  }
+}
+
+/* großes Fenster (maximiert): die ganze Szene wächst mit, statt sich in einer Ecke zu verlieren */
+@media (min-width: 1500px) and (min-height: 880px) {
+  :root[data-look="theke"] .theke-play {
+    zoom: 1.2;
+  }
+}
+
+@media (min-width: 1760px) and (min-height: 1000px) {
+  :root[data-look="theke"] .theke-play {
+    zoom: 1.4;
+  }
+}
+
+@media (min-width: 2300px) and (min-height: 1300px) {
+  :root[data-look="theke"] .theke-play {
+    zoom: 1.8;
+  }
+}
+
+/* Theke: Holzkorpus mit heller Kante, darüber ein Streifen Glas */
+:root[data-look="theke"] .theke-counter {
+  position: absolute;
+  z-index: 0;
+  left: clamp(14px, 3vw, 40px);
+  right: clamp(14px, 3vw, 40px);
+  bottom: 0;
+  height: var(--theke-counter);
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.12) 0 2px, transparent 2px 220px),
+    linear-gradient(180deg, var(--theke-wood), var(--theke-wood-dark));
+  border-top: 8px solid var(--theke-wood-light);
+  box-shadow: 0 -10px 24px -8px rgba(0, 0, 0, 0.45);
+}
+
+:root[data-look="theke"] .theke-glass {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 34px;
+  margin-bottom: 8px;
+  background: linear-gradient(180deg, rgba(220, 235, 240, 0.24), rgba(220, 235, 240, 0.05));
+  border-top: 2px solid rgba(255, 255, 255, 0.4);
+}
+
+/* Spielfigur auf dem Schneidebrett */
+:root[data-look="theke"] .theke-stage {
+  position: absolute;
+  z-index: 3;
+  right: clamp(60px, 11.5vw, 150px);
+  bottom: calc(var(--theke-counter) - 16px);
+  width: clamp(280px, 30vw, 380px);
+  height: 0;
+}
+
+:root[data-look="theke"] .theke-board {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 58px;
+  border-radius: 34px;
+  background: var(--theke-board);
+  box-shadow:
+    inset 0 -10px 0 var(--theke-board-dark),
+    0 9px 0 rgba(0, 0, 0, 0.28);
+}
+
+:root[data-look="theke"] .theke-board-handle {
+  position: absolute;
+  right: -34px;
+  top: 16px;
+  width: 54px;
+  height: 22px;
+  border-radius: 11px;
+  background: var(--theke-board);
+  box-shadow: inset 0 -6px 0 var(--theke-board-dark);
+}
+
+:root[data-look="theke"] .theke-board-handle::after {
+  content: "";
+  position: absolute;
+  right: 8px;
+  top: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(61, 38, 25, 0.75);
+}
+
+/* drei Scheiben, flach aufs Brett gelegt */
+:root[data-look="theke"] .theke-slices {
+  position: absolute;
+  right: 6px;
+  bottom: 24px;
+  display: flex;
+  height: 24px;
+}
+
+:root[data-look="theke"] .theke-slices > svg {
+  flex: none;
+  margin-left: -8px;
+  transform: scaleY(0.46);
+  transform-origin: 50% 0;
+  filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.3));
+}
+
+:root[data-look="theke"] .theke-rig {
+  position: absolute;
+  z-index: 1;
+  left: 38%;
+  bottom: -14px;
+  width: 225px;
+  height: 450px;
+  margin-left: -112px;
+  transform: scale(var(--theke-rig-scale));
+  transform-origin: 50% 100%;
+  pointer-events: none;
+}
+
+:root[data-look="theke"] .theke-bubble {
+  position: absolute;
+  z-index: 6;
+  left: calc(38% + 62px * var(--theke-rig-scale));
+  bottom: calc(392px * var(--theke-rig-scale));
+  width: max-content;
+  max-width: 262px;
+  margin: 0;
+  padding: 9px 14px;
+  background: #fff;
+  color: var(--theke-pepper);
+  border-radius: 14px;
+  box-shadow: 0 5px 0 rgba(0, 0, 0, 0.28);
+  font-size: 15px;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+:root[data-look="theke"] .theke-bubble::after {
+  content: "";
+  position: absolute;
+  left: 26px;
+  bottom: -14px;
+  border: 8px solid transparent;
+  border-top-color: #fff;
+}
+
+@media (max-width: 1140px) {
+  :root[data-look="theke"] .theke-bubble {
+    max-width: 214px;
+  }
+
+  /* auf dem kürzeren Brett liegen nur zwei Scheiben, sonst steht die Figur darauf */
+  :root[data-look="theke"] .theke-slices > svg:first-child {
+    display: none;
+  }
+}
+
+/* Bogen Butterbrotpapier */
+:root[data-look="theke"] .theke-paper {
+  position: absolute;
+  z-index: 5;
+  left: clamp(26px, 5.2vw, 68px);
+  top: clamp(12px, 2.6vh, 24px);
+  width: min(560px, 46%);
+  padding: 22px 32px 22px;
+  background:
+    repeating-linear-gradient(0deg, rgba(43, 29, 26, 0.035) 0 1px, transparent 1px 26px),
+    var(--theke-paper);
+  border-radius: 4px;
+  box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.6);
+  rotate: -1deg;
+}
+
+/* Klebestreifen */
+:root[data-look="theke"] .theke-tape {
+  position: absolute;
+  left: 50%;
+  top: -13px;
+  width: 118px;
+  height: 26px;
+  translate: -50% 0;
+  rotate: 2deg;
+  background: rgba(243, 227, 211, 0.78);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+:root[data-look="theke"] .theke-hello {
+  margin: 0;
+  color: var(--theke-ink);
+  font-size: clamp(15px, 1.4vw, 18px);
+  line-height: 1.3;
+  letter-spacing: 0;
+}
+
+:root[data-look="theke"] .theke-title {
+  display: -webkit-box;
+  margin: 6px 0 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  color: var(--theke-pepper);
+  font-family: var(--theke-display);
+  font-size: clamp(38px, 4.2vw, 54px);
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: 0;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+:root[data-look="theke"] .theke-title[data-size="m"] {
+  font-size: clamp(32px, 3.5vw, 45px);
+}
+
+:root[data-look="theke"] .theke-title[data-size="l"] {
+  font-size: clamp(27px, 2.9vw, 37px);
+}
+
+:root[data-look="theke"] .theke-title[data-size="xl"] {
+  font-size: clamp(23px, 2.4vw, 30px);
+}
+
+:root[data-look="theke"] .theke-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin-top: 14px;
+}
+
+/* auf dem Papier dürfen die Preisschilder größer sein */
+:root[data-look="theke"] .theke-tags .look-label {
+  --theke-tag-tip: 11px;
+  padding: 6px 13px 6px 17px !important;
+  font-size: 15px;
+}
+
+:root[data-look="theke"] .theke-order {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  margin-top: 20px;
+}
+
+/* Stempel = Start-Knopf (MainLaunchButton, nur umgeformt) */
+:root[data-look="theke"] .theke-stamp {
+  --theke-stamp-fill: var(--accent);
+  --theke-stamp-edge: color-mix(in srgb, var(--accent) 60%, black);
+  position: relative;
+  flex: none;
+  width: var(--theke-stamp-size);
+  height: var(--theke-stamp-size);
+  margin: 8px 6px 16px 8px;
+}
+
+:root[data-look="theke"] .theke-stamp .look-play,
+:root[data-look="theke"] .theke-stamp .look-play > div,
+:root[data-look="theke"] .theke-stamp .look-play > div > div {
+  position: static;
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none !important;
+}
+
+:root[data-look="theke"] .theke-stamp .look-play .look-btn {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  padding: 0 !important;
+  background-color: var(--theke-stamp-fill) !important;
+  color: var(--theke-on-accent, #fff) !important;
+  border: 4px dashed rgba(255, 255, 255, 0.58) !important;
+  border-radius: 50% !important;
+  box-shadow:
+    0 0 0 6px var(--theke-stamp-fill),
+    0 8px 0 6px var(--theke-stamp-edge),
+    0 22px 28px -6px rgba(0, 0, 0, 0.55) !important;
+  rotate: -8deg;
+  transition:
+    rotate 0.18s ease,
+    filter 0.15s ease,
+    translate 0.1s ease,
+    box-shadow 0.1s ease !important;
+}
+
+:root[data-look="theke"] .theke-stamp .look-play .look-btn:hover:not(:disabled) {
+  rotate: -4deg;
+  filter: brightness(1.08);
+}
+
+:root[data-look="theke"] .theke-stamp .look-play .look-btn:active:not(:disabled) {
+  translate: 0 4px;
+  box-shadow:
+    0 0 0 6px var(--theke-stamp-fill),
+    0 4px 0 6px var(--theke-stamp-edge),
+    0 12px 18px -6px rgba(0, 0, 0, 0.55) !important;
+}
+
+/* läuft das Spiel, wird aus dem Stempel ein dunkler „Stoppen“-Stempel */
+:root[data-look="theke"] .theke-stamp .look-play .look-btn--destructive {
+  --theke-stamp-fill: var(--theke-pepper);
+  --theke-stamp-edge: #120b09;
+  color: var(--theke-fat) !important;
+  border-color: rgba(243, 227, 211, 0.5) !important;
+}
+
+:root[data-look="theke"] .theke-stamp .look-play .look-btn > span {
+  display: block;
+  width: 100%;
+}
+
+:root[data-look="theke"] .theke-stamp .look-play .look-btn > span > div {
+  flex-direction: column;
+  gap: 0;
+}
+
+/* das runde Symbol vor dem Text braucht der Stempel nicht */
+:root[data-look="theke"] .theke-stamp .look-play .look-btn > span > div > span:first-child {
+  display: none;
+}
+
+:root[data-look="theke"] .theke-stamp .look-play .look-btn > span > div > div {
+  align-items: center;
+  gap: 5px;
+  text-align: center;
+}
+
+:root[data-look="theke"] .theke-stamp .look-play .look-btn > span > div > div > span:first-child {
+  font-family: var(--theke-display);
+  font-size: calc(var(--theke-stamp-size) * 0.165);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+:root[data-look="theke"] .theke-stamp .look-play .look-btn > span > div > div > span:nth-child(2) {
+  display: -webkit-box;
+  max-width: calc(var(--theke-stamp-size) * 0.74) !important;
+  overflow: hidden;
+  font-family: "Fredoka", sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.15;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  opacity: 0.92;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+:root[data-look="theke"] .theke-stamp .look-play .look-btn .text-red-400 {
+  padding: 2px 6px;
+  background: var(--theke-pepper);
+  color: #ffc2b5 !important;
+  border-radius: 6px;
+}
+
+:root[data-look="theke"] .theke-stamp .look-play .look-btn .text-green-400 {
+  color: #d9ffd0 !important;
+}
+
+/* Profil wechseln: kleiner cremefarbener Aufkleber am Stempelrand */
+:root[data-look="theke"] .theke-stamp .look-play button:not(.look-btn) {
+  position: absolute;
+  right: -12px;
+  bottom: -12px;
+  width: 42px !important;
+  height: 42px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background-color: var(--theke-fat) !important;
+  color: var(--theke-pepper) !important;
+  border: 2px solid var(--theke-pepper) !important;
+  border-radius: 50% !important;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.5) !important;
+  transition:
+    translate 0.1s ease,
+    background-color 0.15s ease !important;
+}
+
+:root[data-look="theke"] .theke-stamp .look-play button:not(.look-btn):hover:not(:disabled) {
+  background-color: #fff !important;
+}
+
+:root[data-look="theke"] .theke-stamp .look-play button:not(.look-btn):active:not(:disabled) {
+  translate: 0 2px;
+}
+
+/* ohne Profil: derselbe Stempel führt zum ersten Profil */
+:root[data-look="theke"] .theke-stamp-create {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--theke-stamp-size);
+  height: var(--theke-stamp-size);
+  margin: 8px 6px 16px 8px;
+  padding: 0 14px;
+  background: var(--accent);
+  color: var(--theke-on-accent, #fff);
+  border: 4px dashed rgba(255, 255, 255, 0.58);
+  border-radius: 50% !important;
+  box-shadow:
+    0 0 0 6px var(--accent),
+    0 8px 0 6px color-mix(in srgb, var(--accent) 60%, black),
+    0 22px 28px -6px rgba(0, 0, 0, 0.55);
+  font-family: var(--theke-display);
+  font-size: 19px;
+  line-height: 1.1;
+  text-align: center;
+  rotate: -8deg;
+  cursor: pointer;
+  transition:
+    rotate 0.18s ease,
+    filter 0.15s ease,
+    translate 0.1s ease;
+}
+
+:root[data-look="theke"] .theke-stamp-create:hover {
+  rotate: -4deg;
+  filter: brightness(1.08);
+}
+
+:root[data-look="theke"] .theke-stamp-create:active {
+  translate: 0 4px;
+}
+
+/* „Heute im Angebot“ */
+:root[data-look="theke"] .theke-offers {
+  min-width: 0;
+  margin: 0;
+  color: #6a4a3a;
+  font-size: clamp(14px, 1.25vw, 16px);
+  line-height: 1.6;
+  letter-spacing: 0;
+}
+
+:root[data-look="theke"] .theke-offers-title {
+  margin: 0;
+  line-height: 1.6;
+}
+
+:root[data-look="theke"] .theke-offers ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+:root[data-look="theke"] .theke-offers li button {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  overflow: hidden;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  text-decoration: underline transparent;
+  text-underline-offset: 3px;
+  transition: text-decoration-color 0.15s ease;
+}
+
+:root[data-look="theke"] .theke-offers li button:hover,
+:root[data-look="theke"] .theke-offers li button:focus-visible {
+  outline: none;
+  text-decoration-color: var(--theke-red);
+}
+
+:root[data-look="theke"] .theke-offers b {
+  color: var(--theke-pepper);
+  font-weight: 600;
+}
+
+/* Zuletzt gespielt: Papier-Etiketten in der Theke */
+:root[data-look="theke"] .theke-shelf {
+  position: absolute;
+  z-index: 2;
+  left: clamp(34px, 6.2vw, 80px);
+  right: 250px;
+  bottom: clamp(16px, 3.4vh, 28px);
+}
+
+:root[data-look="theke"] .theke-shelf-title {
+  margin: 0 0 10px;
+  color: var(--theke-fat);
+  font-family: "Fredoka", sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0;
+  opacity: 0.8;
+}
+
+:root[data-look="theke"] .theke-shelf-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  height: 64px;
+  overflow: hidden;
+  padding-bottom: 8px;
+}
+
+:root[data-look="theke"] .theke-recent {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: clamp(168px, 16.5vw, 212px);
+  height: 56px;
+  padding: 0 14px;
+  background: var(--theke-paper);
+  color: var(--theke-pepper);
+  border: 0;
+  border-radius: 6px !important;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.3);
+  text-align: left;
+  rotate: -1deg;
+  cursor: pointer;
+  transition:
+    rotate 0.18s ease,
+    translate 0.15s ease,
+    background-color 0.15s ease;
+}
+
+:root[data-look="theke"] .theke-recent:nth-child(even) {
+  rotate: 1.2deg;
+}
+
+:root[data-look="theke"] .theke-recent:hover,
+:root[data-look="theke"] .theke-recent:focus-visible {
+  outline: none;
+  rotate: 0deg;
+  translate: 0 -2px;
+  background: #fff8ea;
+}
+
+:root[data-look="theke"] .theke-recent:focus-visible,
+:root[data-look="theke"] .theke-stamp-create:focus-visible {
+  outline: 2px solid var(--theke-fat);
+  outline-offset: 3px;
+}
+
+:root[data-look="theke"] .theke-stamp .look-play button:focus-visible {
+  outline: 3px solid var(--theke-pepper);
+  outline-offset: 8px;
+}
+
+:root[data-look="theke"] .theke-recent b {
+  overflow: hidden;
+  font-family: var(--theke-display);
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:root[data-look="theke"] .theke-recent span {
+  overflow: hidden;
+  color: var(--theke-ink);
+  font-size: 12.5px;
+  line-height: 1.3;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:root[data-look="theke"] .theke-recent.is-active b {
+  padding-right: 14px;
+}
+
+/* das gewählte Profil trägt einen roten Punkt wie ein Preisaufkleber */
+:root[data-look="theke"] .theke-recent.is-active::after {
+  content: "";
+  position: absolute;
+  right: 9px;
+  top: 9px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px rgba(43, 29, 26, 0.18);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-look="theke"] .theke-stamp .look-play .look-btn,
+  :root[data-look="theke"] .theke-stamp-create,
+  :root[data-look="theke"] .theke-recent {
+    transition: none !important;
+  }
+}
+
+/* ─────────────────── 5 Gemeinsame Bausteine ─────────────────── */
+
+/* große Titel in der Schaufenster-Schrift */
+:root[data-look="theke"] :is(h1, h2).font-minecraft {
+  font-family: var(--theke-display);
+  letter-spacing: 0.02em;
+}
+
+:root[data-look="theke"]:not([data-font]) :is(h1, h2).font-minecraft,
+:root[data-look="theke"][data-font="salami"] :is(h1, h2).font-minecraft {
+  font-weight: 400;
+}
+
+/* Karten: dunkle Tafel mit Holzrand, leicht unregelmäßig geschnitten, harte Unterkante */
+:root[data-look="theke"] .look-card {
+  border-radius:
+    calc(var(--border-radius) * 1.15) calc(var(--border-radius) * 0.85) calc(var(--border-radius) * 1.2)
+    calc(var(--border-radius) * 0.9) / calc(var(--border-radius) * 0.9) calc(var(--border-radius) * 1.2)
+    calc(var(--border-radius) * 0.85) calc(var(--border-radius) * 1.15) !important;
+  border-width: 2px;
+  box-shadow: var(--look-kante-soft);
+}
+
+:root[data-look="theke"] .look-card[class*="hover:"]:hover {
+  box-shadow:
+    var(--look-kante-soft),
+    0 14px 22px -14px rgba(var(--accent-rgb), 0.75);
+}
+
+/* Etiketten: Preisschild mit spitzem Ende und Loch */
+:root[data-look="theke"] .look-label:not(.look-label--ghost) {
+  --theke-tag-fill: var(--theke-fat);
+  --theke-tag-edge: var(--theke-pepper);
+  --theke-tag-tip: 9px;
+  position: relative;
+  isolation: isolate;
+  padding-left: 13px !important;
+  background: none !important;
+  color: var(--theke-pepper) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.38));
+}
+
+:root[data-look="theke"] .look-label:not(.look-label--ghost).text-xs {
+  --theke-tag-tip: 7px;
+  padding-left: 10px !important;
+}
+
+:root[data-look="theke"] .look-label:not(.look-label--ghost)::before,
+:root[data-look="theke"] .look-label:not(.look-label--ghost)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background: var(--theke-tag-edge);
+  clip-path: polygon(var(--theke-tag-tip) 0, 100% 0, 100% 100%, var(--theke-tag-tip) 100%, 0 50%);
+  pointer-events: none;
+}
+
+:root[data-look="theke"] .look-label:not(.look-label--ghost)::after {
+  inset: 1.5px 1.5px 1.5px 2.5px;
+  z-index: -1;
+  background: var(--theke-tag-fill);
+}
+
+:root[data-look="theke"] .look-label--red:not(.look-label--ghost) {
+  --theke-tag-fill: var(--theke-red);
+  --theke-tag-edge: var(--theke-red-dark);
+  color: #fff !important;
+}
+
+:root[data-look="theke"] .look-label--red:not(.look-label--ghost) > span:first-child {
+  background: #fff !important;
+}
+
+:root[data-look="theke"] .look-label--fat:not(.look-label--ghost) > span:first-child {
+  background: var(--theke-pepper) !important;
+}
+
+/* ruhige Kennzeichen: kleine Kreidetafel */
+:root[data-look="theke"] .look-tag {
+  background-color: var(--theke-chalk) !important;
+  color: var(--theke-chalk-text) !important;
+  box-shadow: inset 0 0 0 1px rgba(233, 239, 230, 0.16);
+}
+
+/* Reiter: kleine Tafeln nebeneinander statt einer Leiste */
+:root[data-look="theke"] .look-tabs {
+  gap: 7px !important;
+  padding: 0 0 4px !important;
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+:root[data-look="theke"] :is(.look-tabs > button, [role="tablist"] > [role="tab"]) {
+  background-color: var(--theke-chalk) !important;
+  color: var(--theke-chalk-text);
+  border: 2px solid var(--theke-wood);
+  border-radius: 6px !important;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4) !important;
+}
+
+:root[data-look="theke"] :is(.look-tabs > button, [role="tablist"] > [role="tab"]):hover {
+  background-color: #2e4038 !important;
+  color: #fff;
+}
+
+:root[data-look="theke"]
+  :is(.look-tabs > button, [role="tablist"] > [role="tab"]):is([aria-selected="true"], [aria-pressed="true"]) {
+  background-color: var(--accent) !important;
+  color: var(--theke-on-accent);
+  border-color: var(--theke-fat);
+  translate: 0 2px;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Gruppen-Reiter der Profilseite (GroupTabs hat keinen eigenen Ansatzpunkt) */
+:root[data-look="theke"] .look-content .flex-wrap > button.rounded-lg.font-smallcaps.text-lg.border {
+  background-color: var(--theke-chalk);
+  color: var(--theke-chalk-text);
+  border: 2px solid var(--theke-wood);
+  border-radius: 6px;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
+}
+
+:root[data-look="theke"] .look-content .flex-wrap > button.rounded-lg.font-smallcaps.text-lg.border:hover {
+  background-color: #2e4038;
+  color: #fff;
+}
+
+:root[data-look="theke"]
+  .look-content
+  .flex-wrap
+  > button.rounded-lg.font-smallcaps.text-lg.border[style*="background-color"] {
+  border-color: var(--theke-fat) !important;
+  translate: 0 2px;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* Eingabefelder: vertiefte dunkle Mulde mit Holzrand */
+:root[data-look="theke"] .look-input {
+  background-color: rgba(20, 11, 9, 0.6) !important;
+  border-color: var(--theke-wood-light) !important;
+  box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.32) !important;
+}
+
+:root[data-look="theke"] .look-input:hover {
+  border-color: var(--theke-rail) !important;
+}
+
+:root[data-look="theke"] .look-input:focus-within,
+:root[data-look="theke"] .look-input:focus {
+  border-color: var(--accent) !important;
+}
+
+:root[data-look="theke"] .look-input.border-red-500 {
+  border-color: rgba(239, 68, 68, 0.75) !important;
+}
+
+/* Dialoge: Tafel mit Holzrand, obendrauf eine kleine Markise */
+:root[data-look="theke"] .look-modal {
+  border: 2px solid var(--theke-wood-light) !important;
+  box-shadow:
+    0 7px 0 rgba(0, 0, 0, 0.5),
+    0 34px 80px -20px rgba(0, 0, 0, 0.85) !important;
+}
+
+/* der Titel steht auf einem Streifen Butterbrotpapier */
+:root[data-look="theke"] .look-modal > div:nth-child(2) h2 {
+  padding: 4px 14px 3px;
+  background: var(--theke-paper);
+  color: var(--theke-pepper) !important;
+  border-radius: 3px;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+  rotate: -1deg;
+}
+
+/* Menüs */
+:root[data-look="theke"] .look-menu {
+  border: 2px solid var(--theke-wood-light) !important;
+  box-shadow:
+    0 5px 0 rgba(0, 0, 0, 0.45),
+    0 24px 50px -16px rgba(0, 0, 0, 0.8) !important;
+}
+
+/* Kopfband: schmal = Markisenstreifen mit Bogenkante; hoch (mit Text darauf) = rot mit Ton-in-Ton-Streifen */
+:root[data-look="theke"] .salami-fat-spots {
+  background-image: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.11) 0 22px, transparent 22px 44px) !important;
+  background-size: auto !important;
+}
+
+:root[data-look="theke"] .salami-fat-spots:is(.h-2\.5, .h-3) {
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--theke-red) 0 16px,
+    var(--theke-fat) 16px 32px
+  ) !important;
+  border-bottom: 0 !important;
+  overflow: visible;
+}
+
+:root[data-look="theke"] .salami-fat-spots:is(.h-2\.5, .h-3):not(.absolute) {
+  position: relative;
+  z-index: 1;
+}
+
+:root[data-look="theke"] .salami-fat-spots:is(.h-2\.5, .h-3)::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 6px;
+  background:
+    radial-gradient(circle at 8px 0, var(--theke-red) 6.5px, transparent 7.5px) 0 0 / 32px 6px repeat-x,
+    radial-gradient(circle at 24px 0, var(--theke-fat) 6.5px, transparent 7.5px) 0 0 / 32px 6px repeat-x;
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.28));
+  pointer-events: none;
+}
+
+/* ───────────────────────── 6 Seiten ───────────────────────── */
+
+/* Listenzeilen mit Trennlinie bleiben eckig (eine globale Regel rundet sonst jeden <button>) */
+:root[data-look="theke"] button.w-full.border-b {
+  border-radius: 0 !important;
+}
+
+/* Shop: die Vorschau-Karte links darf nicht schrumpfen – bei niedrigem Fenster rollt die Spalte */
+:root[data-look="theke"] .look-content aside.overflow-y-auto > .flex.flex-col.overflow-hidden.border {
+  flex-shrink: 0;
+}
+
+/*
+ * Dialoge, die eine Seite selbst öffnet, liegen in .look-content (z-10) und damit unter Leiste und
+ * Schildern (z-20) – die blieben über dem abgedunkelten Hintergrund hell stehen. Solange so eine
+ * Ebene offen ist, kommt der Inhalt nach vorn.
+ */
+:root[data-look="theke"] .look-content:has(.fixed.inset-0) {
+  z-index: 30;
+}
+
+/* Skins: die Figuren stehen wie auf der Startseite auf einem Schneidebrett statt auf der Salamischeibe */
+:root[data-look="theke"] .look-stage > div > * {
+  display: none;
+}
+
+:root[data-look="theke"] .look-stage > div::before {
+  content: "";
+  position: absolute;
+  left: 3%;
+  right: 3%;
+  top: 12%;
+  height: 58%;
+  border-radius: 999px;
+  background: var(--theke-board);
+  box-shadow:
+    inset 0 -7px 0 var(--theke-board-dark),
+    0 6px 0 rgba(0, 0, 0, 0.3);
+}
+
+/* eine Scheibe liegt mit auf dem Brett */
+:root[data-look="theke"] .look-stage > div::after {
+  content: "";
+  position: absolute;
+  right: 11%;
+  top: 22%;
+  width: 30px;
+  height: 13px;
+  border: 2px solid #6a2a20;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 24% 36%, var(--theke-fat) 0 1.5px, transparent 2.1px),
+    radial-gradient(circle at 58% 28%, var(--theke-fat) 0 1.2px, transparent 1.8px),
+    radial-gradient(circle at 44% 72%, var(--theke-fat) 0 1.4px, transparent 2px),
+    radial-gradient(circle at 78% 60%, var(--theke-fat) 0 1.2px, transparent 1.8px),
+    var(--theke-red);
+}

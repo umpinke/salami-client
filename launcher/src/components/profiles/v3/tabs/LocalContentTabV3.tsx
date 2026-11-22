@@ -45,7 +45,10 @@ import { SearchWithFilters } from "../../../ui/SearchWithFilters";
 import { ContentActionButtons, type ContentActionButton } from "../../../ui/ContentActionButtons";
 import type { DropdownOption } from "../../../ui/CustomDropdown";
 import { ContentTile } from "./local-content/ContentTile";
+import { LoadingSpinner } from "../../../ui/LoadingSpinner";
+import { SURFACE } from "../../../ui/design-system";
 import { NoriskPackSelector } from "./local-content/NoriskPackSelector";
+import { useLook } from "../../../../themes/looks/registry";
 
 // Pre-load der haeufig genutzten Iconify-Icons fuer schnelleres First-Paint
 preloadIcons([
@@ -114,7 +117,9 @@ export function LocalContentTabV3<T extends LocalContentItem>({
   emptyStateIconOverride,
   onRefreshRequired,
 }: LocalContentTabV3Props<T>) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // German capitalizes nouns ("Mods durchsuchen…"); other languages use the lowercase form in running text.
+  const typeInText = i18n.language === "de" ? itemTypeNamePlural : itemTypeNamePlural.toLowerCase();
 
   const manager = useLocalContentManager<T>({
     profile,
@@ -125,6 +130,8 @@ export function LocalContentTabV3<T extends LocalContentItem>({
 
   const accentColor = useThemeStore((s) => s.accentColor);
   const navigate = useNavigate();
+  const look = useLook();
+  const Tile = look.ContentItem ?? ContentTile;
   const { setActiveDropContext, registerRefreshCallback, unregisterRefreshCallback } = useAppDragDropStore();
 
   // Map LocalContentType → BackendContentType fuer den Drag-Drop-Store
@@ -392,7 +399,8 @@ export function LocalContentTabV3<T extends LocalContentItem>({
       id: "add",
       label: addContentButtonText,
       icon: "solar:add-circle-bold",
-      variant: "highlight" as const,
+      // Salami: die Hauptaktion der Liste als voller Knopf mit Kante
+      variant: "primary" as const,
       tooltip: addContentButtonText,
       onClick: handleAddClick,
     }] : []),
@@ -401,11 +409,11 @@ export function LocalContentTabV3<T extends LocalContentItem>({
   return (
     <div className="flex flex-col min-h-0 flex-1 relative">
       {/* ── Sticky Toolbar ─────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 px-5 py-2.5 border-b border-white/10 flex-shrink-0 bg-black/20 sticky top-0 z-10">
+      <div className="look-content-toolbar flex items-center gap-3 px-5 py-2.5 border-b flex-shrink-0 sticky top-0 z-10" style={{ borderColor: SURFACE.line }}>
         <SearchWithFilters
           searchValue={manager.searchQuery}
           onSearchChange={manager.setSearchQuery}
-          placeholder={t("profiles.v3.toolbar.searchPlaceholder", { type: itemTypeNamePlural.toLowerCase() })}
+          placeholder={t("profiles.v3.toolbar.searchPlaceholder", { type: typeInText })}
           sortOptions={sortDropdownOptions}
           sortValue={sortBy}
           onSortChange={(v) => setSortBy(v as SortKey)}
@@ -437,7 +445,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
       {/* ── Content area ───────────────────────────────────────────────── */}
       <div
         ref={setScrollParent}
-        className={`flex-1 min-h-0 overflow-y-auto p-5 ${manager.selectedItemIds.size > 0 ? "pb-24" : ""}`}
+        className={`look-content-scroll flex-1 min-h-0 overflow-y-auto p-5 ${manager.selectedItemIds.size > 0 ? "pb-24" : ""}`}
       >
         {manager.error && (
           <div className="mb-4 flex items-start gap-3 p-3 rounded-lg border border-rose-400/30 bg-rose-500/10">
@@ -447,7 +455,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
             </div>
             <button
               onClick={() => manager.fetchData(true)}
-              className="flex-shrink-0 h-7 px-2 rounded-md text-[10px] font-minecraft uppercase tracking-wider text-rose-100 hover:bg-rose-500/20 transition-colors"
+              className="flex-shrink-0 h-7 px-2 rounded-md text-xs font-minecraft text-rose-100 hover:bg-rose-500/20 transition-colors"
               title={t("profiles.v3.content.retry")}
             >
               {t("profiles.v3.content.retry")}
@@ -462,9 +470,8 @@ export function LocalContentTabV3<T extends LocalContentItem>({
           />
         ) : manager.isLoading && visibleItems.length === 0 ? (
           shouldShowLoadingSpinner ? (
-            <div className="flex items-center justify-center h-40 text-white/40 font-minecraft text-sm animate-in fade-in duration-300">
-              <Icon icon="svg-spinners:ring-resize" className="w-4 h-4 mr-2" />
-              {t("profiles.v3.content.loading")}
+            <div className="flex items-center justify-center h-40 animate-in fade-in duration-300">
+              <LoadingSpinner size="md" shadowDepth="none" message={t("profiles.v3.content.loading")} />
             </div>
           ) : (
             <div className="h-40" />
@@ -473,24 +480,24 @@ export function LocalContentTabV3<T extends LocalContentItem>({
           <EmptyStateV3
             icon={emptyStateIconOverride ?? "solar:widget-bold-duotone"}
             title={manager.searchQuery
-              ? t("profiles.v3.content.noMatch", { type: itemTypeNamePlural.toLowerCase(), query: manager.searchQuery })
-              : t("profiles.v3.content.noItems", { type: itemTypeNamePlural.toLowerCase() })}
+              ? t("profiles.v3.content.noMatch", { type: typeInText, query: manager.searchQuery })
+              : t("profiles.v3.content.noItems", { type: typeInText })}
             hint={canBrowse
-              ? t("profiles.v3.content.emptyHint", { cta: addContentButtonText, type: itemTypeNamePlural.toLowerCase() })
+              ? t("profiles.v3.content.emptyHint", { cta: addContentButtonText, type: typeInText })
               : undefined}
           />
         ) : (
           <VirtuosoGrid
             data={visibleItems}
             customScrollParent={scrollParent ?? undefined}
-            listClassName="grid grid-cols-1 lg:grid-cols-2 gap-3"
+            listClassName={look.contentListClassName ?? "grid grid-cols-1 lg:grid-cols-2 gap-3"}
             computeItemKey={(index, item) => `${index}:${tileKey(item)}`}
             itemContent={(_, item) => {
               const key = tileKey(item);
               const updateKey = getUpdateIdentifier(item);
               const updateAvailable = updateKey ? manager.contentUpdates[updateKey] ?? null : null;
               return (
-                <ContentTile
+                <Tile
                   key={key}
                   item={item}
                   displayName={getDisplayFileName(item)}

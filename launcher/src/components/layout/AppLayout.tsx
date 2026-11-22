@@ -7,7 +7,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { Icon } from "@iconify/react";
 
-import { TopNav, type TopNavItem } from ".././navigation/TopNav";
+import type { TopNavItem } from ".././navigation/TopNav";
 import { SalamiBackdrop } from "../effects/SalamiBackdrop";
 import { mixHex, SURFACE } from "../ui/design-system";
 import { Logo } from "../ui/Logo";
@@ -41,6 +41,7 @@ import { useClipsStore } from "../../store/clips-store";
 import { checkUpdateAvailable, downloadAndInstallUpdate } from "../../services/nrc-service";
 import type { UpdateInfo } from "../../types/updater";
 import { ProfileWizardV2Modal } from "../modals/ProfileWizardV2Modal";
+import { useLook } from "../../themes/looks/registry";
 import { ProfileSettingsModal } from "../modals/ProfileSettingsModal";
 import { SettingsModal } from "../modals/SettingsModal";
 import { ProfileDuplicateModal } from "../modals/ProfileDuplicateModal";
@@ -111,7 +112,9 @@ export function AppLayout({
   const { isBackgroundAnimationEnabled, accentColor: themeAccentColor, accentColor } = useThemeStore();
   const { isEnabled: isSnowEnabled } = useSnowEffectStore();
   const { selectedTheme, isThemeActive } = useLauncherTheme();
-  const getComplementaryBackground = () => mixHex("#0f0d0e", themeAccentColor.value, 0.04);
+  const look = useLook();
+  // Salami: warmes Pfefferbraun als Grund statt neutralem Schwarz
+  const getComplementaryBackground = () => mixHex("#15100e", themeAccentColor.value, 0.04);
 
   const getComplementaryBackgroundWithAlpha = (alpha: number) =>
     getComplementaryBackground().replace("rgb(", "rgba(").replace(")", `, ${alpha})`);
@@ -309,7 +312,7 @@ export function AppLayout({
   return (
     <div
       ref={launcherRef}
-      className="h-screen w-full border overflow-hidden relative flex flex-col"
+      className="look-shell h-screen w-full border overflow-hidden relative flex flex-col"
       style={{
         backgroundColor: isCustomMediaVisible ? getComplementaryBackgroundWithAlpha(0.55) : backgroundColor,
         borderColor: SURFACE.line,
@@ -318,7 +321,8 @@ export function AppLayout({
       {/* Hintergrund liegt unter Leiste und Inhalt – die Leiste ist kein eigener Kasten mehr */}
       <div className="absolute inset-0">
         <CustomMediaBackground activeTab={activeTab} />
-        {shouldShowEffects && renderBackgroundEffect()}
+        {shouldShowEffects && !look.ownsBackground && renderBackgroundEffect()}
+        {look.Backdrop && <look.Backdrop activeTab={activeTab} />}
         {/* Snow overlay - independent of theme/background */}
         {shouldShowEffects && isSnowEnabled && <Snowfall />}
         {shouldShowEffects && selectedTheme?.id === SALAMI_THEME_ID && <SalamiFall />}
@@ -333,9 +337,21 @@ export function AppLayout({
         closeRef={closeRef}
       />
 
-      <div className="relative z-10 flex-1 overflow-hidden custom-scrollbar">
+      {look.navPlacement === "below-top" && (
+        <div className="look-nav-row relative z-20 flex-shrink-0">
+          <look.Nav items={navItems} activeItem={navItemFor(activeTab)} onItemClick={onNavChange} />
+        </div>
+      )}
+
+      <div className="look-content relative z-10 flex-1 overflow-hidden custom-scrollbar">
         {children}
       </div>
+
+      {look.navPlacement === "bottom" && (
+        <div className="look-nav-row relative z-20 flex-shrink-0">
+          <look.Nav items={navItems} activeItem={navItemFor(activeTab)} onItemClick={onNavChange} />
+        </div>
+      )}
 
       {/* Global Modals Portal */}
       <ProfileWizardV2Modal />
@@ -359,8 +375,16 @@ interface TopBarProps {
  * Leiste oben: Marke, Navigation als Reiter, Konto und Fenster-Knöpfe in einer Zeile –
  * statt NoRisks Seitenleiste mit eigener Kopfzeile.
  */
+/** Salami: Detailseiten (profilesv2/<id>, mods/<quelle>/<id>, sync-packs) markieren ihren Reiter mit. */
+function navItemFor(path: string): string {
+  const first = path.split("/")[0];
+  if (first === "profilesv2" || first === "sync-packs") return "profiles";
+  return first;
+}
+
 function TopBar({ items, activeTab, onNavChange, minimizeRef, maximizeRef, closeRef }: TopBarProps) {
   const { t } = useTranslation();
+  const look = useLook();
   const accentColor = useThemeStore((state) => state.accentColor);
   const [appVersion, setAppVersion] = useState<string | null>(null);
   const [availableUpdate, setAvailableUpdate] = useState<UpdateInfo | null>(null);
@@ -423,7 +447,7 @@ function TopBar({ items, activeTab, onNavChange, minimizeRef, maximizeRef, close
 
   return (
     <header
-      className="relative z-20 grid h-[60px] flex-shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(max-content,1fr)] items-center gap-3 pl-4 pr-2"
+      className="look-topbar relative z-20 grid h-[60px] flex-shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(max-content,1fr)] items-center gap-3 pl-4 pr-2"
       data-tauri-drag-region
     >
       <div className="flex min-w-0 items-center gap-2" data-tauri-drag-region>
@@ -459,7 +483,12 @@ function TopBar({ items, activeTab, onNavChange, minimizeRef, maximizeRef, close
         )}
       </div>
 
-      <TopNav items={items} activeItem={activeTab} onItemClick={onNavChange} />
+      {/* Salami: jeder Look bringt seine eigene Navigation mit – hier nur, wenn sie in die Leiste gehört */}
+      {look.navPlacement === "top" ? (
+        <look.Nav items={items} activeItem={navItemFor(activeTab)} onItemClick={onNavChange} />
+      ) : (
+        <div data-tauri-drag-region className="h-full" />
+      )}
 
       <div className="flex min-w-0 items-center justify-end gap-2" data-tauri-drag-region>
         <UserProfileBar />

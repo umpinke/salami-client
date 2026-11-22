@@ -25,6 +25,8 @@ import { useTranslation } from "react-i18next";
 import { usePinnedProfilesStore } from "../../store/usePinnedProfilesStore";
 import { useResolvedLoaderVersion } from "../../hooks/useResolvedLoaderVersion";
 import { loaderIconSrc } from "../../lib/loader-icons";
+import { SURFACE, hexAlpha, kopfband, mixHex } from "../ui/design-system";
+import { DeliLabel } from "../../themes/salami/SalamiStage";
 
 // Custom JSX component for tooltip content
 function StandardVersionTooltipContent() {
@@ -389,6 +391,348 @@ export function ProfileCardV2({
     },
   ];
 
+  const openContextMenuAt = (x: number, y: number) => {
+    if (openContextMenuId && openContextMenuId !== contextMenuId) {
+      setOpenContextMenuId(null);
+    }
+    setIsContextMenuOpen(true);
+    setOpenContextMenuId(contextMenuId);
+    setContextMenuPosition({ x, y });
+  };
+
+  // Salami: Kachel im Feinkost-Stil – Kopfband mit Salami-Muster, Etiketten, eigener Spielen-Knopf
+  if (layoutMode === "grid" && variant === "default") {
+    const loaderLabel =
+      profile.loader === "vanilla"
+        ? "Vanilla"
+        : `${(profile.loader ?? "").charAt(0).toUpperCase()}${(profile.loader ?? "").slice(1)}`;
+    return (
+      <div
+        className="look-card group relative flex cursor-pointer flex-col border transition-all duration-200"
+        style={{
+          backgroundColor: SURFACE.base,
+          borderColor: isHovered ? hexAlpha(accentColor.value, 0.55) : SURFACE.line,
+          borderRadius: "var(--border-radius)",
+          transform: isHovered ? "translateY(-2px)" : undefined,
+          boxShadow: isHovered ? `0 10px 24px -12px ${hexAlpha(accentColor.value, 0.6)}` : undefined,
+        }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onClick={(e) => {
+          const target = e.target as Element;
+          if (target.closest("button")) return;
+          if (onMods) onMods(profile);
+          else navigate(`/profilesv2/${profile.id}`);
+        }}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const cardRect = e.currentTarget.getBoundingClientRect();
+          openContextMenuAt(e.clientX - cardRect.left, e.clientY - cardRect.top);
+        }}
+      >
+        {/* Kopfband: Salami-Anschnitt */}
+        <div
+          className="salami-fat-spots relative h-16"
+          // eigene Rundung oben, seit die Karte nicht mehr abschneidet (sonst würde das „…“-Menü gekappt)
+          data-card-band
+          style={{
+            ...kopfband(),
+            borderTopLeftRadius: "calc(var(--border-radius) - 1px)",
+            borderTopRightRadius: "calc(var(--border-radius) - 1px)",
+          }}
+        >
+          {profile.is_standard_version && (
+            <Tooltip content={<StandardVersionTooltipContent />}>
+              <div className="absolute left-[92px] top-2.5 flex h-6 items-center gap-1 px-2 font-minecraft text-xs text-[#2b1d1a]" style={{ background: "#f3e3d3", borderRadius: 999 }}>
+                <Icon icon="solar:star-bold" className="h-3.5 w-3.5" />
+                Salami
+              </div>
+            </Tooltip>
+          )}
+          <div className="absolute right-2 top-2 z-20 flex gap-1">
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); togglePin(profile.id); }}
+              className={`flex h-7 w-7 items-center justify-center bg-black/30 transition-colors hover:bg-black/50 ${pinned ? "text-white" : "text-white/60 hover:text-white"}`}
+              style={{ borderRadius: "calc(var(--border-radius) * 0.6)" }}
+              title={pinned ? t('profiles.card.unpin') : t('profiles.card.pin')}
+              data-action="pin"
+            >
+              <Icon icon={pinned ? "solar:pin-bold" : "solar:pin-bold-duotone"} className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              ref={settingsButtonRef}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (isContextMenuOpen) {
+                  setIsContextMenuOpen(false);
+                  setOpenContextMenuId(null);
+                  return;
+                }
+                const buttonRect = e.currentTarget.getBoundingClientRect();
+                const cardRect = e.currentTarget.closest(".group")?.getBoundingClientRect();
+                if (cardRect) openContextMenuAt(buttonRect.right - cardRect.left - 200, buttonRect.bottom - cardRect.top + 4);
+              }}
+              className="flex h-7 w-7 items-center justify-center bg-black/30 text-white/70 transition-colors hover:bg-black/50 hover:text-white"
+              style={{ borderRadius: "calc(var(--border-radius) * 0.6)" }}
+              title={t('profiles.profileOptions')}
+              data-action="settings"
+            >
+              <Icon icon="solar:menu-dots-bold" className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Profilbild ragt ins Kopfband */}
+        <div
+          className="absolute left-4 top-7 z-10 h-16 w-16 overflow-hidden border-[3px]"
+          style={{ borderColor: "#f3e3d3", backgroundColor: SURFACE.solid, borderRadius: "calc(var(--border-radius) * 0.8)" }}
+        >
+          <ProfileIconV2 profile={profile} size="lg" className="h-full w-full" />
+        </div>
+
+        <div className="flex flex-1 flex-col gap-2.5 px-4 pb-4 pt-9">
+          <h3
+            className="truncate font-minecraft text-xl normal-case leading-tight text-white"
+            title={profile.name}
+          >
+            <span dangerouslySetInnerHTML={{ __html: parseMotdToHtml(profile.name) }} />
+          </h3>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <DeliLabel size="sm">{profile.game_version}</DeliLabel>
+            <DeliLabel size="sm" tone="red">{loaderLabel}</DeliLabel>
+            {preferredAccount && (
+              <span className="flex items-center gap-1 text-xs text-white/55">
+                {preferredAccountAvatarUrl && (
+                  <img src={preferredAccountAvatarUrl} alt="" className="h-4 w-4 rounded-sm" style={{ imageRendering: "pixelated" }} />
+                )}
+                {preferredAccount.username}
+              </span>
+            )}
+          </div>
+          <div className="mt-auto flex items-center justify-between gap-3 pt-1">
+            <span className="min-w-0 truncate text-xs text-white/45">
+              {isLaunching ? (statusMessage || t('profiles.card.starting')) : formatLastPlayed(profile.last_played)}
+            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (onPlay) onPlay(profile);
+                else handleLaunch();
+              }}
+              className="look-btn look-btn--primary flex h-9 flex-shrink-0 items-center gap-1.5 px-4 font-minecraft text-base text-white transition-[filter] hover:brightness-110"
+              style={{
+                backgroundColor: isLaunching ? "#7a2425" : accentColor.value,
+                borderRadius: "calc(var(--border-radius) * 0.8)",
+                boxShadow: `0 3px 0 ${mixHex(accentColor.value, "#000000", 0.45)}`,
+              }}
+              title={isLaunching ? t('profiles.stopPlaying') : t('profiles.startPlaying')}
+            >
+              <Icon icon={isLaunching ? "solar:stop-bold" : "solar:play-bold"} className="h-4 w-4" />
+              {isLaunching ? t('profiles.stop') : t('profiles.play')}
+            </button>
+          </div>
+        </div>
+
+        <SettingsContextMenu
+          profile={profile}
+          isOpen={isContextMenuOpen}
+          position={contextMenuPosition}
+          items={contextMenuItems}
+          onClose={() => {
+            setIsContextMenuOpen(false);
+            setOpenContextMenuId(null);
+          }}
+          triggerButtonRef={settingsButtonRef}
+        />
+      </div>
+    );
+  }
+
+  // Salami: Liste und Kompakt im Feinkost-Stil – Zeile/kleine Kachel wie die Profil-Kachel
+  // (Creme-Rahmen ums Profilbild, Etiketten, eigener Spielen-Knopf mit harter Unterkante)
+  if (variant === "default" && (layoutMode === "list" || layoutMode === "compact")) {
+    const isCompact = layoutMode === "compact";
+    const loaderLabel =
+      profile.loader === "vanilla"
+        ? "Vanilla"
+        : `${(profile.loader ?? "").charAt(0).toUpperCase()}${(profile.loader ?? "").slice(1)}`;
+    const loaderVersion =
+      profile.loader !== "vanilla"
+        ? (resolvedLoaderVersion?.version || profile.loader_version || "").replace(/\s*\(stable\)\s*$/i, "")
+        : "";
+    const smallButton = `flex flex-shrink-0 items-center justify-center text-white/60 transition-colors hover:bg-white/10 hover:text-white ${isCompact ? "h-7 w-7" : "h-8 w-8"}`;
+    return (
+      <div
+        className={`group relative flex cursor-pointer items-center border transition-all duration-200 ${isCompact ? "gap-3 p-2.5" : "gap-4 p-3"}`}
+        style={{
+          backgroundColor: isHovered ? SURFACE.hover : SURFACE.base,
+          borderColor: isHovered ? hexAlpha(accentColor.value, 0.55) : SURFACE.line,
+          borderRadius: "var(--border-radius)",
+          transform: isHovered ? "translateY(-2px)" : undefined,
+          boxShadow: isHovered ? `0 10px 24px -14px ${hexAlpha(accentColor.value, 0.6)}` : undefined,
+        }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onClick={(e) => {
+          const target = e.target as Element;
+          if (target.closest("button")) return;
+          if (onMods) onMods(profile);
+          else navigate(`/profilesv2/${profile.id}`);
+        }}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const cardRect = e.currentTarget.getBoundingClientRect();
+          openContextMenuAt(e.clientX - cardRect.left, e.clientY - cardRect.top);
+        }}
+      >
+        <div className="relative flex-shrink-0">
+          <div
+            className={`overflow-hidden ${isCompact ? "h-12 w-12 border-2" : "h-14 w-14 border-[3px]"}`}
+            style={{ borderColor: "#f3e3d3", backgroundColor: SURFACE.solid, borderRadius: "calc(var(--border-radius) * 0.8)" }}
+          >
+            <ProfileIconV2 profile={profile} size="md" className="h-full w-full" />
+          </div>
+          {profile.is_standard_version && (
+            <div className="absolute -right-1.5 -top-1.5 z-10">
+              <Tooltip content={<StandardVersionTooltipContent />}>
+                <div
+                  className="flex h-5 w-5 items-center justify-center text-[#2b1d1a]"
+                  style={{ background: "#f3e3d3", borderRadius: 999, boxShadow: "0 2px 0 rgba(0,0,0,0.35)" }}
+                >
+                  <Icon icon="solar:star-bold" className="h-3 w-3" />
+                </div>
+              </Tooltip>
+            </div>
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <h3
+              className={`truncate font-minecraft normal-case leading-tight text-white ${isCompact ? "text-base" : "text-lg"}`}
+              title={profile.name}
+            >
+              <span dangerouslySetInnerHTML={{ __html: parseMotdToHtml(profile.name) }} />
+            </h3>
+            {isCompact && (pinned || isHovered) && (
+              <button
+                type="button"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); togglePin(profile.id); }}
+                className={`flex-shrink-0 transition-colors ${pinned ? "text-white" : "text-white/40 hover:text-white"}`}
+                title={pinned ? t('profiles.card.unpin') : t('profiles.card.pin')}
+                data-action="pin"
+              >
+                <Icon icon={pinned ? "solar:pin-bold" : "solar:pin-bold-duotone"} className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="mt-1.5 flex min-w-0 items-center gap-1.5">
+            {isLaunching ? (
+              <span className="truncate text-xs text-white/55">{statusMessage || t('profiles.card.starting')}</span>
+            ) : (
+              <>
+                <DeliLabel size="sm">{profile.game_version}</DeliLabel>
+                {!isCompact && (
+                  <DeliLabel size="sm" tone="red">
+                    {loaderLabel}{loaderVersion ? ` ${loaderVersion}` : ""}
+                  </DeliLabel>
+                )}
+                <span className="min-w-0 truncate text-xs text-white/45">{formatLastPlayed(profile.last_played)}</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {!isCompact && preferredAccount && (
+          <Tooltip content={t('profiles.launchWith', { account: preferredAccount.username })}>
+            <span className="flex flex-shrink-0 items-center gap-1.5 text-sm text-white/55">
+              {preferredAccountAvatarUrl && (
+                <img src={preferredAccountAvatarUrl} alt="" className="h-5 w-5 rounded-sm" style={{ imageRendering: "pixelated" }} />
+              )}
+              <span className="max-w-[120px] truncate">{preferredAccount.username}</span>
+            </span>
+          </Tooltip>
+        )}
+
+        <div className={`flex flex-shrink-0 items-center gap-1 transition-opacity duration-150 ${isHovered || isContextMenuOpen || (!isCompact && pinned) ? "opacity-100" : "opacity-0"}`}>
+          {!isCompact && (
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); togglePin(profile.id); }}
+              className={`${smallButton} ${pinned ? "!text-white" : ""}`}
+              style={{ borderRadius: "calc(var(--border-radius) * 0.6)" }}
+              title={pinned ? t('profiles.card.unpin') : t('profiles.card.pin')}
+              data-action="pin"
+            >
+              <Icon icon={pinned ? "solar:pin-bold" : "solar:pin-bold-duotone"} className="h-4 w-4" />
+            </button>
+          )}
+          <button
+            type="button"
+            ref={settingsButtonRef}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (isContextMenuOpen) {
+                setIsContextMenuOpen(false);
+                setOpenContextMenuId(null);
+                return;
+              }
+              const buttonRect = e.currentTarget.getBoundingClientRect();
+              const cardRect = e.currentTarget.closest(".group")?.getBoundingClientRect();
+              if (cardRect) openContextMenuAt(buttonRect.right - cardRect.left - 200, buttonRect.bottom - cardRect.top + 4);
+            }}
+            className={smallButton}
+            style={{ borderRadius: "calc(var(--border-radius) * 0.6)" }}
+            title={t('profiles.profileOptions')}
+            data-action="settings"
+          >
+            <Icon icon="solar:menu-dots-bold" className="h-4 w-4" />
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (onPlay) onPlay(profile);
+            else handleLaunch();
+          }}
+          className={`flex flex-shrink-0 items-center justify-center gap-1.5 font-minecraft text-white transition-[filter,transform] hover:brightness-110 active:translate-y-px ${isCompact ? "h-9 w-9" : "h-10 px-4 text-base"}`}
+          style={{
+            backgroundColor: isLaunching ? "#7a2425" : accentColor.value,
+            borderRadius: "calc(var(--border-radius) * 0.8)",
+            boxShadow: `0 3px 0 ${mixHex(accentColor.value, "#000000", 0.45)}`,
+          }}
+          title={isLaunching ? t('profiles.stopPlaying') : t('profiles.startPlaying')}
+        >
+          <Icon icon={isLaunching ? "solar:stop-bold" : "solar:play-bold"} className="h-4 w-4" />
+          {!isCompact && (isLaunching ? t('profiles.stop') : t('profiles.play'))}
+        </button>
+
+        <SettingsContextMenu
+          profile={profile}
+          isOpen={isContextMenuOpen}
+          position={contextMenuPosition}
+          items={contextMenuItems}
+          onClose={() => {
+            setIsContextMenuOpen(false);
+            setOpenContextMenuId(null);
+          }}
+          triggerButtonRef={settingsButtonRef}
+        />
+      </div>
+    );
+  }
+
     // Grid layout (more compact, similar to ProfileCard.tsx)
   if (layoutMode === "grid" || layoutMode === "compact") {
     const isCompact = layoutMode === "compact";
@@ -511,7 +855,7 @@ export function ProfileCardV2({
           >
             <Icon icon="solar:box-bold" className={isCompact ? 'w-3 h-3' : 'w-4 h-4'} />
             {variant === "3d" && (
-              <span className={`font-minecraft ${isCompact ? 'text-xs' : 'text-sm'} uppercase`}>MODS</span>
+              <span className={`font-minecraft ${isCompact ? 'text-xs' : 'text-sm'}`}>{t('profiles.content.mods')}</span>
             )}
           </button>
         </div>
@@ -556,7 +900,7 @@ export function ProfileCardV2({
                 <button
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); togglePin(profile.id); }}
                   className={`flex-shrink-0 transition-all duration-200 ${pinned ? 'text-white' : 'text-white/40 hover:text-white'}`}
-                  title={pinned ? "Unpin" : "Pin to Top"}
+                  title={pinned ? t('profiles.card.unpin') : t('profiles.card.pin')}
                   data-action="pin"
                 >
                   <Icon icon={pinned ? "solar:pin-bold" : "solar:pin-bold-duotone"} className="w-4 h-4" />
@@ -634,7 +978,7 @@ export function ProfileCardV2({
                      <span>
                        {profile.loader === "vanilla" 
                          ? "Vanilla" 
-                         : `${resolvedLoaderVersion?.version || profile.loader_version || "Unknown"}`
+                         : `${resolvedLoaderVersion?.version || profile.loader_version || t('common.unknown')}`
                        }
                      </span>
                    </div>
@@ -741,7 +1085,7 @@ export function ProfileCardV2({
             <button
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); togglePin(profile.id); }}
               className={`flex-shrink-0 transition-all duration-200 ${pinned ? 'text-white' : 'text-white/40 hover:text-white'}`}
-              title={pinned ? "Unpin" : "Pin to Top"}
+              title={pinned ? t('profiles.card.unpin') : t('profiles.card.pin')}
               data-action="pin"
             >
               <Icon icon={pinned ? "solar:pin-bold" : "solar:pin-bold-duotone"} className="w-4 h-4" />

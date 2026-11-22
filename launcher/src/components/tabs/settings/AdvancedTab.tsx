@@ -13,6 +13,8 @@ import { openExternalUrl } from "../../../services/tauri-service";
 import { getAppVersion } from "../../../services/launcher-config-service";
 import { BRAND } from "../../../config/salami";
 import { useSettingsConfig, useSettingsKeywords } from "./settings-context";
+import { SURFACE } from "../../ui/design-system";
+import { SALAMI_COLORS } from "../../../themes/salami/salami-theme";
 
 export function AdvancedTab() {
   const { t } = useTranslation();
@@ -324,14 +326,18 @@ export function AdvancedTab() {
               </div>
             </div>
 
-            <div className="mt-6 p-4 rounded-lg border border-[#ffffff20] bg-black/10">
+            {/* Salami: Hinweis in Fett-Creme statt kaltem Blau */}
+            <div
+              className="mt-6 p-4 rounded-lg border"
+              style={{ backgroundColor: SURFACE.base, borderColor: SURFACE.line }}
+            >
               <div className="flex items-start gap-3">
-                <Icon icon="solar:info-circle-bold" className="w-6 h-6 text-blue-400 flex-shrink-0 mt-1" />
+                <Icon icon="solar:info-circle-bold" className="w-6 h-6 flex-shrink-0 mt-1" style={{ color: SALAMI_COLORS.fat }} />
                 <div>
-                  <h4 className="text-sm font-smallcaps text-blue-300 mb-2">
+                  <h4 className="text-sm font-minecraft normal-case tracking-normal text-white mb-2">
                     {t("settings.hooks.examples.title")}
                   </h4>
-                  <div className="space-y-2 text-sm text-blue-200/80 font-minecraft">
+                  <div className="space-y-2 text-sm text-white/70 font-minecraft">
                     <p><strong>Pre-Launch:</strong> <code>echo "Starting game..."</code></p>
                     <p><strong>Wrapper:</strong> <code>firejail</code> or <code>gamemoderun</code></p>
                     <p><strong>Post-Exit:</strong> <code>notify-send "Game finished"</code></p>

@@ -37,6 +37,13 @@ Der Shop im Launcher (Reiter Hüte, Buddys, Emotes, Mini Me) zeigt dieselben Kat
 `launcher/src/lib/skin3d/cosmetics.ts`. Auch er hat die Dateien als Notfall-Kopie. Kommt ein neues Feld
 ins Hut-, Buddy- oder Emote-Format, muss es an drei Stellen gelesen werden: Server, Mod und Launcher.
 
+## Launcher-Design
+
+Der Launcher hat einen eigenen Look („Feinkost“: Salami-Rot, Fett-Creme, Pfefferbraun, Theken-Etiketten,
+Salamischeibe als Motiv) statt des NoRisk-Aufbaus. Regeln und Bausteine stehen in
+`launcher/src/themes/salami/DESIGN.md` – neue Seiten und Komponenten daran ausrichten, keine kalten
+Grau-/Blauflächen und kein CSS-`lowercase` auf deutschen Texten.
+
 ## Versionsnummern bei Releases
 
 Jedes Release (alles, was ins Auto-Update geht) erhöht die Launcher-Version um genau **0.0.1** gegenüber

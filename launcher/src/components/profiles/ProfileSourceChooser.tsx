@@ -4,6 +4,8 @@ import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 
 import { useThemeStore } from "../../store/useThemeStore";
+import { FK_CARD_CLASS, fkCardStyle, fkPrimaryStyle } from "./v3/shared/feinkost";
+import { SALAMI_COLORS } from "../../themes/salami/salami-theme";
 
 export type ProfileSource = "blank" | "modpack" | "file" | "launcher";
 
@@ -27,23 +29,15 @@ export function ProfileSourceChooser({ onChoose, isBusy = false }: ProfileSource
       <button
         onClick={() => onChoose("blank")}
         disabled={isBusy}
-        className="flex w-full items-center gap-5 rounded-lg border-2 px-6 py-5 text-left transition-colors disabled:opacity-50"
-        style={{
-          borderColor: `${accentColor.value}80`,
-          backgroundColor: `${accentColor.value}12`,
-        }}
-        onMouseEnter={(event) => {
-          event.currentTarget.style.backgroundColor = `${accentColor.value}1f`;
-        }}
-        onMouseLeave={(event) => {
-          event.currentTarget.style.backgroundColor = `${accentColor.value}12`;
-        }}
+        className={`flex w-full items-center gap-5 px-6 py-5 text-left hover:-translate-y-0.5 disabled:opacity-50 ${FK_CARD_CLASS}`}
+        style={fkCardStyle(accentColor.value, false, true)}
       >
+        {/* Salami: Hauptweg als volle Akzentfläche mit harter Unterkante */}
         <div
-          className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-lg"
-          style={{ backgroundColor: `${accentColor.value}26` }}
+          className="flex h-14 w-14 flex-shrink-0 items-center justify-center"
+          style={{ ...fkPrimaryStyle(accentColor.value), borderRadius: "calc(var(--border-radius) * 0.8)" }}
         >
-          <Icon icon="solar:widget-add-bold" className="h-7 w-7" style={{ color: accentColor.value }} />
+          <Icon icon="solar:widget-add-bold" className="h-7 w-7" style={{ color: SALAMI_COLORS.fat }} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="font-minecraft text-xl normal-case text-white">
@@ -58,7 +52,7 @@ export function ProfileSourceChooser({ onChoose, isBusy = false }: ProfileSource
 
       <div className="flex items-center gap-3">
         <div className="h-px flex-1 bg-white/10" />
-        <span className="font-minecraft text-[10px] uppercase tracking-wider text-white/35">
+        <span className="font-minecraft text-xs text-white/45">
           {t("profiles.import.source_divider")}
         </span>
         <div className="h-px flex-1 bg-white/10" />
@@ -70,23 +64,12 @@ export function ProfileSourceChooser({ onChoose, isBusy = false }: ProfileSource
             key={source.id}
             onClick={() => onChoose(source.id)}
             disabled={isBusy}
-            className="group flex w-full items-center gap-4 rounded-lg border px-4 py-3 text-left transition-colors disabled:opacity-50"
-            style={{
-              borderColor: "rgba(255,255,255,0.1)",
-              backgroundColor: "rgba(255,255,255,0.02)",
-            }}
-            onMouseEnter={(event) => {
-              event.currentTarget.style.borderColor = `${accentColor.value}66`;
-              event.currentTarget.style.backgroundColor = `${accentColor.value}12`;
-            }}
-            onMouseLeave={(event) => {
-              event.currentTarget.style.borderColor = "rgba(255,255,255,0.1)";
-              event.currentTarget.style.backgroundColor = "rgba(255,255,255,0.02)";
-            }}
+            className={`group flex w-full items-center gap-4 px-4 py-3 text-left disabled:opacity-50 ${FK_CARD_CLASS}`}
+            style={fkCardStyle(accentColor.value)}
           >
             <Icon
               icon={source.icon}
-              className="h-5 w-5 flex-shrink-0 text-white/35 transition-colors group-hover:text-white"
+              className="h-5 w-5 flex-shrink-0 text-white/40 transition-colors group-hover:text-white"
             />
             <div className="min-w-0 flex-1">
               <div className="font-minecraft text-sm text-white/85">

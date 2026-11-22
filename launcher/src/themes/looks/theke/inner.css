@@ -1,0 +1,879 @@
+/*
+ * Look „Feinkost-Theke“ – Innenseiten: Profil (Produktkarte + Kassenbon, Zutatenliste) und
+ * Mod-Browser (Regale + Kreidetafel). Alles nur unter :root[data-look="theke"]. Siehe ../CONTRACT.md
+ */
+
+:root[data-look="theke"] {
+  --theke-paper-2: #efe2cc;
+  --theke-paper-sheet: #fffaf1;
+  --theke-paper-edge: #d9c7aa;
+  --theke-ink-strong: #3a2a24;
+  --theke-ink-soft: rgba(43, 29, 26, 0.62);
+  --theke-receipt: #fffdf8;
+}
+
+/* ═════════════════════════ Profil ═════════════════════════ */
+
+:root[data-look="theke"] .theke-profile {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px 22px 16px;
+  font-family: "Fredoka", sans-serif;
+}
+
+:root[data-look="theke"] .theke-back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--theke-fat);
+  opacity: 0.75;
+  transition: opacity 150ms;
+}
+:root[data-look="theke"] .theke-back:hover { opacity: 1; }
+
+:root[data-look="theke"] .theke-profile-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 22px;
+}
+
+/* ── Produktkarte ── */
+:root[data-look="theke"] .theke-card {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 20px 18px;
+  color: var(--theke-pepper);
+  background:
+    repeating-linear-gradient(0deg, rgba(43, 29, 26, 0.035) 0 1px, transparent 1px 24px),
+    var(--theke-paper);
+  border-radius: 3px;
+  box-shadow: 0 16px 36px -14px rgba(0, 0, 0, 0.7);
+}
+
+:root[data-look="theke"] .theke-tape {
+  position: absolute;
+  left: 50%;
+  top: -11px;
+  width: 112px;
+  height: 24px;
+  transform: translateX(-50%) rotate(2deg);
+  background: rgba(243, 227, 211, 0.75);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+}
+
+:root[data-look="theke"] .theke-card-head {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding-right: 4px;
+}
+
+/* Profilbild als rundes Siegel; das Loader-Abzeichen bleibt daran */
+:root[data-look="theke"] .theke-card-seal { flex-shrink: 0; position: relative; }
+:root[data-look="theke"] .theke-card-seal .look-profile-icon {
+  width: 80px !important;
+  height: 80px !important;
+  border-radius: 50% !important;
+  border: 4px solid var(--theke-pepper) !important;
+  box-shadow: 0 0 0 3px var(--theke-fat), 0 0 0 6px var(--theke-red);
+}
+
+:root[data-look="theke"] .theke-card-title { flex: 1; min-width: 0; }
+:root[data-look="theke"] .theke-card-title h1 {
+  font-family: var(--theke-display);
+  font-size: 36px;
+  line-height: 1.05;
+  color: var(--theke-pepper);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-look="theke"] .theke-card-chips {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+/* Etiketten auf Papier: dunkler Rand, damit Creme auf Creme lesbar bleibt */
+:root[data-look="theke"] .theke-card-chips .look-label {
+  box-shadow: 0 0 0 2px var(--theke-pepper) !important;
+}
+:root[data-look="theke"] .theke-card-chips .look-label--ghost {
+  color: var(--theke-ink-soft) !important;
+  box-shadow: none !important;
+  border: 2px dashed rgba(43, 29, 26, 0.4) !important;
+  background: transparent !important;
+}
+:root[data-look="theke"] .theke-card-chips > span,
+:root[data-look="theke"] .theke-card-chips .text-white\/60 { color: var(--theke-ink-soft) !important; }
+
+/* Stempel zum Starten */
+:root[data-look="theke"] .theke-card-stamp {
+  flex-shrink: 0;
+  width: 112px;
+  height: 112px;
+  margin: -4px 6px 0 0;
+  border-radius: 50% !important;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  color: #fff;
+  background: var(--theke-red);
+  border: 3px dashed rgba(255, 255, 255, 0.6);
+  box-shadow:
+    0 0 0 5px var(--theke-red),
+    0 7px 0 5px var(--theke-red-dark),
+    0 16px 26px rgba(0, 0, 0, 0.4);
+  transform: rotate(-8deg);
+  transition: transform 150ms, filter 150ms, box-shadow 150ms;
+}
+:root[data-look="theke"] .theke-card-stamp:hover { filter: brightness(1.08); transform: rotate(-4deg) scale(1.03); }
+:root[data-look="theke"] .theke-card-stamp:active {
+  transform: rotate(-4deg) translateY(4px);
+  box-shadow: 0 0 0 5px var(--theke-red), 0 3px 0 5px var(--theke-red-dark), 0 8px 14px rgba(0, 0, 0, 0.35);
+}
+:root[data-look="theke"] .theke-card-stamp[data-running] {
+  background: var(--theke-pepper);
+  box-shadow: 0 0 0 5px var(--theke-pepper), 0 7px 0 5px #120b09, 0 16px 26px rgba(0, 0, 0, 0.4);
+}
+:root[data-look="theke"] .theke-card-stamp-label {
+  font-family: var(--theke-display);
+  font-size: 20px;
+  line-height: 1;
+}
+:root[data-look="theke"] .theke-card-stamp small {
+  display: block;
+  margin-top: 4px;
+  font-size: 10.5px;
+  line-height: 1.1;
+  opacity: 0.85;
+  padding: 0 10px;
+}
+
+/* ── Karteireiter ── */
+:root[data-look="theke"] .theke-dividers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 4px 4px;
+  margin-top: 18px;
+  padding-left: 6px;
+}
+:root[data-look="theke"] .theke-dividers > .theke-divider {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 13px 8px;
+  font-size: 13.5px;
+  color: var(--theke-ink) !important;
+  background: var(--theke-paper-2) !important;
+  border: 2px solid var(--theke-paper-edge) !important;
+  border-bottom: 0 !important;
+  border-radius: 10px 10px 0 0 !important;
+  box-shadow: none !important;
+  translate: none;
+  transition: background-color 150ms, color 150ms;
+}
+:root[data-look="theke"] .theke-dividers > .theke-divider:hover { color: var(--theke-pepper) !important; background: #f6ecdc !important; }
+:root[data-look="theke"] .theke-dividers > .theke-divider b {
+  font-family: var(--theke-display);
+  font-weight: normal;
+  color: var(--theke-ink-strong);
+}
+:root[data-look="theke"] .theke-dividers > .theke-divider[data-group="world"] { background: #e6dcc6 !important; }
+:root[data-look="theke"] .theke-dividers > .theke-divider[aria-selected="true"] {
+  color: var(--theke-pepper) !important;
+  background: var(--theke-paper-sheet) !important;
+  border-color: var(--theke-red) !important;
+  border-top-width: 4px !important;
+  translate: 0 2px;
+}
+
+/* ── Bogen mit dem Inhalt ── */
+:root[data-look="theke"] .theke-sheet {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 0 6px 6px 6px;
+  overflow: hidden;
+}
+:root[data-look="theke"] .theke-sheet-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+:root[data-look="theke"] .theke-sheet-content > * { flex: 1; min-height: 0; }
+
+:root[data-look="theke"] .theke-sheet-title {
+  margin: 12px 20px 0;
+  padding-bottom: 6px;
+  font-family: var(--theke-display);
+  font-weight: normal;
+  font-size: 20px;
+  color: var(--theke-pepper);
+  border-bottom: 2px solid var(--theke-pepper);
+}
+
+/* Papier: die gemeinsamen Bausteine sind für dunkle Flächen gebaut – hier Tinte statt Weiß */
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) {
+  background: var(--theke-paper-sheet);
+  border: 2px solid var(--theke-paper-edge);
+  color: var(--theke-pepper);
+  --surface-base: rgba(43, 29, 26, 0.04);
+  --surface-hover: rgba(43, 29, 26, 0.08);
+  --surface-raised: rgba(43, 29, 26, 0.12);
+  --surface-line: rgba(43, 29, 26, 0.16);
+  --surface-line-strong: rgba(43, 29, 26, 0.32);
+  --surface-solid: #f6ecdc;
+  --surface-solid-raised: #efe2cc;
+}
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) [class*="text-white"] { color: var(--theke-pepper) !important; }
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) [class*="text-white/"] { color: var(--theke-ink-soft) !important; }
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) [class*="placeholder-white"]::placeholder,
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) [class*="placeholder:text-white"]::placeholder { color: rgba(43, 29, 26, 0.45) !important; }
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) [class*="bg-white/"] { background-color: rgba(43, 29, 26, 0.06) !important; }
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) [class*="border-white/"] { border-color: rgba(43, 29, 26, 0.18) !important; }
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) [class*="bg-black/"] { background-color: rgba(43, 29, 26, 0.08) !important; }
+/* inline gesetzte Weißtöne (z. B. die Schiene ausgeschalteter Schalter) */
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) [style*="background-color: rgba(255, 255, 255"] { background-color: rgba(43, 29, 26, 0.3) !important; }
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) [style*="color: rgba(255, 255, 255"]:not([style*="background-color: rgba(255, 255, 255"]) { color: var(--theke-ink-soft) !important; }
+/* volle Knöpfe behalten weiße Schrift */
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) :is(.look-btn--primary, .look-btn--accent, .look-btn--destructive, .look-btn--danger, .look-btn--active),
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) :is(.look-btn--primary, .look-btn--accent, .look-btn--destructive, .look-btn--danger, .look-btn--active) * {
+  color: #fff !important;
+}
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) .look-input {
+  background: transparent !important;
+  border: 0 !important;
+  border-bottom: 2px dashed rgba(43, 29, 26, 0.35) !important;
+  border-radius: 0 !important;
+}
+:root[data-look="theke"] .theke-sheet--paper .look-content-toolbar {
+  background: transparent;
+  border-color: transparent !important;
+  padding-top: 8px;
+  padding-bottom: 4px;
+}
+
+/* Tafel: Screenshots und Logs */
+:root[data-look="theke"] .theke-sheet--slate {
+  background: var(--theke-chalk);
+  border: 8px solid var(--theke-wood);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.45);
+  color: var(--theke-chalk-text);
+}
+
+/* ── Zutatenliste ── */
+:root[data-look="theke"] .theke-line {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 30px;
+  padding: 0 4px 0 2px;
+  font-size: 14.5px;
+  color: var(--theke-pepper);
+  border-radius: 4px;
+  transition: background-color 120ms;
+}
+:root[data-look="theke"] .theke-line:hover,
+:root[data-look="theke"] .theke-line[data-selected] { background: rgba(178, 58, 58, 0.07); }
+:root[data-look="theke"] .theke-line[data-selected] { box-shadow: inset 3px 0 0 var(--theke-red); }
+
+:root[data-look="theke"] .theke-tick {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: var(--theke-red);
+  box-shadow: 0 0 0 2px var(--theke-red-dark);
+  transition: transform 120ms, background-color 120ms;
+}
+:root[data-look="theke"] .theke-tick:hover:not(:disabled) { transform: scale(1.12); }
+:root[data-look="theke"] .theke-line[data-off] .theke-tick {
+  background: transparent;
+  box-shadow: none;
+  border: 2px dashed rgba(43, 29, 26, 0.45);
+  color: var(--theke-ink);
+}
+
+:root[data-look="theke"] .theke-line-name {
+  min-width: 0;
+  flex-shrink: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  color: var(--theke-pepper);
+}
+:root[data-look="theke"] button.theke-line-name:hover { text-decoration: underline; text-decoration-color: rgba(43, 29, 26, 0.35); }
+:root[data-look="theke"] .theke-line[data-off] .theke-line-name {
+  color: var(--theke-ink);
+  text-decoration: line-through;
+  text-decoration-color: var(--theke-red);
+  text-decoration-thickness: 2px;
+}
+:root[data-look="theke"] .theke-line-mark { flex-shrink: 0; color: var(--theke-ink); opacity: 0.7; }
+
+:root[data-look="theke"] .theke-leader {
+  flex: 1 1 24px;
+  min-width: 16px;
+  height: 0;
+  border-bottom: 2px dotted rgba(43, 29, 26, 0.32);
+  transform: translateY(4px);
+}
+
+:root[data-look="theke"] .theke-line-version {
+  display: block;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: var(--theke-ink);
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+:root[data-look="theke"] .theke-line-version:hover:not(:disabled) { background: rgba(43, 29, 26, 0.08); color: var(--theke-pepper); }
+:root[data-look="theke"] .theke-line-version:disabled { cursor: default; }
+
+:root[data-look="theke"] .theke-line-update {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  font-size: 11px;
+  color: #fff;
+  background: var(--theke-red);
+  border-radius: 3px;
+  box-shadow: 0 2px 0 var(--theke-red-dark);
+}
+:root[data-look="theke"] .theke-line-update:disabled { background: rgba(43, 29, 26, 0.25); box-shadow: none; }
+
+:root[data-look="theke"] .theke-line-tools {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+:root[data-look="theke"] .theke-line:hover .theke-line-tools,
+:root[data-look="theke"] .theke-line[data-selected] .theke-line-tools,
+:root[data-look="theke"] .theke-line[data-select-mode] .theke-line-tools,
+:root[data-look="theke"] .theke-line:focus-within .theke-line-tools { opacity: 1; }
+:root[data-look="theke"] .theke-line-menu {
+  padding: 3px;
+  border-radius: 4px;
+  color: var(--theke-ink);
+}
+:root[data-look="theke"] .theke-line-menu:hover { color: var(--theke-pepper); background: rgba(43, 29, 26, 0.1); }
+
+/* ── Kassenbon ── */
+:root[data-look="theke"] .theke-receipt {
+  position: relative;
+  flex-shrink: 0;
+  align-self: flex-start;
+  width: 300px;
+  max-height: 100%;
+  overflow-y: auto;
+  scrollbar-width: none;
+  margin-bottom: 12px;
+  padding: 18px 20px 22px;
+  color: var(--theke-ink-strong);
+  background: var(--theke-receipt);
+  box-shadow: 0 16px 32px -14px rgba(0, 0, 0, 0.7);
+  font-size: 14px;
+  /* gezackte Abrisskante unten */
+  -webkit-mask: linear-gradient(#000 0 0) top / 100% calc(100% - 9px) no-repeat,
+    conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / 14px 9px repeat-x;
+  mask: linear-gradient(#000 0 0) top / 100% calc(100% - 9px) no-repeat,
+    conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / 14px 9px repeat-x;
+}
+:root[data-look="theke"] .theke-receipt h3 {
+  font-family: var(--theke-display);
+  font-weight: normal;
+  font-size: 18px;
+  letter-spacing: 0.1em;
+  text-align: center;
+  color: var(--theke-pepper);
+}
+:root[data-look="theke"] .theke-receipt-sub {
+  margin-bottom: 10px;
+  font-size: 11.5px;
+  text-align: center;
+  color: var(--theke-ink);
+}
+:root[data-look="theke"] .theke-receipt-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 0;
+}
+:root[data-look="theke"] .theke-receipt-row > span:last-child { white-space: nowrap; }
+:root[data-look="theke"] .theke-receipt-row i {
+  flex: 1;
+  min-width: 10px;
+  border-bottom: 2px dotted rgba(43, 29, 26, 0.3);
+  transform: translateY(-4px);
+}
+:root[data-look="theke"] .theke-receipt-row[data-muted] > span:last-child { color: var(--theke-ink); }
+:root[data-look="theke"] .theke-receipt-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 6px 8px;
+  font-size: 12.5px;
+  color: #fff;
+  background: var(--theke-red);
+  border-radius: 4px;
+}
+:root[data-look="theke"] .theke-receipt-status span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root[data-look="theke"] .theke-receipt hr {
+  margin: 12px 0;
+  border: 0;
+  border-top: 2px dashed rgba(43, 29, 26, 0.4);
+}
+:root[data-look="theke"] .theke-receipt-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+:root[data-look="theke"] .theke-receipt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px 6px;
+  font-size: 12.5px;
+  color: var(--theke-pepper);
+  background: var(--theke-fat);
+  border: 2px solid var(--theke-pepper);
+  border-radius: 5px;
+  box-shadow: 0 3px 0 rgba(43, 29, 26, 0.4);
+  white-space: nowrap;
+  transition: transform 120ms, filter 120ms;
+}
+:root[data-look="theke"] .theke-receipt-btn:hover { filter: brightness(1.04); }
+:root[data-look="theke"] .theke-receipt-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(43, 29, 26, 0.4); }
+:root[data-look="theke"] .theke-receipt-btn--hot { color: #fff; background: var(--theke-red); border-color: var(--theke-red-dark); }
+:root[data-look="theke"] .theke-receipt-more { display: flex; justify-content: center; align-items: center; }
+:root[data-look="theke"] .theke-receipt-more button { color: var(--theke-ink) !important; }
+:root[data-look="theke"] .theke-receipt-more button:hover { color: var(--theke-pepper) !important; background: rgba(43, 29, 26, 0.08) !important; }
+
+:root[data-look="theke"] .theke-barcode {
+  height: 30px;
+  margin-top: 16px;
+  opacity: 0.8;
+  background: repeating-linear-gradient(90deg, var(--theke-ink-strong) 0 2px, transparent 2px 4px, var(--theke-ink-strong) 4px 5px, transparent 5px 8px, var(--theke-ink-strong) 8px 11px, transparent 11px 13px);
+}
+:root[data-look="theke"] .theke-receipt-thanks {
+  margin-top: 8px;
+  font-size: 11.5px;
+  text-align: center;
+  color: var(--theke-ink);
+}
+
+@media (max-width: 1150px) {
+  :root[data-look="theke"] .theke-receipt { width: 262px; padding: 14px 14px 18px; }
+  :root[data-look="theke"] .theke-receipt-actions { grid-template-columns: 1fr; }
+  :root[data-look="theke"] .theke-card-title h1 { font-size: 30px; }
+  :root[data-look="theke"] .theke-card-stamp { width: 96px; height: 96px; }
+}
+@media (max-height: 740px) {
+  :root[data-look="theke"] .theke-receipt-thanks,
+  :root[data-look="theke"] .theke-barcode { display: none; }
+}
+
+/* ═════════════════════════ Mod-Browser ═════════════════════════ */
+
+/* Kreidetafel links, Regale rechts */
+:root[data-look="theke"] .modrinth-search-v2 { flex-direction: row-reverse; gap: 20px; }
+:root[data-look="theke"] .modrinth-search-v2 .filters-sidebar {
+  width: 16rem;
+  max-width: 16rem;
+  padding: 12px 12px;
+  color: var(--theke-chalk-text);
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(255, 255, 255, 0.05), transparent 60%),
+    var(--theke-chalk);
+  border: 10px solid var(--theke-wood);
+  border-radius: 6px;
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.45), 0 10px 24px -10px rgba(0, 0, 0, 0.6);
+}
+:root[data-look="theke"] .modrinth-search-v2 .filters-sidebar .look-card {
+  background: transparent !important;
+  border-color: transparent !important;
+  border-bottom: 1px dashed rgba(233, 239, 230, 0.28) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+:root[data-look="theke"] .modrinth-search-v2 .filters-sidebar .font-minecraft { font-family: "Fredoka", sans-serif !important; }
+:root[data-look="theke"] .modrinth-search-v2 .filters-sidebar :is(.text-white, [class*="text-white/"]) { color: var(--theke-chalk-text) !important; }
+:root[data-look="theke"] .modrinth-search-v2 .filters-sidebar .look-input {
+  background: rgba(233, 239, 230, 0.06) !important;
+  border-color: rgba(233, 239, 230, 0.25) !important;
+}
+
+/* Inhaltsarten als kleine Holzschilder */
+:root[data-look="theke"] .look-search-types .look-tabs {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  gap: 8px !important;
+}
+:root[data-look="theke"] .look-search-types .look-tabs [role="tab"],
+:root[data-look="theke"] .look-search-types .look-tabs button {
+  color: var(--theke-chalk-text) !important;
+  background: var(--theke-chalk) !important;
+  border: 3px solid var(--theke-wood) !important;
+  border-radius: 5px !important;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35) !important;
+  font-family: "Fredoka", sans-serif !important;
+  font-size: 14px !important;
+}
+:root[data-look="theke"] .look-search-types .look-tabs [role="tab"][aria-selected="true"],
+:root[data-look="theke"] .look-search-types .look-tabs button[aria-pressed="true"] {
+  color: #fff !important;
+  background: var(--theke-red) !important;
+  border-color: var(--theke-fat) !important;
+}
+
+/* Suchfeld als Zettel */
+:root[data-look="theke"] .look-search-bar .look-input {
+  height: 44px;
+  color: var(--theke-pepper);
+  background: var(--theke-paper) !important;
+  border: 0 !important;
+  border-radius: 2px !important;
+  box-shadow: 0 8px 18px -8px rgba(0, 0, 0, 0.6);
+}
+:root[data-look="theke"] .look-search-bar .look-input :is(input, .text-white, [class*="text-white/"]) { color: var(--theke-pepper) !important; }
+:root[data-look="theke"] .look-search-bar .look-input input::placeholder { color: rgba(43, 29, 26, 0.5) !important; }
+:root[data-look="theke"] .look-search-bar .look-input [class*="bg-white/"] { background-color: rgba(43, 29, 26, 0.2) !important; }
+
+/* ── Regale ── */
+:root[data-look="theke"] .theke-shelves { overflow: hidden; }
+:root[data-look="theke"] .theke-ware-slot {
+  position: relative;
+  height: 100%;
+}
+/* Regalbrett unter jeder Ware – nebeneinander ergeben sie ein durchgehendes Brett */
+:root[data-look="theke"] .theke-ware-slot::after {
+  content: "";
+  position: absolute;
+  left: -10px;
+  right: -10px;
+  bottom: -18px;
+  height: 14px;
+  background: linear-gradient(var(--theke-wood-light), var(--theke-wood));
+  border-radius: 2px;
+  box-shadow: 0 8px 12px -4px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+:root[data-look="theke"] .theke-ware {
+  position: relative;
+  height: 100%;
+  min-height: 164px;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px 10px;
+  color: var(--theke-pepper);
+  background: var(--theke-paper);
+  border-radius: 6px 6px 2px 2px;
+  box-shadow: inset 0 -2px 0 rgba(255, 255, 255, 0.4), 0 4px 10px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: transform 150ms, box-shadow 150ms;
+}
+:root[data-look="theke"] .theke-ware:hover {
+  transform: translateY(-3px);
+  box-shadow: inset 0 -2px 0 rgba(255, 255, 255, 0.4), 0 10px 16px rgba(0, 0, 0, 0.4);
+}
+:root[data-look="theke"] .theke-ware:focus-visible { outline: 3px solid var(--theke-fat); outline-offset: 2px; }
+
+:root[data-look="theke"] .theke-ware-flag {
+  position: absolute;
+  top: -9px;
+  right: 10px;
+  padding: 1px 7px;
+  font-size: 10.5px;
+  color: #fff;
+  background: var(--theke-red);
+  border-radius: 3px;
+  transform: rotate(4deg);
+}
+:root[data-look="theke"] .theke-ware-flag--done { background: #5f7f34; }
+
+:root[data-look="theke"] .theke-ware-top { display: flex; align-items: center; gap: 10px; min-width: 0; }
+:root[data-look="theke"] .theke-ware-icon {
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  border: 3px solid var(--theke-pepper);
+  border-radius: 8px;
+  background: #e6d6bf;
+  font-family: var(--theke-display);
+  font-size: 22px;
+  color: var(--theke-pepper);
+}
+:root[data-look="theke"] .theke-ware-icon img { width: 100%; height: 100%; object-fit: cover; }
+:root[data-look="theke"] .theke-ware-name {
+  font-family: var(--theke-display);
+  font-size: 15px;
+  line-height: 1.1;
+  color: var(--theke-pepper);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+:root[data-look="theke"] .theke-ware-author {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--theke-ink);
+  text-align: left;
+}
+:root[data-look="theke"] .theke-ware-author:hover { color: var(--theke-pepper); text-decoration: underline; }
+:root[data-look="theke"] .theke-ware-desc {
+  margin-top: 6px;
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: var(--theke-ink-strong);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+:root[data-look="theke"] .theke-ware-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+  max-height: 18px;
+  overflow: hidden;
+}
+:root[data-look="theke"] .theke-ware-cats span {
+  padding: 0 6px;
+  font-size: 10.5px;
+  line-height: 16px;
+  color: var(--theke-ink);
+  border: 1px solid rgba(43, 29, 26, 0.25);
+  border-radius: 999px;
+}
+:root[data-look="theke"] .theke-ware-bottom {
+  margin-top: auto;
+  padding-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+:root[data-look="theke"] .theke-price {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 8px 1px 16px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--theke-fat);
+  border: 2px solid var(--theke-pepper);
+  clip-path: polygon(8px 0, 100% 0, 100% 100%, 8px 100%, 0 50%);
+}
+:root[data-look="theke"] .theke-price::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--theke-pepper);
+  transform: translateY(-50%);
+}
+:root[data-look="theke"] .theke-ware-actions { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+:root[data-look="theke"] .theke-ware-actions .look-btn { height: 26px !important; min-width: 26px; padding: 0 6px !important; }
+:root[data-look="theke"] .theke-ware-buy {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 9px;
+  font-size: 12px;
+  color: #fff;
+  white-space: nowrap;
+  background: var(--theke-red);
+  border-radius: 4px;
+  box-shadow: 0 3px 0 var(--theke-red-dark);
+  transition: transform 120ms, filter 120ms;
+}
+:root[data-look="theke"] .theke-ware-buy:hover:not(:disabled) { filter: brightness(1.08); }
+:root[data-look="theke"] .theke-ware-buy:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--theke-red-dark); }
+:root[data-look="theke"] .theke-ware-buy[data-done] { background: #5f7f34; box-shadow: 0 3px 0 #435a24; }
+:root[data-look="theke"] .theke-ware-buy:disabled:not([data-done]) { opacity: 0.7; cursor: wait; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-look="theke"] :is(.theke-ware, .theke-card-stamp, .theke-tick, .theke-receipt-btn) { transition: none; }
+}
+
+/* ═════════════════════════ Clips: Pinnwand ═════════════════════════ */
+
+/* Korkwand im Holzrahmen, die Clips hängen als Polaroids daran */
+:root[data-look="theke"] .look-clip-grid {
+  gap: 30px 26px !important;
+  padding: 30px 28px 34px;
+  border: 10px solid var(--theke-wood);
+  border-radius: 6px;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(90, 55, 25, 0.35) 0 1px, transparent 1.5px) 0 0 / 7px 7px,
+    radial-gradient(circle at 70% 60%, rgba(255, 230, 190, 0.18) 0 1px, transparent 1.5px) 0 0 / 9px 9px,
+    radial-gradient(circle at 40% 80%, rgba(60, 35, 15, 0.3) 0 1.2px, transparent 1.8px) 0 0 / 11px 11px,
+    #b98a57;
+  box-shadow: inset 0 0 30px rgba(60, 30, 10, 0.55), 0 12px 26px -12px rgba(0, 0, 0, 0.7);
+}
+
+:root[data-look="theke"] .look-clip-card {
+  overflow: visible !important;
+  padding: 10px 10px 4px;
+  color: var(--theke-pepper);
+  background: #fbf6ec !important;
+  border: 0 !important;
+  border-radius: 2px !important;
+  box-shadow: 0 8px 14px -6px rgba(0, 0, 0, 0.55) !important;
+  transform: rotate(-1.6deg);
+  transition: transform 180ms, box-shadow 180ms !important;
+}
+:root[data-look="theke"] .look-clip-card:nth-child(3n + 2) { transform: rotate(1.2deg); }
+:root[data-look="theke"] .look-clip-card:nth-child(3n) { transform: rotate(-0.6deg); }
+:root[data-look="theke"] .look-clip-card:hover {
+  transform: rotate(0deg) translateY(-3px) !important;
+  box-shadow: 0 16px 22px -8px rgba(0, 0, 0, 0.6) !important;
+  z-index: 2;
+}
+/* Pinnnadel */
+:root[data-look="theke"] .look-clip-card::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -7px;
+  z-index: 30;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  background: radial-gradient(circle at 35% 35%, #f07a6a, var(--theke-red) 55%, var(--theke-red-dark));
+  box-shadow: 0 3px 3px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+:root[data-look="theke"] .look-clip-card > button:first-of-type { border-radius: 0 !important; overflow: hidden; }
+:root[data-look="theke"] .look-clip-card > div.absolute { top: 16px; }
+:root[data-look="theke"] .look-clip-card > div.absolute.left-2 { left: 16px; }
+:root[data-look="theke"] .look-clip-card > div.absolute.right-2 { right: 16px; }
+
+:root[data-look="theke"] .look-clip-caption { padding: 8px 2px 6px !important; }
+:root[data-look="theke"] .look-clip-title {
+  font-family: "Fredoka", sans-serif !important;
+  font-weight: 600;
+  font-size: 16px !important;
+  color: var(--theke-pepper) !important;
+}
+:root[data-look="theke"] .look-clip-meta,
+:root[data-look="theke"] .look-clip-meta span { color: var(--theke-ink) !important; }
+:root[data-look="theke"] .look-clip-meta .bg-white\/30 { background-color: rgba(43, 29, 26, 0.25) !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-look="theke"] .look-clip-card { transition: none !important; }
+}
+
+/* ═════════════════════════ Einstellungen: Karteikasten ═════════════════════════ */
+
+/* Bereiche als Karteireiter oben, darunter ein Papierbogen; die Unterpunkte entfallen (der Bogen scrollt) */
+:root[data-look="theke"] .look-settings {
+  flex-direction: column;
+  gap: 0 !important;
+  padding: 10px 18px 18px !important;
+}
+:root[data-look="theke"] .look-settings-side {
+  width: auto !important;
+  flex-direction: row !important;
+  align-items: flex-end;
+  gap: 12px;
+}
+:root[data-look="theke"] .look-settings-search { order: 2; width: 230px; padding: 0 0 8px !important; }
+:root[data-look="theke"] .look-settings-list {
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  gap: 4px;
+  padding-left: 6px;
+  overflow: visible !important;
+}
+:root[data-look="theke"] .look-settings-entry { flex-shrink: 0; }
+:root[data-look="theke"] .look-settings-sub,
+:root[data-look="theke"] .look-settings-divider { display: none !important; }
+:root[data-look="theke"] .look-settings-tab {
+  width: auto !important;
+  gap: 8px !important;
+  padding: 7px 14px 9px !important;
+  color: var(--theke-ink) !important;
+  background: var(--theke-paper-2) !important;
+  border: 2px solid var(--theke-paper-edge) !important;
+  border-bottom: 0 !important;
+  border-radius: 10px 10px 0 0 !important;
+  box-shadow: none !important;
+}
+:root[data-look="theke"] .look-settings-tab svg { width: 18px !important; height: 18px !important; }
+:root[data-look="theke"] .look-settings-tab .font-minecraft { font-family: "Fredoka", sans-serif !important; font-size: 15px; }
+:root[data-look="theke"] .look-settings-tab:hover { color: var(--theke-pepper) !important; background: #f6ecdc !important; }
+:root[data-look="theke"] .look-settings-tab[data-active] {
+  color: var(--theke-pepper) !important;
+  background: var(--theke-paper-sheet) !important;
+  border-color: var(--theke-red) !important;
+  border-top-width: 4px !important;
+  transform: translateY(2px);
+}
+:root[data-look="theke"] .look-settings-tab[data-active] svg { color: var(--theke-red); }
+:root[data-look="theke"] .look-settings-paper {
+  border-radius: 0 6px 6px 6px;
+  background:
+    repeating-linear-gradient(0deg, rgba(43, 29, 26, 0.035) 0 1px, transparent 1px 28px),
+    var(--theke-paper-sheet) !important;
+}
+:root[data-look="theke"] .look-settings-paper h2,
+:root[data-look="theke"] .look-settings-paper h3 { color: var(--theke-pepper) !important; }
+
+/* Auf Papier: flache Knöpfe in Tinte; die Look-Vorschaukarten bleiben dunkel mit heller Schrift */
+:root[data-look="theke"] :is(.theke-sheet--paper, .look-settings-paper) :is(.look-btn--ghost, .look-btn--secondary, .look-btn--text) { color: var(--theke-pepper) !important; }
+:root[data-look="theke"] .look-settings-paper .look-picker [class*="text-white"] { color: #fff !important; }
+:root[data-look="theke"] .look-settings-paper .look-picker [class*="text-white/"] { color: rgba(255, 255, 255, 0.6) !important; }

@@ -1,27 +1,16 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
-import type { Profile } from "../../types/profile";
+import { useProfileWizardStore } from "../../store/profile-wizard-store";
 import { hexAlpha, SURFACE } from "../ui/design-system";
 import { MainLaunchButton } from "./MainLaunchButton";
 import { PlayerRig } from "./PlayerRig";
+import { DeliLabel, SalamiStage } from "../../themes/salami/SalamiStage";
+import type { LookPlayViewProps } from "../../themes/looks/types";
 
-interface LaunchVersion {
-  id: string;
-  label: string;
-  icon?: string;
-  isCustom?: boolean;
-  profileId?: string;
-}
-
-interface SalamiPlayViewProps {
-  profiles: Profile[];
-  selectedProfile: Profile | null;
-  versions: LaunchVersion[];
-  onVersionChange: (profileId: string) => void;
-  playerName: string | null | undefined;
-}
+type SalamiPlayViewProps = LookPlayViewProps;
 
 const RECENT_COUNT = 4;
 const LOADER_NAMES: Record<string, string> = {
@@ -40,6 +29,7 @@ const LOADER_NAMES: Record<string, string> = {
 export function SalamiPlayView({ profiles, selectedProfile, versions, onVersionChange, playerName }: SalamiPlayViewProps) {
   const { t } = useTranslation();
   const accent = useThemeStore((s) => s.accentColor);
+  const openProfileWizard = useProfileWizardStore((s) => s.openModal);
 
   const recent = useMemo(
     () =>
@@ -64,19 +54,28 @@ export function SalamiPlayView({ profiles, selectedProfile, versions, onVersionC
             {selectedProfile?.name ?? t("salami.play.no_profile")}
           </h1>
           {selectedProfile && (
-            <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
-              <span className="border px-3 py-1 text-white/80" style={{ backgroundColor: SURFACE.base, borderColor: SURFACE.line }}>
-                Minecraft {selectedProfile.game_version}
-              </span>
-              <span
-                className="border px-3 py-1"
-                style={{ backgroundColor: hexAlpha(accent.value, 0.14), borderColor: hexAlpha(accent.value, 0.35), color: accent.light || "#fff" }}
-              >
-                {loaderName}
-              </span>
+            <div className="mt-4 flex flex-wrap items-center gap-2.5">
+              <DeliLabel>Minecraft {selectedProfile.game_version}</DeliLabel>
+              <DeliLabel tone="red">{loaderName}</DeliLabel>
             </div>
           )}
         </div>
+
+        {versions.length === 0 && (
+          // Salami: ohne Profil kein Start-Knopf – dann wenigstens den Weg zum ersten Profil zeigen
+          <div className="flex flex-col items-start gap-3">
+            <p className="text-sm text-white/60">{t("salami.play.no_profile_hint")}</p>
+            <button
+              type="button"
+              onClick={() => openProfileWizard(null)}
+              className="flex h-[68px] w-full max-w-[400px] items-center justify-center gap-3 font-minecraft text-2xl text-white transition-[filter] hover:brightness-110"
+              style={{ backgroundColor: accent.value, borderRadius: "var(--border-radius)" }}
+            >
+              <Icon icon="solar:add-circle-bold" className="h-7 w-7" />
+              {t("salami.play.create_profile")}
+            </button>
+          </div>
+        )}
 
         {versions.length > 0 && (
           <MainLaunchButton
@@ -141,17 +140,8 @@ export function SalamiPlayView({ profiles, selectedProfile, versions, onVersionC
             {selectedProfile.game_version}
           </span>
         )}
-        {/* Bühne: flache Scheibe unter den Füßen */}
-        <div
-          className="pointer-events-none absolute left-1/2 top-1/2 h-[90px] w-[440px] -translate-x-1/2 translate-y-[168px]"
-          style={{
-            borderRadius: "50%",
-            border: `1px solid ${hexAlpha(accent.value, 0.35)}`,
-            backgroundImage: `radial-gradient(closest-side, ${hexAlpha(accent.value, 0.3)}, ${hexAlpha(accent.value, 0.06)} 70%, transparent)`,
-            boxShadow: `0 0 60px -10px ${hexAlpha(accent.value, 0.5)}`,
-          }}
-          aria-hidden="true"
-        />
+        {/* Bühne: die Figur steht auf einer Salamischeibe */}
+        <SalamiStage width={420} className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 translate-y-[150px]" />
         <div className="relative">
           <PlayerRig playerName={playerName} showNametag={false} />
         </div>

@@ -28,8 +28,14 @@ import { CapeFace } from "./CapeFace";
 import { CapeEditor, type CapeEditorTarget } from "./CapeEditor";
 import { CapeReportDialog } from "./CapeReportDialog";
 import "./i18n";
-
-const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
+import { errorText } from "../../utils/error-text";
+import { useConfirmDialog } from "../../hooks/useConfirmDialog";
+import { Button } from "../ui/buttons/Button";
+import { EmptyState } from "../ui/EmptyState";
+import { LoadingSpinner } from "../ui/LoadingSpinner";
+import { SURFACE } from "../ui/design-system";
+import { DeliLabel } from "../../themes/salami/SalamiStage";
+import { SHOP_CARD_CLASS, SHOP_WELL, ShopHeading, ShopPreviewCard, shopCardStyle } from "./shop-style";
 
 /** Nummern der Cape-Regeln in i18n.ts (`salami.capes.rules.<n>`), wie in server/capes/README.md. */
 const RULES = [1, 2, 3, 4, 5, 6] as const;
@@ -65,11 +71,12 @@ function readReported(): Set<string> {
 
 type ReviewState = SalamiCapeReview["status"] | "new";
 
-const REVIEW_STYLE: Record<ReviewState, { icon: string; className: string }> = {
-  approved: { icon: "solar:check-circle-bold", className: "bg-emerald-500/20 text-emerald-200" },
-  pending: { icon: "solar:hourglass-bold", className: "bg-amber-500/20 text-amber-200" },
-  rejected: { icon: "solar:close-circle-bold", className: "bg-red-500/25 text-red-200" },
-  new: { icon: "solar:eye-closed-bold", className: "bg-white/10 text-white/70" },
+/** Salami: Prüfstatus als Etikett – Creme, abgelehnt in Salami-Rot. */
+const REVIEW_STYLE: Record<ReviewState, { icon: string; tone: "fat" | "red" }> = {
+  approved: { icon: "solar:check-circle-bold", tone: "fat" },
+  pending: { icon: "solar:hourglass-bold", tone: "fat" },
+  rejected: { icon: "solar:close-circle-bold", tone: "red" },
+  new: { icon: "solar:eye-closed-bold", tone: "fat" },
 };
 
 /** Vorschau-Auswahl für Galerie-Capes, die noch nicht bei den eigenen liegen. */
@@ -92,6 +99,7 @@ type Reviews = Record<string, SalamiCapeReview>;
 /** Cape-Seite: Salami-Capes, eigene Capes, Capes anderer Spieler, Vorlage, Import und Editor. */
 export function SalamiCapesTab() {
   const { t, i18n } = useTranslation();
+  const { confirm, confirmDialog } = useConfirmDialog();
   const accent = useThemeStore((s) => s.accentColor);
   const [overview, setOverview] = useState<SalamiCapeOverview | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -309,7 +317,12 @@ export function SalamiCapesTab() {
   };
 
   const handleDelete = async (cape: SalamiCape) => {
-    const confirmed = await ask(t("salami.capes.delete_confirm", { name: cape.name }), { kind: "warning" });
+    const confirmed = await confirm({
+      title: t("salami.capes.delete"),
+      message: t("salami.capes.delete_confirm", { name: cape.name }),
+      confirmText: t("salami.capes.delete"),
+      type: "danger",
+    });
     if (!confirmed) return;
     try {
       await deleteCape(cape.id);
@@ -359,12 +372,11 @@ export function SalamiCapesTab() {
     if (!review) return null;
     const style = REVIEW_STYLE[review.state];
     return (
-      <span
-        title={reviewHint(review)}
-        className={cn("flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold", style.className)}
-      >
-        <Icon icon={style.icon} className="h-3 w-3" />
-        {t(`salami.capes.review.${review.state}`)}
+      <span title={reviewHint(review)} className="inline-flex max-w-full whitespace-nowrap">
+        <DeliLabel size="sm" tone={style.tone}>
+          <Icon icon={style.icon} className="-ml-0.5 h-3 w-3" />
+          {t(`salami.capes.review.${review.state}`)}
+        </DeliLabel>
       </span>
     );
   };
@@ -382,24 +394,19 @@ export function SalamiCapesTab() {
         key={key}
         onMouseEnter={() => setHovered(selection)}
         onMouseLeave={() => setHovered(null)}
-        className={cn(
-          "group relative flex flex-col items-center gap-2 rounded-2xl border p-3 transition-colors",
-          isSelected ? "bg-white/10" : "border-white/10 bg-black/25 hover:bg-white/5",
-        )}
-        style={isSelected ? { borderColor: accent.value, boxShadow: `0 0 0 1px ${accent.value}` } : undefined}
+        className={cn("group relative flex flex-col items-center gap-2 p-3", SHOP_CARD_CLASS)}
+        style={shopCardStyle(accent.value, isSelected)}
       >
         <button
           type="button"
           onClick={onPick ?? (() => void choose(selection))}
-          className={cn("flex flex-col items-center gap-2 focus:outline-none", locked && "cursor-not-allowed")}
+          className={cn("flex w-full flex-col items-center gap-2 focus:outline-none", locked && "cursor-not-allowed")}
           aria-pressed={isSelected}
           aria-disabled={locked || undefined}
         >
           <div
-            className={cn(
-              "flex h-[112px] w-[70px] items-center justify-center rounded-lg bg-black/30",
-              locked && "opacity-45 grayscale",
-            )}
+            className={cn("flex h-[120px] w-full items-center justify-center", locked && "opacity-45 grayscale")}
+            style={SHOP_WELL}
           >
             {image ? (
               <CapeFace src={image} width={70} />
@@ -407,14 +414,13 @@ export function SalamiCapesTab() {
               <Icon icon={placeholder} className="h-8 w-8 text-white/40" />
             )}
           </div>
-          <span className="max-w-[120px] truncate text-sm text-white">{label}</span>
+          <span className="max-w-full truncate font-minecraft text-sm text-white">{label}</span>
         </button>
         {isSelected && (
-          <span
-            className="absolute right-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white"
-            style={{ backgroundColor: accent.value }}
-          >
-            {t("salami.capes.selected")}
+          <span className="pointer-events-none absolute right-1.5 top-1.5">
+            <DeliLabel size="sm" tone="red">
+              {t("salami.capes.selected")}
+            </DeliLabel>
           </span>
         )}
         {extra}
@@ -437,7 +443,8 @@ export function SalamiCapesTab() {
           maxLength={40}
           onChange={(e) => setRenaming({ id: cape.id, name: e.target.value })}
           onBlur={() => void handleRename()}
-          className="w-full rounded-md bg-black/40 px-2 py-1 text-xs text-white outline-none"
+          className="w-full border px-2 py-1 text-xs text-white outline-none focus:border-white/30"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.35)", borderColor: SURFACE.lineStrong }}
           aria-label={t("salami.capes.name_prompt")}
         />
       </form>
@@ -454,7 +461,8 @@ export function SalamiCapesTab() {
             title={action.label}
             aria-label={action.label}
             onClick={action.onClick}
-            className="rounded-md p-1.5 text-white/80 hover:bg-white/10 hover:text-white"
+            className="p-1.5 text-white/70 transition-colors duration-150 hover:text-white"
+            style={{ backgroundColor: SURFACE.hover, boxShadow: "0 1px 0 rgba(0, 0, 0, 0.32)" }}
           >
             <Icon icon={action.icon} className="h-4 w-4" />
           </button>
@@ -462,40 +470,47 @@ export function SalamiCapesTab() {
       </div>
     );
 
+  // Salami-Feinkost: Hauptaktion voll im Akzent mit harter Kante, die anderen neutral mit weicher Kante
   const actionButton = (icon: string, label: string, onClick: () => void, primary = false) => (
-    <button
-      type="button"
+    <Button
+      variant={primary ? "3d" : "secondary"}
+      size="xs"
       onClick={onClick}
-      className={cn(
-        "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-colors",
-        primary ? "hover:brightness-110" : "bg-white/10 hover:bg-white/15",
-      )}
-      style={primary ? { backgroundColor: accent.value } : undefined}
+      icon={<Icon icon={icon} className="h-5 w-5" />}
+      className="px-4 font-minecraft text-sm"
     >
-      <Icon icon={icon} className="h-5 w-5" />
       {label}
-    </button>
+    </Button>
   );
 
   return (
     <div className="flex h-full gap-6 overflow-hidden p-6">
-      <aside className="flex w-[280px] shrink-0 flex-col gap-3">
-        <div className="relative h-[340px] overflow-hidden rounded-2xl border border-white/10 bg-black/30">
-          {previewImage ? (
-            <Cape3D src={previewImage} className="h-full w-full" />
-          ) : (
-            <div className="flex h-full items-center justify-center text-white/40">
-              <Icon icon="solar:forbidden-circle-bold" className="h-12 w-12" />
-            </div>
-          )}
-        </div>
-        <div className="px-1">
-          <div className="text-lg font-semibold text-white">{nameOf(previewSelection)}</div>
+      <aside className="custom-scrollbar flex w-[280px] shrink-0 flex-col gap-3 overflow-y-auto">
+        <ShopPreviewCard
+          viewerStyle={{ backgroundColor: "rgba(0, 0, 0, 0.28)" }}
+          viewer={
+            previewImage ? (
+              <Cape3D src={previewImage} className="h-full w-full" />
+            ) : (
+              <div className="flex h-full items-center justify-center text-white/40">
+                <Icon icon="solar:forbidden-circle-bold" className="h-12 w-12" />
+              </div>
+            )
+          }
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-minecraft text-xl leading-tight text-white">{nameOf(previewSelection)}</span>
+            {previewSelection === selected && (
+              <DeliLabel size="sm" tone="red">
+                {t("salami.capes.selected")}
+              </DeliLabel>
+            )}
+          </div>
           {previewSelection?.startsWith(GALLERY_PREFIX) && (
             <p className="mt-2 text-xs leading-relaxed text-white/70">{t("salami.capes.gallery.preview_hint")}</p>
           )}
           {previewCape && reviews !== undefined && (
-            <div className="mt-2 flex flex-col items-start gap-1">
+            <div className="mt-2 flex flex-col items-start gap-1.5">
               {reviewBadge(previewCape)}
               <p className="text-xs leading-relaxed text-white/70">
                 {reviewOf(previewCape) ? reviewHint(reviewOf(previewCape)!) : t("salami.capes.review.unknown_hint")}
@@ -503,7 +518,7 @@ export function SalamiCapesTab() {
             </div>
           )}
           <p className="mt-2 text-xs leading-relaxed text-white/55">{t("salami.capes.visibility")}</p>
-        </div>
+        </ShopPreviewCard>
       </aside>
 
       <section className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
@@ -513,8 +528,11 @@ export function SalamiCapesTab() {
           {actionButton("solar:gallery-add-bold", t("salami.capes.import"), () => void handleImport())}
           {actionButton("solar:download-minimalistic-bold", t("salami.capes.template"), () => void handleTemplate())}
         </div>
-        <details className="mt-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/75">
-          <summary className="cursor-pointer select-none font-semibold text-white">{t("salami.capes.rules.title")}</summary>
+        <details
+          className="mt-4 border px-4 py-3 text-sm text-white/75"
+          style={{ backgroundColor: SURFACE.base, borderColor: SURFACE.line, borderRadius: "var(--border-radius)" }}
+        >
+          <summary className="cursor-pointer select-none font-minecraft text-white">{t("salami.capes.rules.title")}</summary>
           <p className="mt-2">{t("salami.capes.rules.intro")}</p>
           <ul className="mt-1 list-disc space-y-1 pl-5">
             {RULES.map((n) => (
@@ -524,7 +542,7 @@ export function SalamiCapesTab() {
           <p className="mt-2 text-xs leading-relaxed text-white/55">{t("salami.capes.rules.outro")}</p>
         </details>
 
-        <h3 className="mb-3 mt-7 text-base font-semibold text-white">{t("salami.capes.builtin")}</h3>
+        <ShopHeading className="mb-3 mt-7">{t("salami.capes.builtin")}</ShopHeading>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
           {(overview?.builtin ?? []).map((name) =>
             card(name, `${BUILTIN_PREFIX}${name}`, builtinCapeImage(name), t(`salami.capes.${name}`)),
@@ -532,7 +550,7 @@ export function SalamiCapesTab() {
           {card("none", null, null, t("salami.capes.none"))}
         </div>
 
-        <h3 className="mb-3 mt-7 text-base font-semibold text-white">{t("salami.capes.own")}</h3>
+        <ShopHeading className="mb-3 mt-7">{t("salami.capes.own")}</ShopHeading>
         {overview && overview.capes.length > 0 ? (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
             {overview.capes.map((cape) =>
@@ -549,8 +567,11 @@ export function SalamiCapesTab() {
             )}
           </div>
         ) : (
-          <div className="rounded-2xl border border-dashed border-white/15 bg-black/20 p-5 text-sm text-white/75">
-            <div className="mb-2 font-semibold text-white">{t("salami.capes.empty_title")}</div>
+          <div
+            className="border border-dashed p-5 text-sm text-white/75"
+            style={{ borderColor: SURFACE.lineStrong, borderRadius: "var(--border-radius)" }}
+          >
+            <div className="mb-2 font-minecraft text-white">{t("salami.capes.empty_title")}</div>
             <ol className="list-decimal space-y-1 pl-5">
               <li>{t("salami.capes.empty_step1")}</li>
               <li>{t("salami.capes.empty_step2")}</li>
@@ -559,22 +580,20 @@ export function SalamiCapesTab() {
           </div>
         )}
 
-        <h3 className="mt-7 text-base font-semibold text-white">{t("salami.capes.gallery.title")}</h3>
+        <ShopHeading className="mt-7">{t("salami.capes.gallery.title")}</ShopHeading>
         <p className="mb-3 mt-1 text-xs leading-relaxed text-white/55">{t("salami.capes.gallery.subtitle")}</p>
         {gallery === null ? (
-          <div className="flex items-center gap-2 text-sm text-white/60">
-            <Icon icon="svg-spinners:ring-resize" className="h-4 w-4" />
-            {t("salami.capes.gallery.loading")}
-          </div>
+          <LoadingSpinner size="sm" shadowDepth="none" message={t("salami.capes.gallery.loading")} className="items-start py-4" />
         ) : gallery === "error" ? (
-          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-dashed border-white/15 bg-black/20 p-4 text-sm text-white/75">
-            <span>{t("salami.capes.gallery.error")}</span>
-            {actionButton("solar:refresh-bold", t("salami.capes.gallery.retry"), () => void loadGallery())}
-          </div>
+          <EmptyState
+            icon="solar:cloud-cross-bold"
+            message={t("salami.capes.gallery.error")}
+            compact
+            fullHeight={false}
+            action={actionButton("solar:refresh-bold", t("salami.capes.gallery.retry"), () => void loadGallery())}
+          />
         ) : galleryList.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-white/15 bg-black/20 p-4 text-sm text-white/75">
-            {t("salami.capes.gallery.empty")}
-          </div>
+          <EmptyState icon="solar:gallery-bold" message={t("salami.capes.gallery.empty")} compact fullHeight={false} />
         ) : (
           <>
             <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
@@ -593,21 +612,21 @@ export function SalamiCapesTab() {
                       <div className="flex flex-wrap items-center justify-center gap-1">
                         {adopting === entry.id && <Icon icon="svg-spinners:ring-resize" className="h-3.5 w-3.5 text-white/70" />}
                         {entry.official && (
-                          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/80">
-                            {t("salami.capes.gallery.official")}
+                          <span className="inline-flex whitespace-nowrap">
+                            <DeliLabel size="sm" tone="red">{t("salami.capes.gallery.official")}</DeliLabel>
                           </span>
                         )}
                         {own && (
-                          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/80">
-                            {t("salami.capes.gallery.owned")}
+                          <span className="inline-flex whitespace-nowrap">
+                            <DeliLabel size="sm">{t("salami.capes.gallery.owned")}</DeliLabel>
                           </span>
                         )}
                         {entry.wearers > 0 && (
                           <span
                             title={t("salami.capes.gallery.wearers", { count: entry.wearers })}
-                            className="flex items-center gap-1 rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-white/70"
+                            className="flex items-center gap-1 px-1 font-minecraft text-xs text-white/60"
                           >
-                            <Icon icon="solar:users-group-rounded-bold" className="h-3 w-3" />
+                            <Icon icon="solar:users-group-rounded-bold" className="h-3.5 w-3.5" />
                             {entry.wearers}
                           </span>
                         )}
@@ -617,7 +636,7 @@ export function SalamiCapesTab() {
                             title={t("salami.capes.gallery.report")}
                             aria-label={t("salami.capes.gallery.report")}
                             onClick={() => setReporting(entry.id)}
-                            className="rounded-md p-1 text-white/60 opacity-60 transition-opacity hover:bg-white/10 hover:text-red-300 focus:opacity-100 group-hover:opacity-100"
+                            className="p-1 text-white/60 opacity-60 transition-opacity hover:bg-white/10 hover:text-red-300 focus:opacity-100 group-hover:opacity-100"
                           >
                             <Icon icon="solar:flag-bold" className="h-3.5 w-3.5" />
                           </button>
@@ -661,6 +680,7 @@ export function SalamiCapesTab() {
           onReported={hideReported}
         />
       )}
+      {confirmDialog}
     </div>
   );
 }

@@ -17,9 +17,10 @@ export const FONT_PRESETS: Record<string, FontPreset> = {
   minecraft: {
     id: "minecraft",
     name: "Minecraft",
-    smallcaps: '"SmallCaps", monospace',
+    // Fließtext nicht in der Kapitälchen-Schrift – die zeigt alles in Großbuchstaben
+    smallcaps: '"MinecraftTen", "Fredoka", sans-serif',
     minecraft: '"MinecraftTen", sans-serif',
-    preview: '"MinecraftTen", "SmallCaps", sans-serif',
+    preview: '"MinecraftTen", sans-serif',
   },
   system: {
     id: "system",

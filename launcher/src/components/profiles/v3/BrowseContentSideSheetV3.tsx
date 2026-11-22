@@ -28,6 +28,8 @@ import { ModrinthSearchV2 } from "../../modrinth/v2/ModrinthSearchV2";
 import { ModDetailPage } from "../../mods/ModDetailPage";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { useModSearchStoreSnapshot } from "./useModSearchStoreSnapshot";
+import { SURFACE, kopfband } from "../../ui/design-system";
+import { SALAMI_COLORS } from "../../../themes/salami/salami-theme";
 
 export interface BrowseContentSideSheetV3Props {
   open: boolean;
@@ -122,80 +124,41 @@ export function BrowseContentSideSheetV3({
   return createPortal(
     <>
       {/* Backdrop — lighter than the Modal spec so the sheet reads as
-          "docked side task", not "blocking dialog". Blurred so focus lands
-          on the sheet while the profile view behind stays readable. */}
+          "docked side task", not "blocking dialog"; the profile view behind
+          stays readable. */}
       <div
         onClick={onClose}
         aria-hidden="true"
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[1000] animate-in fade-in duration-150"
+        className="fixed inset-0 bg-black/55 z-[1000] animate-in fade-in duration-150"
       />
 
-      {/* Sheet: docked to the right edge. Frosted-glass treatment — lower
-          opacity + heavy blur + saturation boost so the app's gradient and
-          particle layers shine through instead of being walled off. A subtle
-          left-to-right gradient gives the surface depth (slightly lighter on
-          the docked edge where the accent stripe sits). */}
+      {/* Sheet: docked to the right edge, opaque warm surface with a hairline
+          on the docked edge (Salami-Feinkost: no glass, no glow). */}
       <aside
         role="dialog"
         aria-modal="true"
         aria-label={title}
         className="fixed right-0 top-0 h-full w-[82vw] min-w-[640px] max-w-[1300px] z-[1001] flex flex-col shadow-[0_0_64px_-8px_rgba(0,0,0,0.7)] animate-in slide-in-from-right duration-200 overflow-hidden"
         style={{
-          // Light see-through base — a soft dark veil (~0.42 alpha) takes
-          // the edge off what's behind without hiding it, with accent
-          // ellipses layered on top for the themed tint. No blur, so the
-          // profile view stays recognizable through the sheet.
-          // "Soft Gradients 2.0" per 2026 UI consensus, now with real
-          // backdrop-blur. All background layers now carry alpha (incl. the
-          // base) so the backdrop-filter actually has content peeking
-          // through to blur — a fully opaque bottom layer would swallow
-          // the blur entirely. The base alpha is dropped enough to feel
-          // glassy but not so much that text legibility suffers.
-          background: `
-            radial-gradient(ellipse 85% 65% at 12% 15%, ${accent}24 0%,     transparent 60%),
-            radial-gradient(ellipse 75% 60% at 88% 85%, ${accentDark}1e 0%, transparent 60%),
-            linear-gradient(135deg, rgba(14,14,22,0.72) 0%, rgba(10,10,18,0.72) 100%)
-          `,
-          backdropFilter: "blur(22px) saturate(140%)",
-          WebkitBackdropFilter: "blur(22px) saturate(140%)",
+          // Salami: deckende, warme Fläche statt kaltem Glas (DESIGN.md: kein Blur als Stilmittel)
+          background: SURFACE.solid,
+          borderLeft: `1px solid ${SURFACE.lineStrong}`,
         }}
       >
-        {/* Subtle white highlight inside the docked edge — the "glass catches
-            light" moment that keeps the panel from looking flat against the
-            viewport edge. */}
-        <div
-          aria-hidden="true"
-          className="absolute left-0 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-white/20 to-transparent pointer-events-none"
-        />
-
-        {/* Accent stripe on the docked edge — thin, luminous, signals which
-            surface the sheet belongs to without screaming for attention. */}
-        <div
-          aria-hidden="true"
-          className="absolute left-0 top-0 bottom-0 w-[2px] pointer-events-none"
-          style={{
-            background: `linear-gradient(to bottom, transparent, ${accent}cc, ${accent}, ${accent}cc, transparent)`,
-            boxShadow: `0 0 18px ${accent}80`,
-          }}
-        />
-
-        {/* Header uses the V3 detail-view top-bar spec (h-11, px-5, border-
-            white/5, font-minecraft uppercase tracking-wider) so the sheet
-            reads as an extension of the detail view's chrome rather than a
-            foreign dialog with its own type scale.
+        {/* Header: Kopfband im Salami-Anschnitt wie bei Dialogen und Kartenköpfen.
             When a mod detail is stacked on top, the header morphs into a
             breadcrumb back-button so the user can pop just the detail layer
             without closing the whole sheet. */}
-        <div className="flex items-center justify-between px-5 h-11 border-b border-white/5 flex-shrink-0 relative">
+        <div className="salami-fat-spots flex items-center justify-between px-5 h-12 flex-shrink-0 relative" style={kopfband(accent)}>
           <div className="flex items-center gap-2 min-w-0">
             {detail ? (
               <button
                 onClick={() => setDetail(null)}
-                className="flex items-center gap-2 text-white/70 hover:text-white transition-colors"
+                className="flex items-center gap-2 text-white/80 hover:text-white transition-colors"
                 title={t("common.back")}
               >
                 <Icon icon="solar:arrow-left-linear" className="w-4 h-4" />
-                <span className="text-xs font-minecraft uppercase tracking-wider">
+                <span className="text-base font-minecraft">
                   {title}
                 </span>
               </button>
@@ -203,27 +166,27 @@ export function BrowseContentSideSheetV3({
               <>
                 <Icon
                   icon="solar:add-circle-bold"
-                  className="w-4 h-4 flex-shrink-0"
-                  style={{ color: accent }}
+                  className="w-5 h-5 flex-shrink-0"
+                  style={{ color: SALAMI_COLORS.fat }}
                 />
-                <span className="text-xs font-minecraft uppercase tracking-wider text-white/90 truncate">
+                <span className="text-base font-minecraft text-white truncate">
                   {title}
                 </span>
               </>
             )}
-            <span className="text-white/25">/</span>
-            <span className="text-xs font-minecraft text-white/55 normal-case truncate max-w-[280px]">
+            <span className="text-white/40">/</span>
+            <span className="text-base font-minecraft text-white/70 normal-case truncate max-w-[280px]">
               {isPackTarget ? installTarget.packName : profile.name || profile.id}
             </span>
           </div>
-          <div className="flex items-center gap-2 text-[10px] font-minecraft uppercase tracking-wider text-white/30">
+          <div className="flex items-center gap-2 text-xs text-white/60">
             <span className="hidden sm:inline-flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-white/50">esc</kbd>
+              <kbd className="px-1.5 py-0.5 rounded bg-black/25 border border-white/15 text-white/75">Esc</kbd>
               <span>{t("common.close")}</span>
             </span>
             <button
               onClick={onClose}
-              className="p-2 rounded hover:bg-white/5 text-white/50 hover:text-white transition-colors"
+              className="p-2 rounded hover:bg-black/25 text-white/75 hover:text-white transition-colors"
               title={t("common.close")}
             >
               <Icon icon="solar:close-circle-linear" className="w-4 h-4" />

@@ -31,14 +31,14 @@ export function useProjectIcons(refs: ProjectIconRef[]) {
     });
 
     const loadModrinth = async () => {
-      const cached = useIconCacheStore.getState().modrinthIcons;
+      const { modrinthIcons: cached, modrinthTitles: cachedTitles } = useIconCacheStore.getState();
       const ids = [
         ...new Set(
           entries
             .filter(
               (entry) =>
                 entry.platform === "modrinth" &&
-                cached[entry.projectId] === undefined,
+                (cached[entry.projectId] === undefined || cachedTitles[entry.projectId] === undefined),
             )
             .map((entry) => entry.projectId),
         ),
@@ -48,25 +48,29 @@ export function useProjectIcons(refs: ProjectIconRef[]) {
       try {
         const details = await ModrinthService.getProjectDetails(ids);
         const patch: Record<string, string | null> = {};
+        const titles: Record<string, string | null> = {};
         if (Array.isArray(details)) {
           details.forEach((detail) => {
-            if (detail?.id) patch[detail.id] = detail.icon_url || null;
+            if (!detail?.id) return;
+            patch[detail.id] = detail.icon_url || null;
+            titles[detail.id] = detail.title || null;
           });
         }
         useIconCacheStore.getState().mergeModrinthIcons(patch);
+        useIconCacheStore.getState().mergeModrinthTitles(titles);
       } catch {
       }
     };
 
     const loadCurseForge = async () => {
-      const cached = useIconCacheStore.getState().curseforgeIcons;
+      const { curseforgeIcons: cached, curseforgeTitles: cachedTitles } = useIconCacheStore.getState();
       const ids = [
         ...new Set(
           entries
             .filter(
               (entry) =>
                 entry.platform === "curseforge" &&
-                cached[entry.projectId] === undefined,
+                (cached[entry.projectId] === undefined || cachedTitles[entry.projectId] === undefined),
             )
             .map((entry) => entry.projectId),
         ),
@@ -79,10 +83,13 @@ export function useProjectIcons(refs: ProjectIconRef[]) {
       try {
         const response = await CurseForgeService.getModsByIds(numericIds);
         const patch: Record<string, string | null> = {};
-        response?.data?.forEach((entry: { id: number; logo?: { url?: string } }) => {
+        const titles: Record<string, string | null> = {};
+        response?.data?.forEach((entry: { id: number; name?: string; logo?: { url?: string } }) => {
           patch[String(entry.id)] = entry.logo?.url ?? null;
+          titles[String(entry.id)] = entry.name ?? null;
         });
         useIconCacheStore.getState().mergeCurseforgeIcons(patch);
+        useIconCacheStore.getState().mergeCurseforgeTitles(titles);
       } catch {
       }
     };

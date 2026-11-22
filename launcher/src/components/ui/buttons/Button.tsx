@@ -128,9 +128,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       }
     };
 
-    const shouldShowShadow = () => {
-      return variant === "3d" && shadowDepth !== "none";
-    };    const skin = getButtonSkin(variant, accentColor, isHovered && !disabled);
+    // Salami: kein weicher gsap-Schein beim Überfahren – die harte Kante (`kante`) bleibt stehen
+    const shouldShowShadow = () => false;    const skin = getButtonSkin(variant, accentColor, isHovered && !disabled);
     
     const getButtonSizeClasses = () => {
       switch (size) {
@@ -166,6 +165,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={mergedRef}
         type="button"
         disabled={disabled}        className={cn(
+          // Ansatzpunkt für die Looks (themes/looks): look-btn--primary | accent | secondary | ghost | destructive …
+          "look-btn",
+          `look-btn--${variant === "3d" || variant === "elevated" ? "primary" : variant === "default" ? "accent" : variant === "flat-secondary" ? "secondary" : variant}`,
           "relative overflow-hidden font-smallcaps transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2",
           "flex items-center justify-center gap-2 whitespace-nowrap",
           radiusClass,

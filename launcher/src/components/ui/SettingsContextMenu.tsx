@@ -3,6 +3,7 @@
 import React, { useEffect, useRef } from "react";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../store/useThemeStore";
+import { SURFACE } from "./design-system";
 import type { Profile } from "../../types/profile";
 
 export interface ContextMenuItem {
@@ -103,8 +104,11 @@ export function SettingsContextMenu({
   return (
     <div
       ref={menuRef}
-      className="absolute bg-black/90 backdrop-blur-sm border border-white/20 rounded-lg shadow-xl z-50 overflow-hidden"
+      className="look-menu absolute border rounded-lg shadow-xl z-50 overflow-hidden"
       style={{
+        // Salami: deckend und warm statt schwarzem Glas
+        backgroundColor: SURFACE.solid,
+        borderColor: SURFACE.lineStrong,
         left: position.x,
         top: position.y,
         minWidth: "200px",

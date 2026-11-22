@@ -7,6 +7,8 @@ import { useThemeStore } from "../../store/useThemeStore";
 import { CAPE_REPORT_REASONS, reportCape, type CapeReportReason } from "../../services/salami-cape-service";
 import { CapeFace } from "./CapeFace";
 import "./i18n";
+import { errorText } from "../../utils/error-text";
+import { KANTE_SOFT, SURFACE, hexAlpha, kante, kopfband } from "../ui/design-system";
 
 const MAX_NOTE = 200;
 
@@ -44,31 +46,34 @@ export function CapeReportDialog({ id, image, onClose, onReported }: Props) {
       toast.success(t(status === "already_reported" ? "salami.capes.report.already" : "salami.capes.report.sent"));
       onReported(id);
     } catch (error) {
-      toast.error(t("salami.capes.error", { error: error instanceof Error ? error.message : String(error) }));
+      toast.error(t("salami.capes.error", { error: errorText(error) }));
       setSending(false);
     }
   };
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-6 backdrop-blur-sm"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 p-6"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !sending) onClose();
       }}
     >
+      {/* Salami-Feinkost: deckender Dialog mit Kopfband wie `Modal` */}
       <form
         role="dialog"
         aria-modal="true"
         aria-labelledby="cape-report-title"
-        className="flex w-full max-w-[460px] flex-col gap-4 rounded-2xl border border-white/10 bg-[#1d1412] p-5 shadow-2xl"
+        className="flex w-full max-w-[460px] flex-col gap-4 overflow-hidden rounded-2xl border px-5 pb-5 shadow-2xl"
+        style={{ backgroundColor: SURFACE.solid, borderColor: SURFACE.line }}
         onSubmit={(e) => {
           e.preventDefault();
           void send();
         }}
       >
+        <div className="salami-fat-spots -mx-5 h-2.5 flex-shrink-0" style={kopfband(accent.value)} aria-hidden="true" />
         <header className="flex items-center gap-3">
           <Icon icon="solar:flag-bold" className="h-6 w-6 text-red-300" />
-          <h2 id="cape-report-title" className="text-lg font-semibold text-white">
+          <h2 id="cape-report-title" className="font-minecraft text-lg normal-case tracking-normal text-white">
             {t("salami.capes.report.title")}
           </h2>
         </header>
@@ -81,15 +86,19 @@ export function CapeReportDialog({ id, image, onClose, onReported }: Props) {
         </div>
 
         <fieldset className="flex flex-col gap-1.5">
-          <legend className="mb-1.5 text-sm font-semibold text-white">{t("salami.capes.report.reason")}</legend>
+          <legend className="mb-1.5 font-minecraft text-sm text-white">{t("salami.capes.report.reason")}</legend>
           {CAPE_REPORT_REASONS.map((value) => (
             <label
               key={value}
               className={cn(
                 "flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2 text-sm text-white transition-colors",
-                reason === value ? "bg-white/10" : "border-white/10 bg-black/25 hover:bg-white/5",
+                reason !== value && "hover:border-white/20",
               )}
-              style={reason === value ? { borderColor: accent.value } : undefined}
+              style={
+                reason === value
+                  ? { borderColor: accent.value, backgroundColor: hexAlpha(accent.value, 0.12) }
+                  : { borderColor: SURFACE.line, backgroundColor: SURFACE.base }
+              }
             >
               <input
                 type="radio"
@@ -124,14 +133,16 @@ export function CapeReportDialog({ id, image, onClose, onReported }: Props) {
             type="button"
             onClick={onClose}
             disabled={sending}
-            className="rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15 disabled:opacity-50"
+            className="h-9 px-4 font-minecraft text-sm text-white transition-[filter] duration-150 hover:brightness-125 active:translate-y-px disabled:opacity-50"
+            style={{ backgroundColor: SURFACE.hover, boxShadow: KANTE_SOFT }}
           >
             {t("salami.capes.report.cancel")}
           </button>
           <button
             type="submit"
             disabled={!reason || sending}
-            className="flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-9 items-center gap-2 px-4 font-minecraft text-sm text-white transition-[filter] duration-150 hover:brightness-110 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
+            style={{ backgroundColor: "#dc2626", boxShadow: kante("#dc2626") }}
           >
             {sending ? <Icon icon="svg-spinners:ring-resize" className="h-4 w-4" /> : <Icon icon="solar:flag-bold" className="h-4 w-4" />}
             {t("salami.capes.report.send")}

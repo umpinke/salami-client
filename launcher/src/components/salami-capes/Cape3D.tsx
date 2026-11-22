@@ -197,9 +197,10 @@ export function Cape3D({ src, className }: { src: string; className?: string }) 
             type="button"
             aria-pressed={mode === item}
             onClick={() => setMode(item)}
+            // Salami: gewählte Ansicht als cremefarbenes Etikett (wie DeliLabel), die andere zurückhaltend
             className={cn(
-              "rounded-md px-2 py-0.5 text-xs text-white transition-colors",
-              mode === item ? "bg-white/25" : "hover:bg-white/10",
+              "px-2 py-0.5 font-minecraft text-xs transition-colors",
+              mode === item ? "bg-[#F3E3D3] text-[#2B1D1A]" : "text-white/75 hover:bg-white/10 hover:text-white",
             )}
           >
             {t(`salami.capes.preview.${item}`)}

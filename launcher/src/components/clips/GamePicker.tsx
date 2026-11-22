@@ -8,6 +8,7 @@ import { useThemeStore } from "../../store/useThemeStore";
 import { listOpenApps, type OpenApp } from "../../services/clip-service";
 import type { OtherGame } from "../../types/launcherConfig";
 import { cn } from "../../lib/utils";
+import { SURFACE } from "../ui/design-system";
 
 interface Props {
   value: OtherGame | null;
@@ -44,7 +45,10 @@ export function GamePicker({ value, onChange, disabled, t }: Props) {
   }
 
   return (
-    <div className={cn("flex flex-col gap-2 rounded-lg bg-black/20 border border-white/10 p-3", disabled && "opacity-50")}>
+    <div
+      className={cn("flex flex-col gap-2 border p-3", disabled && "opacity-50")}
+      style={{ backgroundColor: SURFACE.base, borderColor: SURFACE.line, borderRadius: "var(--border-radius)" }}
+    >
       <div className="flex items-center justify-between gap-3">
         <p className="font-minecraft text-xs text-white/50">{t("settings.clips.games.open")}</p>
         <Button

@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { UpdateInfo } from '../types/updater';
 import type { Profile } from '../types/profile';
 import { useProfileStore } from '../store/profile-store';
+import i18n from '../i18n/i18n';
 
 /**
  * Triggers a refresh of the pack configuration from the backend.
@@ -56,7 +57,7 @@ export const refreshNrcDataOnMount = async (): Promise<void> => {
   } catch (error) {
     console.error("Error during pack data refresh or profile fetching process:", error);
     useProfileStore.setState({
-      error: "Failed to initialize or refresh app data.",
+      error: i18n.t('profiles.errors.load_failed'),
       loading: false,
     });
   }

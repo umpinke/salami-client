@@ -25,6 +25,9 @@ import { useGlobalModal } from "../../../../hooks/useGlobalModal";
 import { ThemedDropdown, ThemedDropdownItem } from "../shared/ThemedDropdown";
 import { EmptyStateV3 } from "../shared/EmptyStateV3";
 import { FloatingActionBar, type FABActionConfig } from "../shared/FloatingActionBar";
+import { FK_SOFT_BUTTON_CLASS, fkCardStyle, FK_CARD_CLASS } from "../shared/feinkost";
+import { LoadingSpinner } from "../../../ui/LoadingSpinner";
+import { SALAMI_COLORS } from "../../../../themes/salami/salami-theme";
 import { parseErrorMessage } from "../../../../utils/error-utils";
 
 interface ScreenshotsTabV3Props {
@@ -189,11 +192,11 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
   return (
     <div className="flex flex-col min-h-0 flex-1 relative">
       {/* ── Sticky Toolbar ─────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-5 h-12 border-b border-white/5 flex-shrink-0 bg-black/20 sticky top-0 z-10">
+      <div className="flex items-center gap-2 px-5 h-14 border-b border-white/[0.09] flex-shrink-0 sticky top-0 z-10">
         <div className="relative">
           <button
             onClick={() => setSortMenuOpen(v => !v)}
-            className="h-8 px-2.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-minecraft text-white/70 flex items-center gap-1.5"
+            className={`h-9 px-3 text-sm font-minecraft flex items-center gap-1.5 ${FK_SOFT_BUTTON_CLASS}`}
           >
             <Icon icon="solar:sort-vertical-bold" className="w-3.5 h-3.5" />
             {activeSortLabel}
@@ -215,14 +218,14 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
 
         <div className="flex-1" />
 
-        <span className="text-[10px] text-white/35 font-minecraft tabular-nums">
+        <span className="text-sm text-white/45 tabular-nums">
           {t("profiles.v3.screenshots.count", { count: screenshots.length })}
         </span>
 
         <button
           onClick={loadData}
           disabled={loading}
-          className="h-8 px-2.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white disabled:opacity-50 flex items-center transition-colors"
+          className={`h-9 px-2.5 disabled:opacity-50 flex items-center ${FK_SOFT_BUTTON_CLASS}`}
           title={t("profiles.v3.toolbar.refresh")}
         >
           <Icon icon="solar:refresh-bold" className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
@@ -237,7 +240,7 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
             <div className="flex-1 min-w-0 text-xs font-minecraft text-rose-100 break-words">{error}</div>
             <button
               onClick={loadData}
-              className="flex-shrink-0 h-7 px-2 rounded-md text-[10px] font-minecraft uppercase tracking-wider text-rose-100 hover:bg-rose-500/20 transition-colors"
+              className="flex-shrink-0 h-7 px-2 rounded-md text-xs font-minecraft text-rose-100 hover:bg-rose-500/20 transition-colors"
             >
               {t("profiles.v3.content.retry")}
             </button>
@@ -246,9 +249,8 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
 
         {loading && screenshots.length === 0 ? (
           shouldShowLoading ? (
-            <div className="flex items-center justify-center h-40 text-white/40 font-minecraft text-sm animate-in fade-in duration-300">
-              <Icon icon="svg-spinners:ring-resize" className="w-4 h-4 mr-2" />
-              {t("profiles.v3.content.loading")}
+            <div className="flex items-center justify-center h-40 animate-in fade-in duration-300">
+              <LoadingSpinner size="md" shadowDepth="none" message={t("profiles.v3.content.loading")} />
             </div>
           ) : (
             <div className="h-40" />
@@ -353,10 +355,11 @@ const ScreenshotTile: React.FC<ScreenshotTileProps> = ({
         if (selectMode) { e.stopPropagation(); onToggleSelection(); return; }
         onOpen();
       }}
-      style={isSelected ? { borderColor: `${accentColor}aa`, boxShadow: `0 0 0 1px ${accentColor}aa` } : undefined}
-      className={`group relative aspect-video rounded-md overflow-hidden bg-white/5 border transition-all cursor-pointer ${
-        isSelected ? "" : "border-white/10 hover:border-white/30"
-      }`}
+      style={{
+        ...fkCardStyle(accentColor, isSelected),
+        ...(isSelected ? { boxShadow: `0 0 0 1px ${accentColor}` } : {}),
+      }}
+      className={`group relative aspect-video overflow-hidden cursor-pointer hover:-translate-y-0.5 ${FK_CARD_CLASS}`}
     >
       {/* Preview / Placeholder / Error */}
       {previewError ? (
@@ -407,7 +410,10 @@ const ScreenshotTile: React.FC<ScreenshotTileProps> = ({
 
       {/* Date-Badge unten links — nur bei Hover sichtbar */}
       <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <span className="text-[10px] text-white font-minecraft bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded">
+        <span
+          className="text-xs font-minecraft px-1.5 py-0.5"
+          style={{ background: SALAMI_COLORS.fat, color: SALAMI_COLORS.pepper, borderRadius: "4px 10px 10px 4px", boxShadow: "0 2px 0 rgba(0,0,0,0.35)" }}
+        >
           {formatRelativeTime(screenshot.modified)}
         </span>
       </div>

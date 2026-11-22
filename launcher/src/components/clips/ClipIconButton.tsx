@@ -29,8 +29,9 @@ export function ClipIconButton({
         aria-label={label}
         disabled={disabled}
         className={cn(
-          "w-8 h-8 flex items-center justify-center rounded bg-black/30 text-white/70 hover:text-white border border-white/10 hover:border-white/20 transition-all duration-200",
-          tone === "danger" ? "hover:bg-red-700/80" : "hover:bg-black/50",
+          // Salami: wie die kleinen Knöpfe auf der Profil-Kachel – dunkles Feld ohne Rahmen
+          "w-8 h-8 flex items-center justify-center bg-black/40 text-white/75 hover:text-white transition-colors duration-150",
+          tone === "danger" ? "hover:bg-red-700/80" : "hover:bg-black/60",
           disabled && "cursor-not-allowed opacity-40",
           className,
         )}

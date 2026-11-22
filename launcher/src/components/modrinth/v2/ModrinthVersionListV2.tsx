@@ -19,6 +19,8 @@ import { Select, type SelectOption } from "../../ui/Select";
 import { TagBadge } from "../../ui/TagBadge";
 import { gsap } from "gsap";
 import { useThemeStore } from "../../../store/useThemeStore";
+import { EmptyState } from "../../ui/EmptyState";
+import { KanteButton, RemovableLabel, tagLabel } from "./FeinkostParts";
 
 // --- Define Props for the new component ---
 interface ModrinthVersionListV2Props {
@@ -267,7 +269,7 @@ export const ModrinthVersionListV2: React.FC<ModrinthVersionListV2Props> = ({
       { value: "all", label: t('mod_detail.versions.all_loaders') },
       ...availableLoaders.map((loader) => ({
         value: loader,
-        label: loader,
+        label: tagLabel(loader),
         icon: filters.loaders.includes(loader) ? (
           <Icon icon="solar:check-circle-bold" className="w-4 h-4" />
         ) : undefined,
@@ -286,14 +288,8 @@ export const ModrinthVersionListV2: React.FC<ModrinthVersionListV2Props> = ({
   // --- JSX Rendering (To be moved here in the next step) ---
   return (
     <div ref={containerRef} className="p-3 relative">
-      {/* Header with version filters - New design */}
-      <div
-        className="mb-4 p-3 rounded-lg border backdrop-blur-sm"
-        style={{
-          backgroundColor: `${accentColor.value}10`,
-          borderColor: `${accentColor.value}30`,
-        }}
-      >
+      {/* Filterleiste: ruhige Zeile über der Versionsliste */}
+      <div className="mb-3">
         <div className="flex flex-wrap gap-2 items-center">
           {/* Version Type Select */}
           <div className="relative">
@@ -377,95 +373,40 @@ export const ModrinthVersionListV2: React.FC<ModrinthVersionListV2Props> = ({
         </div>
 
         {showFilters && (
-          <div className="flex items-center mt-2 gap-2">
-            <div
-              className="flex-1 border rounded-md h-[48px] overflow-x-auto overflow-y-hidden whitespace-nowrap hide-scrollbar"
-              style={{
-                backgroundColor: `${accentColor.value}08`,
-                borderColor: `${accentColor.value}30`,
-              }}
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <KanteButton
+              tone="ghost"
+              size="sm"
+              onClick={handleClearAllFilters}
+              icon={<Icon icon="solar:trash-bin-trash-bold" className="h-4 w-4" />}
             >
-              <div className="flex items-center gap-1.5 p-2">
-                <TagBadge
-                  variant="destructive"
-                  className="cursor-pointer hover:brightness-110 transition-all flex-shrink-0 flex items-center"
-                  onClick={handleClearAllFilters}
-                >
-                  <Icon icon="solar:trash-bin-trash-bold" className="w-3 h-3 mr-1.5" />
-                  <span>{t('content.filters.clear_all')}</span>
-                </TagBadge>
+              {t('content.filters.clear_all')}
+            </KanteButton>
 
-                {filters.versionType !== "all" && (
-                  <TagBadge 
-                    variant="filter"
-                    className="inline-flex whitespace-nowrap">
-                    {t('mod_detail.type')}: {filters.versionType}
-                    <button
-                      onClick={() =>
-                        onFilterChange(projectId, "versionType", "all")
-                      }
-                      className="ml-1.5 text-current opacity-70 hover:opacity-100 focus:outline-none"
-                      aria-label={`Remove version type ${filters.versionType}`}
-                    >
-                      <Icon
-                        icon="solar:close-circle-bold"
-                        className="w-3 h-3"
-                      />
-                    </button>
-                  </TagBadge>
-                )}
+            {filters.versionType !== "all" && (
+              <RemovableLabel onRemove={() => onFilterChange(projectId, "versionType", "all")}>
+                {t('mod_detail.type')}: {t(`mod_detail.versions.${filters.versionType}`, { defaultValue: filters.versionType })}
+              </RemovableLabel>
+            )}
 
-                {filters.gameVersions.map((version) => (
-                  <TagBadge
-                    key={`gv-${version}`}
-                    variant="filter"
-                    className="inline-flex whitespace-nowrap"
-                  >
-                    {version}
-                    <button
-                      onClick={() => {
-                        const newVersions = filters.gameVersions.filter(
-                          (v) => v !== version,
-                        );
-                        onFilterChange(projectId, "gameVersions", newVersions);
-                      }}
-                      className="ml-1.5 text-current opacity-70 hover:opacity-100 focus:outline-none"
-                      aria-label={`Remove game version ${version}`}
-                    >
-                      <Icon
-                        icon="solar:close-circle-bold"
-                        className="w-3 h-3"
-                      />
-                    </button>
-                  </TagBadge>
-                ))}
+            {filters.gameVersions.map((version) => (
+              <RemovableLabel
+                key={`gv-${version}`}
+                onRemove={() => onFilterChange(projectId, "gameVersions", filters.gameVersions.filter((v) => v !== version))}
+              >
+                {version}
+              </RemovableLabel>
+            ))}
 
-                {filters.loaders.map((loader) => (
-                  <TagBadge
-                    key={`loader-${loader}`}
-                    variant="filter"
-                    className="inline-flex whitespace-nowrap"
-                  >
-                    {loader}
-                    <button
-                      onClick={() => {
-                        const newLoaders = filters.loaders.filter(
-                          (l) => l !== loader,
-                        );
-                        onFilterChange(projectId, "loaders", newLoaders);
-                      }}
-                      className="ml-1.5 text-current opacity-70 hover:opacity-100 focus:outline-none"
-                      aria-label={`Remove loader ${loader}`}
-                    >
-                      <Icon
-                        icon="solar:close-circle-bold"
-                        className="w-3 h-3"
-                      />
-                    </button>
-                  </TagBadge>
-                ))}
-              </div>
-            </div>
+            {filters.loaders.map((loader) => (
+              <RemovableLabel
+                key={`loader-${loader}`}
+                tone="red"
+                onRemove={() => onFilterChange(projectId, "loaders", filters.loaders.filter((l) => l !== loader))}
+              >
+                {tagLabel(loader)}
+              </RemovableLabel>
+            ))}
           </div>
         )}
       </div>
@@ -505,29 +446,22 @@ export const ModrinthVersionListV2: React.FC<ModrinthVersionListV2Props> = ({
           })}
           {/* Load More Button */}
           {filteredVersions.length > displayedCount && (
-            <Button
+            <KanteButton
               onClick={() => onLoadMore(projectId)}
-              variant="ghost"
-              size="xs"
-              shadowDepth="short"
-              className="w-full mt-2 text-xs"
+              size="sm"
+              className="mt-1 w-full"
             >
               {t('content.search.load_more', { remaining: filteredVersions.length - displayedCount })}
-            </Button>
+            </KanteButton>
           )}
         </div>
       ) : (
-        <div
-          className="relative overflow-hidden transition-colors duration-150 rounded-md p-4 text-sm text-gray-400 text-center border backdrop-blur-md"
-          style={{
-            borderColor: `${accentColor.value}60`,
-            borderBottomColor: accentColor.value,
-            boxShadow: `0 8px 28px rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.1), inset 0 0 0 1px rgba(255,255,255,0.05)`,
-            backgroundColor: `${accentColor.value}15`,
-          }}
-        >
-          {t('modrinth.no_versions_match_filters')}
-        </div>
+        <EmptyState
+          icon="solar:filter-bold"
+          message={t('modrinth.no_versions_match_filters')}
+          compact
+          fullHeight={false}
+        />
       )}
     </div>
   );

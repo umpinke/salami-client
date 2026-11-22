@@ -1,4 +1,4 @@
-import { installContentToTarget } from "../../services/content-service";
+import { InstallCancelledError, installContentToTarget } from "../../services/content-service";
 import UnifiedService from "../../services/unified-service";
 import { ContentType } from "../../types/content";
 import type { Profile } from "../../types/profile";
@@ -68,6 +68,11 @@ export async function installCart(
       await installContentToTarget(payload, undefined, { preflight: "conflicts_only" });
       result.ok.push(item);
     } catch (error) {
+      // a closed dependency dialog skips this mod, it did not fail
+      if (error instanceof InstallCancelledError) {
+        result.skipped.push(item);
+        continue;
+      }
       result.failed.push({ item, error: error instanceof Error ? error.message : String(error) });
     }
   }

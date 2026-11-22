@@ -9,6 +9,7 @@ import type { ClipDetails, TrackLevel } from "../../services/clip-service";
 import { TrackLevelControl, Waveform, trackName } from "./ClipTimeline";
 import { cn } from "../../lib/utils";
 import { useTrimPreview } from "./useTrimPreview";
+import { SURFACE, kante } from "../ui/design-system";
 
 const MIN_LENGTH = 0.5;
 
@@ -174,11 +175,15 @@ export function ClipTrimmer({
             type="button"
             onClick={preview}
             aria-label={t("clips.trim.preview")}
-            className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[2px] transition-colors hover:bg-black/40"
+            className="absolute inset-0 flex items-center justify-center bg-black/30 transition-colors hover:bg-black/40"
           >
             <span
-              className="flex h-14 w-14 items-center justify-center rounded-full border border-white/20"
-              style={{ backgroundColor: `${accentColor.value}40` }}
+              className="flex h-14 w-14 items-center justify-center"
+              style={{
+                backgroundColor: accentColor.value,
+                boxShadow: kante(accentColor.value),
+                borderRadius: "calc(var(--border-radius) * 0.8)",
+              }}
             >
               <Icon icon="solar:play-bold" className="h-7 w-7 text-white" />
             </span>
@@ -193,7 +198,7 @@ export function ClipTrimmer({
             {kept.toFixed(1)}
             <span className="ml-1 text-lg text-white/50">s</span>
           </span>
-          <span className="font-smallcaps text-xs uppercase tracking-wider text-white/50">
+          <span className="font-minecraft text-xs text-white/55">
             {t("clips.trim.kept_label")}
           </span>
         </div>
@@ -235,7 +240,7 @@ export function ClipTrimmer({
                 style={{ color: accentColor.light }}
               >
                 <Waveform peaks={track.peaks} gain={volume / 100} muted={volume === 0} />
-                <span className="pointer-events-none absolute left-2 top-1.5 font-smallcaps text-xs uppercase tracking-wider text-white/50">
+                <span className="pointer-events-none absolute left-2 top-1.5 font-minecraft text-xs text-white/55">
                   {trackName(track.label, t)}
                 </span>
               </div>
@@ -289,7 +294,10 @@ export function ClipTrimmer({
       </div>
 
       {adjustable.length > 0 && (
-        <div className="flex flex-col gap-3 rounded-lg bg-black/20 border border-white/10 px-4 py-3">
+        <div
+          className="flex flex-col gap-3 border px-4 py-3"
+          style={{ backgroundColor: SURFACE.base, borderColor: SURFACE.line, borderRadius: "var(--border-radius)" }}
+        >
           {adjustable.map((track) => (
             <TrackLevelControl
               key={track.stream}
@@ -353,7 +361,7 @@ function Readout({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col items-center pb-1">
       <span className="font-minecraft text-base text-white/80">{value}</span>
-      <span className="font-smallcaps text-xs uppercase tracking-wider text-white/50">{label}</span>
+      <span className="font-minecraft text-xs text-white/55">{label}</span>
     </div>
   );
 }

@@ -10,6 +10,9 @@ import type { UnifiedProjectDetails } from "../../types/unified";
 import { UnifiedDependencyType } from "../../types/unified";
 import type { AccentColor } from "../../store/useThemeStore";
 import { openExternalUrl } from "../../services/tauri-service";
+import { KANTE_SOFT, SURFACE } from "../ui/design-system";
+import { DeliLabel } from "../../themes/salami/SalamiStage";
+import { ICON_WELL, PLAIN_CARD, projectTypeKey, SectionHeading, tagLabel } from "../modrinth/v2/FeinkostParts";
 
 interface ModDetailSidebarProps {
   project: UnifiedProjectDetails;
@@ -37,7 +40,13 @@ function LinkItem({ icon, label, url }: LinkItemProps) {
   return (
     <button
       onClick={handleClick}
-      className="flex items-center gap-2 w-full px-3 py-2 rounded-lg bg-black/20 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all text-left group"
+      className="flex items-center gap-2 w-full px-3 py-2 border transition-[background-color,border-color,transform] duration-150 text-left group hover:bg-white/[0.08] hover:border-white/20 active:translate-y-px motion-reduce:transition-none"
+      style={{
+        backgroundColor: SURFACE.hover,
+        borderColor: SURFACE.line,
+        borderRadius: "calc(var(--border-radius) * 0.7)",
+        boxShadow: KANTE_SOFT,
+      }}
     >
       <Icon icon={icon} className="w-4 h-4 text-white/70 group-hover:text-white" />
       <span className="text-sm font-minecraft text-white/70 group-hover:text-white truncate">
@@ -180,11 +189,8 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
     <div className="space-y-4">
       {/* Compatibility Section */}
       {hasCompatibilityInfo && (
-        <div className="bg-black/20 rounded-lg p-4 border border-white/10">
-          <h3 className="text-sm font-minecraft text-white/70 mb-3 uppercase flex items-center gap-2">
-            <Icon icon="solar:check-circle-bold" className="w-4 h-4" />
-            {t('mod_detail.compatibility')}
-          </h3>
+        <div className="look-card p-4" style={PLAIN_CARD}>
+          <SectionHeading size="sm" className="mb-3">{t('mod_detail.compatibility')}</SectionHeading>
 
           <div className="space-y-3 text-xs font-minecraft">
             {/* Minecraft Versions */}
@@ -193,17 +199,14 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
                 <span className="text-white/50 mb-2 block">
                   {t('mod_detail.minecraft_java')}
                 </span>
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap items-center gap-1.5">
                   {formattedVersions.slice(0, 8).map((version) => (
-                    <span
-                      key={version}
-                      className="px-2 py-0.5 bg-white/10 rounded text-white/80 text-[10px]"
-                    >
+                    <DeliLabel key={version} size="sm">
                       {version}
-                    </span>
+                    </DeliLabel>
                   ))}
                   {formattedVersions.length > 8 && (
-                    <span className="px-2 py-0.5 text-white/50 text-[10px]">
+                    <span className="px-1 text-white/50 text-[11px]">
                       +{formattedVersions.length - 8} {t('common.more')}
                     </span>
                   )}
@@ -217,15 +220,11 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
                 <span className="text-white/50 mb-2 block">
                   {t('mod_detail.platforms')}
                 </span>
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap items-center gap-1.5">
                   {project.loaders.map((loader) => (
-                    <span
-                      key={loader}
-                      className="px-2 py-0.5 bg-white/10 rounded text-white/80 text-[10px] capitalize flex items-center gap-1"
-                    >
-                      <Icon icon={getLoaderIcon(loader)} className="w-3 h-3" />
-                      {loader}
-                    </span>
+                    <DeliLabel key={loader} size="sm" tone="red">
+                      {tagLabel(loader)}
+                    </DeliLabel>
                   ))}
                 </div>
               </div>
@@ -265,41 +264,39 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
 
       {/* Dependencies Section */}
       {hasDependencies && (
-        <div className="bg-black/20 rounded-lg p-4 border border-white/10">
-          <h3 className="text-sm font-minecraft text-white/70 mb-3 uppercase flex items-center gap-2">
-            <Icon icon="solar:widget-add-bold" className="w-4 h-4" />
-            Dependencies ({project.dependencies.length})
-          </h3>
+        <div className="look-card p-4" style={PLAIN_CARD}>
+          <SectionHeading size="sm" className="mb-3">{t('mod_detail.dependencies')} ({project.dependencies.length})</SectionHeading>
 
           <div className="space-y-2">
             {project.dependencies.map((dep) => (
               <button
                 key={dep.project_id}
                 onClick={() => navigate(`/mods/${dep.source.toLowerCase()}/${dep.project_id}`)}
-                className="flex items-center gap-2 w-full text-left hover:bg-white/5 rounded-md p-1.5 -mx-1.5 transition-colors group"
+                className="flex items-center gap-2.5 w-full text-left hover:bg-white/[0.06] p-1.5 -mx-1.5 transition-colors duration-150 group"
+                style={{ borderRadius: "calc(var(--border-radius) * 0.6)" }}
               >
                 {dep.icon_url ? (
                   <img
                     src={dep.icon_url}
                     alt={dep.title}
-                    className="w-8 h-8 rounded object-cover flex-shrink-0"
+                    className="w-8 h-8 object-cover flex-shrink-0"
+                    style={{ borderRadius: "calc(var(--border-radius) * 0.5)" }}
                   />
                 ) : (
-                  <div className="w-8 h-8 rounded bg-white/10 flex items-center justify-center flex-shrink-0">
-                    <Icon icon="solar:box-bold" className="w-4 h-4 text-white/50" />
+                  <div
+                    className="w-8 h-8 flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: ICON_WELL, borderRadius: "calc(var(--border-radius) * 0.5)" }}
+                  >
+                    <Icon icon="solar:box-bold" className="w-4 h-4 text-[#f3e3d3]/50" />
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <span className="text-xs font-minecraft text-white truncate group-hover:text-accent transition-colors block">
+                  <span className="mb-1 block truncate text-xs font-minecraft text-white">
                     {dep.title}
                   </span>
-                  <span className={`text-[10px] font-minecraft ${
-                    dep.dependency_type === UnifiedDependencyType.Required
-                      ? 'text-red-400/80'
-                      : 'text-yellow-400/80'
-                  }`}>
-                    {dep.dependency_type === UnifiedDependencyType.Required ? 'Required' : 'Optional'}
-                  </span>
+                  <DeliLabel size="sm" tone={dep.dependency_type === UnifiedDependencyType.Required ? "red" : "fat"}>
+                    {dep.dependency_type === UnifiedDependencyType.Required ? t('mod_detail.support.required') : t('mod_detail.support.optional')}
+                  </DeliLabel>
                 </div>
                 <Icon
                   icon="solar:arrow-right-bold"
@@ -313,32 +310,34 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
 
       {/* Team Members Section */}
       {project.team_members.length > 0 && (
-        <div className="bg-black/20 rounded-lg p-4 border border-white/10">
-          <h3 className="text-sm font-minecraft text-white/70 mb-3 uppercase flex items-center gap-2">
-            <Icon icon="solar:users-group-rounded-bold" className="w-4 h-4" />
-            Team ({project.team_members.length})
-          </h3>
+        <div className="look-card p-4" style={PLAIN_CARD}>
+          <SectionHeading size="sm" className="mb-3">{t('mod_detail.team')} ({project.team_members.length})</SectionHeading>
 
           <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
             {project.team_members.map((member, index) => (
               <button
                 key={index}
                 onClick={() => openExternalUrl(member.profile_url)}
-                className="flex items-center gap-2 w-full text-left hover:bg-white/5 rounded-md p-1 -m-1 transition-colors group"
+                className="flex items-center gap-2.5 w-full text-left hover:bg-white/[0.06] p-1.5 -mx-1.5 transition-colors duration-150 group"
+                style={{ borderRadius: "calc(var(--border-radius) * 0.6)" }}
               >
                 {member.avatar_url ? (
                   <img
                     src={member.avatar_url}
                     alt={member.username}
-                    className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                    className="w-8 h-8 object-cover flex-shrink-0"
+                    style={{ borderRadius: "calc(var(--border-radius) * 0.5)" }}
                   />
                 ) : (
-                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
-                    <Icon icon="solar:user-bold" className="w-4 h-4 text-white/50" />
+                  <div
+                    className="w-8 h-8 flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: ICON_WELL, borderRadius: "calc(var(--border-radius) * 0.5)" }}
+                  >
+                    <Icon icon="solar:user-bold" className="w-4 h-4 text-[#f3e3d3]/50" />
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-minecraft text-white truncate group-hover:text-accent transition-colors">{member.username}</p>
+                  <p className="text-xs font-minecraft text-white truncate">{member.username}</p>
                   <p className="text-[10px] text-white/50 font-minecraft truncate">{member.role}</p>
                 </div>
                 <Icon
@@ -353,11 +352,8 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
 
       {/* Donate Section */}
       {hasDonations && (
-        <div className="bg-black/20 rounded-lg p-4 border border-white/10">
-          <h3 className="text-sm font-minecraft text-white/70 mb-3 uppercase flex items-center gap-2">
-            <Icon icon="solar:heart-bold" className="w-4 h-4 text-red-400" />
-            {t('mod_detail.support')}
-          </h3>
+        <div className="look-card p-4" style={PLAIN_CARD}>
+          <SectionHeading size="sm" className="mb-3">{t('mod_detail.support')}</SectionHeading>
 
           <div className="space-y-2">
             {project.donation_urls.map((donation, index) => (
@@ -374,11 +370,8 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
 
       {/* Links Section */}
       {hasLinks && (
-        <div className="bg-black/20 rounded-lg p-4 border border-white/10">
-          <h3 className="text-sm font-minecraft text-white/70 mb-3 uppercase flex items-center gap-2">
-            <Icon icon="solar:link-bold" className="w-4 h-4" />
-            {t('mod_detail.links_title')}
-          </h3>
+        <div className="look-card p-4" style={PLAIN_CARD}>
+          <SectionHeading size="sm" className="mb-3">{t('mod_detail.links_title')}</SectionHeading>
 
           <div className="space-y-2">
             <LinkItem
@@ -411,11 +404,8 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
       )}
 
       {/* Details Section */}
-      <div className="bg-black/20 rounded-lg p-4 border border-white/10">
-        <h3 className="text-sm font-minecraft text-white/70 mb-3 uppercase flex items-center gap-2">
-          <Icon icon="solar:info-circle-bold" className="w-4 h-4" />
-          {t('mod_detail.details')}
-        </h3>
+      <div className="look-card p-4" style={PLAIN_CARD}>
+        <SectionHeading size="sm" className="mb-3">{t('mod_detail.details')}</SectionHeading>
 
         <div className="space-y-3 text-xs font-minecraft">
           {/* License */}
@@ -448,14 +438,14 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
           </div>
 
           {/* Project Info */}
-          <div className="border-t border-white/10 pt-3 mt-3">
+          <div className="pt-3 mt-3" style={{ borderTop: `1px solid ${SURFACE.line}` }}>
             <div className="flex justify-between">
               <span className="text-white/50">{t('mod_detail.project_id')}</span>
               <span className="text-white/70 font-mono text-[10px]">{project.id}</span>
             </div>
             <div className="flex justify-between mt-2">
               <span className="text-white/50">{t('mod_detail.type')}</span>
-              <span className="text-white/90 capitalize">{project.project_type}</span>
+              <span className="text-white/90">{projectTypeKey(project.project_type) ? t(projectTypeKey(project.project_type)!) : project.project_type}</span>
             </div>
           </div>
         </div>

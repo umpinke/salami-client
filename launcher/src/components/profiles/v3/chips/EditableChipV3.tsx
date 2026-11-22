@@ -20,6 +20,8 @@ import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../../../store/useThemeStore";
 import { ThemedDropdown } from "../shared/ThemedDropdown";
+import { hexAlpha, kante, readableOn } from "../../../ui/design-system";
+import { SALAMI_COLORS } from "../../../../themes/salami/salami-theme";
 
 interface EditableChipV3Props {
   icon?: string;
@@ -34,6 +36,9 @@ interface EditableChipV3Props {
   withSaveCancel?: boolean;
   /** Tailwind width class understood by `ThemedDropdown` (w-48 … w-72). */
   width?: string;
+  /** Salami: Etikett in Creme (Standard) oder Salami-Rot – wie `DeliLabel`. */
+  /** "ghost": noch leer (z. B. keine Gruppe) – gestrichelter Umriss statt Etikett */
+  tone?: "fat" | "red" | "ghost";
 }
 
 export function EditableChipV3({
@@ -47,6 +52,7 @@ export function EditableChipV3({
   disabledReason,
   withSaveCancel = true,
   width = "w-56",
+  tone = "fat",
 }: EditableChipV3Props) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -71,28 +77,40 @@ export function EditableChipV3({
 
   return (
     <div className="relative inline-flex">
+      {/* Salami: Etikett wie an der Feinkosttheke (DeliLabel) – Creme mit Lochung, klickbar */}
       <button
         ref={triggerRef}
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setOpen((v) => !v)}
         title={disabled ? disabledReason : undefined}
-        className={`group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-minecraft transition-colors
-          ${disabled
-            ? "bg-black/20 border-white/5 text-white/30 cursor-not-allowed"
-            : open
-              ? "bg-black/40 border-white/25 text-white cursor-pointer"
-              : "bg-black/30 border-white/10 text-white/75 hover:bg-black/40 hover:border-white/20 hover:text-white cursor-pointer"}`}
+        className={`look-label look-label--${tone} group inline-flex items-center gap-2 py-1.5 pl-2 pr-2.5 text-sm font-minecraft leading-none transition-[filter,transform] duration-150
+          ${disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:brightness-105 active:translate-y-px"}`}
+        style={{
+          background: tone === "red" ? SALAMI_COLORS.red : tone === "ghost" ? "transparent" : SALAMI_COLORS.fat,
+          color: tone === "red" ? SALAMI_COLORS.fat : tone === "ghost" ? "rgba(243, 227, 211, 0.6)" : SALAMI_COLORS.pepper,
+          border: tone === "ghost" ? "1px dashed rgba(243, 227, 211, 0.35)" : undefined,
+          borderRadius: "4px 10px 10px 4px",
+          boxShadow: open && !disabled
+            ? `0 2px 0 rgba(0,0,0,0.35), 0 0 0 2px ${hexAlpha(accent.value, 0.75)}`
+            : "0 2px 0 rgba(0,0,0,0.35)",
+        }}
       >
-        {icon && <Icon icon={icon} className="w-4 h-4 flex-shrink-0" />}
+        {tone !== "ghost" && (
+          <span
+            className="h-2 w-2 flex-shrink-0"
+            style={{ borderRadius: 999, background: tone === "red" ? SALAMI_COLORS.redDark : SALAMI_COLORS.casing }}
+          />
+        )}
+        {icon && <Icon icon={icon} className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />}
         <span>{children}</span>
         {disabled ? (
-          <Icon icon="solar:lock-keyhole-minimalistic-bold" className="w-3.5 h-3.5 text-white/30 ml-0.5 flex-shrink-0" />
+          <Icon icon="solar:lock-keyhole-minimalistic-bold" className="w-3.5 h-3.5 opacity-60 flex-shrink-0" />
         ) : (
           <Icon
             icon="solar:pen-linear"
-            className={`w-3.5 h-3.5 ml-0.5 flex-shrink-0 transition-opacity ${
-              open ? "opacity-80" : "opacity-40 group-hover:opacity-80"
+            className={`w-3.5 h-3.5 flex-shrink-0 transition-opacity ${
+              open ? "opacity-90" : "opacity-45 group-hover:opacity-90"
             }`}
           />
         )}
@@ -112,20 +130,18 @@ export function EditableChipV3({
             <div className="flex items-center justify-end gap-1 px-2 py-1">
               <button
                 onClick={close}
-                className="px-2.5 py-1 rounded text-[10px] uppercase tracking-wider font-minecraft text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                className="px-2.5 py-1 rounded text-xs font-minecraft text-white/60 hover:text-white hover:bg-white/10 transition-colors"
               >
                 {t("profiles.v3.chips.cancel")}
               </button>
               <button
                 onClick={commit}
                 style={{
-                  backgroundColor: `${accent.value}40`,
-                  borderColor: `${accent.value}80`,
-                  color: accent.light,
+                  backgroundColor: accent.value,
+                  color: readableOn(accent.value),
+                  boxShadow: kante(accent.value, 2),
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = `${accent.value}66`; }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = `${accent.value}40`; }}
-                className="px-2.5 py-1 rounded border text-[10px] uppercase tracking-wider font-minecraft transition-colors"
+                className="px-2.5 py-1 rounded text-xs font-minecraft transition-[filter,transform] hover:brightness-110 active:translate-y-px"
               >
                 {t("profiles.v3.chips.save")}
               </button>

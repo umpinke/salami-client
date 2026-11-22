@@ -8,7 +8,10 @@ import { cn } from "../../lib/utils";
 import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import { useThemeStore } from "../../store/useThemeStore";
-import { hexAlpha, readableOn, SURFACE } from "../../components/ui/design-system";
+import { hexAlpha, kante, kopfband, readableOn, SURFACE } from "../../components/ui/design-system";
+import { EmptyState } from "../../components/ui/EmptyState";
+import { LoadingSpinner } from "../../components/ui/LoadingSpinner";
+import { SALAMI_COLORS } from "../../themes/salami/salami-theme";
 import {
   CLIP_EXTENSIONS,
   FriendsService,
@@ -20,6 +23,7 @@ import {
   type FriendRequest,
 } from "./friends-service";
 import { useFriendsStore } from "./friends-store";
+import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import "./i18n";
 
 const STATUS_COLOR = { game: "#4ade80", launcher: "#fbbf24", offline: "rgba(255,255,255,0.25)" } as const;
@@ -79,13 +83,11 @@ export function FriendsTab() {
 }
 
 function Notice({ icon, text }: { icon: string; text: string }) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-      <Icon icon={icon} className="h-10 w-10 text-white/20" />
-      <p className="max-w-md font-minecraft text-sm text-white/60">{text}</p>
-    </div>
-  );
+  return <EmptyState icon={icon} message={text} />;
 }
+
+/** Salami: Kopf der Spalten im Salami-Anschnitt – Liste und Gespräch ergeben zusammen ein Band. */
+const HEADER_HEIGHT = "h-16";
 
 /** Erster Besuch: erklären, was Freunde sehen und was gespeichert wird – erst dann einschalten. */
 function Intro({ signedIn }: { signedIn: boolean }) {
@@ -106,32 +108,39 @@ function Intro({ signedIn }: { signedIn: boolean }) {
   };
 
   return (
-    <div className="flex h-full items-center justify-center px-8">
-      <div className="max-w-xl border-l-2 pl-6" style={{ borderColor: accent }}>
-        <h1 className="font-minecraft text-5xl lowercase leading-none text-white">{t("salami.friends.intro.title")}</h1>
-        <p className="mt-4 font-minecraft text-sm leading-relaxed text-white/70">{t("salami.friends.intro.text")}</p>
-        <ul className="mt-5 space-y-2.5">
-          {["privacy_online", "privacy_storage", "privacy_off"].map((key) => (
-            <li key={key} className="flex items-start gap-2.5 font-minecraft text-xs leading-relaxed text-white/55">
-              <Icon icon="solar:shield-check-bold" className="mt-0.5 h-4 w-4 shrink-0" style={{ color: accent }} />
-              {t(`salami.friends.intro.${key}`)}
-            </li>
-          ))}
-        </ul>
-        {signedIn ? (
-          <button
-            type="button"
-            onClick={enable}
-            disabled={busy}
-            className="mt-7 flex h-11 items-center gap-2 px-5 font-minecraft text-lg lowercase transition-[filter] duration-150 hover:brightness-110 disabled:opacity-50"
-            style={{ backgroundColor: accent, color: readableOn(accent) }}
-          >
-            <Icon icon={busy ? "svg-spinners:ring-resize" : "solar:users-group-rounded-bold"} className="h-5 w-5" />
-            {t("salami.friends.enable")}
-          </button>
-        ) : (
-          <p className="mt-7 font-minecraft text-sm text-amber-200/90">{t("salami.friends.sign_in")}</p>
-        )}
+    <div className="custom-scrollbar flex h-full items-center justify-center overflow-y-auto px-8 py-6">
+      <div
+        className="w-full max-w-xl overflow-hidden border"
+        style={{ backgroundColor: SURFACE.base, borderColor: SURFACE.line, borderRadius: "var(--border-radius)" }}
+      >
+        <div className="salami-fat-spots flex h-20 items-end px-7 pb-3" style={kopfband(accent)}>
+          <h1 className="font-minecraft text-4xl normal-case leading-none tracking-normal text-white">{t("salami.friends.intro.title")}</h1>
+        </div>
+        <div className="px-7 pb-7 pt-5">
+          <p className="text-sm leading-relaxed text-white/75">{t("salami.friends.intro.text")}</p>
+          <ul className="mt-5 space-y-2.5">
+            {["privacy_online", "privacy_storage", "privacy_off"].map((key) => (
+              <li key={key} className="flex items-start gap-2.5 text-xs leading-relaxed text-white/60">
+                <Icon icon="solar:shield-check-bold" className="mt-0.5 h-4 w-4 shrink-0" style={{ color: accent }} />
+                {t(`salami.friends.intro.${key}`)}
+              </li>
+            ))}
+          </ul>
+          {signedIn ? (
+            <button
+              type="button"
+              onClick={enable}
+              disabled={busy}
+              className="mt-7 flex h-11 items-center gap-2 px-5 font-minecraft text-lg transition-[filter,transform] duration-150 hover:brightness-110 active:translate-y-px disabled:opacity-50"
+              style={{ backgroundColor: accent, color: readableOn(accent), boxShadow: kante(accent) }}
+            >
+              <Icon icon={busy ? "svg-spinners:ring-resize" : "solar:users-group-rounded-bold"} className="h-5 w-5" />
+              {t("salami.friends.enable")}
+            </button>
+          ) : (
+            <p className="mt-7 font-minecraft text-sm text-amber-200/90">{t("salami.friends.sign_in")}</p>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -142,9 +151,16 @@ function ListHeader() {
   const accent = useThemeStore((s) => s.accentColor.value);
   const connected = useFriendsStore((s) => s.connected);
   const setEnabled = useFriendsStore((s) => s.setEnabled);
+  const { confirm, confirmDialog } = useConfirmDialog();
 
   const disable = async () => {
-    if (!window.confirm(t("salami.friends.disable_confirm"))) return;
+    const confirmed = await confirm({
+      title: t("salami.friends.disable"),
+      message: t("salami.friends.disable_confirm"),
+      confirmText: t("salami.friends.disable"),
+      type: "warning",
+    });
+    if (!confirmed) return;
     try {
       await setEnabled(false);
     } catch (error) {
@@ -153,13 +169,10 @@ function ListHeader() {
   };
 
   return (
-    <div className="flex items-end justify-between border-b px-4 pt-4" style={{ borderColor: SURFACE.line }}>
-      <span className="relative pb-2.5 font-minecraft text-2xl lowercase leading-none text-white">
-        {t("salami.friends.title")}
-        <span className="absolute inset-x-0 -bottom-px h-[3px]" style={{ backgroundColor: accent }} />
-      </span>
-      <div className="mb-2 flex items-center gap-3">
-        <span className="flex items-center gap-1.5 font-minecraft text-xs lowercase text-white/45">
+    <div className={cn("salami-fat-spots flex shrink-0 items-center justify-between px-4", HEADER_HEIGHT)} style={kopfband(accent)}>
+      <span className="font-minecraft text-2xl leading-none text-white">{t("salami.friends.title")}</span>
+      <div className="flex items-center gap-2">
+        <span className="flex items-center gap-1.5 font-minecraft text-xs text-white/70">
           <span
             className={cn("h-2 w-2", !connected && "animate-pulse")}
             style={{ borderRadius: 999, backgroundColor: connected ? STATUS_COLOR.game : STATUS_COLOR.launcher }}
@@ -170,11 +183,12 @@ function ListHeader() {
           type="button"
           onClick={disable}
           title={t("salami.friends.disable")}
-          className="flex h-7 w-7 items-center justify-center text-white/35 transition-colors hover:bg-white/[0.06] hover:text-white"
+          className="flex h-7 w-7 items-center justify-center bg-black/30 text-white/70 transition-colors hover:bg-black/50 hover:text-white"
         >
           <Icon icon="solar:power-bold" className="h-4 w-4" />
         </button>
       </div>
+      {confirmDialog}
     </div>
   );
 }
@@ -206,8 +220,8 @@ function AddFriend() {
   return (
     <form onSubmit={submit} className="flex items-center gap-2 px-4 py-3">
       <label
-        className="flex h-9 min-w-0 flex-1 items-center gap-2 border border-white/[0.08] bg-black/25 px-3 transition-colors focus-within:border-white/25"
-        style={{ borderRadius: "var(--border-radius)" }}
+        className="flex h-9 min-w-0 flex-1 items-center gap-2 border bg-black/25 px-3 transition-colors focus-within:border-white/25"
+        style={{ borderRadius: "var(--border-radius)", borderColor: SURFACE.line }}
       >
         <Icon icon="solar:user-plus-bold" className="h-4 w-4 shrink-0 text-white/40" />
         <input
@@ -222,8 +236,8 @@ function AddFriend() {
       <button
         type="submit"
         disabled={!valid || busy}
-        className="flex h-9 shrink-0 items-center px-3 font-minecraft text-sm lowercase transition-[filter,opacity] duration-150 hover:brightness-110 disabled:opacity-40"
-        style={{ backgroundColor: accent, color: readableOn(accent) }}
+        className="flex h-9 shrink-0 items-center px-3 font-minecraft text-sm transition-[filter,opacity,transform] duration-150 hover:brightness-110 active:translate-y-px disabled:opacity-40"
+        style={{ backgroundColor: accent, color: readableOn(accent), boxShadow: kante(accent) }}
       >
         {busy ? <Icon icon="svg-spinners:ring-resize" className="h-4 w-4" /> : t("salami.friends.add.button")}
       </button>
@@ -248,7 +262,7 @@ function Avatar({ uuid, size = 36 }: { uuid: string; size?: number }) {
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <p className="px-4 pb-1 pt-3 font-minecraft text-[11px] lowercase text-white/35">{children}</p>;
+  return <p className="px-4 pb-1 pt-3 font-minecraft text-xs text-white/40">{children}</p>;
 }
 
 function Requests() {
@@ -380,7 +394,7 @@ function FriendList() {
               <span className={cn("block truncate font-minecraft text-base leading-tight", friend.online ? "text-white" : "text-white/55")}>
                 {friend.name}
               </span>
-              <span className="block font-minecraft text-[11px] lowercase" style={{ color: friend.online ? STATUS_COLOR[status] : "rgba(255,255,255,0.35)" }}>
+              <span className="block font-minecraft text-[11px]" style={{ color: friend.online ? STATUS_COLOR[status] : "rgba(255,255,255,0.35)" }}>
                 {t(`salami.friends.status.${status}`)}
               </span>
             </span>
@@ -409,6 +423,7 @@ function Conversation() {
   const sendText = useFriendsStore((s) => s.sendText);
   const sendFile = useFriendsStore((s) => s.sendFile);
   const respond = useFriendsStore((s) => s.respond);
+  const { confirm, confirmDialog } = useConfirmDialog();
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(0);
@@ -427,10 +442,15 @@ function Conversation() {
 
   if (!friend || !me) {
     return (
-      <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-        <Icon icon="solar:chat-round-dots-bold" className="mb-1 h-10 w-10 text-white/15" />
-        <p className="font-minecraft text-2xl lowercase leading-none text-white/70">{t("salami.friends.chat.pick")}</p>
-        <p className="font-minecraft text-xs text-white/40">{t("salami.friends.chat.pick_hint")}</p>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className={cn("salami-fat-spots shrink-0", HEADER_HEIGHT)} style={kopfband(accent)} aria-hidden="true" />
+        <EmptyState
+          icon="solar:chat-round-dots-bold"
+          message={t("salami.friends.chat.pick")}
+          description={t("salami.friends.chat.pick_hint")}
+          smallDescription
+          className="min-h-0 flex-1"
+        />
       </div>
     );
   }
@@ -471,7 +491,13 @@ function Conversation() {
   };
 
   const remove = async () => {
-    if (!window.confirm(t("salami.friends.chat.remove_confirm", { name: friend.name }))) return;
+    const confirmed = await confirm({
+      title: t("salami.friends.chat.remove"),
+      message: t("salami.friends.chat.remove_confirm", { name: friend.name }),
+      confirmText: t("salami.friends.chat.remove"),
+      type: "danger",
+    });
+    if (!confirmed) return;
     try {
       await respond("remove", friend.uuid);
     } catch (error) {
@@ -481,25 +507,36 @@ function Conversation() {
 
   return (
     <section className="flex min-w-0 flex-1 flex-col">
-      <header className="flex items-center gap-3 border-b px-5 py-3" style={{ borderColor: SURFACE.line }}>
-        <Avatar uuid={friend.uuid} size={40} />
+      <header className={cn("salami-fat-spots flex shrink-0 items-center gap-3 px-5", HEADER_HEIGHT)} style={kopfband(accent)}>
+        {/* Salami: Kopf wie die Profil-Kachel – cremegerahmtes Bild, Status als Etikett */}
+        <span className="border-2" style={{ borderColor: SALAMI_COLORS.fat, borderRadius: "calc(var(--border-radius) * 0.8)" }}>
+          <Avatar uuid={friend.uuid} size={38} />
+        </span>
         <div className="min-w-0 flex-1">
           <p className="truncate font-minecraft text-2xl leading-none text-white">{friend.name}</p>
-          <p className="mt-1 flex items-center gap-1.5 font-minecraft text-xs lowercase" style={{ color: STATUS_COLOR[status] }}>
+          <p className="mt-1.5 flex items-center gap-1.5 font-minecraft text-xs text-white/80">
             <span className="h-2 w-2" style={{ borderRadius: 999, backgroundColor: STATUS_COLOR[status] }} />
             {t(`salami.friends.status.${status}`)}
           </p>
         </div>
-        <RowButton icon="solar:user-minus-bold" title={t("salami.friends.chat.remove")} onClick={remove} />
+        <button
+          type="button"
+          title={t("salami.friends.chat.remove")}
+          aria-label={t("salami.friends.chat.remove")}
+          onClick={remove}
+          className="flex h-8 w-8 shrink-0 items-center justify-center bg-black/30 text-white/70 transition-colors hover:bg-black/50 hover:text-white"
+        >
+          <Icon icon="solar:user-minus-bold" className="h-5 w-5" />
+        </button>
       </header>
 
       <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto px-5 py-4">
         {messages && messages.length === 0 && (
-          <p className="py-10 text-center font-minecraft text-sm text-white/40">{t("salami.friends.chat.empty")}</p>
+          <EmptyState icon="solar:chat-round-line-bold" message={t("salami.friends.chat.empty")} compact />
         )}
         {days.map((day) => (
           <div key={day.label}>
-            <p className="my-3 flex items-center gap-3 font-minecraft text-[11px] lowercase text-white/30">
+            <p className="my-3 flex items-center gap-3 font-minecraft text-[11px] text-white/35">
               <span className="h-px flex-1" style={{ backgroundColor: SURFACE.line }} />
               {day.label}
               <span className="h-px flex-1" style={{ backgroundColor: SURFACE.line }} />
@@ -524,8 +561,8 @@ function Conversation() {
           <Icon icon={uploading > 0 ? "svg-spinners:ring-resize" : "solar:gallery-add-bold"} className="h-5 w-5" />
         </button>
         <label
-          className="flex h-10 min-w-0 flex-1 items-center gap-2 border border-white/[0.08] bg-black/25 px-3 transition-colors focus-within:border-white/25"
-          style={{ borderRadius: "var(--border-radius)" }}
+          className="flex h-10 min-w-0 flex-1 items-center gap-2 border bg-black/25 px-3 transition-colors focus-within:border-white/25"
+          style={{ borderRadius: "var(--border-radius)", borderColor: SURFACE.line }}
         >
           <input
             ref={inputRef}
@@ -542,13 +579,14 @@ function Conversation() {
         <button
           type="submit"
           disabled={!text.trim() || sending}
-          className="flex h-10 shrink-0 items-center gap-2 px-4 font-minecraft text-sm lowercase transition-[filter,opacity] duration-150 hover:brightness-110 disabled:opacity-40"
-          style={{ backgroundColor: accent, color: readableOn(accent) }}
+          className="flex h-10 shrink-0 items-center gap-2 px-4 font-minecraft text-sm transition-[filter,opacity,transform] duration-150 hover:brightness-110 active:translate-y-px disabled:opacity-40"
+          style={{ backgroundColor: accent, color: readableOn(accent), boxShadow: kante(accent) }}
         >
           <Icon icon="solar:plain-bold" className="h-4 w-4" />
           {t("salami.friends.chat.send")}
         </button>
       </form>
+      {confirmDialog}
     </section>
   );
 }
@@ -624,10 +662,7 @@ function Media({ media }: { media: FriendMedia }) {
   }
   if (!src) {
     return (
-      <p className="flex h-24 w-56 items-center justify-center gap-2 font-minecraft text-xs text-white/45">
-        <Icon icon="svg-spinners:ring-resize" className="h-4 w-4" />
-        {t("salami.friends.media.loading")}
-      </p>
+      <LoadingSpinner size="xs" shadowDepth="none" message={t("salami.friends.media.loading")} className="h-24 w-56 text-white/45" />
     );
   }
   return (

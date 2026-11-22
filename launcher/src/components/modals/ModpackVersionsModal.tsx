@@ -166,7 +166,7 @@ function VersionItem({
             <button
               onClick={toggleExpanded}
               className="mt-1 flex items-center gap-1 px-2 py-1 rounded text-xs hover:bg-white/10 transition-colors font-minecraft border border-white/20"
-              title={isExpanded ? "Hide changelog" : "Show changelog"}
+              title={isExpanded ? t('modpack_versions.hide_changelog') : t('modpack_versions.show_changelog')}
               disabled={isLoadingChangelog}
             >
               {isLoadingChangelog ? (
@@ -188,7 +188,7 @@ function VersionItem({
       {/* Changelog Bereich */}
       {isExpanded && displayChangelog && (
         <div className="mt-3 pt-3 border-t border-white/10">
-          <div className="text-xs font-minecraft text-white/70 mb-2 uppercase">
+          <div className="text-xs font-minecraft text-white/70 mb-2">
             {t('modpack_versions.changelog')}
           </div>
           <div className="max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
@@ -262,57 +262,7 @@ export function ModpackVersionsModal({
   isSwitching = false,
 }: ModpackVersionsModalProps) {
   const { t } = useTranslation();
-  const [versions, setVersions] = useState<UnifiedModpackVersionsResponse | null>(() => {
-    // DEBUG: Add mock changelogs to initial versions for testing with Markdown (only for Modrinth)
-    if (initialVersions && initialVersions.all_versions.length > 0) {
-      initialVersions.all_versions.forEach((version, index) => {
-        if (!version.changelog && version.source === "Modrinth") {
-          const mockChangelogs = [
-            `### Version ${version.version_number}
-
-**An actually working version of ${version.version_number}, sorry about last time.** No changes to anything except for the pack format, same mods and fabric version as last time.
-
-> ### Status Update
-> I've been working on new tooling for Sodium Plus for a long time now. I'm in the middle of migrating some of my infrastructure to a new system, so it may be a while. In the future, these tools will allow us to update and work on Sodium Plus a lot more quickly and with much higher quality. It is important that I finish this. In the meantime, @NoSadBeHappy will be updating the pack with smaller fixes and alpha versions to support Minecraft updates. Thank you for your patience!
-> - RedstoneWizard08
-
-#### Changes:
-- Fixed compatibility with Minecraft ${version.game_versions[0] || 'latest'}
-- Updated mod dependencies
-- Performance improvements`,
-            `## What's New in ${version.version_number}
-
-### ✨ Features
-- Added new shader support
-- Improved graphics settings
-- Enhanced mod compatibility
-
-### 🐛 Bug Fixes
-- Fixed crash on startup
-- Resolved memory leaks
-- Corrected texture rendering issues
-
-### 🔧 Technical
-- Updated to Fabric ${version.loaders.includes('fabric') ? 'latest' : 'compatible'} version
-- Optimized resource loading
-- Better error handling`,
-            `# Changelog for ${version.version_number}
-
-This release focuses on stability and performance improvements.
-
-**Key Changes:**
-- **Performance**: Significant FPS improvements in heavy modpacks
-- **Compatibility**: Better support for Minecraft ${version.game_versions[0] || 'various versions'}
-- **Bug Fixes**: Various crash fixes and stability improvements
-
-> **Note**: This version requires Java 17 or higher for optimal performance.`
-          ];
-          version.changelog = mockChangelogs[index % mockChangelogs.length];
-        }
-      });
-    }
-    return initialVersions;
-  });
+  const [versions, setVersions] = useState<UnifiedModpackVersionsResponse | null>(initialVersions);
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
 
   // Load fresh versions when modal opens by loading the current profile
@@ -320,8 +270,6 @@ This release focuses on stability and performance improvements.
     if (isOpen && profileId) {
       setIsLoadingVersions(true);
 
-      console.log("Loading modpack versions for profile:", profileId);
-      console.log("Initial versions:", initialVersions);
 
       // Load the current profile to get the latest modpack source
       ProfileService.getProfile(profileId)
@@ -333,58 +281,6 @@ This release focuses on stability and performance improvements.
           }
         })
         .then(versions => {
-          console.log("Loaded modpack versions:", versions);
-          console.log("First version has changelog:", versions.all_versions[0]?.changelog);
-
-          // Only add mock changelogs for Modrinth versions (CurseForge will be lazy loaded)
-          if (versions && versions.all_versions.length > 0) {
-            versions.all_versions.forEach((version, index) => {
-              if (!version.changelog && version.source === "Modrinth") {
-                const mockChangelogs = [
-                  `### Version ${version.version_number}
-
-**An actually working version of ${version.version_number}, sorry about last time.** No changes to anything except for the pack format, same mods and fabric version as last time.
-
-> ### Status Update
-> I've been working on new tooling for Sodium Plus for a long time now. I'm in the middle of migrating some of my infrastructure to a new system, so it may be a while. In the future, these tools will allow us to update and work on Sodium Plus a lot more quickly and with much higher quality. It is important that I finish this. In the meantime, @NoSadBeHappy will be updating the pack with smaller fixes and alpha versions to support Minecraft updates. Thank you for your patience!
-> - RedstoneWizard08
-
-#### Changes:
-- Fixed compatibility with Minecraft ${version.game_versions[0] || 'latest'}
-- Updated mod dependencies
-- Performance improvements`,
-                  `## What's New in ${version.version_number}
-
-### ✨ Features
-- Added new shader support
-- Improved graphics settings
-- Enhanced mod compatibility
-
-### 🐛 Bug Fixes
-- Fixed crash on startup
-- Resolved memory leaks
-- Corrected texture rendering issues
-
-### 🔧 Technical
-- Updated to Fabric ${version.loaders.includes('fabric') ? 'latest' : 'compatible'} version
-- Optimized resource loading
-- Better error handling`,
-                  `# Changelog for ${version.version_number}
-
-This release focuses on stability and performance improvements.
-
-**Key Changes:**
-- **Performance**: Significant FPS improvements in heavy modpacks
-- **Compatibility**: Better support for Minecraft ${version.game_versions[0] || 'various versions'}
-- **Bug Fixes**: Various crash fixes and stability improvements
-
-> **Note**: This version requires Java 17 or higher for optimal performance.`
-                ];
-                version.changelog = mockChangelogs[index % mockChangelogs.length];
-              }
-            });
-          }
-
           setVersions(versions);
         })
         .catch(err => {
@@ -423,6 +319,7 @@ This release focuses on stability and performance improvements.
 
   const handleSwitchVersion = async () => {
     if (!selectedVersion) return;
+    const switchToastId = `modpack-switch-${profileId ?? "unknown"}`;
 
     // Check if we have all required information for the new modpack switching
     if (profileId && selectedVersion.files.length > 0) {
@@ -460,13 +357,13 @@ This release focuses on stability and performance improvements.
         };
 
         // Show loading toast
-        const loadingToast = toast.loading(t('modpack_versions.toast.switching', { name: modpackName, version: selectedVersion.version_number }));
+        // One toast id for loading, success and error, so a failed switch does not leave the spinner behind
+        const loadingToast = toast.loading(t('modpack_versions.toast.switching', { name: modpackName, version: selectedVersion.version_number }), { id: switchToastId });
 
         await UnifiedService.switchModpackVersion(request);
 
-        // Dismiss loading toast and show success
-        toast.dismiss(loadingToast);
-        toast.success(t('modpack_versions.toast.switch_success', { name: modpackName, version: selectedVersion.version_number }));
+        // Replace the loading toast with the success message
+        toast.success(t('modpack_versions.toast.switch_success', { name: modpackName, version: selectedVersion.version_number }), { id: loadingToast });
 
         // Don't refresh here - let parent components handle the refresh
 
@@ -479,7 +376,7 @@ This release focuses on stability and performance improvements.
         onClose();
 
       } catch (error) {
-        toast.error(t('modpack_versions.toast.switch_failed', { error: parseErrorMessage(error) }));
+        toast.error(t('modpack_versions.toast.switch_failed', { error: parseErrorMessage(error) }), { id: switchToastId });
       }
     } else if (onVersionSwitch) {
       // Fallback to old method if we don't have all required info

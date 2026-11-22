@@ -495,7 +495,7 @@ export function JavaSettingsTab({
               <div className="text-base text-white font-smallcaps mb-2 tracking-wide select-none">
                 {t('profiles.settings.usingDefaultJava')}
               </div>
-              <div className="text-xs text-white/70 font-minecraft break-all lowercase tracking-wide select-none">
+              <div className="text-xs text-white/70 break-words select-none">
                 {t('profiles.settings.defaultJavaDescription')}
               </div>
             </div>
@@ -553,7 +553,7 @@ export function JavaSettingsTab({
                   <h4 className="text-xs text-white/70 font-minecraft mb-2 tracking-wide">
                     {t('profiles.settings.detectedJavaInstallations')}
                   </h4>
-                  <div className="max-h-40 overflow-y-auto custom-scrollbar space-y-1 p-2 bg-black/10 rounded-lg">
+                  <div className="max-h-40 overflow-y-auto custom-scrollbar space-y-1 p-2 bg-white/[0.03] rounded-lg">
                     {detectedJavaInstallations.map((java) => (
                       <button
                         key={java.path}
@@ -563,7 +563,7 @@ export function JavaSettingsTab({
                           "w-full text-left p-2 border transition-all duration-150 font-minecraft text-xs rounded-md",
                           customJavaPathInput === java.path
                             ? "bg-accent/30 border-accent text-white"
-                            : "bg-black/20 border-white/10 hover:bg-black/30 hover:border-white/20 text-white/80",
+                            : "bg-white/[0.045] border-white/[0.09] hover:bg-white/[0.08] hover:border-white/20 text-white/80",
                         )}
                         style={
                           customJavaPathInput === java.path

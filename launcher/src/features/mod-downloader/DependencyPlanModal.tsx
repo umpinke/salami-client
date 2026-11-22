@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { Modal } from "../../components/ui/Modal";
-import { Button } from "../../components/ui/buttons/Button";
 import { Checkbox } from "../../components/ui/Checkbox";
+import { KanteButton, PLAIN_CARD } from "../../components/modrinth/v2/FeinkostParts";
 import type { DependencyPlan, PlannedDependency } from "./dependency-plan";
 import "./i18n";
 
@@ -62,17 +62,22 @@ export function DependencyPlanModal({ name, plan, onDone }: Props) {
             size="sm"
           />
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => finish(false)}>
+            <KanteButton size="lg" onClick={() => finish(false)}>
               {t("salami.downloader.plan.cancel")}
-            </Button>
-            <Button variant={hasConflicts ? "warning" : "success"} onClick={() => finish(true)}>
+            </KanteButton>
+            <KanteButton
+              size="lg"
+              tone={hasConflicts ? "danger" : "primary"}
+              onClick={() => finish(true)}
+              icon={<Icon icon={hasConflicts ? "solar:danger-triangle-bold" : "solar:download-minimalistic-bold"} className="h-5 w-5" />}
+            >
               {t(hasConflicts ? "salami.downloader.plan.install_anyway" : "salami.downloader.plan.install")}
-            </Button>
+            </KanteButton>
           </div>
         </div>
       }
     >
-      <div className="space-y-4 p-1">
+      <div className="space-y-4 px-5 py-4">
         {hasConflicts && (
           <Section icon="solar:danger-triangle-bold" title={t("salami.downloader.plan.conflicts")} tone="text-amber-300">
             <p className="text-sm text-white/70 mb-2">{t("salami.downloader.plan.conflict_hint", { name })}</p>
@@ -115,8 +120,8 @@ export function DependencyPlanModal({ name, plan, onDone }: Props) {
 
 function Section({ icon, title, tone = "text-white", children }: { icon: string; title: string; tone?: string; children: React.ReactNode }) {
   return (
-    <div>
-      <div className={`flex items-center gap-2 font-minecraft text-xl lowercase mb-1 ${tone}`}>
+    <div className="p-3" style={PLAIN_CARD}>
+      <div className={`mb-2 flex items-center gap-2 font-minecraft text-base ${tone}`}>
         <Icon icon={icon} className="w-5 h-5" />
         {title}
       </div>
@@ -126,5 +131,10 @@ function Section({ icon, title, tone = "text-white", children }: { icon: string;
 }
 
 function Row({ text, dim }: { text: string; dim?: boolean }) {
-  return <div className={`text-sm ${dim ? "text-white/50" : "text-white/85"}`}>• {text}</div>;
+  return (
+    <div className={`flex items-center gap-2 text-sm ${dim ? "text-white/50" : "text-white/85"}`}>
+      <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#f3e3d3]/60" aria-hidden="true" />
+      {text}
+    </div>
+  );
 }

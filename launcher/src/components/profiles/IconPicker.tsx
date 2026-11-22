@@ -183,7 +183,7 @@ export function IconPicker({ selected, onSelect, onClose }: IconPickerProps) {
               className="relative aspect-square rounded-lg border-2 border-dashed border-white/15 hover:border-white/35 bg-black/20 flex flex-col items-center justify-center gap-1 transition-colors"
             >
               <Icon icon="solar:upload-bold" className="w-6 h-6 text-white/60" />
-              <span className="font-minecraft text-[10px] text-white/50 lowercase">
+              <span className="font-minecraft text-[11px] text-white/55">
                 {t("profiles.iconPicker.uploadFile")}
               </span>
             </button>
@@ -196,7 +196,7 @@ export function IconPicker({ selected, onSelect, onClose }: IconPickerProps) {
               className="relative aspect-square rounded-lg border-2 border-dashed border-white/15 hover:border-white/35 bg-black/20 flex flex-col items-center justify-center gap-1 transition-colors"
             >
               <Icon icon="solar:link-bold" className="w-6 h-6 text-white/60" />
-              <span className="font-minecraft text-[10px] text-white/50 lowercase">
+              <span className="font-minecraft text-[11px] text-white/55">
                 {t("profiles.iconPicker.addUrl")}
               </span>
             </button>

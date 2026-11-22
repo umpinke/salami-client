@@ -5,7 +5,7 @@ import { ErrorMessage } from "../ui/ErrorMessage";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import { useProfileStore } from "../../store/profile-store";
 import { useThemeStore } from "../../store/useThemeStore";
-import { SalamiPlayView } from "../launcher/SalamiPlayView";
+import { useLook } from "../../themes/looks/registry";
 import { OnlineCountBadge } from "../launcher/OnlineCountBadge";
 import { RetroGridEffect } from "../effects/RetroGridEffect";
 import {
@@ -23,6 +23,7 @@ import { useTranslation } from "react-i18next";
 
 export function PlayTab() {
   const { t } = useTranslation();
+  const look = useLook();
   const {
     profiles,
     selectedProfile: storeSelectedProfile,
@@ -94,11 +95,11 @@ export function PlayTab() {
 
         {profilesError && !loading && (
           <div className="absolute left-10 top-6 z-20">
-            <ErrorMessage message={profilesError || "An unknown error occurred"} />
+            <ErrorMessage message={profilesError || t('common.unknown_error')} />
           </div>
         )}
 
-        <SalamiPlayView
+        <look.PlayView
           profiles={profiles}
           selectedProfile={currentDisplayProfile}
           versions={versions}

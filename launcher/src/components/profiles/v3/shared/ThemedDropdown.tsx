@@ -31,6 +31,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../../../store/useThemeStore";
+import { SURFACE, hexAlpha } from "../../../ui/design-system";
 
 interface ThemedDropdownProps {
   open: boolean;
@@ -71,7 +72,6 @@ export function ThemedDropdown({
   maxWidth = "max-w-xs", className = "",
   triggerRef, matchTriggerWidth = false,
 }: ThemedDropdownProps) {
-  const accent = useThemeStore((s) => s.accentColor.value);
   const [pos, setPos] = useState<{ top: number; left: number; width?: number } | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const [flipped, setFlipped] = useState(false);
@@ -113,11 +113,11 @@ export function ThemedDropdown({
   // min-width wird als Inline-Style gesetzt damit Tailwind JIT mit
   // unterschiedlichen `w-*` Werten vom Caller klarkommt.
   const minWidthPx = WIDTH_TO_PX[width] ?? 192; // 192px = w-48 default
+  // Salami: deckendes, warmes Menü mit Haarlinie statt akzentgetöntem Glas
   const panelStyle: React.CSSProperties = {
-    backgroundColor: `${accent}1f`,
-    borderColor: `${accent}66`,
-    backdropFilter: "blur(16px)",
-    WebkitBackdropFilter: "blur(16px)",
+    backgroundColor: SURFACE.solid,
+    borderColor: SURFACE.lineStrong,
+    boxShadow: "0 3px 0 rgba(0,0,0,0.35), 0 14px 30px -12px rgba(0,0,0,0.7)",
     minWidth: `${minWidthPx}px`,
   };
 
@@ -202,7 +202,7 @@ export function ThemedDropdownItem({
         : "text-white/80 hover:text-white";
 
   const style: React.CSSProperties = selected
-    ? { backgroundColor: `${accent}33` }
+    ? { backgroundColor: hexAlpha(accent, 0.3) }
     : {};
 
   return (
@@ -213,16 +213,16 @@ export function ThemedDropdownItem({
       onMouseEnter={(e) => {
         if (selected || disabled) return;
         e.currentTarget.style.backgroundColor = tone === "danger"
-          ? "rgba(244, 63, 94, 0.10)"
-          : `${accent}40`;
+          ? "rgba(244, 63, 94, 0.12)"
+          : SURFACE.raised;
       }}
       onMouseLeave={(e) => {
         if (selected || disabled) return;
         e.currentTarget.style.backgroundColor = "transparent";
       }}
-      className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs font-minecraft text-left transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed ${toneText}`}
+      className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-minecraft text-left transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed ${toneText}`}
     >
-      {icon && <Icon icon={icon} className="w-3.5 h-3.5 flex-shrink-0" />}
+      {icon && <Icon icon={icon} className="w-4 h-4 flex-shrink-0" />}
       <span className="flex-1 min-w-0">{children}</span>
     </button>
   );
@@ -231,11 +231,11 @@ export function ThemedDropdownItem({
 // ────────────────────────────────────────────────────────────────────────────
 
 export const ThemedDropdownDivider: React.FC = () => (
-  <div className="my-1 border-t border-white/10" />
+  <div className="my-1 border-t" style={{ borderColor: SURFACE.line }} />
 );
 
 export const ThemedDropdownHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.15em] text-white/40 font-minecraft border-b border-white/10">
+  <div className="px-3 py-1.5 text-xs text-white/45 font-minecraft border-b" style={{ borderColor: SURFACE.line }}>
     {children}
   </div>
 );

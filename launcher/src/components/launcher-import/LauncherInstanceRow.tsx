@@ -6,6 +6,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { CheckboxV2 } from "../ui/CheckboxV2";
 import { Tooltip } from "../ui/Tooltip";
 import { useThemeStore } from "../../store/useThemeStore";
+import { FK_CARD_CLASS, fkCardStyle, fkThumbStyle } from "../profiles/v3/shared/feinkost";
 import { loaderIconSrc, loaderLabel } from "../../lib/loader-icons";
 import { formatRelativeTime } from "../../utils/format-relative-time";
 import type { ExternalInstanceRef } from "../../types/launcherImport";
@@ -52,21 +53,15 @@ export function LauncherInstanceRow({
   const row = (
     <div
       onClick={disabled ? undefined : onToggle}
-      style={
-        selected
-          ? { backgroundColor: `${accentColor.value}14`, borderColor: `${accentColor.value}55` }
-          : undefined
-      }
-      className={`flex items-center gap-3 rounded-lg border px-3 py-2 transition-colors ${
-        selected ? "" : "border-white/[0.06] bg-black/20"
-      } ${disabled ? "opacity-50" : "cursor-pointer hover:border-white/20 hover:bg-black/30"}`}
+      style={fkCardStyle(accentColor.value, selected)}
+      className={`flex items-center gap-3 px-3 py-2 ${FK_CARD_CLASS} ${disabled ? "opacity-50" : "cursor-pointer"}`}
     >
       <div onClick={(event) => event.stopPropagation()} className="flex-shrink-0">
         <CheckboxV2 size="sm" checked={selected} disabled={disabled} onChange={onToggle} />
       </div>
 
       <div className="relative h-9 w-9 flex-shrink-0">
-        <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-md bg-white/5 ring-1 ring-white/10">
+        <div className="flex h-full w-full items-center justify-center overflow-hidden border-2" style={fkThumbStyle}>
           <img
             src={instance.iconPath ? convertFileSrc(instance.iconPath) : loaderIconSrc(instance.loader)}
             alt=""
@@ -103,7 +98,7 @@ export function LauncherInstanceRow({
             event.stopPropagation();
             onOpenProfile(importedProfileId);
           }}
-          className="flex-shrink-0 px-2 py-1 font-minecraft text-[10px] uppercase tracking-wider transition-opacity hover:opacity-80"
+          className="flex-shrink-0 px-2 py-1 font-minecraft text-xs transition-opacity hover:opacity-80"
           style={{ color: accentColor.value }}
         >
           {t("profiles.launcherImport.card.open_profile")}

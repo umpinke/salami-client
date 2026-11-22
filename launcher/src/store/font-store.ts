@@ -49,11 +49,13 @@ export const useFontStore = create<FontState>()(
     }),
     {
       name: "norisk-font-storage",
-      version: 1,
-      // Salami Client: einmalig von der Pixel-Schrift auf die Salami-Schrift wechseln
+      version: 2,
+      // Salami Client: einmalig von der Pixel-Schrift auf die Salami-Schrift wechseln. v2: wer die
+      // Einstellung aus dem NoRisk-Launcher mitgebracht hat, stand trotz v1 noch auf „minecraft“
+      // (Kapitälchen-Schrift → überall Großbuchstaben); die Looks bringen ihre Schrift selbst mit.
       migrate: (persisted, version) => {
         const state = persisted as Partial<FontState>;
-        if (version < 1 && state.fontId === "minecraft") {
+        if (version < 2 && state.fontId === "minecraft") {
           return { ...state, fontId: DEFAULT_FONT_ID } as FontState;
         }
         return state as FontState;

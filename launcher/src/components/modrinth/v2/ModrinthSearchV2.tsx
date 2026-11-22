@@ -68,6 +68,9 @@ import { ModrinthQuickInstallModalV2 } from './ModrinthQuickInstallModalV2'; // 
 import { ModrinthFilterSidebarV2 } from './ModrinthFilterSidebarV2'; // Import the new sidebar component
 import { ModrinthProjectCardV2 } from './ModrinthProjectCardV2'; // Import the new project card component
 import { ModrinthSearchControlsV2 } from './ModrinthSearchControlsV2'; // Import the new search controls component
+import { KanteButton } from './FeinkostParts';
+import { LoadingSpinner } from '../../ui/LoadingSpinner';
+import { EmptyState } from '../../ui/EmptyState';
 import { ModrinthQuickInstallProfilesModal } from './ModrinthQuickInstallProfilesModal'; // Import the new quick install profiles modal
 
 // Consolidate imports from content-service and types/content
@@ -75,7 +78,9 @@ import {
   installContentToProfile,
   installContentToTarget,
   uninstallContentFromTarget,
-  toggleContentFromProfile
+  toggleContentFromProfile,
+  withInstallToast,
+  shouldReportInstallError,
 } from '../../../services/content-service';
 import {
   ContentType as NrContentType, // Alias for ContentType from content.ts
@@ -88,7 +93,8 @@ import type { ContentInstallStatus, ContentCheckRequest, BatchCheckContentParams
 
 import { useProfileStore } from '../../../store/profile-store'; // Hinzufügen des ProfileStore Imports
 import { useModSearchStore } from '../../../store/useModSearchStore';
-import { Virtuoso } from 'react-virtuoso'; // Import Virtuoso
+import { Virtuoso, VirtuosoGrid } from 'react-virtuoso'; // Import Virtuoso
+import { useLook } from '../../../themes/looks/registry';
 import { useNavigate } from 'react-router-dom';
 import { useGlobalModal } from '../../../hooks/useGlobalModal';
 import { useThemeStore } from '../../../store/useThemeStore';
@@ -159,6 +165,7 @@ export function ModrinthSearchV2({
   const navigate = useNavigate();
   const { showModal, hideModal } = useGlobalModal();
   const searchResultsAreaRef = useRef<HTMLDivElement>(null); // Ref for the scrollable area
+  const look = useLook();
 
   const {
     searchTerm, setSearchTerm,
@@ -1298,7 +1305,7 @@ export function ModrinthSearchV2({
       }
       
     } catch (error) {
-      toast.error(t('content.install.failed', { error: parseErrorMessage(error) }));
+      if (shouldReportInstallError(error)) toast.error(t('content.install.failed', { error: parseErrorMessage(error) }));
       console.error("Install error in installToProfile:", error);
     } finally {
       setInstalling(prev => ({ ...prev, [profileId]: false }));
@@ -1358,10 +1365,10 @@ export function ModrinthSearchV2({
         source: project.source,
       };
 
-      await toast.promise(
+      await withInstallToast(
         installContentToTarget(payload, installTarget, { pinVersion: true }),
         {
-          loading: `Installing ${project.title} (${version.version_number}) to ${profileName}...`,
+          loading: t('content.install.installing', { title: project.title, version: version.version_number, profile: profileName }),
           success: t('content.install.success', { title: project.title, version: version.version_number, profile: profileName }),
           error: (err) => t('content.install.failed', { error: err.message || parseErrorMessage(err) }),
         }
@@ -1404,7 +1411,7 @@ export function ModrinthSearchV2({
 
     } catch (error) {
       console.error(`Direct install failed for ${project.title}:`, error);
-      toast.error(t('content.install.failed', { error: project.title }));
+      if (shouldReportInstallError(error)) toast.error(t('content.install.failed', { error: parseErrorMessage(error) }));
     } finally {
       // Reset loading state for the version
       setInstallingVersion(prev => ({ ...prev, [version.id]: false }));
@@ -1624,10 +1631,10 @@ export function ModrinthSearchV2({
         source: project.source,
         };
 
-        await toast.promise(
+        await withInstallToast(
         installContentToTarget(payload, installTarget),
         {
-          loading: `Installing ${project.title} (${bestVersion.version_number}) to ${selectedProfile.name}...`,
+          loading: t('content.install.installing', { title: project.title, version: bestVersion.version_number, profile: selectedProfile.name }),
           success: t('content.install.success', { title: project.title, version: bestVersion.version_number, profile: selectedProfile.name }),
           error: (err) => t('content.install.failed', { error: err.message || parseErrorMessage(err) }),
         }
@@ -1670,7 +1677,7 @@ export function ModrinthSearchV2({
 
     } catch (error) {
       console.error(`Quick install failed for ${project.title}:`, error);
-      toast.error(t('content.install.failed', { error: project.title }));
+      if (shouldReportInstallError(error)) toast.error(t('content.install.failed', { error: parseErrorMessage(error) }));
     } finally {
       // Reset loading state for the project
       setQuickInstallingProjects(prev => ({ ...prev, [project.project_id]: false }));
@@ -1827,10 +1834,10 @@ export function ModrinthSearchV2({
         source: project.source,
         };
 
-        await toast.promise(
+        await withInstallToast(
         installContentToTarget(payload, installTarget),
         {
-          loading: `Installing ${project.title} (${bestVersion.version_number}) to ${profile.name}...`,
+          loading: t('content.install.installing', { title: project.title, version: bestVersion.version_number, profile: profile.name }),
           success: t('content.install.success', { title: project.title, version: bestVersion.version_number, profile: profile.name }),
           error: (err) => t('content.install.failed', { error: err.message || parseErrorMessage(err) }),
         }
@@ -1876,7 +1883,7 @@ export function ModrinthSearchV2({
 
     } catch (error) {
       console.error(`Quick install failed for ${project.title}:`, error);
-      toast.error(t('content.install.failed', { error: project.title }));
+      if (shouldReportInstallError(error)) toast.error(t('content.install.failed', { error: parseErrorMessage(error) }));
     } finally {
       // Reset loading state for the profile
       setInstalling(prev => ({ ...prev, [profile.id]: false }));
@@ -1999,7 +2006,7 @@ export function ModrinthSearchV2({
       }
       
     } catch (error) {
-      toast.error(t('content.install.failed', { error: parseErrorMessage(error) }));
+      if (shouldReportInstallError(error)) toast.error(t('content.install.failed', { error: parseErrorMessage(error) }));
       console.error("Install error in quickInstallToProfile:", error);
     } finally {
       setInstalling(prev => ({ ...prev, [profileId]: false }));
@@ -2284,14 +2291,14 @@ export function ModrinthSearchV2({
         const progress = (progressPayload.progress ?? 0) * 100;
 
         toast.custom(
-          () => <ProgressToast message={`Installing ${fileName}`} progress={progress} />,
+          () => <ProgressToast message={t('content.install.installing_file', { name: fileName })} progress={progress} />,
           { id: toastId, duration: Infinity }
         );
       });
 
       // Show initial progress toast
       toast.custom(
-        () => <ProgressToast message={`Installing ${fileName}`} progress={0} />,
+        () => <ProgressToast message={t('content.install.installing_file', { name: fileName })} progress={0} />,
         { id: toastId, duration: Infinity }
       );
 
@@ -2359,7 +2366,7 @@ export function ModrinthSearchV2({
 
     } catch (err: any) {
       console.error("Failed to install modpack as profile:", err);
-      toast.error(t('content.install.modpack_error', { title: project.title, error: err.message || 'Unknown error' }), { id: toastId });
+      toast.error(t('content.install.modpack_error', { title: project.title, error: err.message || t('common.unknown_error') }), { id: toastId });
     } finally {
       // Clean up listener
       if (progressUnlisten) {
@@ -2406,14 +2413,14 @@ export function ModrinthSearchV2({
         const progress = (progressPayload.progress ?? 0) * 100;
 
         toast.custom(
-          () => <ProgressToast message={`Installing ${fileName}`} progress={progress} />,
+          () => <ProgressToast message={t('content.install.installing_file', { name: fileName })} progress={progress} />,
           { id: toastId, duration: Infinity }
         );
       });
 
       // Show initial progress toast
       toast.custom(
-        () => <ProgressToast message={`Installing ${fileName}`} progress={0} />,
+        () => <ProgressToast message={t('content.install.installing_file', { name: fileName })} progress={0} />,
         { id: toastId, duration: Infinity }
       );
 
@@ -2480,7 +2487,7 @@ export function ModrinthSearchV2({
 
     } catch (err: any) {
       console.error("Failed to install modpack version as profile:", err);
-      toast.error(t('content.install.modpack_error', { title: project.title, error: err.message || 'Unknown error' }), { id: toastId });
+      toast.error(t('content.install.modpack_error', { title: project.title, error: err.message || t('common.unknown_error') }), { id: toastId });
     } finally {
       // Clean up listener
       if (progressUnlisten) {
@@ -2613,7 +2620,7 @@ export function ModrinthSearchV2({
 
     } catch (error) {
       console.error("Error in handleInstallToNewProfile:", error);
-      toast.error(t('content.install.create_profile_failed', { error: error instanceof Error ? error.message : 'Unknown error' }));
+      toast.error(t('content.install.create_profile_failed', { error: error instanceof Error ? error.message : t('common.unknown_error') }));
     }
   };
 
@@ -2659,7 +2666,7 @@ export function ModrinthSearchV2({
     await toast.promise(
       removePromise,
       {
-        loading: `Removing ${project.title} (${version.version_number}) from ${profileName}...`,
+        loading: t('content.install.removing', { title: project.title, version: version.version_number, profile: profileName }),
         success: (data: any) => {
           // Update version status - set to not installed FOR THE SPECIFIC profileId
           setInstalledVersions(prev => {
@@ -2726,7 +2733,7 @@ export function ModrinthSearchV2({
           if (onInstallSuccess) {
             onInstallSuccess();
           }
-          return `Successfully removed ${project.title} (${version.version_number}) from ${profileName}`;
+          return t('content.install.removed', { title: project.title, version: version.version_number, profile: profileName });
         },
         error: (err) => {
           // Reset uninstalling state on error
@@ -2736,7 +2743,7 @@ export function ModrinthSearchV2({
             delete newState[profileId];
             return newState;
           });
-          return `Failed to remove: ${err.message || parseErrorMessage(err)}`;
+          return t('content.install.remove_failed', { error: err.message || parseErrorMessage(err) });
         },
       }
     ).finally(() => {
@@ -2786,8 +2793,7 @@ export function ModrinthSearchV2({
       const noriskIdentifier = currentVersionStatus.norisk_pack_item_details.norisk_mod_identifier;
       
       const toastMessage = newEnabledState ? "Enabling" : "Disabling";
-      const successMessage = newEnabledState ? "enabled" : "disabled";
-      
+
       await toast.promise(
         async () => {
           const payload: ToggleContentPayload = {
@@ -2849,9 +2855,9 @@ export function ModrinthSearchV2({
           return { versionName: version.version_number };
         },
         {
-          loading: `${toastMessage} pack item: ${project.title} (${version.version_number})...`,
-          success: ({ versionName }) => `Successfully ${successMessage} pack item: ${project.title} (${versionName})`,
-          error: (err) => `Failed to ${toastMessage.toLowerCase()} pack item: ${err.message || parseErrorMessage(err)}`
+          loading: t(newEnabledState ? 'content.toggle.enabling' : 'content.toggle.disabling', { title: project.title, version: version.version_number }),
+          success: ({ versionName }) => t(newEnabledState ? 'content.toggle.enabled' : 'content.toggle.disabled', { title: project.title, version: versionName }),
+          error: (err) => t(newEnabledState ? 'content.toggle.enable_failed' : 'content.toggle.disable_failed', { error: err.message || parseErrorMessage(err) })
         }
       ).catch(err => {
         console.error(`Error ${toastMessage.toLowerCase()} pack item:`, err);
@@ -2867,8 +2873,7 @@ export function ModrinthSearchV2({
     }
 
     const toastMessage = newEnabledState ? "Enabling" : "Disabling";
-    const successMessage = newEnabledState ? "enabled" : "disabled";
-    
+
     await toast.promise(
       async () => {
         const payload: ToggleContentPayload = {
@@ -2916,9 +2921,9 @@ export function ModrinthSearchV2({
         return { versionName: version.version_number };
       },
       {
-        loading: `${toastMessage} ${project.title} (${version.version_number})...`,
-        success: ({ versionName }) => `Successfully ${successMessage} ${project.title} (${versionName})`,
-        error: (err) => `Failed to ${toastMessage.toLowerCase()}: ${err.message || parseErrorMessage(err)}`
+        loading: t(newEnabledState ? 'content.toggle.enabling' : 'content.toggle.disabling', { title: project.title, version: version.version_number }),
+        success: ({ versionName }) => t(newEnabledState ? 'content.toggle.enabled' : 'content.toggle.disabled', { title: project.title, version: versionName }),
+        error: (err) => t(newEnabledState ? 'content.toggle.enable_failed' : 'content.toggle.disable_failed', { error: err.message || parseErrorMessage(err) })
       }
     ).catch(err => {
       console.error(`Error ${toastMessage.toLowerCase()} content:`, err);
@@ -2934,6 +2939,61 @@ export function ModrinthSearchV2({
     found_item_details: null,
     norisk_pack_item_details: null,
   };
+
+  const renderResult = (index: number, hit: any) => {
+                  const projectVersions = expandedVersions[hit.project_id];
+                  const displayedCount = numDisplayedVersions[hit.project_id] || initialDisplayCount;
+                  const currentProjectInstallStatus = selectedProfile ? installedProjects[hit.project_id] : null;
+                  const currentVersionFilters = versionFilters[hit.project_id] || { gameVersions: [], loaders: [], versionType: 'all' };
+                  const currentVersionDropdownUIState = versionDropdownUIState[hit.project_id] || { showAllGameVersions: false, gameVersionSearchTerm: '' };
+                  const currentOpenVersionDropdowns = openVersionDropdowns[hit.project_id] || { type: false, gameVersion: false, loader: false };
+
+                  return (
+                    <ModrinthProjectCardV2
+                      key={hit.project_id}
+                      itemIndex={index}
+                      hit={hit}
+                      accentColor={accentColor}
+                      installStatus={currentProjectInstallStatus}
+                      isQuickInstalling={quickInstallingProjects[hit.project_id] || false}
+                      isInstallingModpackAsProfile={installingModpackAsProfile[hit.project_id] || false}
+                      installingVersionStates={installingVersion}
+                      installingModpackVersionStates={installingModpackVersion}
+                      onQuickInstallClick={overrideDisplayContext === "detail" ? handleDirectQuickInstall : quickInstall}
+                      onInstallModpackAsProfileClick={handleInstallModpackAsProfile}
+                      onInstallModpackVersionAsProfileClick={handleInstallModpackVersionAsProfile}
+                      onToggleVersionsClick={toggleProjectVersions}
+                      isExpanded={Array.isArray(projectVersions) && projectVersions.length > 0}
+                      isLoadingVersions={projectVersions === 'loading'}
+                      projectVersions={projectVersions}
+                      displayedCount={displayedCount}
+                      versionFilters={currentVersionFilters}
+                      versionDropdownUIState={currentVersionDropdownUIState}
+                      openVersionDropdowns={currentOpenVersionDropdowns}
+                      installedVersions={selectedProfile ? (installedVersions[selectedProfile.id] || {}) : {}}
+                      selectedProfile={selectedProfile}
+                      selectedProfileId={selectedProfile?.id}
+                      hoveredVersionId={hoveredVersionId}
+                      gameVersionsData={gameVersionsData}
+                      showAllGameVersionsSidebar={showAllGameVersionsSidebar}
+                      selectedGameVersionsSidebar={selectedGameVersions}
+                      onVersionFilterChange={handleVersionFilterChange}
+                      onVersionUiStateChange={handleVersionDropdownUIChange}
+                      onToggleVersionDropdown={toggleVersionDropdown}
+                      onCloseAllVersionDropdowns={closeAllVersionDropdowns}
+                      onLoadMoreVersions={loadMoreProjectVersions}
+                      onInstallVersionClick={handleDirectInstall}
+                      onHoverVersion={setHoveredVersionId}
+                      onDeleteVersionClick={handleDeleteVersionFromProfile}
+                      onToggleEnableClick={
+                        installTarget?.type === "syncPack"
+                          ? undefined
+                          : handleToggleEnableVersion
+                      }
+                      onProjectClick={onProjectClick}
+                    />
+                  );
+                };
 
   return (
     // Overall container: now flex-row to place left content and sidebar side-by-side
@@ -2981,18 +3041,28 @@ export function ModrinthSearchV2({
 
         {/* Search Results Area (scrollable within the left content area) */}
         <div ref={searchResultsAreaRef} onScroll={handleScrollSave} className="search-results-area flex-1 overflow-y-auto"> {/* Removed p-4 */}
-          {/* {loading && searchResults.length === 0 && <p className="p-4 text-center">Loading initial results...</p>} REMOVED */}
+          {/* Salami: erste Suche lädt – Salamischeibe statt leerer Fläche */}
+          {loading && searchResults.length === 0 && (
+            <div className="flex h-full min-h-[200px] items-center justify-center">
+              <LoadingSpinner size="lg" showMessage={false} />
+            </div>
+          )}
           {searchResults.length === 0 && !loading && error && (
-            <p className="p-4 text-red-500 text-center">{t('content.search.error', { error })}</p>
+            <EmptyState
+              icon="solar:danger-triangle-bold"
+              message={t('content.search.error', { error })}
+              compact
+            />
           )}
           {searchResults.length === 0 && !loading && !error && showNoResultsMessage && (
-            <p className="p-4 text-center text-sm text-gray-400">{t('content.search.no_results')}</p>
+            <EmptyState icon="solar:magnifer-bold" message={t('content.search.no_results')} compact />
           )}
 
           {searchResults.length > 0 && (
             disableVirtualization ? (
               // Non-virtualized scrollable div
               <div>
+                <div className={look.SearchCard ? (look.searchGridClassName ?? "grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4") : undefined}>
                 {searchResults.map((hit, index) => {
                   const projectVersions = expandedVersions[hit.project_id];
                   const displayedCount = numDisplayedVersions[hit.project_id] || initialDisplayCount;
@@ -3047,35 +3117,61 @@ export function ModrinthSearchV2({
                     />
                   );
                 })}
+                </div>
 
                 {/* Load more button for non-virtualized mode */}
                 {!loading && searchResults.length > 0 && searchResults.length < totalHits && (
                   <div className="flex justify-center p-4">
-                    <button
-                      onClick={loadMoreResults}
-                      className="px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-smallcaps text-base transition-all duration-200"
-                    >
+                    <KanteButton onClick={loadMoreResults}>
                       {t('content.search.load_more', { remaining: totalHits - searchResults.length })}
-                    </button>
+                    </KanteButton>
                   </div>
                 )}
 
                 {/* Loading indicator */}
                 {loading && searchResults.length > 0 && (
-                  <div className="p-4 text-center">
-                    {t('content.search.loading_more')}
+                  <div className="flex justify-center p-4">
+                    <LoadingSpinner size="sm" message={t('content.search.loading_more')} />
                   </div>
                 )}
 
                 {/* End of results */}
                 {!loading && searchResults.length > 0 && searchResults.length >= totalHits && (
-                  <div className="p-4 text-center text-sm text-gray-400">
+                  <div className="p-4 text-center text-sm text-white/35">
                     {t('content.search.no_more_results')}
                   </div>
                 )}
               </div>
             ) : (
               // Virtualized list (original implementation)
+              look.SearchCard ? (
+                <VirtuosoGrid
+                  style={{ height: '100%' }}
+                  data={searchResults}
+                  endReached={loadMoreResults}
+                  listClassName={look.searchGridClassName ?? "grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4"}
+                  itemContent={renderResult}
+                components={{
+                  Footer: () => {
+                    if (loading && searchResults.length > 0) {
+                      return (
+                        <div className="flex justify-center p-4">
+                          <LoadingSpinner size="sm" message={t('content.search.loading_more')} />
+                        </div>
+                      );
+                    }
+                    if (!loading && searchResults.length > 0 && searchResults.length >= totalHits) {
+                       return (
+                        <div className="p-4 text-center text-sm text-white/35">
+                          {t('content.search.no_more_results')}
+                        </div>
+                      );
+                    }
+                    return null;
+                  },
+                }}
+                />
+              ) : (
               <Virtuoso
                 style={{ height: '100%' }}
                 initialScrollTop={restoredScrollTop.current}
@@ -3087,72 +3183,19 @@ export function ModrinthSearchV2({
                     setScrollPosition((e.target as HTMLElement).scrollTop);
                   }, 150);
                 }}
-                itemContent={(index, hit) => {
-                  const projectVersions = expandedVersions[hit.project_id];
-                  const displayedCount = numDisplayedVersions[hit.project_id] || initialDisplayCount;
-                  const currentProjectInstallStatus = selectedProfile ? installedProjects[hit.project_id] : null;
-                  const currentVersionFilters = versionFilters[hit.project_id] || { gameVersions: [], loaders: [], versionType: 'all' };
-                  const currentVersionDropdownUIState = versionDropdownUIState[hit.project_id] || { showAllGameVersions: false, gameVersionSearchTerm: '' };
-                  const currentOpenVersionDropdowns = openVersionDropdowns[hit.project_id] || { type: false, gameVersion: false, loader: false };
-
-                  return (
-                    <ModrinthProjectCardV2
-                      key={hit.project_id}
-                      itemIndex={index}
-                      hit={hit}
-                      accentColor={accentColor}
-                      installStatus={currentProjectInstallStatus}
-                      isQuickInstalling={quickInstallingProjects[hit.project_id] || false}
-                      isInstallingModpackAsProfile={installingModpackAsProfile[hit.project_id] || false}
-                      installingVersionStates={installingVersion}
-                      installingModpackVersionStates={installingModpackVersion}
-                      onQuickInstallClick={overrideDisplayContext === "detail" ? handleDirectQuickInstall : quickInstall}
-                      onInstallModpackAsProfileClick={handleInstallModpackAsProfile}
-                      onInstallModpackVersionAsProfileClick={handleInstallModpackVersionAsProfile}
-                      onToggleVersionsClick={toggleProjectVersions}
-                      isExpanded={Array.isArray(projectVersions) && projectVersions.length > 0}
-                      isLoadingVersions={projectVersions === 'loading'}
-                      projectVersions={projectVersions}
-                      displayedCount={displayedCount}
-                      versionFilters={currentVersionFilters}
-                      versionDropdownUIState={currentVersionDropdownUIState}
-                      openVersionDropdowns={currentOpenVersionDropdowns}
-                      installedVersions={selectedProfile ? (installedVersions[selectedProfile.id] || {}) : {}}
-                      selectedProfile={selectedProfile}
-                      selectedProfileId={selectedProfile?.id}
-                      hoveredVersionId={hoveredVersionId}
-                      gameVersionsData={gameVersionsData}
-                      showAllGameVersionsSidebar={showAllGameVersionsSidebar}
-                      selectedGameVersionsSidebar={selectedGameVersions}
-                      onVersionFilterChange={handleVersionFilterChange}
-                      onVersionUiStateChange={handleVersionDropdownUIChange}
-                      onToggleVersionDropdown={toggleVersionDropdown}
-                      onCloseAllVersionDropdowns={closeAllVersionDropdowns}
-                      onLoadMoreVersions={loadMoreProjectVersions}
-                      onInstallVersionClick={handleDirectInstall}
-                      onHoverVersion={setHoveredVersionId}
-                      onDeleteVersionClick={handleDeleteVersionFromProfile}
-                      onToggleEnableClick={
-                        installTarget?.type === "syncPack"
-                          ? undefined
-                          : handleToggleEnableVersion
-                      }
-                      onProjectClick={onProjectClick}
-                    />
-                  );
-                }}
+                itemContent={renderResult}
                 components={{
                   Footer: () => {
                     if (loading && searchResults.length > 0) {
                       return (
-                        <div className="p-4 text-center">
-                          {t('content.search.loading_more')}
+                        <div className="flex justify-center p-4">
+                          <LoadingSpinner size="sm" message={t('content.search.loading_more')} />
                         </div>
                       );
                     }
                     if (!loading && searchResults.length > 0 && searchResults.length >= totalHits) {
                        return (
-                        <div className="p-4 text-center text-sm text-gray-400">
+                        <div className="p-4 text-center text-sm text-white/35">
                           {t('content.search.no_more_results')}
                         </div>
                       );
@@ -3161,6 +3204,7 @@ export function ModrinthSearchV2({
                   },
                 }}
               />
+              )
             )
           )}
 

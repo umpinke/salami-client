@@ -138,7 +138,7 @@ export function InstallationSettingsTab({
       } catch (err) {
         console.error("Failed to fetch Minecraft versions:", err);
         setError(
-          `failed to fetch minecraft versions: ${parseErrorMessage(err)}`,
+          t('profiles.errors.load_minecraft_versions_failed', { error: parseErrorMessage(err) }),
         );
       } finally {
         setIsLoadingVersions(false);
@@ -212,7 +212,7 @@ export function InstallationSettingsTab({
       } catch (err) {
         console.error(`Failed to fetch ${editedProfile.loader} versions:`, err);
         setError(
-          `failed to fetch ${editedProfile.loader} versions: ${parseErrorMessage(err)}`,
+          t('profiles.errors.load_loader_versions_failed', { loader: editedProfile.loader, error: parseErrorMessage(err) }),
         );
       } finally {
         setIsLoadingLoaderVersions(false);
@@ -467,7 +467,7 @@ export function InstallationSettingsTab({
                           "text-center text-sm w-full",
                           editedProfile.game_version === version
                             ? "bg-accent/20 border-accent text-white"
-                            : "bg-black/20 hover:bg-black/30 border-white/10 text-white/80 hover:text-white",
+                            : "bg-white/[0.045] hover:bg-white/[0.08] border-white/[0.09] text-white/80 hover:text-white",
                           profile.is_standard_version && "cursor-not-allowed opacity-50"
                         )}
                         onClick={() => !profile.is_standard_version && handleGameVersionClick(version)}
@@ -510,10 +510,10 @@ export function InstallationSettingsTab({
                   className={cn(
                     "p-3 flex flex-col items-center justify-center cursor-pointer platform-${loader.name}",
                     isSelected
-                      ? "bg-black/30 grayscale-0 text-white"
+                      ? "bg-white/[0.08] grayscale-0 text-white"
                       : isCompatible
-                        ? "bg-black/20 text-white/70 border-white/10 hover:bg-black/30 hover:text-white hover:border-white/20"
-                        : "bg-black/10 text-white/30 border-white/10 cursor-not-allowed",
+                        ? "bg-white/[0.045] text-white/70 border-white/[0.09] hover:bg-white/[0.08] hover:text-white hover:border-white/20"
+                        : "bg-white/[0.02] text-white/30 border-white/[0.09] cursor-not-allowed",
                   )}
                   onClick={() => isCompatible && handleLoaderClick(loader.name)}
                 >

@@ -5,7 +5,7 @@ import { forwardRef, useEffect, useRef } from "react";
 import { cn } from "../../lib/utils";
 import { gsap } from "gsap";
 import { useThemeStore } from "../../store/useThemeStore";
-import { Icon } from "@iconify/react";
+import { SalamiSlice } from "../../themes/salami/SalamiSlice";
 
 interface LoadingSpinnerProps extends React.HTMLAttributes<HTMLDivElement> {
   size?: "xs" | "sm" | "md" | "lg" | "xl" | "xxl";
@@ -29,7 +29,8 @@ export const LoadingSpinner = forwardRef<HTMLDivElement, LoadingSpinnerProps>(
       message,
       showMessage = true,
       className,
-      shadowDepth = "short",
+      // Salami: ohne getönten Glas-Kasten – nur die Scheibe
+      shadowDepth = "none",
       ...props
     },
     ref,
@@ -164,21 +165,10 @@ export const LoadingSpinner = forwardRef<HTMLDivElement, LoadingSpinnerProps>(
         )}
 
         <div className="relative flex items-center justify-center">
-          <Icon
-            icon="solar:refresh-bold"
-            className={cn("animate-spin", sizeStyles.icon)}
-            style={{ color: colors.text }}
-          />
-
-          <div
-            className="absolute rounded-full animate-pulse"
-            style={{
-              inset: "0",
-              backgroundColor: "transparent",
-              boxShadow: `0 0 15px ${colors.text}40`,
-              opacity: 0.6,
-            }}
-          />
+          {/* Salami: eine sich drehende Salamischeibe statt des allgemeinen Kreispfeils */}
+          <span className={cn("salami-spin inline-flex", sizeStyles.icon)}>
+            <SalamiSlice size={64} className="h-full w-full" />
+          </span>
         </div>
 
         {showMessage && message && (

@@ -9,9 +9,10 @@ import type { UnifiedProjectDetails, UnifiedVersion, UnifiedModSearchResult } fr
 import { ModPlatform } from "../../types/unified";
 import type { AccentColor } from "../../store/useThemeStore";
 import type { Profile } from "../../types/profile";
-import { TagBadge } from "../ui/TagBadge";
-import { ActionButton } from "../ui/ActionButton";
 import { ProgressToast } from "../ui/ProgressToast";
+import { kopfband, KANTE_SOFT } from "../ui/design-system";
+import { DeliLabel } from "../../themes/salami/SalamiStage";
+import { ICON_WELL, isLoaderTag, KanteButton, PLAIN_CARD, projectTypeKey, QuietTag, tagLabel } from "../modrinth/v2/FeinkostParts";
 import { openExternalUrl } from "../../services/tauri-service";
 import { useProfileStore } from "../../store/profile-store";
 import { useGlobalModalStore } from "../../hooks/useGlobalModal";
@@ -19,7 +20,8 @@ import { ModrinthQuickInstallProfilesModal } from "../modrinth/v2/ModrinthQuickI
 import UnifiedService from "../../services/unified-service";
 import { ModrinthService } from "../../services/modrinth-service";
 import { CurseForgeService } from "../../services/curseforge-service";
-import { installContentToProfile, installContentToTarget } from "../../services/content-service";
+import { installContentToProfile, installContentToTarget, shouldReportInstallError } from "../../services/content-service";
+import { errorText } from "../../utils/error-text";
 import { ContentType, type ContentInstallTarget, type InstallContentPayload } from "../../types/content";
 import { EventType, type EventPayload } from "../../types/events";
 import { useNavigate } from "react-router-dom";
@@ -171,14 +173,14 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
 
         // Update toast with progress
         toast.custom(
-          () => <ProgressToast message={`Installing ${fileName}`} progress={progress} />,
+          () => <ProgressToast message={t('content.install.installing_file', { name: fileName })} progress={progress} />,
           { id: toastId, duration: Infinity }
         );
       });
 
       // Show initial progress toast
       toast.custom(
-        () => <ProgressToast message={`Installing ${fileName}`} progress={0} />,
+        () => <ProgressToast message={t('content.install.installing_file', { name: fileName })} progress={0} />,
         { id: toastId, duration: Infinity }
       );
 
@@ -273,7 +275,7 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
       setInstallStatus(prev => ({ ...prev, [profile.id]: true }));
     } catch (error) {
       console.error("Installation failed:", error);
-      toast.error(t('mod_detail.install_failed', { error }));
+      if (shouldReportInstallError(error)) toast.error(t('mod_detail.install_failed', { error: errorText(error) }));
     } finally {
       setInstallingProfiles(prev => ({ ...prev, [profile.id]: false }));
     }
@@ -366,7 +368,7 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
         setInstallStatus(prev => ({ ...prev, [profile.id]: true }));
       } catch (error) {
         console.error("Installation failed:", error);
-        toast.error(t('mod_detail.install_failed', { error }));
+        if (shouldReportInstallError(error)) toast.error(t('mod_detail.install_failed', { error: errorText(error) }));
       } finally {
         setInstallingProfiles(prev => ({ ...prev, [profile.id]: false }));
       }
@@ -393,120 +395,139 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [installModalVersions, installingProfiles, installStatus, profiles, project.id]);
 
+  const typeKey = projectTypeKey(project.project_type);
+  const categoryTags = project.categories.filter((c) => !isLoaderTag(c));
+  const loaderTags = project.categories.filter((c) => isLoaderTag(c));
+
   return (
-    <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 bg-black/20 rounded-lg p-4 border border-white/10">
-      {/* Project Icon */}
+    // Feinkost-Kopf: Karte mit Kopfband im Salami-Anschnitt, das Projektbild ragt ins Band
+    <div className="look-card relative overflow-hidden" style={{ ...PLAIN_CARD, boxShadow: KANTE_SOFT }}>
       <div
-        className="w-24 h-24 sm:w-32 sm:h-32 flex-shrink-0 rounded-lg overflow-hidden border self-center sm:self-start"
-        style={{
-          borderColor: `${accentColor.value}30`,
-          backgroundColor: `${accentColor.value}10`,
-        }}
+        className="salami-fat-spots relative flex h-16 items-start justify-end gap-4 px-4 pt-3"
+        style={kopfband(accentColor.value)}
       >
-        {project.icon_url ? (
-          <img
-            src={project.icon_url}
-            alt={`${project.title} icon`}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full bg-gray-700/50 flex items-center justify-center">
-            <Icon icon={getProjectTypeIcon(project.project_type)} className="w-12 h-12 text-gray-500" />
-          </div>
-        )}
+        {/* Kennzahlen auf dem Band */}
+        <div className="flex items-center gap-4 font-minecraft text-sm text-[#f3e3d3]">
+          <span className="flex items-center gap-1.5" title={project.downloads.toLocaleString()}>
+            <Icon icon="solar:download-minimalistic-bold" className="h-4 w-4" />
+            {formatNumber(project.downloads)}
+          </span>
+          <span className="flex items-center gap-1.5" title={project.followers.toLocaleString()}>
+            <Icon icon="solar:heart-bold" className="h-4 w-4" />
+            {formatNumber(project.followers)}
+          </span>
+        </div>
       </div>
 
-      {/* Project Info */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        {/* Title Row */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-          <div>
-            <button
-              onClick={handleOpenProjectPage}
-              className="text-2xl font-minecraft text-white leading-tight hover:text-accent hover:underline transition-colors text-left"
-            >
-              {project.title}
-            </button>
-            {project.author && (
-              <p className="text-sm text-gray-400 font-minecraft mt-1">
-                by {project.author}
-              </p>
-            )}
-          </div>
-
-          {/* Stats + Install Button */}
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-4 text-sm text-white/70 font-minecraft">
-              <div className="flex items-center gap-1">
-                <Icon icon="solar:download-minimalistic-bold" className="w-4 h-4" />
-                <span>{formatNumber(project.downloads)}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Icon icon="solar:heart-bold" className="w-4 h-4" />
-                <span>{formatNumber(project.followers)}</span>
-              </div>
-            </div>
-
-            {/* Install Button + Versions Toggle */}
-            <div className="flex items-center gap-1">
-              <ActionButton
-                label={isInstalling ? "Installing..." : "Install"}
-                icon={isInstalling ? "solar:refresh-bold" : "solar:download-minimalistic-bold"}
-                iconClassName={isInstalling ? "animate-spin-slow" : ""}
-                variant={isInstalling ? "secondary" : "primary"}
-                size="sm"
-                disabled={isInstalling}
-                onClick={handleInstallClick}
-              />
-              <ActionButton
-                icon={showVersions ? "solar:alt-arrow-up-bold" : "solar:alt-arrow-down-bold"}
-                variant="icon-only"
-                tooltip={showVersions ? "Hide Versions" : "Show Versions"}
-                onClick={onToggleVersions}
-                size="sm"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Description */}
-        <p className="text-sm text-gray-300 font-minecraft mt-3 line-clamp-2">
-          {project.description}
-        </p>
-
-        {/* Meta Row */}
-        <div className="flex flex-wrap items-center gap-2 mt-4">
-          {/* Source Badge */}
-          <TagBadge
-            variant={project.source === ModPlatform.Modrinth ? "success" : "warning"}
-            size="sm"
-          >
-            <Icon
-              icon={project.source === ModPlatform.Modrinth ? "simple-icons:modrinth" : "simple-icons:curseforge"}
-              className="w-3 h-3 mr-1"
+      <div className="flex gap-5 px-5 pb-5">
+        {/* Project Icon */}
+        <div
+          className="relative z-10 -mt-10 h-28 w-28 flex-shrink-0 self-start overflow-hidden border-[3px]"
+          style={{
+            borderColor: "#f3e3d3",
+            backgroundColor: ICON_WELL,
+            borderRadius: "calc(var(--border-radius) * 0.9)",
+            boxShadow: "0 3px 0 rgba(0,0,0,0.35)",
+          }}
+        >
+          {project.icon_url ? (
+            <img
+              src={project.icon_url}
+              alt={`${project.title} icon`}
+              className="w-full h-full object-cover"
             />
-            {project.source}
-          </TagBadge>
-
-          {/* Project Type */}
-          <TagBadge variant="info" size="sm">
-            <Icon icon={getProjectTypeIcon(project.project_type)} className="w-3 h-3 mr-1" />
-            <span className="capitalize">{project.project_type}</span>
-          </TagBadge>
-
-          {/* Categories */}
-          {project.categories.slice(0, 4).map((category) => (
-            <TagBadge key={category} size="sm">
-              {category.replace(/-/g, " ")}
-            </TagBadge>
-          ))}
-          {project.categories.length > 4 && (
-            <span className="text-xs text-white/50 font-minecraft">
-              +{project.categories.length - 4} more
-            </span>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <Icon icon={getProjectTypeIcon(project.project_type)} className="w-12 h-12 text-[#f3e3d3]/40" />
+            </div>
           )}
         </div>
 
+        {/* Project Info */}
+        <div className="flex-1 min-w-0 flex flex-col pt-3">
+          {/* Title Row */}
+          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+            <div className="min-w-0">
+              <button
+                onClick={handleOpenProjectPage}
+                className="text-left font-minecraft text-3xl leading-tight text-white transition-colors hover:underline"
+                style={{ textDecorationColor: accentColor.value }}
+              >
+                {project.title}
+              </button>
+              {project.author && (
+                <p className="mt-1 text-sm text-white/55">
+                  {t('content.by_creator', { creator: project.author })}
+                </p>
+              )}
+            </div>
+
+            {/* Install Button + Versions Toggle */}
+            <div className="flex flex-shrink-0 items-center gap-2">
+              <KanteButton
+                tone={isInstalling ? "secondary" : "primary"}
+                size="lg"
+                disabled={isInstalling}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleInstallClick();
+                }}
+                icon={
+                  <Icon
+                    icon={isInstalling ? "solar:refresh-bold" : "solar:download-minimalistic-bold"}
+                    className={isInstalling ? "h-5 w-5 animate-spin-slow" : "h-5 w-5"}
+                  />
+                }
+              >
+                {isInstalling ? t('modrinth.installing') : t('modrinth.install')}
+              </KanteButton>
+              <KanteButton
+                size="lg"
+                active={showVersions}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleVersions();
+                }}
+                title={showVersions ? t('modrinth.hide_versions') : t('modrinth.show_versions')}
+                icon={<Icon icon="solar:list-bold" className="h-5 w-5" />}
+              >
+                {showVersions ? t('modrinth.hide_versions') : t('modrinth.show_versions')}
+              </KanteButton>
+            </div>
+          </div>
+
+          {/* Description */}
+          <p className="mt-3 line-clamp-2 text-sm text-white/75">
+            {project.description}
+          </p>
+
+          {/* Meta Row: Quelle und Typ ruhig, Loader und Kategorien als Theken-Etiketten */}
+          <div className="mt-4 flex flex-wrap items-center gap-1.5">
+            <QuietTag>
+              <Icon
+                icon={project.source === ModPlatform.Modrinth ? "simple-icons:modrinth" : "simple-icons:curseforge"}
+                className="h-3 w-3"
+              />
+              {project.source}
+            </QuietTag>
+            <QuietTag>
+              <Icon icon={getProjectTypeIcon(project.project_type)} className="h-3 w-3" />
+              {typeKey ? t(typeKey) : project.project_type}
+            </QuietTag>
+
+            {loaderTags.map((loader) => (
+              <DeliLabel key={loader} size="sm" tone="red">{tagLabel(loader)}</DeliLabel>
+            ))}
+            {categoryTags.slice(0, 4).map((category) => (
+              <DeliLabel key={category} size="sm">{tagLabel(category)}</DeliLabel>
+            ))}
+            {categoryTags.length > 4 && (
+              <span className="text-xs text-white/50 font-minecraft">
+                {t('mod_detail.more_categories', { count: categoryTags.length - 4 })}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -25,6 +25,7 @@ import { useClipsStore } from "../../store/clips-store";
 import { setDiscordState } from "../../utils/discordRpc";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { cn } from "../../lib/utils";
+import { KANTE_SOFT, SURFACE } from "../ui/design-system";
 
 const STATUS_POLL_MS = 2000;
 const ALL_GAMES = "__all__";
@@ -86,9 +87,10 @@ function health(
   }
 }
 
+// Salami: „wartet“ in Fett-Creme statt kaltem Blau
 const TONE_DOT: Record<Tone, string> = {
   live: "bg-green-400",
-  waiting: "bg-blue-400",
+  waiting: "bg-[#F3E3D3]",
   warn: "bg-yellow-400",
   off: "bg-white/30",
 };
@@ -192,7 +194,7 @@ export function ClipsPage() {
           smallDescription
           action={
             <Button
-              variant="default"
+              variant="3d"
               size="sm"
               icon={<Icon icon="solar:settings-bold" className="w-4 h-4" />}
               onClick={toClipSettings}
@@ -207,7 +209,7 @@ export function ClipsPage() {
 
   return (
     <div className="h-full flex flex-col overflow-hidden p-4 relative">
-      <div className="mb-6 pb-4 border-b border-white/10">
+      <div className="mb-6 pb-4 border-b" style={{ borderColor: SURFACE.line }}>
         <div className="flex items-center gap-4">
           <div className="flex-1">
             <SearchWithFilters
@@ -291,14 +293,17 @@ function CaptureStatusPill({
   const focused = useWindowFocus();
 
   const pill = (
-    <div className="flex items-center gap-2.5 h-10 px-3 bg-black/30 border border-white/10 rounded-lg">
+    <div
+      className="flex items-center gap-2.5 h-10 px-3 border"
+      style={{ backgroundColor: SURFACE.base, borderColor: SURFACE.line, borderRadius: "var(--border-radius)", boxShadow: KANTE_SOFT }}
+    >
       <span className="relative flex h-2.5 w-2.5 shrink-0">
         {state.tone === "live" && focused && (
-          <span className="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-60 animate-ping" />
+          <span className="absolute inline-flex h-full w-full bg-green-400 opacity-60 motion-safe:animate-ping" style={{ borderRadius: 999 }} />
         )}
-        <span className={cn("relative inline-flex h-2.5 w-2.5 rounded-full", TONE_DOT[state.tone])} />
+        <span className={cn("relative inline-flex h-2.5 w-2.5", TONE_DOT[state.tone])} style={{ borderRadius: 999 }} />
       </span>
-      <span className="font-smallcaps text-base text-white/70 whitespace-nowrap">{state.label}</span>
+      <span className="font-minecraft text-sm text-white/80 whitespace-nowrap">{state.label}</span>
       {hotkey && (
         <>
           <span className="w-px h-3 bg-white/30" />

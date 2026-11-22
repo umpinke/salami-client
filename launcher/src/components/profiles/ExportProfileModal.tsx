@@ -50,7 +50,7 @@ export function ExportProfileModal({
       </div>
       <div>
         <Button
-          variant="default"
+          variant="3d"
           onClick={exportAction.handleExport}
           disabled={exportAction.isDisabled()}
           icon={<Icon icon="solar:export-bold" className="w-5 h-5" />}
@@ -65,7 +65,7 @@ export function ExportProfileModal({
 
   return (
     <Modal
-      title={`Export Profile: ${profile.name}`}
+      title={t('export.title_with_name', { name: profile.name })}
       onClose={onClose}
       width="lg"
       footer={footerContent}

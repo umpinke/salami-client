@@ -19,6 +19,24 @@
     font-display: swap;
 }
 
+/* Serifenschrift des Looks „Salumeria": Cormorant Garamond (SIL Open Font License,
+   public/fonts/cormorant-garamond-OFL.txt) */
+@font-face {
+    font-family: "Cormorant Garamond";
+    src: url("/fonts/cormorant-garamond.ttf") format("truetype");
+    font-weight: 300 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Cormorant Garamond";
+    src: url("/fonts/cormorant-garamond-italic.ttf") format("truetype");
+    font-weight: 300 700;
+    font-style: italic;
+    font-display: swap;
+}
+
 @font-face {
     font-family: "MinecraftTen";
     src: url("/fonts/minecraft.woff2") format("woff2");
@@ -596,9 +614,11 @@ nav button:not(.no-radius),
 }
 
 /* Salami: Launcher im Hintergrund (Spiel läuft) – Animationen anhalten, mehr FPS fürs Spiel */
-.salami-inactive *,
-.salami-inactive *::before,
-.salami-inactive *::after {
+/* Einblend-Animationen (`animate-in`) laufen zu Ende: angehalten blieben Karten, die gerade
+   erscheinen, unsichtbar, wenn das Fenster in dem Moment den Fokus verliert. */
+.salami-inactive *:not(.animate-in),
+.salami-inactive *:not(.animate-in)::before,
+.salami-inactive *:not(.animate-in)::after {
   animation-play-state: paused !important;
 }
 

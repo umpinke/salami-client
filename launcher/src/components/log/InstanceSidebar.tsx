@@ -427,7 +427,7 @@ export function InstanceSidebar({
       // Launch initiated successfully - status updates will come from events
     } catch (error) {
       console.error("Failed to launch profile:", error);
-      const errorMsg = typeof error === "string" ? error : (error as Error).message || "Launch failed";
+      const errorMsg = typeof error === "string" ? error : (error as Error).message || t('launch.error.unknown');
       finalizeButtonLaunch(profileId, errorMsg);
     }
   };

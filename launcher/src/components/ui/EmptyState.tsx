@@ -3,6 +3,7 @@
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
+import { SalamiSlice } from "../../themes/salami/SalamiSlice";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 import { gsap } from "gsap";
@@ -116,13 +117,20 @@ export function EmptyState({
             compact ? "w-20 h-12" : "w-28 h-20",
             onIconClick ? "cursor-pointer hover:opacity-80 transition-opacity" : ""
           )}
-          style={{ color: accentColor.value }}
           onClick={onIconClick}
         >
-          <Icon icon={icon} className={compact ? "w-12 h-12" : "w-20 h-20"} />
+          {/* Salami: das Symbol liegt auf einer Salamischeibe */}
+          <span className={cn("relative flex items-center justify-center", compact ? "w-14 h-14" : "w-20 h-20")}>
+            <SalamiSlice size={80} className="absolute inset-0 h-full w-full opacity-90" />
+            <Icon
+              icon={icon}
+              className={cn("relative", compact ? "w-7 h-7" : "w-10 h-10")}
+              style={{ color: "#f3e3d3", filter: "drop-shadow(0 2px 0 rgba(43,29,26,0.9))" }}
+            />
+          </span>
         </div>        <p
           className={cn(
-            "text-white lowercase text-center mb-2",
+            "text-white text-center mb-2 font-minecraft",
             compact ? "text-xl" : "text-2xl",
           )}
         >
@@ -132,7 +140,7 @@ export function EmptyState({
         {description && (
           <p
             className={cn(
-              "text-white/70 lowercase text-center max-w-md",
+              "text-white/70 text-center max-w-md",
               smallDescription
                 ? (compact ? "text-base mb-4" : "text-lg mb-6")
                 : (compact ? "text-2xl mb-4" : "text-2xl mb-6"),

@@ -16,6 +16,7 @@ import { ToggleSwitch } from "../ui/ToggleSwitch";
 import { Tooltip } from "../ui/Tooltip";
 import { RowAction, SyncPackRow } from "./SyncPackRow";
 import { SyncPackVersionRow } from "./SyncPackVersionRow";
+import { FK_SOFT_BUTTON_CLASS } from "../profiles/v3/shared/feinkost";
 
 export interface SyncPackModRowProps {
   selectable?: boolean;
@@ -129,9 +130,12 @@ export function SyncPackModRow({
       />
 
       {isExpanded && (
-        <div className="mt-2 rounded-lg border border-white/10 bg-black/30 p-3">
+        <div
+          className="mt-2 border border-white/[0.09] bg-white/[0.03] p-3"
+          style={{ borderRadius: "var(--border-radius)" }}
+        >
           <div className="mb-2 flex items-center justify-between">
-            <span className="font-minecraft text-[10px] uppercase tracking-wider text-white/35">
+            <span className="font-minecraft text-sm text-white/55">
               {t("syncPacks.entries.overridesTitle")}
             </span>
             <Tooltip
@@ -143,7 +147,7 @@ export function SyncPackModRow({
                 onClick={() => onResolve()}
                 disabled={resolving}
                 aria-label={t("syncPacks.entries.resolveAll")}
-                className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-black/40 text-white/45 transition-colors hover:border-white/20 hover:bg-black/60 hover:!text-white disabled:opacity-30"
+                className={`flex h-7 w-7 items-center justify-center disabled:opacity-30 ${FK_SOFT_BUTTON_CLASS}`}
               >
                 <Icon
                   icon="solar:refresh-bold"

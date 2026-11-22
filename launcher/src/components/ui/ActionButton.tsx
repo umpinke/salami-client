@@ -3,6 +3,7 @@
 import React from "react";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../store/useThemeStore";
+import { KANTE_SOFT, SURFACE, kante } from "./design-system";
 
 export type ActionButtonVariant = "primary" | "secondary" | "icon-only" | "destructive" | "text" | "highlight";
 
@@ -84,47 +85,36 @@ export function ActionButton({
   const getButtonStyles = () => {
     const baseClasses = (effectiveVariant === "text" || effectiveVariant === "highlight")
       ? `transition-all duration-200 font-smallcaps flex items-center gap-2 ${getSizeClasses()}`
-      : `transition-all duration-200 hover:scale-105 border font-smallcaps rounded-lg flex items-center gap-2 ${getSizeClasses()}`;
+      : `transition-all duration-150 active:translate-y-px border font-minecraft rounded-lg flex items-center gap-2 ${getSizeClasses()}`;
     
     switch (effectiveVariant) {
       case "primary":
         return {
-          className: `${baseClasses} text-white`,
+          className: `${baseClasses} text-white hover:brightness-110`,
           style: {
-            backgroundColor: `${accentColor.value}20`,
-            borderColor: `${accentColor.value}60`,
+            backgroundColor: accentColor.value,
+            borderColor: "transparent",
             color: 'white',
-          },
-          onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
-            if (!disabled) {
-              e.currentTarget.style.backgroundColor = `${accentColor.value}30`;
-              e.currentTarget.style.borderColor = `${accentColor.value}80`;
-            }
-          },
-          onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
-            if (!disabled) {
-              e.currentTarget.style.backgroundColor = `${accentColor.value}20`;
-              e.currentTarget.style.borderColor = `${accentColor.value}60`;
-            }
+            boxShadow: kante(accentColor.value),
           },
         };
       
       case "secondary":
         return {
-          className: `${baseClasses} bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border-white/10 hover:border-white/20`,
-          style: {},
+          className: `${baseClasses} text-white/75 hover:text-white hover:brightness-125`,
+          style: { backgroundColor: SURFACE.hover, borderColor: SURFACE.line, boxShadow: KANTE_SOFT },
         };
       
       case "icon-only":
         return {
-          className: `${baseClasses} bg-black/30 hover:bg-black/40 text-white/70 hover:text-white justify-center border-white/10 hover:border-white/20`,
-          style: {},
+          className: `${baseClasses} text-white/75 hover:text-white hover:brightness-125 justify-center`,
+          style: { backgroundColor: SURFACE.hover, borderColor: SURFACE.line, boxShadow: KANTE_SOFT },
         };
       
       case "destructive":
         return {
           className: `${baseClasses} bg-red-600/20 hover:bg-red-600/30 text-white hover:text-white border-red-500/30 hover:border-red-500/50`,
-          style: {},
+          style: { boxShadow: KANTE_SOFT },
         };
       
       case "text":
@@ -174,8 +164,8 @@ export function ActionButton({
       
       default:
         return {
-          className: `${baseClasses} bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border-white/10 hover:border-white/20`,
-          style: {},
+          className: `${baseClasses} text-white/75 hover:text-white hover:brightness-125`,
+          style: { backgroundColor: SURFACE.hover, borderColor: SURFACE.line, boxShadow: KANTE_SOFT },
         };
     }
   };
@@ -187,7 +177,7 @@ export function ActionButton({
     <button
       id={id}
       onClick={handleClick}
-      className={`${buttonStyles.className} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
+      className={`look-btn look-btn--${effectiveVariant === 'icon-only' ? 'secondary' : effectiveVariant} ${buttonStyles.className} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
       style={!isDisabled ? buttonStyles.style : { ...buttonStyles.style, opacity: 0.5 }}
       onMouseEnter={!isDisabled ? buttonStyles.onMouseEnter : undefined}
       onMouseLeave={!isDisabled ? buttonStyles.onMouseLeave : undefined}

@@ -9,16 +9,23 @@ import { UnifiedSortType, ModPlatform } from "../../../types/unified";
 // Profile type will be defined locally
 import { SearchWithFilters } from "../../ui/SearchWithFilters";
 import type { GroupTab } from "../../ui/GroupTabs";
-import { hexAlpha, SURFACE } from "../../ui/design-system";
-import { IconButton } from "../../ui/buttons/IconButton";
-import { TagBadge } from "../../ui/TagBadge";
+import { kante, KANTE_SOFT, readableOn, SURFACE } from "../../ui/design-system";
 import { Icon } from "@iconify/react";
 import { useDisplayContextStore } from "../../../store/useDisplayContextStore";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { cn } from "../../../lib/utils";
+import { KanteButton, PLAIN_CARD, RemovableLabel as FilterChip, tagLabel } from "./FeinkostParts";
 
 // Define Profile type locally, similar to ModrinthSearchV2.tsx
 type Profile = any;
+
+const PROJECT_TYPE_LABEL_KEYS: Record<ModrinthProjectType, string> = {
+  mod: "modrinth.project_types.mods",
+  modpack: "modrinth.project_types.modpacks",
+  resourcepack: "modrinth.project_types.resource_packs",
+  shader: "modrinth.project_types.shaders",
+  datapack: "modrinth.project_types.datapacks",
+};
 
 export // Define SelectOption type locally
 interface SelectOption {
@@ -112,10 +119,14 @@ export const ModrinthSearchControlsV2: React.FC<
     (filterClientRequired ? 1 : 0) +
     (filterServerRequired ? 1 : 0);
 
+  // Translated plural name per project type ("Ressourcenpakete", not "resourcepacks")
+  const typeLabel = (type: ModrinthProjectType): string =>
+    t(PROJECT_TYPE_LABEL_KEYS[type] ?? "", { defaultValue: type.charAt(0).toUpperCase() + type.slice(1) + 's' });
+
   // Create groups array for project types
   const groups: GroupTab[] = allProjectTypes.map(type => ({
     id: type,
-    name: type.charAt(0).toUpperCase() + type.slice(1) + 's',
+    name: typeLabel(type),
     count: 0, // Could be populated with result counts if needed
   }));
 
@@ -136,38 +147,48 @@ export const ModrinthSearchControlsV2: React.FC<
 
   return (
     <>
-      {/* Inhaltsarten als Textreiter mit Akzentstrich, rechts die Quelle */}
-      <div
-        className="mb-4 flex items-end justify-between gap-4 border-b"
-        style={{ borderColor: SURFACE.line }}
-      >
-        <div className="flex min-w-0 items-end gap-6 overflow-x-auto">
+      {/* Feinkost: Inhaltsarten als Theken-Reiter (aktiv = volle Akzentfarbe mit Unterkante), rechts die Quelle */}
+      <div className="look-search-types mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div
+          className="look-card look-tabs flex min-w-0 flex-wrap items-center gap-1 p-1"
+          style={{ ...PLAIN_CARD, borderRadius: "calc(var(--border-radius) * 0.9)" }}
+          role="tablist"
+        >
           {groups.map((group) => {
             const active = group.id === projectType;
             return (
               <button
                 key={group.id}
                 type="button"
+                role="tab"
+                aria-selected={active}
                 onClick={() => onProjectTypeChange(group.id as ModrinthProjectType)}
                 className={cn(
-                  "relative flex-shrink-0 pb-2.5 font-minecraft text-2xl lowercase leading-none transition-colors duration-150",
-                  active ? "text-white" : "text-white/40 hover:text-white/75",
+                  "flex h-9 flex-shrink-0 items-center px-3.5 font-minecraft text-base leading-none transition-[background-color,color,filter] duration-150 motion-reduce:transition-none",
+                  active ? "hover:brightness-110" : "text-white/55 hover:bg-white/[0.06] hover:text-white",
                 )}
-                style={{ borderRadius: 0 }}
+                style={{
+                  borderRadius: "calc(var(--border-radius) * 0.7)",
+                  ...(active
+                    ? {
+                        backgroundColor: accentColor.value,
+                        color: readableOn(accentColor.value),
+                        boxShadow: kante(accentColor.value),
+                      }
+                    : {}),
+                }}
               >
                 {group.name}
-                {active && (
-                  <span
-                    className="absolute inset-x-0 -bottom-px h-[3px]"
-                    style={{ backgroundColor: accentColor.value }}
-                  />
-                )}
               </button>
             );
           })}
         </div>
 
-        <div className="mb-2 flex flex-shrink-0 items-center gap-3 text-sm">
+        {/* Quelle: kleiner Umschalter, die gewählte Plattform liegt erhaben */}
+        <div
+          className="look-card look-tabs flex flex-shrink-0 items-center gap-1 p-1 text-sm"
+          style={{ ...PLAIN_CARD, borderRadius: "calc(var(--border-radius) * 0.9)" }}
+        >
           {sources.map((source) => {
             const active = modSource === source.id;
             return (
@@ -176,13 +197,15 @@ export const ModrinthSearchControlsV2: React.FC<
                 type="button"
                 onClick={() => onModSourceChange(source.id)}
                 title={source.title}
+                aria-pressed={active}
                 className={cn(
-                  "flex items-center gap-1.5 border px-2.5 py-1 font-minecraft lowercase transition-colors duration-150",
+                  "flex h-8 items-center gap-1.5 px-2.5 font-minecraft transition-colors duration-150 motion-reduce:transition-none",
                   active ? "text-white" : "text-white/45 hover:text-white/80",
                 )}
                 style={{
-                  backgroundColor: active ? hexAlpha(accentColor.value, 0.16) : "transparent",
-                  borderColor: active ? hexAlpha(accentColor.value, 0.45) : SURFACE.line,
+                  borderRadius: "calc(var(--border-radius) * 0.7)",
+                  backgroundColor: active ? SURFACE.raised : "transparent",
+                  boxShadow: active ? `inset 0 0 0 1px ${SURFACE.lineStrong}, ${KANTE_SOFT}` : undefined,
                 }}
               >
                 <img
@@ -198,12 +221,12 @@ export const ModrinthSearchControlsV2: React.FC<
       </div>
 
       {/* Search & Filter Header */}
-      <div className="mb-3">
+      <div className="look-search-bar mb-3">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 flex-1">
             <SearchWithFilters
               className="min-w-0 flex-1 [&>div]:max-w-none"
-              placeholder={t('content.search_placeholder', { type: projectType })}
+              placeholder={t('content.search_placeholder', { type: projectType, typeLabel: typeLabel(projectType) })}
               searchValue={searchTerm}
               onSearchChange={onSearchTermChange}
               sortOptions={sortOptions}
@@ -211,124 +234,66 @@ export const ModrinthSearchControlsV2: React.FC<
               onSortChange={(value) => onSortOrderChange(value as UnifiedSortType)}
             />
 
-            <button
+            <KanteButton
               onClick={onToggleSidebar}
-              className="flex min-h-[2.5rem] items-center gap-2 border px-3 font-minecraft text-sm lowercase transition-colors duration-150"
-              style={{
-                backgroundColor: isSidebarVisible ? hexAlpha(accentColor.value, 0.16) : SURFACE.base,
-                borderColor: isSidebarVisible ? hexAlpha(accentColor.value, 0.45) : SURFACE.line,
-                color: isSidebarVisible ? "#fff" : "rgba(255,255,255,0.6)",
-              }}
+              active={isSidebarVisible}
+              className="h-10"
               title={isSidebarVisible ? t('content.filters.hide') : t('content.filters.show')}
+              icon={<Icon icon="solar:tuning-2-bold" className="h-4 w-4" />}
             >
-              <Icon icon="solar:tuning-2-bold" className="h-4 w-4" />
-              <span>{t('content.filters.title', 'Filter')}</span>
+              <span>{t('modrinth.filters')}</span>
               {totalFilters > 0 && (
                 <span
-                  className="flex h-4 min-w-4 items-center justify-center px-1 text-[10px] leading-none text-white"
-                  style={{ backgroundColor: accentColor.value, borderRadius: 999 }}
+                  className="flex h-4 min-w-4 items-center justify-center px-1 text-[10px] leading-none"
+                  style={{ backgroundColor: accentColor.value, color: readableOn(accentColor.value), borderRadius: 999 }}
                 >
                   {totalFilters}
                 </span>
               )}
-            </button>
+            </KanteButton>
           </div>
         </div>
 
-        {/* Filter Tags - Under Search */}
+        {/* Gewählte Filter als Etiketten – Klick entfernt den Filter */}
         {totalFilters > 0 && (
-          <div className="flex items-center gap-2 mt-4">
-            <TagBadge
-              variant="destructive"
-              className="cursor-pointer hover:brightness-110 transition-all flex-shrink-0 flex items-center"
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            <KanteButton
+              tone="ghost"
+              size="sm"
               onClick={onClearAllFilters}
-              size="md"
+              icon={<Icon icon="solar:trash-bin-trash-bold" className="h-4 w-4" />}
             >
-              <Icon
-                icon="solar:trash-bin-trash-bold"
-                className="w-4 h-4 mr-1"
-              />
-              <span>{t('content.filters.clear_all')}</span>
-            </TagBadge>
+              {t('content.filters.clear_all')}
+            </KanteButton>
 
             {selectedGameVersions.map((version) => (
-              <TagBadge
-                key={`gv-${version}`}
-                variant="filter"
-                className="inline-flex whitespace-nowrap items-center"
-                size="md"
-                onClick={() => onRemoveGameVersionTag(version)}
-              >
-                <span>{version}</span>
-                <Icon
-                  icon="solar:close-circle-bold"
-                  className="w-4 h-4 ml-1"
-                />
-              </TagBadge>
+              <FilterChip key={`gv-${version}`} onRemove={() => onRemoveGameVersionTag(version)}>
+                {version}
+              </FilterChip>
             ))}
 
             {currentSelectedLoaders.map((loader) => (
-              <TagBadge
-                key={`loader-${loader}`}
-                variant="filter"
-                className="inline-flex whitespace-nowrap items-center"
-                size="md"
-                onClick={() => onRemoveLoaderTag(loader)}
-              >
-                <span>{loader}</span>
-                <Icon
-                  icon="solar:close-circle-bold"
-                  className="w-4 h-4 ml-1"
-                />
-              </TagBadge>
+              <FilterChip key={`loader-${loader}`} tone="red" onRemove={() => onRemoveLoaderTag(loader)}>
+                {tagLabel(loader)}
+              </FilterChip>
             ))}
 
             {currentSelectedCategories.map((category) => (
-              <TagBadge
-                key={`cat-${category}`}
-                variant="filter"
-                className="inline-flex whitespace-nowrap items-center"
-                size="md"
-                onClick={() => onRemoveCategoryTag(category)}
-              >
-                <span>{category}</span>
-                <Icon
-                  icon="solar:close-circle-bold"
-                  className="w-4 h-4 ml-1"
-                />
-              </TagBadge>
+              <FilterChip key={`cat-${category}`} onRemove={() => onRemoveCategoryTag(category)}>
+                {tagLabel(category)}
+              </FilterChip>
             ))}
 
             {filterClientRequired && (
-              <TagBadge
-                key="client-req"
-                variant="filter"
-                className="inline-flex whitespace-nowrap items-center"
-                size="md"
-                onClick={onRemoveClientRequiredTag}
-              >
-                <span>{t('content.filters.client')}</span>
-                <Icon
-                  icon="solar:close-circle-bold"
-                  className="w-4 h-4 ml-1"
-                />
-              </TagBadge>
+              <FilterChip key="client-req" onRemove={onRemoveClientRequiredTag}>
+                {t('content.filters.client')}
+              </FilterChip>
             )}
 
             {filterServerRequired && (
-              <TagBadge
-                key="server-req"
-                variant="filter"
-                className="inline-flex whitespace-nowrap items-center"
-                size="md"
-                onClick={onRemoveServerRequiredTag}
-              >
-                <span>{t('content.filters.server')}</span>
-                <Icon
-                  icon="solar:close-circle-bold"
-                  className="w-4 h-4 ml-1"
-                />
-              </TagBadge>
+              <FilterChip key="server-req" onRemove={onRemoveServerRequiredTag}>
+                {t('content.filters.server')}
+              </FilterChip>
             )}
           </div>
         )}

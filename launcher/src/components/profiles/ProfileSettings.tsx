@@ -21,6 +21,8 @@ import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 import { parseErrorMessage } from "../../utils/error-utils";
+import { kante, readableOn } from "../ui/design-system";
+import { errorText } from "../../utils/error-text";
 
 interface ProfileSettingsProps {
   profile: Profile;
@@ -151,7 +153,7 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
       setRefreshTrigger(prev => prev + 1);
     } catch (err) {
       console.error("Failed to save profile:", err);
-      toast.error(t('profiles.settings.saveError'));
+      toast.error(t('profiles.settings.saveError', { error: errorText(err) }));
     } finally {
       setIsSaving(false);
     }
@@ -270,7 +272,7 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
         {t('profiles.settings.cancel')}
       </Button>
       <Button
-        variant="default"
+        variant="3d"
         onClick={handleSave}
         disabled={isSaving}
         size="md"
@@ -320,33 +322,33 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
           ref={sidebarRef}
           className="w-64 flex flex-col flex-shrink-0"
         >
-          <div className="space-y-0.5 flex-1 overflow-y-auto scrollbar-hover">
+          <div className="space-y-1.5 flex-1 overflow-y-auto scrollbar-hover px-1 pb-1">
             {tabConfig.map((tab) => {
               const isActive = activeTab === tab.id;
 
               return (
+                // Salami: aktiver Reiter = volle Akzentfarbe mit harter Unterkante (wie im Profil)
                 <button
                   key={tab.id}
                   className={cn(
-                    "w-full text-left px-3 py-2.5 rounded-lg transition-colors border-0 outline-none flex items-center gap-3",
+                    "w-full text-left px-3 h-11 transition-colors border-0 outline-none flex items-center gap-3",
                     isActive
-                      ? "text-white"
-                      : "bg-transparent text-white/60 hover:bg-white/5 hover:text-white/90",
+                      ? ""
+                      : "bg-transparent text-white/65 hover:bg-white/[0.08] hover:text-white",
                   )}
-                  style={isActive ? { backgroundColor: `${accentColor.value}26` } : undefined}
+                  style={{
+                    borderRadius: "calc(var(--border-radius) * 0.8)",
+                    ...(isActive
+                      ? { backgroundColor: accentColor.value, color: readableOn(accentColor.value), boxShadow: kante(accentColor.value) }
+                      : {}),
+                  }}
                   onClick={() => handleTabClick(tab.id)}
                 >
                   <Icon
                     icon={tab.icon}
                     className="w-6 h-6 transition-colors duration-200"
-                    style={{ color: isActive ? accentColor.value : undefined }}
                   />
-                  <span
-                    className={cn(
-                      "font-smallcaps text-lg transition-colors duration-200",
-                      isActive && "font-medium",
-                    )}
-                  >
+                  <span className="font-minecraft text-lg transition-colors duration-200">
                     {tab.label}
                   </span>
                 </button>

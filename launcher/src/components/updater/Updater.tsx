@@ -14,6 +14,7 @@ import { cn } from "../../lib/utils";
 import { gsap } from "gsap";
 import { Button } from "../ui/buttons/Button";
 import { useTranslation } from "react-i18next";
+import i18n from "../../i18n/i18n";
 import { NebulaGrid } from "../effects/NebulaGrid";
 import { NebulaParticles } from "../effects/NebulaParticles";
 import { NebulaWaves } from "../effects/NebulaWaves";
@@ -38,6 +39,28 @@ interface UpdaterStatusPayload {
   progress?: number;
   total?: number;
   chunk?: number;
+}
+
+// The backend sends English status texts; show the known ones in the UI language.
+const UPDATER_MESSAGES: [RegExp, (m: RegExpMatchArray) => string][] = [
+  [/^Checking for .* updates\.\.\.$/, () => i18n.t('updater.checking')],
+  [/^Update found, preparing download\.\.\.$/, () => i18n.t('updater.preparing')],
+  [/^Update (.+) found!$/, (m) => i18n.t('updater.found', { version: m[1] })],
+  [/^Downloading update: (\d+) bytes$/, (m) => i18n.t('updater.downloading_size', { mb: (Number(m[1]) / (1024 * 1024)).toFixed(1) })],
+  [/^Installation complete\.$/, () => i18n.t('updater.installed')],
+  [/^(Update installed successfully!|Update successful\.)$/, () => i18n.t('updater.success')],
+  [/^Application is up to date\.$/, () => i18n.t('updater.up_to_date')],
+  [/^Update check timed out\. Starting without update\.$/, () => i18n.t('updater.timed_out')],
+  [/^Update download\/install failed: ([\s\S]+)$/, (m) => i18n.t('updater.failed', { error: m[1] })],
+  [/^Update check error: ([\s\S]+)$/, (m) => i18n.t('updater.check_failed', { error: m[1] })],
+];
+
+function translateUpdaterMessage(message: string): string {
+  for (const [pattern, render] of UPDATER_MESSAGES) {
+    const match = message.match(pattern);
+    if (match) return render(match);
+  }
+  return message;
 }
 
 export default function Updater() {
@@ -99,7 +122,7 @@ export default function Updater() {
           closeTimerRef.current = null;
         }
 
-        setStatusMessage(message);
+        setStatusMessage(translateUpdaterMessage(message));
         setStatus(newStatus);
 
         if (
@@ -248,7 +271,7 @@ export default function Updater() {
             <img
               ref={logoRef}
               src="/logo.png"
-              alt="Salami Client Logo"
+              alt="Salami Client"
               className="w-32 h-32 object-contain mb-1"
             />
             <p className="text-xs font-smallcaps text-white/70">

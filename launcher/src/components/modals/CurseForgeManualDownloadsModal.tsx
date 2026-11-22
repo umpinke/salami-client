@@ -9,6 +9,7 @@ import { openExternalUrl } from "../../services/tauri-service";
 import { revealItemInDir } from "../../utils/opener-utils";
 import { EventType, type EventPayload } from "../../types/events";
 import "./curseforge-manual-i18n";
+import { errorText } from "../../utils/error-text";
 
 /** Eine Datei, die der Autor nur über die CurseForge-Webseite herausgibt (`integrations/curseforge_manual.rs`). */
 interface ManualDownload {
@@ -43,9 +44,9 @@ export function CurseForgeManualDownloadsModal() {
   if (!files) return null;
 
   const open = (url: string) =>
-    openExternalUrl(url).catch((error) => toast.error(t("curseforge_manual.open_failed", { error: String(error) })));
+    openExternalUrl(url).catch((error) => toast.error(t("curseforge_manual.open_failed", { error: errorText(error) })));
   const reveal = (path: string) =>
-    revealItemInDir(path).catch((error) => toast.error(t("curseforge_manual.open_failed", { error: String(error) })));
+    revealItemInDir(path).catch((error) => toast.error(t("curseforge_manual.open_failed", { error: errorText(error) })));
 
   const mods = files.filter((f) => !f.folder);
   const content = files.filter((f) => f.folder);

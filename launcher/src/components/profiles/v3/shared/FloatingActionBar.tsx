@@ -3,6 +3,7 @@
 import type React from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
+import { SURFACE, hexAlpha, kante } from "../../../ui/design-system";
 
 export interface FABActionConfig {
   icon: string;
@@ -37,13 +38,13 @@ export function FloatingActionBar({
     >
       <div
         style={{
-          backgroundColor: `${accent}1f`,
-          borderColor: `${accent}66`,
-          backdropFilter: "blur(16px)",
-          WebkitBackdropFilter: "blur(16px)",
-          boxShadow: `0 12px 32px -10px rgba(0,0,0,0.5)`,
+          // Salami: deckende Leiste mit Akzent-Rahmen und harter Unterkante statt Glas
+          backgroundColor: SURFACE.solidRaised,
+          borderColor: hexAlpha(accent, 0.55),
+          borderRadius: "var(--border-radius)",
+          boxShadow: `${kante(accent)}, 0 14px 32px -10px rgba(0,0,0,0.6)`,
         }}
-        className={`flex items-center h-11 rounded-xl border overflow-hidden whitespace-nowrap transition-opacity duration-200 ease-out ${
+        className={`flex items-center h-11 border overflow-hidden whitespace-nowrap transition-opacity duration-200 ease-out ${
           visible ? "opacity-100" : "opacity-0"
         }`}
       >
@@ -63,7 +64,7 @@ export function FloatingActionBar({
               {!allSelected && (
                 <button
                   onClick={onSelectAll}
-                  className="h-7 px-2 rounded-md text-[10px] font-minecraft uppercase tracking-wider text-white/55 hover:text-white hover:bg-white/10 transition-colors"
+                  className="h-7 px-2 rounded-md text-xs font-minecraft text-white/60 hover:text-white hover:bg-white/10 transition-colors"
                 >
                   {t("profiles.v3.fab.all")}
                 </button>

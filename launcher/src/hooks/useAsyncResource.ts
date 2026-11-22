@@ -1,4 +1,5 @@
 import { useEffect, useState, type DependencyList } from "react";
+import { errorText } from "../utils/error-text";
 
 export interface AsyncResource<T> {
   data: T;
@@ -99,7 +100,7 @@ export function useAsyncResource<T>(
       .catch((err: unknown) => {
         fresh = true;
         if (!alive) return;
-        const error = err instanceof Error ? err : new Error(String(err));
+        const error = err instanceof Error ? err : new Error(errorText(err));
         setState((s) => ({ data: known ?? fallback, loading: false, error }));
       });
 
