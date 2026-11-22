@@ -51,6 +51,7 @@ pub async fn set_launcher_config(app: AppHandle, mut config: LauncherConfig) -> 
 
     // Set the entire configuration
     state.config_manager.set_config(config.clone()).await?;
+    state.apply_io_limit(config.concurrent_io_limit);
 
     // Return the updated config
     Ok(config)

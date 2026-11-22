@@ -164,6 +164,15 @@ async fn main() {
                 return;
             }
 
+            // Salami: a .salamipack double-clicked while the launcher runs arrives here
+            {
+                let handle = app.clone();
+                let args = argv.clone();
+                tauri::async_runtime::spawn(async move {
+                    integrations::norisk_packs::handle_noriskpack_file_paths(&handle, args).await;
+                });
+            }
+
             match app.get_webview_window("main") {
                 Some(window) => {
                     if let Err(e) = window.show() {
@@ -323,15 +332,16 @@ async fn main() {
             // --- Handle .noriskpack file opening on initial startup (all platforms) ---
             // The single-instance plugin does not handle the *very first* launch with arguments.
             // We still need to check std::env::args() here for that first launch.
-            /*info!("Checking for startup file arguments...");
+            // Salami: this was commented out upstream, so double-clicking a .salamipack while the
+            // launcher was closed only opened it. import_profile waits for the state itself.
             let startup_args: Vec<String> = std::env::args().collect();
             if startup_args.len() > 1 { // args[0] is exe path, check if there are more
                 let handle_clone = app_handle.clone();
                 tauri::async_runtime::spawn(async move {
                     // Pass all startup_args; handle_noriskpack_file_paths will skip the exe path if needed
-                    norisk_packs::handle_noriskpack_file_paths(&handle_clone, startup_args).await;
+                    integrations::norisk_packs::handle_noriskpack_file_paths(&handle_clone, startup_args).await;
                 });
-            }*/
+            }
             // --- End .noriskpack handling on startup ---
 
             // Task for State Init and Updater Window
@@ -369,15 +379,21 @@ async fn main() {
                             .dialog()
                             .message(
                                 [
+                                    "Salami Client konnte nicht starten.".to_string(),
                                     "Salami Client could not start.".to_string(),
                                     String::new(),
                                     e.to_string(),
                                     String::new(),
-                                    "If that does not help:".to_string(),
                                     concat!(
-                                        "\"Reset database and restart\" keeps the old ",
-                                        "database as app.db.broken.<time> and restores ",
-                                        "your profiles from profiles.json.migrated."
+                                        "„Zurücksetzen“ legt die alte Datenbank als ",
+                                        "app.db.broken.<Zeit> beiseite und holt deine ",
+                                        "Profile aus profiles.json.migrated zurück."
+                                    )
+                                    .to_string(),
+                                    concat!(
+                                        "\"Reset\" keeps the old database as ",
+                                        "app.db.broken.<time> and restores your ",
+                                        "profiles from profiles.json.migrated."
                                     )
                                     .to_string(),
                                     String::new(),
@@ -386,10 +402,10 @@ async fn main() {
                                 .join("\n"),
                             )
                             .kind(MessageDialogKind::Error)
-                            .title("Salami Client - Startup Failed")
+                            .title("Salami Client – Start fehlgeschlagen / Startup failed")
                             .buttons(MessageDialogButtons::OkCancelCustom(
-                                "Reset database and restart".to_string(),
-                                "Quit".to_string(),
+                                "Zurücksetzen / Reset".to_string(),
+                                "Beenden / Quit".to_string(),
                             ))
                             .blocking_show();
 
@@ -405,7 +421,7 @@ async fn main() {
                                         .dialog()
                                         .message(format!("{}", err))
                                         .kind(MessageDialogKind::Error)
-                                        .title("Salami Client - Reset Failed")
+                                        .title("Salami Client – Zurücksetzen fehlgeschlagen / Reset failed")
                                         .blocking_show();
                                 }
                             }
@@ -508,11 +524,12 @@ async fn main() {
                                 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
                                 let _ = state_init_app_handle
                                     .dialog()
-                                    .message("Salami Client encountered a critical error.\n\n\
+                                    .message("Im Salami Client ist ein kritischer Fehler aufgetreten.\n\
+                                        Salami Client encountered a critical error.\n\n\
                                         Support:\n\
                                         https://github.com/umpinke/salami-client/issues")
                                     .kind(MessageDialogKind::Error)
-                                    .title("Salami Client - Critical Error")
+                                    .title("Salami Client – Kritischer Fehler / Critical error")
                                     .blocking_show();
                             }
 
@@ -527,11 +544,12 @@ async fn main() {
                         use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
                         let _ = state_init_app_handle
                             .dialog()
-                            .message("Salami Client encountered a critical error.\n\n\
+                            .message("Im Salami Client ist ein kritischer Fehler aufgetreten.\n\
+                                Salami Client encountered a critical error.\n\n\
                                 Support:\n\
                                 https://github.com/umpinke/salami-client/issues")
                             .kind(MessageDialogKind::Error)
-                            .title("Salami Client - Critical Error")
+                            .title("Salami Client – Kritischer Fehler / Critical error")
                             .blocking_show();
                     }
 
@@ -838,12 +856,18 @@ async fn main() {
             commands::clip_commands::clip_rename,
             commands::clip_commands::clip_open_folder,
             utils::online_counter::get_online_count,
+            integrations::norisk_packs::salami_take_pending_pack,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(
             #[allow(unused_variables)]
             |app_handle, event| {
+                // Salami: the in-app X ends the app through the process plugin (app.exit), which
+                // skipped the online-counter sign-off that tray "Beenden" and the window close do
+                if let tauri::RunEvent::Exit = event {
+                    utils::online_counter::leave_blocking();
+                }
                 #[cfg(target_os = "macos")]
                 if let tauri::RunEvent::ExitRequested { api, code, .. } = event {
                     use std::sync::atomic::{AtomicBool, Ordering};

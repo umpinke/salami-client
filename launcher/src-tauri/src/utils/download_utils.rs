@@ -36,6 +36,10 @@ pub struct DownloadConfig {
     pub disk_space_buffer: f64,
     pub hash_existing_files: bool,
     pub stats: Option<Arc<DownloadStats>>,
+    /// When the finished download cannot replace the target because another process holds it
+    /// (a running game keeps its mod jars open on Windows), keep the existing, intact file
+    /// instead of failing.
+    pub keep_existing_if_locked: bool,
 }
 
 impl std::fmt::Debug for DownloadConfig {
@@ -53,6 +57,7 @@ impl std::fmt::Debug for DownloadConfig {
             .field("disk_space_buffer", &self.disk_space_buffer)
             .field("hash_existing_files", &self.hash_existing_files)
             .field("stats", &self.stats.is_some())
+            .field("keep_existing_if_locked", &self.keep_existing_if_locked)
             .finish()
     }
 }
@@ -74,6 +79,7 @@ impl Clone for DownloadConfig {
             disk_space_buffer: self.disk_space_buffer,
             hash_existing_files: self.hash_existing_files,
             stats: self.stats.clone(),
+            keep_existing_if_locked: self.keep_existing_if_locked,
         }
     }
 }
@@ -93,6 +99,7 @@ impl Default for DownloadConfig {
             disk_space_buffer: 0.25, // 25% buffer by default
             hash_existing_files: true,
             stats: None,
+            keep_existing_if_locked: false,
         }
     }
 }
@@ -162,6 +169,11 @@ impl DownloadConfig {
 
     pub fn with_stats(mut self, stats: Option<Arc<DownloadStats>>) -> Self {
         self.stats = stats;
+        self
+    }
+
+    pub fn with_keep_existing_if_locked(mut self, keep: bool) -> Self {
+        self.keep_existing_if_locked = keep;
         self
     }
 }
@@ -365,12 +377,37 @@ impl DownloadUtils {
         }
         if let Err(e) = fs::rename(&part_path, target_path).await {
             let _ = fs::remove_file(&part_path).await;
+            // Windows reports a file held open by another process as "access denied" (5) or
+            // as a sharing violation (32).
+            let held_by_other_process = e.kind() == std::io::ErrorKind::PermissionDenied
+                || (cfg!(windows) && e.raw_os_error() == Some(32));
+            if config.keep_existing_if_locked
+                && held_by_other_process
+                && Self::is_intact_existing_file(target_path).await
+            {
+                warn!(
+                    "{:?} is in use (probably by a running game) and cannot be replaced right now; keeping the existing copy",
+                    target_path
+                );
+                return Ok(());
+            }
             return Err(AppError::Download(format!(
                 "Failed to move downloaded file into place {:?}: {}",
                 target_path, e
             )));
         }
         Ok(())
+    }
+
+    /// An existing target that is still usable: present, and for jars a complete ZIP.
+    async fn is_intact_existing_file(target_path: &Path) -> bool {
+        if !target_path.is_file() {
+            return false;
+        }
+        let is_jar = target_path
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("jar"));
+        !is_jar || Self::is_zip_file_complete(target_path).await
     }
 
     /// Teildatei neben dem Ziel (gleicher Ordner, damit das Umbenennen atomar bleibt).

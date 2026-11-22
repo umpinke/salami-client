@@ -84,6 +84,10 @@ pub fn start(app: AppHandle) {
         let mut failures = 0u32;
         loop {
             ticker.tick().await;
+            // signed off already (the app is shutting down): don't count it again
+            if !STARTED.load(Ordering::SeqCst) {
+                break;
+            }
             let before = current();
             match post(&base, "heartbeat", REQUEST_TIMEOUT).await {
                 Some(online) => {
@@ -109,7 +113,8 @@ pub fn start(app: AppHandle) {
 /// Meldet den Launcher beim Beenden ab (höchstens [`LEAVE_TIMEOUT`], Fehler egal).
 /// Läuft in einem eigenen Thread, damit es aus jedem Kontext aufgerufen werden kann.
 pub fn leave_blocking() {
-    if !STARTED.load(Ordering::SeqCst) {
+    // Salami: several exit paths call this (tray, window close, the in-app X); sign off once
+    if !STARTED.swap(false, Ordering::SeqCst) {
         return;
     }
     let Some(base) = base_url() else { return };

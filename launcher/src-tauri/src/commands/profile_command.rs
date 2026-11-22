@@ -214,6 +214,16 @@ pub async fn launch_profile(
 
     let state = State::get().await?;
 
+    // Salami: a second request while this profile is still being prepared or installed (a double
+    // click) is ignored instead of starting a second install that fights over the same files.
+    let Some(launch_claim) = state.process_manager.claim_launch(id) else {
+        info!(
+            "Profile {} is already being launched; ignoring the second request.",
+            id
+        );
+        return Ok(());
+    };
+
     // Try to get the regular profile
     let profile = match state.profile_manager.get_profile(id).await {
         Ok(profile) => {
@@ -331,7 +341,13 @@ pub async fn launch_profile(
     }
 
     // Spawn the installation task and get the JoinHandle
+    let (registered_tx, registered_rx) = tokio::sync::oneshot::channel::<()>();
     let handle = tokio::spawn(async move {
+        // Released when this task ends or is aborted.
+        let _launch_claim = launch_claim;
+        // Salami: wait until the handle is registered below. A launch that fails at once would
+        // otherwise remove its handle before it was added and leave a stale "launching" entry.
+        let _ = registered_rx.await;
         let install_result = installer::install_minecraft_version(
             &version,
             &modloader.as_str(),
@@ -410,6 +426,7 @@ pub async fn launch_profile(
     state
         .process_manager
         .add_launching_process(profile_id, handle);
+    let _ = registered_tx.send(());
 
     Ok(())
 }

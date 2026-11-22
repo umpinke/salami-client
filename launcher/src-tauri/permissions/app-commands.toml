@@ -262,4 +262,5 @@ permissions = [
   "allow-clip-rename",
   "allow-clip-open-folder",
   "allow-get-online-count",
+  "allow-salami-take-pending-pack",
 ]

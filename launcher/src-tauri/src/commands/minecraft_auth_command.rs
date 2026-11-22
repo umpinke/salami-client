@@ -278,7 +278,7 @@ async fn begin_login_inner<R: Runtime>(
                     AppError::AccountError("Error parsing auth redirect URL".to_string())
                 })?),
             )
-            .title("Sign into Minecraft")
+            .title("Salami Client · Login")
             .always_on_top(true)
             .center()
             .build()

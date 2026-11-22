@@ -196,7 +196,7 @@ pub async fn open_minecraft_log_window<R: tauri::Runtime>(
         window_label,
         tauri::WebviewUrl::App(url.into()),
     )
-    .title("Minecraft Logs")
+    .title("Salami Client · Logs")
     .inner_size(1200.0, 800.0)
     .decorations(false)
     .center()

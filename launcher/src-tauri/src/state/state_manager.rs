@@ -50,7 +50,33 @@ where
     Ok(())
 }
 
+/// Permits `io_semaphore` was created with and has been resized to since.
+static IO_LIMIT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(10);
+
 impl State {
+    /// Resizes `io_semaphore` to the "concurrent file operations" setting (1–20 in the UI).
+    /// Permits in use can't be taken away; the limit then settles a bit higher until the next call.
+    pub fn apply_io_limit(&self, limit: usize) {
+        use std::sync::atomic::Ordering;
+        // Two saves at once must not both read the old limit and both take permits away
+        static RESIZE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let _resize = RESIZE.lock().unwrap_or_else(|e| e.into_inner());
+        let limit = limit.clamp(1, 64);
+        let old = IO_LIMIT.load(Ordering::SeqCst);
+        let effective = if limit > old {
+            self.io_semaphore.add_permits(limit - old);
+            limit
+        } else if limit < old {
+            old - self.io_semaphore.forget_permits(old - limit)
+        } else {
+            old
+        };
+        IO_LIMIT.store(effective, Ordering::SeqCst);
+        if effective != old {
+            log::info!("Concurrent file operations: {} -> {}", old, effective);
+        }
+    }
+
     // Initialize the global state
     pub async fn init(app: Arc<tauri::AppHandle>) -> Result<()> {
         let init_start = std::time::Instant::now();
@@ -117,13 +143,8 @@ impl State {
 
         let loaded_config = initial_state_arc.config_manager.get_config().await;
 
-        if initial_state_arc.io_semaphore.available_permits() != loaded_config.concurrent_io_limit {
-            log::warn!(
-                "State::init - io_semaphore was initialized with default limit ({}). Actual config limit is {}. Consider refactoring io_semaphore for dynamic updates if this discrepancy is an issue.", 
-                initial_state_arc.io_semaphore.available_permits(), // This shows current permits, not initial limit
-                loaded_config.concurrent_io_limit
-            );
-        }
+        // Salami: the "concurrent file operations" setting used to be saved but never applied
+        initial_state_arc.apply_io_limit(loaded_config.concurrent_io_limit);
 
         initial_state_arc
             .discord_manager

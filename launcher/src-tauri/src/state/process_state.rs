@@ -35,12 +35,26 @@ use tokio::sync::mpsc; // Für den Channel
 const PROCESSES_FILENAME: &str = "processes.json";
 const NOTIFY_EVENT_CHANNEL_BUFFER: usize = 100;
 
+/// Held while a profile launch is prepared and installed; see [`ProcessManager::claim_launch`].
+pub struct LaunchClaim {
+    claims: Arc<dashmap::DashSet<Uuid>>,
+    profile_id: Uuid,
+}
+
+impl Drop for LaunchClaim {
+    fn drop(&mut self) {
+        self.claims.remove(&self.profile_id);
+    }
+}
+
 pub struct ProcessManager {
     app_handle: Arc<tauri::AppHandle>,
     processes: Arc<RwLock<HashMap<Uuid, Process>>>,
     processes_file_path: PathBuf,
     save_lock: Mutex<()>,
     launching_processes: Arc<DashMap<Uuid, JoinHandle<()>>>,
+    /// Profiles whose launch is being prepared or installed right now (see [`LaunchClaim`]).
+    launch_claims: Arc<dashmap::DashSet<Uuid>>,
 
     notify_event_tx: mpsc::Sender<CrashReportNotification>,
     active_watchers: Arc<RwLock<HashMap<Uuid, RecommendedWatcher>>>,
@@ -281,6 +295,7 @@ impl ProcessManager {
             processes_file_path,
             save_lock,
             launching_processes,
+            launch_claims: Arc::new(dashmap::DashSet::new()),
             notify_event_tx, // Store the sender
             active_watchers,
             crash_report_contents,
@@ -1692,6 +1707,21 @@ impl ProcessManager {
         } else {
             log::info!("No crash report files found in {:?} for profile {}", crash_reports_dir, profile_id);
             Ok(None)
+        }
+    }
+
+    /// Claims the launch of a profile. None while another launch of it is still being prepared
+    /// or installed (a double click on "Spielen" used to start two installs that fought over
+    /// the same files). The claim ends when the returned guard is dropped, which also happens
+    /// when the launch task is aborted.
+    pub fn claim_launch(&self, profile_id: Uuid) -> Option<LaunchClaim> {
+        if self.launch_claims.insert(profile_id) {
+            Some(LaunchClaim {
+                claims: Arc::clone(&self.launch_claims),
+                profile_id,
+            })
+        } else {
+            None
         }
     }
 

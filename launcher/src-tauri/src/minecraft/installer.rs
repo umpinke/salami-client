@@ -188,9 +188,9 @@ pub async fn install_minecraft_version(
                     event_id: uuid::Uuid::new_v4(),
                     event_type: crate::state::event_state::EventType::MigrationFailed,
                     target_id: Some(profile.id),
-                    message: format!("Migration failed: {:?}", e),
+                    message: format!("Migration failed: {}", e),
                     progress: Some(0.0),
-                    error: Some(format!("{:?}", e)),
+                    error: Some(e.to_string()),
                 };
 
                 if let Err(e) = state.event_state.emit(migration_failed_payload).await {
@@ -822,10 +822,20 @@ pub async fn install_minecraft_version(
                 profile.name
             );
         }
+        // Salami: the same mod from two places (Modrinth and CurseForge, or a modpack and the
+        // Salami pack) makes Fabric refuse to start – load each mod only once.
+        let (launch_mods, root_mods) = summary_phase!(summary, "duplicate check", {
+            crate::minecraft::downloads::mod_resolver::drop_duplicate_fabric_mods(
+                &target_mods,
+                &root_mods,
+                &mut mod_resolution,
+            )
+            .await
+        });
         let add_mods_arg = crate::minecraft::downloads::mod_resolver::build_fabric_add_mods_arg(
             profile.id,
             version_id,
-            &target_mods,
+            &launch_mods,
             &root_mods,
         )
         .await?;

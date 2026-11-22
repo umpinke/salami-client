@@ -75,6 +75,7 @@ impl ModDownloadService {
         let mut download_futures = Vec::new();
         // Salami: vom Autor gesperrte CurseForge-Dateien (kein Download-Link), siehe curseforge_manual
         let manual: Arc<std::sync::Mutex<Vec<ManualFile>>> = Arc::default();
+        let mut queued_files: HashSet<String> = HashSet::new();
 
         for mod_info in mods.iter() {
             if !mod_info.enabled {
@@ -89,6 +90,24 @@ impl ModDownloadService {
             let manual = manual.clone();
 
             let filename_result = profile_state::get_profile_mod_filename(&mod_info.source);
+
+            // Salami: the same mod from Modrinth and from CurseForge can have the same file name
+            // but different bytes. Downloading both would swap the cached file back and forth on
+            // every start (and fail while a running game holds it). The first entry wins.
+            let downloads = matches!(
+                mod_info.source,
+                ModSource::Modrinth { .. } | ModSource::CurseForge { .. } | ModSource::Url { .. }
+            );
+            if let (true, Ok(name)) = (downloads, &filename_result) {
+                if !queued_files.insert(name.to_lowercase()) {
+                    info!(
+                        "Skipping '{}': another mod of this profile already uses the file {}",
+                        display_name_opt.as_deref().unwrap_or(name),
+                        name
+                    );
+                    continue;
+                }
+            }
 
             download_futures.push(async move {
                 let filename = match filename_result {
@@ -513,6 +532,7 @@ impl ModDownloadService {
         let mut config = DownloadConfig::new()
             .with_streaming(true)  // Mods can be large files
             .with_retries(3)      // Built-in retry logic for network issues
+            .with_keep_existing_if_locked(true)
             .with_stats(stats);
 
         // Add SHA1 verification if provided
@@ -613,7 +633,13 @@ mod forge_sync_tests {
     fn target(dir: &std::path::Path, name: &str, content: &str) -> TargetMod {
         let cache_path = dir.join(name);
         std::fs::write(&cache_path, content).unwrap();
-        TargetMod { mod_id: name.to_string(), filename: name.to_string(), cache_path, sha1: None }
+        TargetMod {
+            mod_id: name.to_string(),
+            filename: name.to_string(),
+            cache_path,
+            sha1: None,
+            origin: crate::minecraft::downloads::mod_resolver::ModOrigin::Profile,
+        }
     }
 
     #[tokio::test]

@@ -10,6 +10,15 @@ use uuid::Uuid;
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use tokio::fs;
 
+/// Where a resolved mod comes from. The order is the priority when the same mod turns up twice:
+/// the player's own jars beat profile mods, and both beat the mods the Salami pack brings along.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ModOrigin {
+    Pack,
+    Profile,
+    Local,
+}
+
 // --- Struct for resolved mods ---
 #[derive(Debug, Clone)]
 pub struct TargetMod {
@@ -18,6 +27,7 @@ pub struct TargetMod {
     pub filename: String,
     pub cache_path: PathBuf,
     pub sha1: Option<String>, // Known SHA1 from Modrinth/CurseForge (None for Maven/URL/local)
+    pub origin: ModOrigin,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -142,6 +152,20 @@ impl ModResolutionReport {
         }
     }
 
+    /// A mod that was resolved but dropped because another jar provides the same Fabric mod.
+    fn mark_duplicate(&mut self, dropped: &TargetMod, winner_filename: &str) {
+        for outcome in self.outcomes_mut() {
+            if outcome.status == ModResolutionStatus::Included
+                && outcome.canonical_key.as_deref() == Some(dropped.mod_id.as_str())
+                && outcome.filename.as_deref() == Some(dropped.filename.as_str())
+            {
+                outcome.status = ModResolutionStatus::Overridden;
+                outcome.overridden_by = Some(winner_filename.to_string());
+                outcome.version = None;
+            }
+        }
+    }
+
     pub fn mark_all_undelivered(&mut self) {
         for outcome in self.outcomes_mut() {
             if outcome.status.in_launch_set() == Some(true) {
@@ -193,6 +217,7 @@ async fn try_add_mod_to_final_list(
     final_mods: &mut HashMap<String, TargetMod>,
     mod_type_str: &str,
     sha1: Option<String>, // Known SHA1 hash (Modrinth/CurseForge)
+    origin: ModOrigin,
 ) -> ModResolutionStatus {
     // 1. Check if file exists in cache
     let cache_path = mod_cache_dir.join(&filename);
@@ -224,6 +249,7 @@ async fn try_add_mod_to_final_list(
             filename,
             cache_path,
             sha1,
+            origin,
         },
     );
 
@@ -328,6 +354,7 @@ async fn resolve_pack_entry(
         final_mods,
         mod_type_str,
         None,
+        ModOrigin::Pack,
     )
     .await;
 
@@ -432,6 +459,7 @@ async fn resolve_profile_mod(
         final_mods,
         mod_type_str,
         get_sha1_from_source(&mod_info.source),
+        ModOrigin::Profile,
     )
     .await;
 
@@ -517,6 +545,7 @@ pub async fn resolve_target_mods(
                     filename: info.filename.clone(),
                     cache_path: info.path.clone(),
                     sha1: None, // Local custom mods don't have known SHA1
+                    origin: ModOrigin::Local,
                 };
 
                 // Use the unique canonical key
@@ -650,6 +679,278 @@ pub async fn build_fabric_add_mods_arg(
         "-Dfabric.addMods=@{}",
         meta.to_string_lossy().replace("\\", "/")
     ))
+}
+
+/// `id` and `version` from a jar's `fabric.mod.json`. None when the jar has none or it cannot
+/// be read; such jars are never treated as duplicates.
+fn read_fabric_mod_meta(path: &std::path::Path) -> Option<(String, String)> {
+    use std::io::Read;
+    let file = std::fs::File::open(path).ok()?;
+    let mut archive = zip::ZipArchive::new(std::io::BufReader::new(file)).ok()?;
+    let mut entry = archive.by_name("fabric.mod.json").ok()?;
+    if entry.size() > 1024 * 1024 {
+        return None;
+    }
+    let mut text = String::new();
+    entry.read_to_string(&mut text).ok()?;
+    // Fabric reads this file leniently and some mods have raw line breaks inside strings,
+    // which strict JSON rejects. Outside of strings they are only whitespace.
+    let cleaned: String = text
+        .trim_start_matches('\u{feff}')
+        .chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect();
+    let json: serde_json::Value = serde_json::from_str(&cleaned).ok()?;
+    let id = json.get("id")?.as_str()?.trim();
+    if id.is_empty() {
+        return None;
+    }
+    let version = json
+        .get("version")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    Some((id.to_string(), version))
+}
+
+/// Orders two mod versions. Semantic versions compare by precedence (build metadata such as
+/// `+mc26.3` is ignored); anything else by its numbers, then by text.
+fn compare_mod_versions(a: &str, b: &str) -> std::cmp::Ordering {
+    if let (Ok(va), Ok(vb)) = (semver::Version::parse(a), semver::Version::parse(b)) {
+        return va.cmp_precedence(&vb);
+    }
+    let numbers = |s: &str| -> Vec<u64> {
+        s.split('+')
+            .next()
+            .unwrap_or("")
+            .split(|c: char| !c.is_ascii_digit())
+            .filter(|part| !part.is_empty())
+            .map(|part| part.parse::<u64>().unwrap_or(u64::MAX))
+            .collect()
+    };
+    numbers(a).cmp(&numbers(b)).then_with(|| a.cmp(b))
+}
+
+/// Libraries other mods are compiled against: of two copies, the newer one is loaded whatever its
+/// origin, so nothing runs against an older API than it was built for.
+const NEWEST_WINS_MOD_IDS: &[&str] = &[
+    "fabric-api",
+    "fabric-language-kotlin",
+    "cloth-config",
+    "yet_another_config_lib_v3",
+    "architectury",
+    "modmenu",
+];
+
+/// Fabric refuses to start when two jars bring the same mod in the same version ("Replace mod
+/// 'Sodium' and mod 'Sodium' with mod 'Sodium'"), which happens when a mod is installed from both
+/// Modrinth and CurseForge, or when a modpack brings its own copy of a mod the Salami pack also
+/// adds. Keeps one jar per Fabric mod id: the player's own jars beat profile mods, profile mods
+/// beat pack mods, and between equals the newer version wins (the first one on a tie). Libraries in
+/// [`NEWEST_WINS_MOD_IDS`] always load in their newest version.
+/// Jars without a readable `fabric.mod.json` are always kept.
+pub async fn drop_duplicate_fabric_mods(
+    target_mods: &[TargetMod],
+    extra_jars: &[PathBuf],
+    report: &mut ModResolutionReport,
+) -> (Vec<TargetMod>, Vec<PathBuf>) {
+    let paths: Vec<PathBuf> = target_mods
+        .iter()
+        .map(|m| m.cache_path.clone())
+        .chain(extra_jars.iter().cloned())
+        .collect();
+    let metas: Vec<Option<(String, String)>> = match tokio::task::spawn_blocking(move || {
+        paths.iter().map(|p| read_fabric_mod_meta(p)).collect::<Vec<_>>()
+    })
+    .await
+    {
+        Ok(metas) => metas,
+        Err(e) => {
+            warn!("Could not read mod ids for the duplicate check: {}", e);
+            return (target_mods.to_vec(), extra_jars.to_vec());
+        }
+    };
+
+    let count = target_mods.len();
+    let origin_of = |i: usize| {
+        if i < count {
+            target_mods[i].origin
+        } else {
+            ModOrigin::Local
+        }
+    };
+    let path_of = |i: usize| -> &std::path::Path {
+        if i < count {
+            &target_mods[i].cache_path
+        } else {
+            &extra_jars[i - count]
+        }
+    };
+    let name_of = |i: usize| -> String {
+        if i < count {
+            target_mods[i].filename.clone()
+        } else {
+            extra_jars[i - count]
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default()
+        }
+    };
+
+    let mut winners: HashMap<&str, usize> = HashMap::new();
+    for (i, meta) in metas.iter().enumerate() {
+        let Some((id, version)) = meta else { continue };
+        match winners.get(id.as_str()) {
+            None => {
+                winners.insert(id.as_str(), i);
+            }
+            Some(&current) => {
+                let current_version = metas[current].as_ref().map(|m| m.1.as_str()).unwrap_or("");
+                let by_version = || compare_mod_versions(version, current_version);
+                let by_origin = || origin_of(i).cmp(&origin_of(current));
+                // Libraries: the newest copy, because other mods (and salami-core) are built against
+                // a recent API. Other mods: the player's/modpack's own copy, which a modpack may pin
+                // on purpose (e.g. Sodium matching its Iris).
+                let order = if NEWEST_WINS_MOD_IDS.contains(&id.as_str()) {
+                    by_version().then_with(by_origin)
+                } else {
+                    by_origin().then_with(by_version)
+                };
+                let better = order == std::cmp::Ordering::Greater;
+                if better {
+                    winners.insert(id.as_str(), i);
+                }
+            }
+        }
+    }
+
+    let mut dropped = vec![false; metas.len()];
+    for (i, meta) in metas.iter().enumerate() {
+        let Some((id, version)) = meta else { continue };
+        let winner = winners[id.as_str()];
+        // The same file listed twice is harmless: the addMods file lists every path once.
+        if winner == i || path_of(winner) == path_of(i) {
+            continue;
+        }
+        dropped[i] = true;
+        let winner_name = name_of(winner);
+        let winner_version = metas[winner].as_ref().map(|m| m.1.as_str()).unwrap_or("");
+        warn!(
+            "[Mods] '{}' is there twice: loading {} ({}), skipping {} ({})",
+            id,
+            winner_name,
+            winner_version,
+            name_of(i),
+            version
+        );
+        if i < count {
+            report.mark_duplicate(&target_mods[i], &winner_name);
+        }
+    }
+
+    let kept_targets = target_mods
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| !dropped[*i])
+        .map(|(_, m)| m.clone())
+        .collect();
+    let kept_extra = extra_jars
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| !dropped[count + *i])
+        .map(|(_, p)| p.clone())
+        .collect();
+    (kept_targets, kept_extra)
+}
+
+#[cfg(test)]
+mod duplicate_tests {
+    use super::*;
+    use std::io::Write;
+
+    fn jar(dir: &std::path::Path, name: &str, fabric_mod_json: Option<&str>) -> PathBuf {
+        let path = dir.join(name);
+        let file = std::fs::File::create(&path).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        let options = zip::write::SimpleFileOptions::default();
+        if let Some(json) = fabric_mod_json {
+            zip.start_file("fabric.mod.json", options).unwrap();
+            zip.write_all(json.as_bytes()).unwrap();
+        }
+        zip.start_file("x.class", options).unwrap();
+        zip.write_all(b"x").unwrap();
+        zip.finish().unwrap();
+        path
+    }
+
+    fn target(path: PathBuf, key: &str, origin: ModOrigin) -> TargetMod {
+        TargetMod {
+            mod_id: key.to_string(),
+            filename: path.file_name().unwrap().to_string_lossy().into_owned(),
+            cache_path: path,
+            sha1: None,
+            origin,
+        }
+    }
+
+    fn names(mods: &[TargetMod]) -> Vec<String> {
+        mods.iter().map(|m| m.filename.clone()).collect()
+    }
+
+    #[tokio::test]
+    async fn keeps_one_jar_per_mod_id() {
+        let dir = std::env::temp_dir().join(format!("salami-dupes-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let sodium = |v: &str| format!(r#"{{"schemaVersion":1,"id":"sodium","version":"{}"}}"#, v);
+
+        let pack_sodium = jar(&dir, "sodium-pack.jar", Some(&sodium("0.9.3-beta.5+mc26.3")));
+        let cf_sodium = jar(&dir, "sodium-cf.jar", Some(&sodium("0.9.3-beta.4+mc26.3")));
+        let mr_sodium = jar(&dir, "sodium-mr.jar", Some(&sodium("0.9.3-beta.4+mc26.3")));
+        let old_cloth = jar(&dir, "cloth-158.jar", Some(r#"{"id":"cloth-config","version":"26.3.158"}"#));
+        let new_cloth = jar(&dir, "cloth-159.jar", Some(r#"{"id":"cloth-config","version":"26.3.159"}"#));
+        // a raw line break inside a string must not hide the id
+        let iris = jar(&dir, "iris.jar", Some("{\"id\":\"iris\",\"version\":\"1.11.7\",\"description\":\"a\nb\"}"));
+        let library = jar(&dir, "library.jar", None);
+        let pack_api = jar(&dir, "fabric-api-pack.jar", Some(r#"{"id":"fabric-api","version":"0.166.2+26.3"}"#));
+        let old_api = jar(&dir, "fabric-api-old.jar", Some(r#"{"id":"fabric-api","version":"0.160.0+26.3"}"#));
+
+        let targets = vec![
+            target(pack_sodium, "modrinth:AANobbMI", ModOrigin::Pack),
+            target(cf_sodium, "curseforge:394468", ModOrigin::Profile),
+            target(mr_sodium, "modrinth:AANobbMI-profile", ModOrigin::Profile),
+            target(old_cloth, "curseforge:348521", ModOrigin::Profile),
+            target(new_cloth, "modrinth:9s6osm5g", ModOrigin::Profile),
+            target(iris.clone(), "modrinth:YL57xq9U", ModOrigin::Profile),
+            target(library.clone(), "url:lib", ModOrigin::Profile),
+            target(pack_api, "modrinth:P7dR8mSH", ModOrigin::Pack),
+            target(old_api, "curseforge:306612", ModOrigin::Profile),
+        ];
+        let loose_iris = jar(&dir, "iris-loose.jar", Some(r#"{"id":"iris","version":"1.11.6"}"#));
+
+        let mut report = ModResolutionReport::default();
+        let (kept, extra) =
+            drop_duplicate_fabric_mods(&targets, &[loose_iris.clone()], &mut report).await;
+
+        // profile beats pack even with an older version; on a tie the first one stays
+        // newer version wins between profile mods; the player's own jar beats the profile
+        // a library loads in its newest version, even from the pack
+        assert_eq!(names(&kept), vec!["sodium-cf.jar", "cloth-159.jar", "library.jar", "fabric-api-pack.jar"]);
+        assert_eq!(extra, vec![loose_iris]);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn versions_compare_sensibly() {
+        use std::cmp::Ordering::*;
+        assert_eq!(compare_mod_versions("26.3.159", "26.3.158"), Greater);
+        assert_eq!(compare_mod_versions("0.9.3-beta.5+mc26.3", "0.9.3-beta.4+mc26.3"), Greater);
+        assert_eq!(compare_mod_versions("0.9.3+mc26.3", "0.9.3-beta.5+mc26.3"), Greater);
+        assert_eq!(compare_mod_versions("3.9.7+26.3-fabric", "3.9.7+26.3-neoforge"), Equal);
+        assert_eq!(compare_mod_versions("mc26.3-1.10", "mc26.3-1.9"), Greater);
+    }
 }
 
 

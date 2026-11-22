@@ -315,7 +315,7 @@ pub async fn create_updater_window(app_handle: &AppHandle) -> tauri::Result<Webv
         "updater",                              // Unique label
         WebviewUrl::App("updater.html".into()), // Load local HTML file
     )
-    .title(format!("{} Updater", crate::branding::PRODUCT_NAME))
+    .title(format!("{} · Update", crate::branding::PRODUCT_NAME))
     .inner_size(325.0, 400.0)
     .resizable(false)
     .center()

@@ -716,6 +716,20 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf, event_id: Option<U
 
 /// Handles the opening of a .noriskpack file, either on app startup or second instance.
 /// It will call the `import_profile` command if a valid file path is found in the arguments.
+/// Tells the UI that a double-clicked pack is waiting; it fetches it with [`salami_take_pending_pack`].
+pub const PACK_OPEN_EVENT: &str = "salami-pack-open";
+
+/// A double-clicked `.salamipack` the UI has not picked up yet. Kept here as well as announced,
+/// because on a cold start the event fires before the UI listens.
+static PENDING_PACK: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+/// The UI asks for a double-clicked pack (once on start, and on every [`PACK_OPEN_EVENT`]) and
+/// shows the same import preview as for a dragged-in file.
+#[tauri::command]
+pub fn salami_take_pending_pack() -> Option<String> {
+    PENDING_PACK.lock().unwrap_or_else(|e| e.into_inner()).take()
+}
+
 pub async fn handle_noriskpack_file_paths<R: tauri::Runtime>(
     app_handle: &tauri::AppHandle<R>,
     args: Vec<String>, // Changed from Vec<PathBuf>
@@ -731,8 +745,12 @@ pub async fn handle_noriskpack_file_paths<R: tauri::Runtime>(
     };
 
     for arg_str in args_to_check {
-        // Attempt to parse as URL first for file:// scheme, then as direct path
-        let path_candidate = if let Ok(url) = url::Url::parse(arg_str) {
+        // Salami: a plain path first. "C:\…\pack.salamipack" also parses as a URL (scheme "c")
+        // and was skipped as a non-file URL, so double-clicked packs never imported on Windows.
+        let direct = PathBuf::from(arg_str);
+        let path_candidate = if direct.is_file() {
+            Some(direct)
+        } else if let Ok(url) = url::Url::parse(arg_str) {
             if url.scheme() == "file" {
                 url.to_file_path().ok()
             } else {
@@ -745,9 +763,10 @@ pub async fn handle_noriskpack_file_paths<R: tauri::Runtime>(
         };
 
         if let Some(path) = path_candidate {
-            if path.is_file()
-                && matches!(path.extension().and_then(|ext| ext.to_str()), Some("salamipack") | Some("noriskpack"))
-            {
+            let is_pack = path.extension().and_then(|ext| ext.to_str()).is_some_and(|ext| {
+                ext.eq_ignore_ascii_case("salamipack") || ext.eq_ignore_ascii_case("noriskpack")
+            });
+            if path.is_file() && is_pack {
                 info!("Found .noriskpack file to process: {}", path.display());
                 noriskpack_to_import = Some(path);
                 break; // Handle the first .noriskpack file found
@@ -756,67 +775,17 @@ pub async fn handle_noriskpack_file_paths<R: tauri::Runtime>(
     }
 
     if let Some(file_path_to_import) = noriskpack_to_import {
-        if let Some(file_path_str) = file_path_to_import.to_str() {
-            info!("Attempting to import profile from path: {}", file_path_str);
-            let import_app_handle = app_handle.clone();
-            let path_string_for_task = file_path_str.to_string();
-
-            // Spawn an async task to handle the import
-            tauri::async_runtime::spawn(async move {
-                match crate::commands::profile_command::import_profile(
-                    path_string_for_task,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                )
-                .await
-                {
-                    Ok(profile_id) => {
-                        info!("Profile {} imported successfully.", profile_id);
-                        // Attempt to bring the main window to the front and focus it.
-                        if let Some(window) = import_app_handle.get_webview_window("main") {
-                            if let Err(e) = window.unminimize() {
-                                warn!("Failed to unminimize window: {:?}", e);
-                            }
-                            if let Err(e) = window.set_focus() {
-                                warn!("Failed to focus window: {:?}", e);
-                            }
-                            // The import_profile command should already emit an event for UI update.
-                        } else {
-                            warn!("Could not get main window handle to unminimize/focus.");
-                        }
-                    }
-                    Err(e) => {
-                        error!(
-                            "Error importing profile from path ({}): {:?}",
-                            file_path_to_import.display(),
-                            e // Use {:?} for CommandError
-                        );
-                        // Optionally, send an event to the frontend to show an error toast/dialog
-                        if let Some(_window) = import_app_handle.get_webview_window("main") {
-                            let _error_message = format!(
-                                "Failed to import noriskpack ({}): {:?}",
-                                file_path_to_import.display(),
-                                e
-                            );
-                            /*if let Err(emit_err) = window.emit("show-error-toast", error_message) {
-                                warn!("Failed to emit show-error-toast event: {:?}", emit_err);
-                            }*/
-                        } else {
-                            warn!(
-                                "Could not get main window to emit error toast for import failure."
-                            );
-                        }
-                    }
-                }
-            });
-        } else {
-            error!(
-                "Failed to convert .noriskpack path to string: {}",
-                file_path_to_import.display()
-            );
+        // Salami: no silent import – the UI shows the same preview and confirmation as for a
+        // dragged-in pack (rejected files, mod count) and imports from there.
+        let path = file_path_to_import.to_string_lossy().into_owned();
+        info!("Pack opened from outside, waiting for the UI to confirm: {}", path);
+        *PENDING_PACK.lock().unwrap_or_else(|e| e.into_inner()) = Some(path);
+        if let Err(e) = tauri::Emitter::emit(app_handle, PACK_OPEN_EVENT, ()) {
+            warn!("Failed to announce the opened pack: {}", e);
+        }
+        if let Some(window) = app_handle.get_webview_window("main") {
+            let _ = window.unminimize();
+            let _ = window.set_focus();
         }
     } else {
         info!("No .noriskpack file found in the provided paths.");
