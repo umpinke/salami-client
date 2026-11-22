@@ -33,7 +33,13 @@ public final class BuddyFollowers {
 		{-1.3, -0.7}, {-1.3, 0.7}, {-1.8, 0}, {0, -1.2}, {0, 1.2}, {-2.5, 0}, {1.5, 0}, {0, 0},
 	};
 	/** So hoch (in Blöcken) hüpft ein Buddy bei jedem Schritt. */
-	private static final float HOP = 0.14f;
+	private static final float HOP = 0.15f;
+	/**
+	 * So weit (in Blöcken) kommt ein Buddy mit einem Hüpfer: beim Gehen knapp drei Hüpfer pro Sekunde,
+	 * beim Rennen vier. (Vorher hing der Takt an der Beinphase eines Mini Mes – über acht Hüpfer pro
+	 * Sekunde, er zappelte mehr, als dass er hüpfte.)
+	 */
+	private static final double HOP_LENGTH = 1.5;
 
 	private static final FollowerSim SIM = new FollowerSim(HALF_WIDTH, HEIGHT, 0.4f, SPOTS);
 
@@ -87,11 +93,12 @@ public final class BuddyFollowers {
 			double y = f.prevY + (f.y - f.prevY) * partial;
 			double z = f.prevZ + (f.z - f.prevZ) * partial;
 			float yaw = f.prevYaw + (((f.yaw - f.prevYaw) % 360f + 540f) % 360f - 180f) * partial;
-			float walk = f.prevWalk + (f.walk - f.prevWalk) * partial;
-			// jeder Schritt ein Hüpfer, dazu ein leichtes Wackeln von Seite zu Seite
-			float step = walk * 0.6662f;
-			float hop = (float) Math.abs(Math.sin(step)) * f.amount * HOP;
-			float wobble = (float) Math.sin(step) * f.amount * 0.14f;
+			// alle Größen zwischen zwei Ticks überblenden – sonst springen Höhe und Wackeln 20-mal pro Sekunde
+			float amount = f.amount(partial);
+			double phase = f.distance(partial) / HOP_LENGTH * Math.PI;
+			// jeder Hüpfer ein Bogen, dazu ein leichtes Wackeln von Seite zu Seite
+			float hop = (float) Math.abs(Math.sin(phase)) * amount * HOP;
+			float wobble = (float) Math.sin(phase) * amount * 0.1f;
 
 			int light = buddy.glow() ? BoxRender.FULL_BRIGHT : BoxRender.lightAt(mc.level, x, y + 0.3, z);
 			float scale = buddy.scale() * SCALE / 16f;
