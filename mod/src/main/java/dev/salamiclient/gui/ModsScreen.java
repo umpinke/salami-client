@@ -126,7 +126,7 @@ public final class ModsScreen extends Screen {
 	/** Zähler „an / alle“ eines Reiters; bei den Extras nur die Anzahl. */
 	private ModsView.Tab tabModel(Object tab) {
 		if (tab == EXTRAS) {
-			return new ModsView.Tab(tabLabel(tab), -1, ExternalMods.installed().size());
+			return new ModsView.Tab(tabLabel(tab), -1, ExternalMods.installed().size(), "extras");
 		}
 		int total = 0;
 		int enabled = 0;
@@ -139,7 +139,7 @@ public final class ModsScreen extends Screen {
 				enabled++;
 			}
 		}
-		return new ModsView.Tab(tabLabel(tab), enabled, total);
+		return new ModsView.Tab(tabLabel(tab), enabled, total, tab instanceof Category category ? category.id() : "all");
 	}
 
 	/** Sichtbare Einträge: {@link Module} und {@link ExternalMods.Entry} gemischt. */
@@ -198,11 +198,12 @@ public final class ModsScreen extends Screen {
 		for (Object entry : visibleEntries()) {
 			if (entry instanceof Module module) {
 				items.add(new ModsView.Item(I18n.get(module.translationKey()), module.description(), module.isEnabled(), true,
-					hasSettings(module), null));
+					hasSettings(module), null, module.id()));
 			} else {
 				ExternalMods.Entry external = (ExternalMods.Entry) entry;
 				Component description = Language.getInstance().has(external.descriptionKey()) ? Component.translatable(external.descriptionKey()) : null;
-				items.add(new ModsView.Item(I18n.get(external.nameKey()), description, false, false, true, I18n.get("salami.mods.tab.extras")));
+				items.add(new ModsView.Item(I18n.get(external.nameKey()), description, false, false, true, I18n.get("salami.mods.tab.extras"),
+					"extra:" + external.modId()));
 			}
 		}
 		return new ModsView.Model(title.getString(), tabs, Math.max(0, keys.indexOf(tab)), tools, items, query, I18n.get("salami.mods.search"),
@@ -261,6 +262,29 @@ public final class ModsScreen extends Screen {
 			}
 			g.setTooltipForNextFrame(lines, mouseX, mouseY);
 		}
+	}
+
+	// ------------------------------------------------------------------ Für Tests
+
+	/** Mitte des Eintrags {@code index} in GUI-Koordinaten oder {@code null} – für Tests (sucht über {@link ModsView#hit}). */
+	public double[] pointOfItem(int index) {
+		ModsView view = Skins.current().modsView();
+		ModsView.Model model = model();
+		int x0 = Integer.MAX_VALUE;
+		int y0 = Integer.MAX_VALUE;
+		int x1 = -1;
+		int y1 = -1;
+		for (int y = 1; y < uiHeight(); y += 2) {
+			for (int x = 1; x < uiWidth(); x += 2) {
+				if (view.hit(font, model, uiWidth(), uiHeight(), x, y) instanceof ModsView.Hit.ItemHit hit && hit.index() == index) {
+					x0 = Math.min(x0, x);
+					y0 = Math.min(y0, y);
+					x1 = Math.max(x1, x);
+					y1 = Math.max(y1, y);
+				}
+			}
+		}
+		return x1 < 0 ? null : new double[] {(x0 + x1) / 2.0 * uiScale, (y0 + y1) / 2.0 * uiScale};
 	}
 
 	// ------------------------------------------------------------------ Eingabe

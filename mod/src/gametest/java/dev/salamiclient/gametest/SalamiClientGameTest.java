@@ -9,15 +9,18 @@ import dev.salamiclient.gui.HudEditorScreen;
 import dev.salamiclient.gui.ModsScreen;
 import dev.salamiclient.gui.SalamiMenuScreen;
 import dev.salamiclient.gui.clickgui.ClickGuiScreen;
+import dev.salamiclient.gui.skin.MenuView;
 import dev.salamiclient.module.Category;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.ModuleManager;
 import dev.salamiclient.modules.client.GuiScaleModule;
 import dev.salamiclient.modules.client.SalamiThemeModule;
 import dev.salamiclient.modules.misc.AutoReconnectModule;
+import dev.salamiclient.modules.misc.AutoTextModule;
 import dev.salamiclient.modules.visual.CrosshairModule;
 import dev.salamiclient.setting.NumberSetting;
 import dev.salamiclient.setting.Setting;
+import dev.salamiclient.setting.TextSetting;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
@@ -105,6 +108,7 @@ public final class SalamiClientGameTest implements FabricClientGameTest {
 			context.waitTick();
 			check(context.computeOnClient(client -> client.screen instanceof SalamiMenuScreen), "Salami menu did not open via keybind");
 			context.takeScreenshot("salami-02-menu");
+			testMenuHover(context, modules);
 			testMenuFirst(context, modules);
 
 			// --- Panel-Ansicht (über die Kachel „Panel-Ansicht“ erreichbar) ---
@@ -236,6 +240,35 @@ public final class SalamiClientGameTest implements FabricClientGameTest {
 	}
 
 	/**
+	 * Maus über „Mods“ (Hover und Tooltip des Looks) und – wenn der Look Schnellschalter zeigt – über den
+	 * ersten; ein Klick darauf schaltet Zoom um, ein zweiter zurück.
+	 */
+	private static void testMenuHover(ClientGameTestContext context, ModuleManager modules) {
+		double scale = context.computeOnClient(c -> (double) c.getWindow().getGuiScale());
+		double[] mods = context.computeOnClient(c -> c.screen instanceof SalamiMenuScreen menu ? menu.pointOf(MenuView.Kind.MODS) : null);
+		check(mods != null, "Salami menu: no Mods entry found");
+		context.getInput().setCursorPos(mods[0] * scale, mods[1] * scale);
+		context.waitTick();
+		context.takeScreenshot("salami-02c-menu-hover");
+		double[] quick = context.computeOnClient(c -> c.screen instanceof SalamiMenuScreen menu ? menu.pointOfQuick(0) : null);
+		if (quick != null) {
+			Module zoom = modules.get("zoom").orElseThrow();
+			boolean before = context.computeOnClient(c -> zoom.isEnabled());
+			context.getInput().setCursorPos(quick[0] * scale, quick[1] * scale);
+			context.waitTick();
+			context.takeScreenshot("salami-02d-menu-quick");
+			context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
+			context.waitTick();
+			check(context.computeOnClient(c -> zoom.isEnabled()) != before, "quick toggle did not switch Zoom");
+			context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
+			context.waitTick();
+			check(context.computeOnClient(c -> zoom.isEnabled()) == before, "quick toggle did not switch Zoom back");
+		}
+		context.getInput().setCursorPos(0, 0);
+		context.waitTick();
+	}
+
+	/**
 	 * „Salami-Menü zuerst“: die Menü-Taste öffnet immer das Salami-Menü (nie die Panel-Ansicht). Die
 	 * Panel-Ansicht ist eine Unteransicht – Esc führt ins Salami-Menü zurück, die Menü-Taste schließt aus
 	 * jedem Salami-Bildschirm alles; danach öffnet sie wieder das Salami-Menü.
@@ -322,14 +355,20 @@ public final class SalamiClientGameTest implements FabricClientGameTest {
 		check(context.computeOnClient(c -> c.screen == null), "Configs screen did not close with Esc");
 
 		NumberSetting delay = (NumberSetting) setting(modules.get(AutoReconnectModule.class), "delay");
+		// AutoText sendet im Namen des Spielers – ein Import darf es nicht belegen, die eigenen Einträge bleiben
+		TextSetting autoText = (TextSetting) setting(modules.get(AutoTextModule.class), "text_3");
 		Path file = FabricLoader.getInstance().getConfigDir().resolve("salami-gametest-export.json");
 		context.runOnClient(c -> {
 			delay.set(12.0);
+			autoText.set("/aus der Datei");
 			SalamiClient.get().config().exportTo(file);
 			delay.set(20.0);
+			autoText.set("eigener Text");
 			SalamiClient.get().importConfig(file);
 		});
 		check(delay.get() == 12.0, "Configs: import did not restore the exported value (" + delay.get() + ")");
+		check(autoText.get().equals("eigener Text"), "Configs: import overwrote AutoText (" + autoText.get() + ")");
+		context.runOnClient(c -> autoText.set(autoText.defaultValue()));
 
 		context.runOnClient(c -> {
 			Files.writeString(file, "{ kaputt");

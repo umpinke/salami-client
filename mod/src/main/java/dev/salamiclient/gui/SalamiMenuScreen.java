@@ -10,6 +10,8 @@ import dev.salamiclient.gui.skin.Skins;
 import dev.salamiclient.module.Module;
 import dev.salamiclient.module.ModuleManager;
 import dev.salamiclient.modules.client.GuiScaleModule;
+import dev.salamiclient.setting.KeybindSetting;
+import dev.salamiclient.setting.Setting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.PauseScreen;
@@ -18,7 +20,9 @@ import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -146,7 +150,58 @@ public final class SalamiMenuScreen extends Screen {
 				friendsBadge),
 			new MenuView.Entry(MenuView.Kind.COSMETICS, I18n.get("salami.menu.cosmetics"), null, 0),
 			new MenuView.Entry(MenuView.Kind.MINIGAMES, I18n.get("salami.clickgui.minigames"), null, 0));
-		return new MenuView.Model("Salami", I18n.get("salami.menu.status", enabled, total), entries, I18n.get("salami.menu.hint"));
+		return new MenuView.Model("Salami", I18n.get("salami.menu.status", enabled, total), entries, I18n.get("salami.menu.hint"), quick());
+	}
+
+	/**
+	 * Module für die Schnellschalter (Looks dürfen sie zeigen, z. B. als Hotbar der Werkbank): die am
+	 * häufigsten umgeschalteten, sofern es sie gibt.
+	 */
+	private static final List<String> QUICK = List.of("zoom", "free_look", "fullbright", "hitbox", "capes", "hats", "time_changer",
+		"particles", "toggle_sprint");
+
+	private List<Module> quickModules() {
+		List<Module> list = new ArrayList<>();
+		for (String id : QUICK) {
+			modules.get(id).ifPresent(list::add);
+		}
+		return list;
+	}
+
+	private List<MenuView.Quick> quick() {
+		List<MenuView.Quick> list = new ArrayList<>();
+		for (Module module : quickModules()) {
+			list.add(new MenuView.Quick(module.id(), I18n.get(module.translationKey()), module.description(), module.isEnabled(),
+				shortKey(module), hasSettings(module)));
+		}
+		return list;
+	}
+
+	/** Kurzer Name der Taste des Moduls (eigene Umschalt-Taste, sonst die erste belegte Taste seiner Einstellungen), höchstens 2 Zeichen. */
+	private static String shortKey(Module module) {
+		KeybindSetting key = module.keybind.isBound() ? module.keybind : null;
+		if (key == null) {
+			for (Setting<?> setting : module.settings()) {
+				if (setting instanceof KeybindSetting bind && !setting.isHidden() && bind.isBound()) {
+					key = bind;
+					break;
+				}
+			}
+		}
+		if (key == null) {
+			return null;
+		}
+		String name = key.keyName();
+		return name.length() <= 2 ? name : null;
+	}
+
+	private static boolean hasSettings(Module module) {
+		for (Setting<?> setting : module.settings()) {
+			if (!setting.isHidden()) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	// ------------------------------------------------------------------ Zeichnen
@@ -170,10 +225,61 @@ public final class SalamiMenuScreen extends Screen {
 	public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
 		super.render(g, mouseX, mouseY, partialTick);
 	//?}
+		MenuView view = Skins.current().menuView();
+		MenuView.Model model = model();
+		int mx = (int) (mouseX / uiScale);
+		int my = (int) (mouseY / uiScale);
 		g.pose().pushMatrix();
 		g.pose().scale(uiScale, uiScale);
-		Skins.current().menuView().render(g, font, model(), uiWidth(), uiHeight(), (int) (mouseX / uiScale), (int) (mouseY / uiScale));
+		view.render(g, font, model, uiWidth(), uiHeight(), mx, my);
 		g.pose().popMatrix();
+
+		List<Component> tooltip = view.tooltip(font, model, uiWidth(), uiHeight(), mx, my);
+		if (tooltip != null && !tooltip.isEmpty()) {
+			List<FormattedCharSequence> lines = new ArrayList<>();
+			for (Component line : tooltip) {
+				lines.addAll(font.split(line, 220));
+			}
+			g.setTooltipForNextFrame(lines, mouseX, mouseY);
+		}
+	}
+
+	// ------------------------------------------------------------------ Für Tests
+
+	/** Mitte des Eintrags {@code kind} in GUI-Koordinaten oder {@code null} – für Tests (sucht über {@link MenuView#hit}). */
+	public double[] pointOf(MenuView.Kind kind) {
+		MenuView view = Skins.current().menuView();
+		MenuView.Model model = model();
+		return find((x, y) -> {
+			MenuView.Entry entry = view.hit(model, uiWidth(), uiHeight(), x, y);
+			return entry != null && entry.kind() == kind;
+		});
+	}
+
+	/** Mitte des Schnellschalters {@code index} in GUI-Koordinaten oder {@code null}, wenn der Look keine zeigt – für Tests. */
+	public double[] pointOfQuick(int index) {
+		MenuView view = Skins.current().menuView();
+		MenuView.Model model = model();
+		return find((x, y) -> view.hitQuick(model, uiWidth(), uiHeight(), x, y) == index);
+	}
+
+	/** Mitte aller UI-Punkte (Raster 2 Pixel), auf die {@code test} zutrifft, in GUI-Koordinaten. */
+	private double[] find(java.util.function.BiPredicate<Double, Double> test) {
+		int x0 = Integer.MAX_VALUE;
+		int y0 = Integer.MAX_VALUE;
+		int x1 = -1;
+		int y1 = -1;
+		for (int y = 1; y < uiHeight(); y += 2) {
+			for (int x = 1; x < uiWidth(); x += 2) {
+				if (test.test((double) x, (double) y)) {
+					x0 = Math.min(x0, x);
+					y0 = Math.min(y0, y);
+					x1 = Math.max(x1, x);
+					y1 = Math.max(y1, y);
+				}
+			}
+		}
+		return x1 < 0 ? null : new double[] {(x0 + x1) / 2.0 * uiScale, (y0 + y1) / 2.0 * uiScale};
 	}
 
 	// ------------------------------------------------------------------ Eingabe
@@ -193,12 +299,31 @@ public final class SalamiMenuScreen extends Screen {
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+		MenuView view = Skins.current().menuView();
+		MenuView.Model model = model();
+		double x = event.x() / uiScale;
+		double y = event.y() / uiScale;
 		if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
-			MenuView.Entry entry = Skins.current().menuView().hit(model(), uiWidth(), uiHeight(), event.x() / uiScale, event.y() / uiScale);
+			MenuView.Entry entry = view.hit(model, uiWidth(), uiHeight(), x, y);
 			if (entry != null) {
 				open(entry.kind());
 				return true;
 			}
+			if (view.hitClose(model, uiWidth(), uiHeight(), x, y)) {
+				onClose();
+				return true;
+			}
+		}
+		int quick = view.hitQuick(model, uiWidth(), uiHeight(), x, y);
+		List<Module> quickModules = quickModules();
+		if (quick >= 0 && quick < quickModules.size()) {
+			Module module = quickModules.get(quick);
+			if (event.button() == InputConstants.MOUSE_BUTTON_RIGHT && hasSettings(module)) {
+				minecraft.setScreen(new ModSettingsScreen(modules, module, this));
+			} else if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
+				modules.toggle(module);
+			}
+			return true;
 		}
 		return super.mouseClicked(event, doubleClick);
 	}

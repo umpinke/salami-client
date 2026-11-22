@@ -68,6 +68,15 @@ public final class SalamiModsGameTest implements FabricClientGameTest {
 		context.setScreen(() -> new ModsScreen(modules, null));
 		context.waitTicks(3);
 		context.takeScreenshot("salami-20-mods-menu");
+		// Maus über dem zweiten Eintrag: Hover und Tooltip des Looks
+		double scale = context.computeOnClient(c -> (double) c.getWindow().getGuiScale());
+		double[] item = context.computeOnClient(c -> c.screen instanceof ModsScreen mods ? mods.pointOfItem(1) : null);
+		check(item != null, "Mods menu: entry 1 not found");
+		context.getInput().setCursorPos(item[0] * scale, item[1] * scale);
+		context.waitTick();
+		context.takeScreenshot("salami-20b-mods-hover");
+		context.getInput().setCursorPos(0, 0);
+		context.waitTick();
 		// Die Suche nimmt immer Zeichen an – ab 26.3 muss dafür die Texteingabe des Fensters an sein
 		check(context.computeOnClient(GametestCompat::acceptsTypedText), "Mods search: window does not accept typed text");
 

@@ -8,7 +8,7 @@ Spiel mit `-Dsalami.look=theke|werkbank|salumeria`; `Skins.current()` lädt per 
 | Look | Paket | Stand |
 |---|---|---|
 | Feinkost-Theke | `gui/skin/theke` | fertig – Vorbild |
-| Pixel-Werkbank | `gui/skin/werkbank` | offen |
+| Pixel-Werkbank | `gui/skin/werkbank` | fertig |
 | Salumeria | `gui/skin/salumeria` | offen |
 
 Entwürfe (854 × 480, GUI-Größe 2): `design-concepts-ingame/` im Repo (a = Theke, b = Werkbank, c = Salumeria).
@@ -34,6 +34,16 @@ Cape-Vorschauen, Farbwähler-Felder, Spielgrafik der Minispiele, Online-Grün in
 - **Eigene Aufbauten:** `menuView()` (Startmenü) und `modsView()` (Mod-Liste). Model-Records rein,
   `render` und `hit` rechnen mit **derselben** Layout-Methode. `ModsView.Tab.count()` (Extras ohne „an“),
   `ModsView.Tool.kind()` (Symbol), `tooltip`, `scrollArea`, `contentHeight`.
+- **Freiwillige Extras** (Default-Methoden bzw. zusätzliche Record-Felder mit altem Konstruktor – ein
+  Look, der sie nicht nutzt, bleibt unverändert):
+  - `MenuView.Model.quick()` – Schnellschalter (`MenuView.Quick`: Modul-ID, Name, Beschreibung, an,
+    kurze Taste, hat Einstellungen). `SalamiMenuScreen` füllt sie (Zoom, Free Look, Fullbright …).
+    `hitQuick` → Index: Linksklick schaltet, Rechtsklick öffnet die Einstellungen.
+  - `MenuView.hitClose` – eigener Schließen-Knopf (Werkbank: „Fertig“).
+  - `MenuView.tooltip` – Minecraft-Tooltip wie bei `ModsView.tooltip`.
+  - `ModsView.Tab.id()` („all“, Kategorie-ID, „extras“) und `ModsView.Item.id()` (Modul-ID bzw.
+    „extra:&lt;Mod-ID&gt;“) – für Symbole (Werkbank: Items in Reitern und Slots).
+- `TextFit.draw`/`drawCentered` gibt es auch mit Schriftschatten (`shadow`).
 
 Gemeinsame Helfer (für alle Looks):
 
@@ -115,3 +125,28 @@ Muss etwas versionsabhängig sein: Stonecutter-Kommentare wie in `GuiDraw`.
   Notizzettel mit der vollen Beschreibung des Eintrags unter der Maus.
 - Look-eigene Texte: `salami.theke.*` in beiden Sprachdateien (ein anderer Look bekommt
   `salami.werkbank.*` bzw. `salami.salumeria.*`).
+
+## Die Pixel-Werkbank
+
+Minecrafts Inventar, als hätte Mojang die Salami-Menüs gebaut. Keine eigenen Texturen: die Werkbank
+zeichnet Minecrafts GUI-Sprites (folgt so jedem Ressourcenpaket) und sonst die Vanilla-Farben.
+
+- `Werkbank.java`: Inventarfarben (#C6C6C6, Licht #FFFFFF, Schatten #555555, Slot #8B8B8B/#373737,
+  Titel #404040) und Helfer: `panel` (Kante samt runden Ecken wie `container/inventory.png`), `inset`
+  (Slot), `raised`, `groove`, `stone` (`widget/button*`, eingefärbt: grün = an/Hauptaktion, rot =
+  Löschen), `tooltipBox` (`tooltip/background` + `frame`), Reiter `container/creative_inventory/tab_top_*`
+  (26 × 32, ragen 4 Pixel ins Panel; 1 = bündig links, 7 = bündig rechts), `slotHoverBack/Front`.
+- `WerkbankItems.java`: Item je Menüeintrag, Kategorie und Modul (gefärbte Items wie Wolle/Farbstoff/
+  Banner meiden – ab 26.2 sind das Farbsammlungen).
+- `WerkbankSkin.java`: WINDOW/POPUP = Inventar-Panel, SIDE = Steinfläche (Panel-Köpfe), CARD = Rille,
+  INPUT = schwarzes Textfeld. Schalter = Stein-Schieber auf einer Slot-Schiene (an: grün), Checkbox wie
+  `widget/checkbox`, Regler `widget/slider*`, Schild = Tooltip-Kasten, Überschriften ohne Fett und nur
+  in ganzen Größen.
+- `WerkbankMenuView.java`: Panel „Salami“ mit Stand, Logo im schwarzen Vorschaukasten (wie die
+  Spielerfigur), 3 × 2 große Slots (Buch, Kompass, Truhe, Kopf, Lederrüstung, Kuchen), Hotbar mit den
+  Schnellschaltern, darunter „Panel-Ansicht“ und „Fertig“. Passt es nicht, wird alles verkleinert.
+- `WerkbankModsView.java`: Kreativinventar – Reiter mit Items (Kategorien links, Werkzeuge rechts,
+  entfallen, wenn sie nicht nebeneinander passen), Titel „Optik · 4 von 34 an“, Suchfeld, Einträge in
+  1–3 Spalten (Slot, Name, „An“/„Aus“), Kreativ-Rollbalken; Beschreibung im Tooltip.
+
+Screenshots: `-PsalamiLook=werkbank`.

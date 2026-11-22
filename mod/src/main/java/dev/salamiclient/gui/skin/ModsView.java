@@ -50,8 +50,18 @@ public interface ModsView {
 	record Model(String title, List<Tab> tabs, int activeTab, List<Tool> tools, List<Item> items, String query,
 		String searchHint, String emptyText, double scroll, String closeLabel) {}
 
-	/** Kategorie mit Zähler „an / alle“; {@code enabled < 0}: nur die Anzahl zeigen (mitgelieferte Mods). */
-	record Tab(String label, int enabled, int total) {
+	/**
+	 * Kategorie mit Zähler „an / alle“; {@code enabled < 0}: nur die Anzahl zeigen (mitgelieferte Mods).
+	 *
+	 * @param id „all“, die Kategorie-ID („client“, „visual“, „hud“, „misc“, „social“) oder „extras“ – für ein
+	 *           Symbol des Looks (Werkbank: Item im Reiter); {@code null} = unbekannt
+	 */
+	record Tab(String label, int enabled, int total, String id) {
+		/** Ohne ID. */
+		public Tab(String label, int enabled, int total) {
+			this(label, enabled, total, null);
+		}
+
 		/** „4/34“ bzw. „5“. */
 		public String count() {
 			return enabled < 0 ? String.valueOf(total) : enabled + "/" + total;
@@ -75,8 +85,15 @@ public interface ModsView {
 	 * @param toggleable  lässt sich hier an-/ausschalten (mitgelieferte Mods nicht)
 	 * @param hasSettings hat Einstellungen (Zahnrad)
 	 * @param tag         kleine Marke, z. B. „mitgeliefert“, oder {@code null}
+	 * @param id          Modul-ID („zoom“) bzw. „extra:&lt;Mod-ID&gt;“ bei mitgelieferten Mods – für ein Symbol des Looks
+	 *                    (Werkbank: Item im Slot); {@code null} = unbekannt
 	 */
-	record Item(String name, Component description, boolean on, boolean toggleable, boolean hasSettings, String tag) {}
+	record Item(String name, Component description, boolean on, boolean toggleable, boolean hasSettings, String tag, String id) {
+		/** Ohne ID. */
+		public Item(String name, Component description, boolean on, boolean toggleable, boolean hasSettings, String tag) {
+			this(name, description, on, toggleable, hasSettings, tag, null);
+		}
+	}
 
 	/** Ergebnis von {@link #hit}. */
 	sealed interface Hit {

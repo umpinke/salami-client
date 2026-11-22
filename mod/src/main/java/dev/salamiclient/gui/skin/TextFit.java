@@ -29,9 +29,14 @@ public final class TextFit {
 	}
 
 	public static int draw(GuiGraphics g, Font font, String text, int x, int y, int maxWidth, int color, float minScale) {
+		return draw(g, font, text, x, y, maxWidth, color, minScale, false);
+	}
+
+	/** Wie {@link #draw}, wahlweise mit Minecrafts Schriftschatten (Werkbank: Text auf Knöpfen und Slots). */
+	public static int draw(GuiGraphics g, Font font, String text, int x, int y, int maxWidth, int color, float minScale, boolean shadow) {
 		int width = font.width(text);
 		if (width <= maxWidth || maxWidth <= 0) {
-			GuiDraw.text(g, font, text, x, y, color, false);
+			GuiDraw.text(g, font, text, x, y, color, shadow);
 			return width;
 		}
 		float scale = Math.max(minScale, maxWidth / (float) width);
@@ -42,16 +47,21 @@ public final class TextFit {
 		g.pose().pushMatrix();
 		g.pose().translate(x, y + (1 - scale) * 4);
 		g.pose().scale(scale, scale);
-		GuiDraw.text(g, font, shown, 0, 0, color, false);
+		GuiDraw.text(g, font, shown, 0, 0, color, shadow);
 		g.pose().popMatrix();
 		return Math.round(font.width(shown) * scale);
 	}
 
 	/** Wie {@link #draw}, aber mittig um {@code centerX}. */
 	public static void drawCentered(GuiGraphics g, Font font, String text, int centerX, int y, int maxWidth, int color) {
+		drawCentered(g, font, text, centerX, y, maxWidth, color, false);
+	}
+
+	/** Wie {@link #drawCentered}, wahlweise mit Schriftschatten. */
+	public static void drawCentered(GuiGraphics g, Font font, String text, int centerX, int y, int maxWidth, int color, boolean shadow) {
 		int width = font.width(text);
 		if (width <= maxWidth) {
-			GuiDraw.text(g, font, text, centerX - width / 2, y, color, false);
+			GuiDraw.text(g, font, text, centerX - width / 2, y, color, shadow);
 			return;
 		}
 		float scale = Math.max(MIN_SCALE, maxWidth / (float) width);
@@ -59,7 +69,7 @@ public final class TextFit {
 		g.pose().pushMatrix();
 		g.pose().translate(centerX - font.width(shown) * scale / 2f, y + (1 - scale) * 4);
 		g.pose().scale(scale, scale);
-		GuiDraw.text(g, font, shown, 0, 0, color, false);
+		GuiDraw.text(g, font, shown, 0, 0, color, shadow);
 		g.pose().popMatrix();
 	}
 
