@@ -1,7 +1,7 @@
 use crate::commands::oauth_error_html::ERROR_HTML;
 use crate::commands::oauth_success_html::SUCCESS_HTML;
 use crate::error::{AppError, CommandError};
-use crate::minecraft::minecraft_auth::Credentials;
+use crate::minecraft::minecraft_auth::{Credentials, DirectOAuthFlow, EmbeddedLogin, MinecraftLoginFlow};
 use crate::state::event_state::{EventPayload, EventType};
 use crate::state::state_manager::State;
 use crate::utils::updater_utils;
@@ -68,85 +68,313 @@ async fn begin_login_inner<R: Runtime>(
     let use_browser_based_login = updater_utils::is_flatpak() || config.use_browser_based_login;
 
     if use_browser_based_login {
-        // Flatpak: Use external browser with local HTTP server
-        info!("[Login] Using external browser flow (Flatpak detected)");
+        info!("[Login] Using external browser flow");
+        return direct_login(&app, DirectLoginView::Browser).await;
+    }
 
-        // Salami: Port sofort belegen und halten (kein Wettlauf zwischen Prüfen und Binden) –
-        // auf 127.0.0.1 und, falls vorhanden, [::1], damit kein anderes Programm unter
-        // „localhost“ die Login-Antwort abfängt.
-        let (port, listeners) = crate::minecraft::auth::minecraft_auth::bind_oauth_listeners(25585)
-            .await
-            .map_err(CommandError::from)?;
+    info!("[Login] Using Tauri webview flow");
+    match state.minecraft_account_manager_v2.login_begin(None).await? {
+        EmbeddedLogin::Live(flow) => live_window_login(&app, flow).await,
+        // Salami: Das Netz sperrt die Xbox-Geräteanmeldung (Schul- oder Jugendschutzfilter) –
+        // dann über login.microsoftonline.com wie beim Browser-Login, aber im Launcher-Fenster.
+        EmbeddedLogin::Direct => direct_login(&app, DirectLoginView::Window).await,
+    }
+}
 
-        let redirect_uri = format!("http://localhost:{}/callback", port);
-        info!("[Login] Using redirect URI: {}", redirect_uri);
+/// Öffnet das Login-Fenster („signin“) mit der Microsoft-Anmeldeseite.
+fn open_signin_window<R: Runtime>(
+    app: &tauri::AppHandle<R>,
+    url: &str,
+) -> Result<tauri::WebviewWindow<R>, CommandError> {
+    // Close any existing sign-in window
+    if let Some(window) = app.get_webview_window("signin") {
+        window.close().map_err(|e| AppError::Other(e.to_string()))?;
+    }
 
-        // Emit login started event
-        let login_event_id = Uuid::new_v4();
-        state.emit_event(EventPayload {
-            event_id: login_event_id,
-            event_type: EventType::AccountLoginStarted,
-            target_id: None,
-            message: "Starting browser-based login process".to_string(),
-            progress: Some(0.0),
-            error: None,
-        }).await?;
+    let window = tauri::WebviewWindowBuilder::new(
+        app,
+        "signin",
+        tauri::WebviewUrl::External(url.parse().map_err(|_| {
+            AppError::AccountError("Error parsing auth redirect URL".to_string())
+        })?),
+    )
+    .title("Salami Client · Login")
+    .always_on_top(true)
+    .center()
+    .build()
+    .map_err(|e| AppError::Other(e.to_string()))?;
 
-        // Start the direct OAuth2 flow (for localhost redirect)
-        let flow = State::get()
-            .await?
-            .minecraft_account_manager_v2
-            .login_begin_direct_oauth(&redirect_uri)
-            .await?;
+    window
+        .request_user_attention(Some(UserAttentionType::Critical))
+        .map_err(|e| AppError::Other(e.to_string()))?;
+    Ok(window)
+}
 
-        // Use embedded HTML templates (works on all platforms including Flatpak)
-        let success_html = SUCCESS_HTML.to_string();
-        let error_html = ERROR_HTML.to_string();
+/// Anmeldung über login.live.com im Login-Fenster: Der Code steht am Ende in der Adresse von
+/// oauth20_desktop.srf.
+async fn live_window_login<R: Runtime>(
+    app: &tauri::AppHandle<R>,
+    flow: MinecraftLoginFlow,
+) -> Result<Option<Credentials>, CommandError> {
+    let window = open_signin_window(app, &flow.redirect_uri)?;
+    let start = Utc::now();
 
-        // Start the OAuth callback server (accepts only callbacks carrying this flow's state)
-        let (server_handle, mut code_rx) = crate::minecraft::auth::minecraft_auth::start_oauth_callback_server(
-            listeners,
-            flow.state.clone(),
-            success_html,
-            error_html,
-        )
-        .await
-        .map_err(|e| CommandError::from(AppError::Other(format!("Failed to start OAuth server: {}", e))))?;
-
-        // Store the server handle in state for cancellation
-        {
-            let mut handle_guard = state.login_server_handle.lock().await;
-            *handle_guard = Some(server_handle);
+    // Wait for the user to complete the login (10 minutes = 600 seconds)
+    while (Utc::now() - start) < Duration::seconds(600) {
+        if window.title().is_err() {
+            // User closed the window, cancelling flow
+            window.close().map_err(|e| AppError::Other(e.to_string()))?;
+            return Ok(None);
         }
 
-        // Emit waiting for browser event
-        state.emit_event(EventPayload {
-            event_id: login_event_id,
-            event_type: EventType::AccountLoginWaitingForBrowser,
-            target_id: None,
-            message: "Opening browser window for authentication".to_string(),
-            progress: Some(10.0),
-            error: None,
-        }).await?;
+        if let Ok(url) = window.url() {
+            if url
+                .as_str()
+                .starts_with("https://login.live.com/oauth20_desktop.srf")
+            {
+                if let Some((_, code)) = url.query_pairs().find(|x| x.0 == "code") {
+                    window.close().map_err(|e| AppError::Other(e.to_string()))?;
 
-        // Open the browser with the authorization URL
-        info!("[Login] Opening browser with URL: {}", flow.authorize_url);
-        app.opener()
-            .open_url(&flow.authorize_url, None::<&str>)
-            .map_err(|e| CommandError::from(AppError::Other(format!("Failed to open browser: {}", e))))?;
+                    // Complete the login flow with the code
+                    let account = State::get()
+                        .await?
+                        .minecraft_account_manager_v2
+                        .login_finish(&code, flow)
+                        .await?;
 
-        // Wait for the callback (with timeout)
-        let start = Utc::now();
-        let timeout = Duration::seconds(600); // 10 minutes
-
-        loop {
-            if (Utc::now() - start) >= timeout {
-                info!("[Login] Timeout waiting for OAuth callback");
-                // Abort server via state
-                if let Some(handle) = state.login_server_handle.lock().await.take() {
-                    handle.abort();
+                    return Ok(Some(account));
                 }
-                let error_msg = "Login timeout: No response from browser after 10 minutes".to_string();
+            }
+        }
+
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+
+    window.close().map_err(|e| AppError::Other(e.to_string()))?;
+    Ok(None)
+}
+
+/// Wo die Anmeldeseite von login.microsoftonline.com erscheint.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DirectLoginView {
+    /// Im Standardbrowser (Einstellung „Browser-basierter Login“, Flatpak).
+    Browser,
+    /// Im Login-Fenster des Launchers (wenn das Netz die Xbox-Geräteanmeldung sperrt).
+    Window,
+}
+
+/// Anmeldung über login.microsoftonline.com: Nach der Anmeldung leitet Microsoft an einen lokalen
+/// Server des Launchers zurück, der den Code entgegennimmt.
+async fn direct_login<R: Runtime>(
+    app: &tauri::AppHandle<R>,
+    view: DirectLoginView,
+) -> Result<Option<Credentials>, CommandError> {
+    let state = State::get().await?;
+
+    // Salami: Port sofort belegen und halten (kein Wettlauf zwischen Prüfen und Binden) –
+    // auf 127.0.0.1 und, falls vorhanden, [::1], damit kein anderes Programm unter
+    // „localhost“ die Login-Antwort abfängt.
+    let (port, listeners) = crate::minecraft::auth::minecraft_auth::bind_oauth_listeners(25585)
+        .await
+        .map_err(CommandError::from)?;
+
+    let redirect_uri = format!("http://localhost:{}/callback", port);
+    info!("[Login] Using redirect URI: {}", redirect_uri);
+
+    // Emit login started event
+    let login_event_id = Uuid::new_v4();
+    state.emit_event(EventPayload {
+        event_id: login_event_id,
+        event_type: EventType::AccountLoginStarted,
+        target_id: None,
+        message: "Starting browser-based login process".to_string(),
+        progress: Some(0.0),
+        error: None,
+    }).await?;
+
+    // Start the direct OAuth2 flow (for localhost redirect)
+    let flow = state
+        .minecraft_account_manager_v2
+        .login_begin_direct_oauth(&redirect_uri)
+        .await?;
+
+    // Use embedded HTML templates (works on all platforms including Flatpak)
+    let success_html = SUCCESS_HTML.to_string();
+    let error_html = ERROR_HTML.to_string();
+
+    // Start the OAuth callback server (accepts only callbacks carrying this flow's state)
+    let (server_handle, code_rx) = crate::minecraft::auth::minecraft_auth::start_oauth_callback_server(
+        listeners,
+        flow.state.clone(),
+        success_html,
+        error_html,
+    )
+    .await
+    .map_err(|e| CommandError::from(AppError::Other(format!("Failed to start OAuth server: {}", e))))?;
+
+    // Store the server handle in state for cancellation
+    {
+        let mut handle_guard = state.login_server_handle.lock().await;
+        *handle_guard = Some(server_handle);
+    }
+
+    let window = match view {
+        DirectLoginView::Browser => {
+            // Emit waiting for browser event
+            state.emit_event(EventPayload {
+                event_id: login_event_id,
+                event_type: EventType::AccountLoginWaitingForBrowser,
+                target_id: None,
+                message: "Opening browser window for authentication".to_string(),
+                progress: Some(10.0),
+                error: None,
+            }).await?;
+
+            // Open the browser with the authorization URL
+            info!("[Login] Opening browser with URL: {}", flow.authorize_url);
+            if let Err(e) = app.opener().open_url(&flow.authorize_url, None::<&str>) {
+                abort_login_server(&state).await;
+                return Err(CommandError::from(AppError::Other(format!("Failed to open browser: {}", e))));
+            }
+            None
+        }
+        DirectLoginView::Window => {
+            // Die Rückleitung an den lokalen Server muss im Login-Fenster durch die Navigationssperre
+            crate::nav_guard::allow_signin_callback(Some(port));
+            match open_signin_window(app, &flow.authorize_url) {
+                Ok(window) => Some(window),
+                Err(e) => {
+                    crate::nav_guard::allow_signin_callback(None);
+                    abort_login_server(&state).await;
+                    return Err(e);
+                }
+            }
+        }
+    };
+
+    let result = wait_for_direct_login(&state, flow, code_rx, window.as_ref(), login_event_id).await;
+
+    if view == DirectLoginView::Window {
+        crate::nav_guard::allow_signin_callback(None);
+    }
+    if let Some(window) = window {
+        let _ = window.close();
+    }
+    abort_login_server(&state).await;
+    result
+}
+
+async fn abort_login_server(state: &State) {
+    if let Some(handle) = state.login_server_handle.lock().await.take() {
+        handle.abort();
+    }
+}
+
+/// Wartet auf den Code vom lokalen Server (höchstens 10 Minuten) und schließt damit die Anmeldung
+/// ab. `None`, wenn die Anmeldung abgebrochen wurde (Fenster zu, Abbrechen, Zeit um).
+async fn wait_for_direct_login<R: Runtime>(
+    state: &State,
+    flow: DirectOAuthFlow,
+    mut code_rx: tokio::sync::oneshot::Receiver<crate::error::Result<String>>,
+    window: Option<&tauri::WebviewWindow<R>>,
+    login_event_id: Uuid,
+) -> Result<Option<Credentials>, CommandError> {
+    let start = Utc::now();
+    let timeout = Duration::seconds(600); // 10 minutes
+
+    loop {
+        if (Utc::now() - start) >= timeout {
+            info!("[Login] Timeout waiting for OAuth callback");
+            let error_msg = "Login timeout: No response from browser after 10 minutes".to_string();
+            state.emit_event(EventPayload {
+                event_id: login_event_id,
+                event_type: EventType::Error,
+                target_id: None,
+                message: error_msg.clone(),
+                progress: None,
+                error: Some(error_msg),
+            }).await?;
+            return Ok(None);
+        }
+
+        if window.is_some_and(|window| window.title().is_err()) {
+            info!("[Login] Sign-in window closed, cancelling login");
+            return Ok(None);
+        }
+
+        // Check if we received the code
+        match code_rx.try_recv() {
+            Ok(Ok(code)) => {
+                info!("[Login] Received authorization code");
+                abort_login_server(state).await;
+                if let Some(window) = window {
+                    let _ = window.close();
+                }
+
+                // Emit exchanging token event
+                state.emit_event(EventPayload {
+                    event_id: login_event_id,
+                    event_type: EventType::AccountLoginExchangingToken,
+                    target_id: None,
+                    message: "Exchanging authorization code for access token".to_string(),
+                    progress: Some(30.0),
+                    error: None,
+                }).await?;
+
+                // Complete the direct OAuth2 login flow with the code
+                return match state
+                    .minecraft_account_manager_v2
+                    .login_finish_direct_oauth_with_events(&code, flow, login_event_id)
+                    .await
+                {
+                    Ok(account) => {
+                        // Emit completed event
+                        state.emit_event(EventPayload {
+                            event_id: login_event_id,
+                            event_type: EventType::AccountLoginCompleted,
+                            target_id: None,
+                            message: format!("Login completed successfully for {}", account.username),
+                            progress: Some(100.0),
+                            error: None,
+                        }).await?;
+
+                        Ok(Some(account))
+                    }
+                    Err(e) => {
+                        error!("[Login] Error during login flow: {:?}", e);
+                        let error_msg = format!("Login failed: {}", e);
+                        state.emit_event(EventPayload {
+                            event_id: login_event_id,
+                            event_type: EventType::Error,
+                            target_id: None,
+                            message: error_msg.clone(),
+                            progress: None,
+                            error: Some(error_msg),
+                        }).await?;
+                        Err(CommandError::from(e))
+                    }
+                };
+            }
+            Ok(Err(e)) => {
+                error!("[Login] OAuth callback error: {:?}", e);
+                let error_msg = format!("OAuth callback error: {}", e);
+                state.emit_event(EventPayload {
+                    event_id: login_event_id,
+                    event_type: EventType::Error,
+                    target_id: None,
+                    message: error_msg.clone(),
+                    progress: None,
+                    error: Some(error_msg),
+                }).await?;
+                return Err(CommandError::from(e));
+            }
+            Err(tokio::sync::oneshot::error::TryRecvError::Empty) => {
+                // Still waiting, continue
+            }
+            Err(tokio::sync::oneshot::error::TryRecvError::Closed) => {
+                // Abgebrochen (cancel_login) oder der Server ist weg
+                error!("[Login] OAuth callback channel closed unexpectedly");
+                let error_msg = "Login connection closed unexpectedly".to_string();
                 state.emit_event(EventPayload {
                     event_id: login_event_id,
                     event_type: EventType::Error,
@@ -157,173 +385,9 @@ async fn begin_login_inner<R: Runtime>(
                 }).await?;
                 return Ok(None);
             }
-
-            // Check if we received the code
-            match code_rx.try_recv() {
-                Ok(Ok(code)) => {
-                    info!("[Login] Received authorization code");
-                    // Abort server via state
-                    if let Some(handle) = state.login_server_handle.lock().await.take() {
-                        handle.abort();
-                    }
-                    
-                    // Emit exchanging token event
-                    state.emit_event(EventPayload {
-                        event_id: login_event_id,
-                        event_type: EventType::AccountLoginExchangingToken,
-                        target_id: None,
-                        message: "Exchanging authorization code for access token".to_string(),
-                        progress: Some(30.0),
-                        error: None,
-                    }).await?;
-                    
-                    // Complete the direct OAuth2 login flow with the code
-                    match State::get()
-                        .await?
-                        .minecraft_account_manager_v2
-                        .login_finish_direct_oauth_with_events(&code, flow, login_event_id)
-                        .await
-                    {
-                        Ok(account) => {
-                            // Emit completed event
-                            state.emit_event(EventPayload {
-                                event_id: login_event_id,
-                                event_type: EventType::AccountLoginCompleted,
-                                target_id: None,
-                                message: format!("Login completed successfully for {}", account.username),
-                                progress: Some(100.0),
-                                error: None,
-                            }).await?;
-
-                            return Ok(Some(account));
-                        }
-                        Err(e) => {
-                            error!("[Login] Error during login flow: {:?}", e);
-                            let error_msg = format!("Login failed: {}", e);
-                            state.emit_event(EventPayload {
-                                event_id: login_event_id,
-                                event_type: EventType::Error,
-                                target_id: None,
-                                message: error_msg.clone(),
-                                progress: None,
-                                error: Some(error_msg),
-                            }).await?;
-                            return Err(CommandError::from(e));
-                        }
-                    }
-                }
-                Ok(Err(e)) => {
-                    error!("[Login] OAuth callback error: {:?}", e);
-                    // Abort server via state
-                    if let Some(handle) = state.login_server_handle.lock().await.take() {
-                        handle.abort();
-                    }
-                    let error_msg = format!("OAuth callback error: {}", e);
-                    state.emit_event(EventPayload {
-                        event_id: login_event_id,
-                        event_type: EventType::Error,
-                        target_id: None,
-                        message: error_msg.clone(),
-                        progress: None,
-                        error: Some(error_msg),
-                    }).await?;
-                    return Err(CommandError::from(e));
-                }
-                Err(tokio::sync::oneshot::error::TryRecvError::Empty) => {
-                    // Still waiting, continue
-                }
-                Err(tokio::sync::oneshot::error::TryRecvError::Closed) => {
-                    error!("[Login] OAuth callback channel closed unexpectedly");
-                    // Clear the server handle
-                    {
-                        let mut handle_guard = state.login_server_handle.lock().await;
-                        *handle_guard = None;
-                    }
-                    let error_msg = "Login connection closed unexpectedly".to_string();
-                    state.emit_event(EventPayload {
-                        event_id: login_event_id,
-                        event_type: EventType::Error,
-                        target_id: None,
-                        message: error_msg.clone(),
-                        progress: None,
-                        error: Some(error_msg),
-                    }).await?;
-                    return Ok(None);
-                }
-            }
-
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        }
-    } else {
-        // Non-Flatpak: Use Tauri webview window (existing behavior)
-        info!("[Login] Using Tauri webview flow (non-Flatpak)");
-
-        let flow = State::get()
-            .await?
-            .minecraft_account_manager_v2
-            .login_begin(None)
-            .await?;
-
-        // Close any existing sign-in window
-        if let Some(window) = app.get_webview_window("signin") {
-            window.close().map_err(|e| AppError::Other(e.to_string()))?;
         }
 
-        // Create a new window for the sign-in process
-        let window =
-            tauri::WebviewWindowBuilder::new(
-                &app,
-                "signin",
-                tauri::WebviewUrl::External(flow.redirect_uri.parse().map_err(|_| {
-                    AppError::AccountError("Error parsing auth redirect URL".to_string())
-                })?),
-            )
-            .title("Salami Client · Login")
-            .always_on_top(true)
-            .center()
-            .build()
-            .map_err(|e| AppError::Other(e.to_string()))?;
-
-        window
-            .request_user_attention(Some(UserAttentionType::Critical))
-            .map_err(|e| AppError::Other(e.to_string()))?;
-
-        let start = Utc::now();
-
-        // Wait for the user to complete the login (10 minutes = 600 seconds)
-        while (Utc::now() - start) < Duration::seconds(600) {
-            if window.title().is_err() {
-                // User closed the window, cancelling flow
-                window.close().map_err(|e| AppError::Other(e.to_string()))?;
-                return Ok(None);
-            }
-
-            if let Ok(url) = window.url() {
-                if url
-                    .as_str()
-                    .starts_with("https://login.live.com/oauth20_desktop.srf")
-                {
-                    if let Some((_, code)) = url.query_pairs().find(|x| x.0 == "code") {
-                        window.close().map_err(|e| AppError::Other(e.to_string()))?;
-
-                        // Complete the login flow with the code
-                        let account = State::get()
-                            .await?
-                            .minecraft_account_manager_v2
-                            .login_finish(&code, flow)
-                            .await?;
-
-
-                        return Ok(Some(account));
-                    }
-                }
-            }
-
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-        }
-
-        window.close().map_err(|e| AppError::Other(e.to_string()))?;
-        Ok(None)
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     }
 }
 

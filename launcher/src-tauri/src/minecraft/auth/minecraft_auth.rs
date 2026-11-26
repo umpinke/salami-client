@@ -317,10 +317,31 @@ pub fn request_error_summary(err: &reqwest::Error) -> (NetworkProblem, String, S
 
 /// Salami: Manche Netze (Schul-, Jugendschutz- und Firmenfilter) sperren die Xbox-Geräteanmeldung
 /// (device.auth.xboxlive.com, sisu.xboxlive.com), lassen die eigentliche Xbox-Anmeldung aber
-/// durch. Dann meldet sich der Launcher ohne Geräte-Token an: dieselbe Microsoft-Anmeldung
-/// (Client-ID, Rückleitung) → user.auth.xboxlive.com → XSTS → Minecraft. Gemerkt wird das bis zum
-/// Neustart, damit nicht jede Erneuerung erst am gesperrten Server hängen bleibt.
+/// durch. Dann meldet sich der Launcher ohne Geräte-Token an (siehe [`route_without_device`]).
+/// Gemerkt wird das bis zum Neustart, damit nicht jede Erneuerung erst am gesperrten Server
+/// hängen bleibt.
 static DEVICE_ROUTE_BLOCKED: AtomicBool = AtomicBool::new(false);
+
+/// Wie die Anmeldung im Launcher-Fenster läuft.
+#[derive(Debug)]
+pub enum EmbeddedLogin {
+    /// Anmeldeseite von login.live.com mit Rückleitung auf oauth20_desktop.srf – über die
+    /// Xbox-Geräteanmeldung (SISU) oder, wenn nur sie gesperrt ist, ohne sie.
+    Live(MinecraftLoginFlow),
+    /// Geräteanmeldung gesperrt: Anmeldung über login.microsoftonline.com wie beim Browser-Login
+    /// (Rückleitung an den lokalen Server), nur im Launcher-Fenster.
+    Direct,
+}
+
+/// Weg ohne Geräteanmeldung, siehe [`route_without_device`].
+#[derive(Debug, PartialEq, Eq)]
+enum RouteWithoutDevice {
+    Direct,
+    Live,
+}
+
+/// Wie lange die Prüfung vor dem Weg ohne Geräteanmeldung auf jeden Server wartet.
+const ROUTE_CHECK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(12);
 
 fn device_route_blocked() -> bool {
     DEVICE_ROUTE_BLOCKED.load(Ordering::Relaxed)
@@ -372,23 +393,52 @@ fn login_url_without_device(challenge: &str, state: &str) -> Result<String> {
     Ok(url.to_string())
 }
 
-/// Bevor die Anmeldung ohne Geräteanmeldung startet: Sind login.live.com und
-/// user.auth.xboxlive.com überhaupt erreichbar? Sonst sagt die Meldung gleich, welcher Server
-/// gesperrt ist, statt dass sich ein Fenster mit einer Fehlerseite öffnet oder die Anmeldung erst
-/// nach dem Passwort scheitert. Jede HTTP-Antwort zählt als erreichbar.
-async fn check_route_without_device() -> Result<()> {
-    async fn reach(url: &'static str, step: MinecraftAuthStep) -> Result<()> {
-        auth_retry(|| HTTP_CLIENT.get(url).timeout(AUTH_REQUEST_TIMEOUT).send())
-            .await
-            .map(|_| ())
-            .map_err(|source| AppError::from(MinecraftAuthenticationError::Request { source, step }))
-    }
-    let (live, xbox) = tokio::join!(
-        reach("https://login.live.com/", MinecraftAuthStep::GetOAuthToken),
-        reach("https://user.auth.xboxlive.com/", MinecraftAuthStep::XboxUserToken),
+/// Welcher Weg ohne Geräteanmeldung in diesem Netz durchkommt. Geprüft werden die Server, mit denen
+/// der Launcher selbst spricht (die Anmeldeseite lädt das Fenster wie ein Browser):
+/// - **Direct** (bevorzugt): Token von login.microsoftonline.com, dann user.auth.xboxlive.com mit
+///   „d=“ – derselbe Weg wie der Browser-Login, der in Filternetzen nachweislich durchkommt, in
+///   denen der Launcher login.live.com nicht erreicht.
+/// - **Live**: Token von login.live.com, dann user.auth.xboxlive.com mit „t=“ – falls nur
+///   login.microsoftonline.com gesperrt ist.
+///
+/// Sonst sagt die Meldung gleich, welcher Server gesperrt ist, statt dass sich ein Fenster mit
+/// einer Fehlerseite öffnet oder die Anmeldung erst nach dem Passwort scheitert. Jede HTTP-Antwort
+/// des Servers selbst zählt als erreichbar; ein Versuch, kurze Wartezeit, alles gleichzeitig.
+async fn route_without_device() -> Result<RouteWithoutDevice> {
+    // Ohne Weiterleitungen: Eine Umleitung auf eine andere (vielleicht gesperrte) Seite soll nicht
+    // als gesperrter Anmeldeserver zählen.
+    let client = crate::config::http_client_builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(ROUTE_CHECK_TIMEOUT)
+        .build()
+        .map_err(|e| AppError::Other(format!("Failed to build HTTP client: {e}")))?;
+    let reach = |url: &'static str, step: MinecraftAuthStep| {
+        let request = client.get(url);
+        async move {
+            request
+                .send()
+                .await
+                .map(|_| ())
+                .map_err(|source| AppError::from(MinecraftAuthenticationError::Request { source, step }))
+        }
+    };
+    let (identity, live, xbox) = tokio::join!(
+        reach(DIRECT_OAUTH_TOKEN_URL, MinecraftAuthStep::GetOAuthToken),
+        reach("https://login.live.com/oauth20_token.srf", MinecraftAuthStep::GetOAuthToken),
+        reach("https://user.auth.xboxlive.com/user/authenticate", MinecraftAuthStep::XboxUserToken),
     );
-    live?;
-    xbox
+    xbox?;
+    match (identity, live) {
+        (Ok(()), _) => Ok(RouteWithoutDevice::Direct),
+        (Err(identity), Ok(())) => {
+            warn!("[Auth Flow] login.microsoftonline.com unreachable, signing in via login.live.com: {identity}");
+            Ok(RouteWithoutDevice::Live)
+        }
+        (Err(identity), Err(live)) => {
+            warn!("[Auth Flow] login.live.com unreachable as well: {live}");
+            Err(identity)
+        }
+    }
 }
 
 /// XSTS-Token für ein Microsoft-Token von login.live.com: über die Geräteanmeldung (SISU), wenn
@@ -685,12 +735,12 @@ impl MinecraftAuthStore {
         })
     }
 
-    pub async fn login_begin(&self, redirect_uri: Option<&str>) -> Result<MinecraftLoginFlow> {
+    pub async fn login_begin(&self, redirect_uri: Option<&str>) -> Result<EmbeddedLogin> {
         info!("[Auth Flow] Starting login_begin process");
         if !device_route_blocked() {
             match self.login_begin_sisu(redirect_uri).await {
-                Ok(flow) => return Ok(flow),
-                // Der Weg ohne Geräteanmeldung kennt nur die feste Rückleitung von login.live.com
+                Ok(flow) => return Ok(EmbeddedLogin::Live(flow)),
+                // Die Wege ohne Geräteanmeldung haben ihre eigene, feste Rückleitung
                 Err(err) if redirect_uri.is_none() && device_route_failed(&err) => {
                     note_device_route_failure(&err)
                 }
@@ -698,17 +748,20 @@ impl MinecraftAuthStore {
             }
         }
 
-        check_route_without_device().await?;
-        info!("[Auth Flow] Starting the login without the Xbox device login");
+        if route_without_device().await? == RouteWithoutDevice::Direct {
+            info!("[Auth Flow] Signing in via login.microsoftonline.com, without the Xbox device login");
+            return Ok(EmbeddedLogin::Direct);
+        }
+        info!("[Auth Flow] Signing in via login.live.com, without the Xbox device login");
         let verifier = generate_oauth_challenge();
         let challenge = BASE64_URL_SAFE_NO_PAD.encode(sha2::Sha256::digest(&verifier));
         let redirect_uri = login_url_without_device(&challenge, &generate_oauth_challenge())?;
-        Ok(MinecraftLoginFlow {
+        Ok(EmbeddedLogin::Live(MinecraftLoginFlow {
             verifier,
             challenge,
             session_id: None,
             redirect_uri,
-        })
+        }))
     }
 
     async fn login_begin_sisu(&self, redirect_uri: Option<&str>) -> Result<MinecraftLoginFlow> {
@@ -2632,13 +2685,21 @@ mod device_route_tests {
     /// Spielt einen Schulfilter nach, der die Xbox-Geräteanmeldung per DNS sperrt. Geht ins Netz
     /// (Microsoft und Xbox, ohne Kontodaten), deshalb nur auf Abruf:
     /// `cargo test device_route -- --ignored`
+    fn block_hosts(extra: &str) {
+        let mut hosts = String::from("device.auth.xboxlive.com,sisu.xboxlive.com");
+        if !extra.is_empty() {
+            hosts.push(',');
+            hosts.push_str(extra);
+        }
+        std::env::set_var("SALAMI_TEST_BLOCKED_HOSTS", hosts);
+    }
+
+    /// Spielt Schulfilter nach, die die Xbox-Geräteanmeldung (und mehr) per DNS sperren. Geht ins
+    /// Netz (Microsoft und Xbox, ohne Kontodaten), deshalb nur auf Abruf:
+    /// `cargo test device_route -- --ignored`
     #[tokio::test]
     #[ignore]
     async fn blocked_device_login_falls_back() {
-        std::env::set_var(
-            "SALAMI_TEST_BLOCKED_HOSTS",
-            "device.auth.xboxlive.com,sisu.xboxlive.com",
-        );
         let store = MinecraftAuthStore {
             accounts: Arc::new(RwLock::new(Vec::new())),
             store_path: std::env::temp_dir()
@@ -2647,19 +2708,48 @@ mod device_route_tests {
             save_lock: Arc::new(Mutex::new(())),
         };
 
-        let flow = store.login_begin(None).await.unwrap();
-        assert!(flow.session_id.is_none());
-        assert!(flow.redirect_uri.starts_with(LIVE_AUTHORIZE_URL), "{}", flow.redirect_uri);
+        // Nur die Geräteanmeldung gesperrt: über login.microsoftonline.com wie der Browser-Login
+        block_hosts("");
+        let route = store.login_begin(None).await.unwrap();
+        assert!(matches!(route, EmbeddedLogin::Direct), "{route:?}");
         assert!(device_route_blocked());
         assert!(!store.store_path.exists(), "nothing may be saved without a device token");
 
-        // Die Anmeldeseite im Launcher-Fenster lädt
+        // Die Anmeldeseite dafür lädt (im Login-Fenster, Rückleitung an den lokalen Server)
+        let flow = store
+            .login_begin_direct_oauth("http://localhost:25585/callback")
+            .await
+            .unwrap();
+        let page = HTTP_CLIENT.get(&flow.authorize_url).send().await.unwrap();
+        assert!(page.status().is_success(), "{}", page.status());
+
+        // Wie im Netz, in dem 1.8.9 scheiterte: login.live.com antwortet dem Launcher nicht
+        block_hosts("login.live.com");
+        let route = store.login_begin(None).await.unwrap();
+        assert!(matches!(route, EmbeddedLogin::Direct), "{route:?}");
+
+        // Nur login.microsoftonline.com gesperrt: über login.live.com
+        block_hosts("login.microsoftonline.com");
+        let EmbeddedLogin::Live(flow) = store.login_begin(None).await.unwrap() else {
+            panic!("expected the login.live.com route");
+        };
+        assert!(flow.session_id.is_none());
+        assert!(flow.redirect_uri.starts_with(LIVE_AUTHORIZE_URL), "{}", flow.redirect_uri);
         let page = HTTP_CLIENT.get(&flow.redirect_uri).send().await.unwrap();
         assert!(page.status().is_success(), "{}", page.status());
-        let html = page.text().await.unwrap();
-        assert!(html.contains("Sign in"), "unexpected login page");
+
+        // Beide Anmeldeserver gesperrt: Die Meldung nennt den Server
+        block_hosts("login.microsoftonline.com,login.live.com");
+        let err = store.login_begin(None).await.unwrap_err();
+        assert!(err.to_string().contains("login.microsoftonline.com"), "{err}");
+
+        // Xbox gesperrt: Da hilft kein Weg
+        block_hosts("user.auth.xboxlive.com");
+        let err = store.login_begin(None).await.unwrap_err();
+        assert!(err.to_string().contains("user.auth.xboxlive.com"), "{err}");
 
         // Und die Erneuerung bestehender Konten überspringt die Geräteanmeldung jetzt gleich
+        block_hosts("");
         let err = live_token_to_xsts("not-a-token", None, None).await.unwrap_err();
         assert!(!device_route_failed(&err), "{err}");
         println!("without device, a bad token ends at: {err}");

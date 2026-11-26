@@ -5,11 +5,22 @@
 //! Microsoft-Seiten anzeigen.
 
 use log::warn;
+use std::sync::atomic::{AtomicU16, Ordering};
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::{Runtime, Url};
 
 /// Fenster für den Microsoft-Login (siehe commands/minecraft_auth_command.rs).
 const SIGNIN_WINDOW: &str = "signin";
+
+/// Port der laufenden Anmeldung über login.microsoftonline.com im Login-Fenster (0 = keine).
+/// Microsoft leitet dann auf `http://localhost:<port>/callback` zurück, wo der lokale Server des
+/// Launchers den Code entgegennimmt – nur diese eine Adresse, nur so lange.
+static SIGNIN_CALLBACK_PORT: AtomicU16 = AtomicU16::new(0);
+
+/// Erlaubt dem Login-Fenster die Rückleitung an den lokalen Login-Server (`None` = wieder sperren).
+pub fn allow_signin_callback(port: Option<u16>) {
+    SIGNIN_CALLBACK_PORT.store(port.unwrap_or(0), Ordering::Relaxed);
+}
 
 /// Domains, die das Login-Fenster anzeigen darf (inkl. Subdomains).
 const SIGNIN_DOMAINS: &[&str] = &[
@@ -39,7 +50,16 @@ pub fn is_allowed(window_label: &str, url: &Url) -> bool {
     if is_local(url) {
         return true;
     }
-    window_label == SIGNIN_WINDOW && is_signin_url(url)
+    window_label == SIGNIN_WINDOW && (is_signin_url(url) || is_signin_callback(url))
+}
+
+fn is_signin_callback(url: &Url) -> bool {
+    let port = SIGNIN_CALLBACK_PORT.load(Ordering::Relaxed);
+    port != 0
+        && url.scheme() == "http"
+        && url.host_str() == Some("localhost")
+        && url.port() == Some(port)
+        && url.path() == "/callback"
 }
 
 fn is_local(url: &Url) -> bool {
@@ -98,5 +118,27 @@ mod tests {
         assert!(!is_allowed("signin", &url("https://evil-live.com/")));
         assert!(!is_allowed("signin", &url("http://login.live.com/")));
         assert!(!is_allowed("signin", &url("https://live.com.evil.example/")));
+    }
+
+    // Über `is_signin_callback`, weil Entwicklungs-Builds localhost für den Vite-Server ohnehin
+    // durchlassen.
+    #[test]
+    fn signin_callback_only_while_a_login_waits() {
+        use super::{allow_signin_callback, is_signin_callback};
+        let callback = url("http://localhost:25585/callback?code=c&state=s");
+        allow_signin_callback(None);
+        assert!(!is_signin_callback(&callback));
+
+        allow_signin_callback(Some(25585));
+        assert!(is_signin_callback(&callback));
+        assert!(is_allowed("signin", &callback));
+        assert!(!is_signin_callback(&url("http://localhost:25586/callback?code=c")));
+        assert!(!is_signin_callback(&url("http://localhost:25585/other")));
+        assert!(!is_signin_callback(&url("https://localhost:25585/callback")));
+        assert!(!is_signin_callback(&url("http://evil.example:25585/callback")));
+        assert!(!is_allowed("main", &url("http://evil.example:25585/callback")));
+
+        allow_signin_callback(None);
+        assert!(!is_signin_callback(&callback));
     }
 }
