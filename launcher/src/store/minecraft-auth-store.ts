@@ -6,6 +6,40 @@ import { getLauncherConfig } from "../services/launcher-config-service";
 import i18n from '../i18n/i18n';
 import { parseErrorMessage } from "../utils/error-utils";
 
+/** Schritte, die nur die Anmeldung im Launcher-Fenster braucht – der Browser-Login kommt ohne sie aus. */
+const EMBEDDED_ONLY_STEPS = new Set(["GetDeviceToken", "SisuAuthenticate", "SisuAuthorize"]);
+
+/**
+ * Anmeldeserver, ohne die kein Minecraft-Launcher auskommt. Sperrt ein Netz (Schule,
+ * Jugendschutzfilter) einen davon, hilft kein anderer Weg im Launcher – das sagt die Meldung dann.
+ */
+const LOGIN_SERVICE_HOST = /(^|\.)(xboxlive\.com|minecraftservices\.com|live\.com|microsoftonline\.com)$/i;
+
+/**
+ * Salami: Scheitert die Anmeldung am Netz, schickt das Backend Übersetzungsschlüssel, Server,
+ * Ursache und Schritt mit (`auth.errors.network.*`). Daraus wird eine Meldung, die sagt, was zu
+ * tun ist – statt „error sending request for url (…)“. Alles andere bleibt wie vom Backend.
+ */
+function describeLoginError(err: unknown, browserLogin: boolean): string {
+  if (typeof err === "object" && err !== null) {
+    const { translatable_key: key, args } = err as { translatable_key?: unknown; args?: unknown };
+    if (typeof key === "string" && key.startsWith("auth.errors.network.") && Array.isArray(args)) {
+      const [host = "", cause = "", step = ""] = args.map((arg) => String(arg ?? ""));
+      const lines = [i18n.t(key, { host: host || "Microsoft" })];
+      if (!browserLogin && EMBEDDED_ONLY_STEPS.has(step)) {
+        lines.push(i18n.t("auth.errors.network.browser_hint"));
+      } else if (LOGIN_SERVICE_HOST.test(host)) {
+        lines.push(i18n.t("auth.errors.network.filter_hint"));
+      }
+      if (cause) {
+        lines.push(i18n.t("auth.errors.network.cause", { cause }));
+      }
+      return lines.join("\n\n");
+    }
+  }
+  return parseErrorMessage(err);
+}
+
 interface MinecraftAuthState {
   accounts: MinecraftAccount[];
   activeAccount: MinecraftAccount | null;
@@ -102,7 +136,7 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
           loading: i18n.t('auth.loading.browser_sign_in'),
           success: ({ newAccount }) =>
             i18n.t('auth.success.account_added', { username: newAccount.username }),
-          error: (err) => err?.message || String(err),
+          error: (err) => describeLoginError(err, false),
         },
         {
           // Salami: die Anmeldung (mit Zwei-Faktor) dauert oft länger als 50 s, und ein
@@ -146,18 +180,19 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
     } catch (error) {
       const errorMessage =
         parseErrorMessage(error);
-      
+      const shownMessage = describeLoginError(error, useBrowserLogin);
+
       // Only show error toast if using browser login (toast.promise already handles it)
       if (useBrowserLogin && !errorMessage.includes(i18n.t('auth.errors.login_cancelled'))) {
-        toast.error(errorMessage || i18n.t('auth.errors.login_failed'), {
-          duration: 1500,
+        toast.error(shownMessage || i18n.t('auth.errors.login_failed'), {
+          duration: 8000,
         });
       }
-      
+
       // The toast handles displaying the error. We just log it and set state if it's a critical error.
       if (!errorMessage.includes(i18n.t('auth.errors.login_cancelled'))) {
         console.error("Failed to add account:", error);
-        set({ error: i18n.t('auth.errors.add_account', { error: errorMessage }), isLoading: false });
+        set({ error: i18n.t('auth.errors.add_account', { error: shownMessage }), isLoading: false });
       } else {
         // Closing the login window is a decision, not a fault. Storing it as an
         // error left it sitting in state forever, and surfaces that render

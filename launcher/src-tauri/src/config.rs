@@ -40,10 +40,27 @@ impl reqwest::dns::Resolve for BlockingResolver {
             if crate::branding::is_blocked_host(Some(&host)) {
                 return Err(format!("{} is blocked in {}", host, crate::branding::PRODUCT_NAME).into());
             }
+            if test_blocked_host(&host) {
+                return Err(format!("{} is blocked by SALAMI_TEST_BLOCKED_HOSTS", host).into());
+            }
             let addrs: Vec<std::net::SocketAddr> = tokio::net::lookup_host((host.as_str(), 0)).await?.collect();
             Ok(Box::new(addrs.into_iter()) as reqwest::dns::Addrs)
         })
     }
+}
+
+/// Nur in Entwicklungs-Builds: `SALAMI_TEST_BLOCKED_HOSTS=device.auth.xboxlive.com,sisu.xboxlive.com`
+/// spielt ein Netz nach, das diese Server per DNS sperrt (Schul- oder Jugendschutzfilter).
+#[cfg(debug_assertions)]
+fn test_blocked_host(host: &str) -> bool {
+    std::env::var("SALAMI_TEST_BLOCKED_HOSTS").is_ok_and(|hosts| {
+        hosts.split(',').any(|blocked| blocked.trim().eq_ignore_ascii_case(host))
+    })
+}
+
+#[cfg(not(debug_assertions))]
+fn test_blocked_host(_host: &str) -> bool {
+    false
 }
 
 /// Basis für alle HTTP-Clients des Launchers: User-Agent und gesperrte Hosts.

@@ -11,6 +11,7 @@ use log::debug;
 use log::error;
 use log::info;
 use log::trace;
+use log::warn;
 use p256::ecdsa::signature::Signer;
 use p256::ecdsa::{Signature, SigningKey, VerifyingKey};
 use p256::pkcs8::{DecodePrivateKey, EncodePrivateKey, LineEnding};
@@ -22,6 +23,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::Digest;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::fs;
 use tokio::sync::{oneshot, Mutex, RwLock};
@@ -87,6 +89,8 @@ pub enum MinecraftAuthStep {
     GetOAuthToken,
     RefreshOAuthToken,
     SisuAuthorize,
+    /// Xbox-Benutzertoken ohne Geräteanmeldung (user.auth.xboxlive.com, RPS)
+    XboxUserToken,
     XstsAuthorize,
     MinecraftToken,
     MinecraftEntitlements,
@@ -116,7 +120,7 @@ pub enum MinecraftAuthenticationError {
         source: serde_json::Error,
         status_code: reqwest::StatusCode,
     },
-    #[error("Request failed during step {step:?}: {source}")]
+    #[error("Request failed during step {step:?}: {}", request_error_text(.source))]
     Request {
         step: MinecraftAuthStep,
         #[source]
@@ -151,7 +155,9 @@ pub struct SaveDeviceToken {
 pub struct MinecraftLoginFlow {
     pub verifier: String,
     pub challenge: String,
-    pub session_id: String,
+    /// SISU-Sitzung; `None`, wenn die Anmeldung ohne Xbox-Geräteanmeldung läuft (siehe
+    /// [`device_route_failed`]).
+    pub session_id: Option<String>,
     pub redirect_uri: String,
 }
 
@@ -172,6 +178,245 @@ fn masked_body(raw: &str) -> String {
         Some((cut, _)) => format!("{}...", &masked[..cut]),
         None => masked,
     }
+}
+
+/// Salami: Die Ursachen unter einem reqwest-Fehler, von außen nach innen und ohne Wiederholungen.
+/// reqwest selbst meldet nur „error sending request for url (…)“ – ob eine Firewall, der
+/// Namensdienst oder ein Zertifikat schuld war, steht erst in dieser Kette.
+fn request_error_causes(err: &reqwest::Error) -> Vec<String> {
+    let mut causes: Vec<String> = Vec::new();
+    let mut current = std::error::Error::source(err);
+    while let Some(cause) = current {
+        let text = cause.to_string();
+        if !text.is_empty() && !causes.iter().any(|known| known.contains(&text)) {
+            causes.push(text);
+        }
+        current = cause.source();
+    }
+    causes
+}
+
+/// Salami: reqwest-Meldung samt aller Ursachen in einer Zeile.
+fn request_error_text(err: &reqwest::Error) -> String {
+    let mut text = err.to_string();
+    for cause in request_error_causes(err) {
+        text.push_str(": ");
+        text.push_str(&cause);
+    }
+    text
+}
+
+/// Salami: Woran eine Anfrage beim Anmelden gescheitert ist – damit die Meldung sagen kann,
+/// was zu tun ist, statt nur „error sending request“.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NetworkProblem {
+    /// Eine Firewall oder ein Virenschutz verbietet dem Launcher die Verbindung.
+    Blocked,
+    /// Der Servername ließ sich nicht auflösen (kein Internet, DNS-Filter, VPN).
+    Dns,
+    Timeout,
+    /// Die Gegenseite oder etwas dazwischen hat die Verbindung abgelehnt oder getrennt.
+    Refused,
+    /// Die sichere Verbindung kam nicht zustande (Uhrzeit, HTTPS-Prüfung, Zertifikat).
+    Certificate,
+    Other,
+}
+
+impl NetworkProblem {
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::Blocked => "blocked",
+            Self::Dns => "dns",
+            Self::Timeout => "timeout",
+            Self::Refused => "refused",
+            Self::Certificate => "certificate",
+            Self::Other => "other",
+        }
+    }
+}
+
+/// Windows-Fehlernummern: Socketfehler (WSA…) und HRESULTs von Schannel, das unter Windows die
+/// HTTPS-Verbindungen aufbaut.
+fn problem_from_os_code(code: i32) -> Option<NetworkProblem> {
+    match code {
+        10013 => Some(NetworkProblem::Blocked),
+        11001..=11004 => Some(NetworkProblem::Dns),
+        10060 => Some(NetworkProblem::Timeout),
+        10050..=10054 | 10061 | 10064 | 10065 => Some(NetworkProblem::Refused),
+        // HRESULT der Bereiche „Security“ (SEC_E_…, CRYPT_E_…) und „Cert“ (CERT_E_…)
+        code if code < 0 && matches!(((code as u32) >> 16) & 0x1FFF, 9 | 11) => {
+            Some(NetworkProblem::Certificate)
+        }
+        _ => None,
+    }
+}
+
+/// „… (os error 10013)“ → 10013. Schannel-Fehler stecken nur als Text in der Kette.
+fn os_code_in_text(text: &str) -> Option<i32> {
+    let start = text.rfind("(os error ")? + "(os error ".len();
+    let rest = &text[start..];
+    rest[..rest.find(')')?].trim().parse().ok()
+}
+
+pub fn classify_request_error(err: &reqwest::Error) -> NetworkProblem {
+    if err.is_timeout() {
+        return NetworkProblem::Timeout;
+    }
+    let mut current = std::error::Error::source(err);
+    while let Some(cause) = current {
+        let text = cause.to_string().to_ascii_lowercase();
+        if let Some(problem) = os_code_in_text(&text).and_then(problem_from_os_code) {
+            return problem;
+        }
+        if let Some(io) = cause.downcast_ref::<std::io::Error>() {
+            if let Some(problem) = io.raw_os_error().and_then(problem_from_os_code) {
+                return problem;
+            }
+            match io.kind() {
+                std::io::ErrorKind::PermissionDenied => return NetworkProblem::Blocked,
+                std::io::ErrorKind::TimedOut => return NetworkProblem::Timeout,
+                std::io::ErrorKind::ConnectionRefused
+                | std::io::ErrorKind::ConnectionReset
+                | std::io::ErrorKind::ConnectionAborted => return NetworkProblem::Refused,
+                _ => {}
+            }
+        }
+        if text.contains("dns error")
+            || text.contains("failed to lookup address")
+            || text.contains("no such host")
+            || text.contains("name or service not known")
+        {
+            return NetworkProblem::Dns;
+        }
+        if text.contains("certificate")
+            || text.contains("revocation")
+            || text.contains("handshake")
+            || text.contains("tls")
+            || text.contains("ssl")
+        {
+            return NetworkProblem::Certificate;
+        }
+        current = cause.source();
+    }
+    NetworkProblem::Other
+}
+
+/// Salami: Für die Oberfläche – Problemart, Server und die innerste (meist aussagekräftigste)
+/// Ursache, z. B. „No such host is known. (os error 11001)“.
+pub fn request_error_summary(err: &reqwest::Error) -> (NetworkProblem, String, String) {
+    let host = err
+        .url()
+        .and_then(|url| url.host_str())
+        .unwrap_or_default()
+        .to_string();
+    let cause = request_error_causes(err)
+        .pop()
+        .unwrap_or_else(|| err.to_string());
+    (classify_request_error(err), host, cause)
+}
+
+/// Salami: Manche Netze (Schul-, Jugendschutz- und Firmenfilter) sperren die Xbox-Geräteanmeldung
+/// (device.auth.xboxlive.com, sisu.xboxlive.com), lassen die eigentliche Xbox-Anmeldung aber
+/// durch. Dann meldet sich der Launcher ohne Geräte-Token an: dieselbe Microsoft-Anmeldung
+/// (Client-ID, Rückleitung) → user.auth.xboxlive.com → XSTS → Minecraft. Gemerkt wird das bis zum
+/// Neustart, damit nicht jede Erneuerung erst am gesperrten Server hängen bleibt.
+static DEVICE_ROUTE_BLOCKED: AtomicBool = AtomicBool::new(false);
+
+fn device_route_blocked() -> bool {
+    DEVICE_ROUTE_BLOCKED.load(Ordering::Relaxed)
+}
+
+/// Ob ein Fehler aus der Xbox-Geräteanmeldung stammt (Geräte-Token, SISU) – dann geht es ohne sie
+/// weiter. Fehler der übrigen Schritte betreffen beide Wege gleich.
+pub fn device_route_failed(err: &AppError) -> bool {
+    use MinecraftAuthenticationError as E;
+    let AppError::MinecraftAuthenticationError(err) = err else {
+        return false;
+    };
+    let step = match err {
+        E::Request { step, .. }
+        | E::DeserializeResponse { step, .. }
+        | E::SerializeBody { step, .. }
+        | E::ConstructingSignedRequest { step, .. } => *step,
+        // Geräteschlüssel und SISU-Sitzung gibt es nur auf diesem Weg
+        E::NoSessionId | E::ReadingPublicKey | E::PEMSerialize(_) => return true,
+        _ => return false,
+    };
+    matches!(
+        step,
+        MinecraftAuthStep::GetDeviceToken
+            | MinecraftAuthStep::SisuAuthenticate
+            | MinecraftAuthStep::SisuAuthorize
+    )
+}
+
+fn note_device_route_failure(err: &AppError) {
+    warn!("[Auth Flow] Xbox device login unavailable, continuing without it: {}", err);
+    DEVICE_ROUTE_BLOCKED.store(true, Ordering::Relaxed);
+}
+
+/// Anmeldeseite für den Weg ohne Geräteanmeldung: dieselbe Client-ID, derselbe Umfang und
+/// dieselbe Rückleitung wie über SISU, nur direkt bei login.live.com angefragt.
+fn login_url_without_device(challenge: &str, state: &str) -> Result<String> {
+    let mut url = url::Url::parse(LIVE_AUTHORIZE_URL)
+        .map_err(|e| AppError::Other(format!("Failed to parse authorize URL: {}", e)))?;
+    url.query_pairs_mut()
+        .append_pair("client_id", MICROSOFT_CLIENT_ID)
+        .append_pair("response_type", "code")
+        .append_pair("scope", REQUESTED_SCOPE)
+        .append_pair("redirect_uri", AUTH_REPLY_URL)
+        .append_pair("code_challenge", challenge)
+        .append_pair("code_challenge_method", "S256")
+        .append_pair("state", state)
+        .append_pair("prompt", "select_account");
+    Ok(url.to_string())
+}
+
+/// Bevor die Anmeldung ohne Geräteanmeldung startet: Sind login.live.com und
+/// user.auth.xboxlive.com überhaupt erreichbar? Sonst sagt die Meldung gleich, welcher Server
+/// gesperrt ist, statt dass sich ein Fenster mit einer Fehlerseite öffnet oder die Anmeldung erst
+/// nach dem Passwort scheitert. Jede HTTP-Antwort zählt als erreichbar.
+async fn check_route_without_device() -> Result<()> {
+    async fn reach(url: &'static str, step: MinecraftAuthStep) -> Result<()> {
+        auth_retry(|| HTTP_CLIENT.get(url).timeout(AUTH_REQUEST_TIMEOUT).send())
+            .await
+            .map(|_| ())
+            .map_err(|source| AppError::from(MinecraftAuthenticationError::Request { source, step }))
+    }
+    let (live, xbox) = tokio::join!(
+        reach("https://login.live.com/", MinecraftAuthStep::GetOAuthToken),
+        reach("https://user.auth.xboxlive.com/", MinecraftAuthStep::XboxUserToken),
+    );
+    live?;
+    xbox
+}
+
+/// XSTS-Token für ein Microsoft-Token von login.live.com: über die Geräteanmeldung (SISU), wenn
+/// ein Geräte-Token da ist und sie durchkommt, sonst ohne sie.
+async fn live_token_to_xsts(
+    access_token: &str,
+    session_id: Option<&str>,
+    device: Option<(DeviceTokenKey, DeviceToken, DateTime<Utc>)>,
+) -> Result<DeviceToken> {
+    if let Some((key, token, current_date)) = device {
+        let via_sisu = async {
+            info!("[Auth Flow] Authorizing with SISU");
+            let authorized =
+                sisu_authorize(session_id, access_token, &token.token, &key, current_date).await?;
+            info!("[Auth Flow] Authorizing with XSTS");
+            xsts_authorize(authorized.value, &token.token, &key, authorized.date).await
+        }
+        .await;
+        match via_sisu {
+            Ok(xsts) => return Ok(xsts.value),
+            Err(err) if device_route_failed(&err) => note_device_route_failure(&err),
+            Err(err) => return Err(err),
+        }
+    }
+    info!("[Auth Flow] Authorizing with Xbox Live without the device login");
+    // „t=“: Token einer Xbox-Titel-Client-ID von login.live.com (Azure-Apps nehmen „d=“)
+    let user_token = xbox_user_token(&format!("t={access_token}")).await?;
+    xsts_authorize_direct(user_token).await
 }
 
 fn publish_log_redactions(accounts: &[Credentials]) {
@@ -442,6 +687,31 @@ impl MinecraftAuthStore {
 
     pub async fn login_begin(&self, redirect_uri: Option<&str>) -> Result<MinecraftLoginFlow> {
         info!("[Auth Flow] Starting login_begin process");
+        if !device_route_blocked() {
+            match self.login_begin_sisu(redirect_uri).await {
+                Ok(flow) => return Ok(flow),
+                // Der Weg ohne Geräteanmeldung kennt nur die feste Rückleitung von login.live.com
+                Err(err) if redirect_uri.is_none() && device_route_failed(&err) => {
+                    note_device_route_failure(&err)
+                }
+                Err(err) => return Err(err),
+            }
+        }
+
+        check_route_without_device().await?;
+        info!("[Auth Flow] Starting the login without the Xbox device login");
+        let verifier = generate_oauth_challenge();
+        let challenge = BASE64_URL_SAFE_NO_PAD.encode(sha2::Sha256::digest(&verifier));
+        let redirect_uri = login_url_without_device(&challenge, &generate_oauth_challenge())?;
+        Ok(MinecraftLoginFlow {
+            verifier,
+            challenge,
+            session_id: None,
+            redirect_uri,
+        })
+    }
+
+    async fn login_begin_sisu(&self, redirect_uri: Option<&str>) -> Result<MinecraftLoginFlow> {
         info!("[Auth Flow] Initializing device token refresh");
         let (key, token, current_date, valid_date) =
             self.refresh_and_get_device_token(Utc::now(), false).await?;
@@ -463,7 +733,7 @@ impl MinecraftAuthStore {
                 Ok(MinecraftLoginFlow {
                     verifier,
                     challenge,
-                    session_id,
+                    session_id: Some(session_id),
                     redirect_uri: redirect_uri.value.msa_oauth_redirect,
                 })
             }
@@ -487,12 +757,12 @@ impl MinecraftAuthStore {
 
                     info!(
                         "[Auth Flow] Retry successful - New session ID: {}",
-                        session_id
+                        crate::utils::security_utils::mask_identifier(&session_id)
                     );
                     Ok(MinecraftLoginFlow {
                         verifier,
                         challenge,
-                        session_id,
+                        session_id: Some(session_id),
                         redirect_uri: redirect_uri.value.msa_oauth_redirect,
                     })
                 } else {
@@ -567,7 +837,7 @@ impl MinecraftAuthStore {
             "Exchanging Microsoft token for Xbox token",
             Some(50.0),
         ).await?;
-        let xbox_token = xbox_authenticate_rps(&oauth_token.value.access_token).await
+        let xbox_token = xbox_user_token(&format!("d={}", oauth_token.value.access_token)).await
             .map_err(|e| {
                 Self::emit_login_error_event(&state, event_id, format!("Failed to authenticate with Xbox: {}", e));
                 e
@@ -659,33 +929,35 @@ impl MinecraftAuthStore {
 
     pub async fn login_finish(&self, code: &str, flow: MinecraftLoginFlow) -> Result<Credentials> {
         info!("[Auth Flow] Starting login_finish process");
-        info!("[Auth Flow] Refreshing device token");
-        let (key, token, _, _) = self.refresh_and_get_device_token(Utc::now(), false).await?;
+        let device = match flow.session_id {
+            Some(_) if !device_route_blocked() => {
+                info!("[Auth Flow] Refreshing device token");
+                match self.refresh_and_get_device_token(Utc::now(), false).await {
+                    Ok((key, token, _, _)) => Some((key, token)),
+                    Err(err) if device_route_failed(&err) => {
+                        note_device_route_failure(&err);
+                        None
+                    }
+                    Err(err) => return Err(err),
+                }
+            }
+            _ => None,
+        };
 
         info!("[Auth Flow] Getting OAuth token");
         let oauth_token = oauth_token(code, &flow.verifier).await?;
 
-        info!("[Auth Flow] Authorizing with SISU");
-        let sisu_authorize = sisu_authorize(
-            Some(&flow.session_id),
+        // Der Code gilt für beide Wege: Scheitert die Geräteanmeldung erst jetzt, geht es ohne
+        // sie weiter, statt dass sich der Spieler noch einmal anmelden muss.
+        let xbox_token = live_token_to_xsts(
             &oauth_token.value.access_token,
-            &token.token,
-            &key,
-            oauth_token.date,
-        )
-        .await?;
-
-        info!("[Auth Flow] Authorizing with XSTS");
-        let xbox_token = xsts_authorize(
-            sisu_authorize.value,
-            &token.token,
-            &key,
-            sisu_authorize.date,
+            flow.session_id.as_deref(),
+            device.map(|(key, token)| (key, token, oauth_token.date)),
         )
         .await?;
 
         info!("[Auth Flow] Getting Minecraft token");
-        let minecraft_token = minecraft_token(xbox_token.value).await?;
+        let minecraft_token = minecraft_token(xbox_token).await?;
 
         info!("[Auth Flow] Checking Minecraft entitlements");
         minecraft_entitlements(&minecraft_token.access_token).await?;
@@ -765,7 +1037,7 @@ impl MinecraftAuthStore {
         let oauth_token = oauth_refresh_direct(&creds.refresh_token).await?;
 
         info!("[Token Refresh] Getting Xbox token (direct via RPS)");
-        let xbox_token = xbox_authenticate_rps(&oauth_token.value.access_token).await?;
+        let xbox_token = xbox_user_token(&format!("d={}", oauth_token.value.access_token)).await?;
 
         info!("[Token Refresh] Authorizing with XSTS (direct)");
         let xsts_token = xsts_authorize_direct(xbox_token).await?;
@@ -798,32 +1070,25 @@ impl MinecraftAuthStore {
         info!("[Token Refresh] Getting OAuth refresh token (SISU flow)");
         let oauth_token = oauth_refresh(&creds.refresh_token).await?;
 
-        info!("[Token Refresh] Refreshing device token");
-        let (key, token, current_date, _) = self
-            .refresh_and_get_device_token(oauth_token.date, false)
-            .await?;
+        let device = if device_route_blocked() {
+            None
+        } else {
+            info!("[Token Refresh] Refreshing device token");
+            match self.refresh_and_get_device_token(oauth_token.date, false).await {
+                Ok((key, token, current_date, _)) => Some((key, token, current_date)),
+                Err(err) if device_route_failed(&err) => {
+                    note_device_route_failure(&err);
+                    None
+                }
+                Err(err) => return Err(err),
+            }
+        };
 
-        info!("[Token Refresh] Authorizing with SISU");
-        let sisu_authorize = sisu_authorize(
-            None,
-            &oauth_token.value.access_token,
-            &token.token,
-            &key,
-            current_date,
-        )
-        .await?;
-
-        info!("[Token Refresh] Authorizing with XSTS");
-        let xbox_token = xsts_authorize(
-            sisu_authorize.value,
-            &token.token,
-            &key,
-            sisu_authorize.date,
-        )
-        .await?;
+        let xbox_token =
+            live_token_to_xsts(&oauth_token.value.access_token, None, device).await?;
 
         info!("[Token Refresh] Getting Minecraft token");
-        let minecraft_token = minecraft_token(xbox_token.value).await?;
+        let minecraft_token = minecraft_token(xbox_token).await?;
 
         info!("[Token Refresh] Creating new credentials");
         let val = Credentials {
@@ -1166,6 +1431,7 @@ impl MinecraftAuthStore {
 
 const MICROSOFT_CLIENT_ID: &str = "00000000402b5328";
 const AUTH_REPLY_URL: &str = "https://login.live.com/oauth20_desktop.srf";
+const LIVE_AUTHORIZE_URL: &str = "https://login.live.com/oauth20_authorize.srf";
 const REQUESTED_SCOPE: &str = "service::user.auth.xboxlive.com::MBI_SSL";
 
 // Alternative Client-ID for direct OAuth2 flow (supports localhost redirect)
@@ -1397,8 +1663,9 @@ async fn direct_oauth_token(
     })
 }
 
-/// Xbox authentication using RPS method (direct, no SISU)
-async fn xbox_authenticate_rps(access_token: &str) -> Result<String> {
+/// Xbox authentication using RPS method (direct, no SISU). `rps_ticket` is the Microsoft access
+/// token with its prefix: "d=" for the Azure app of the browser login, "t=" for login.live.com.
+async fn xbox_user_token(rps_ticket: &str) -> Result<String> {
     let res = auth_retry(|| {
         HTTP_CLIENT
             .post("https://user.auth.xboxlive.com/user/authenticate")
@@ -1409,7 +1676,7 @@ async fn xbox_authenticate_rps(access_token: &str) -> Result<String> {
                 "Properties": {
                     "AuthMethod": "RPS",
                     "SiteName": "user.auth.xboxlive.com",
-                    "RpsTicket": format!("d={}", access_token)
+                    "RpsTicket": rps_ticket
                 },
                 "RelyingParty": "http://auth.xboxlive.com",
                 "TokenType": "JWT"
@@ -1419,7 +1686,7 @@ async fn xbox_authenticate_rps(access_token: &str) -> Result<String> {
     .await
     .map_err(|source| MinecraftAuthenticationError::Request {
         source,
-        step: MinecraftAuthStep::SisuAuthorize,
+        step: MinecraftAuthStep::XboxUserToken,
     })?;
 
     let status = res.status();
@@ -1428,14 +1695,14 @@ async fn xbox_authenticate_rps(access_token: &str) -> Result<String> {
         .await
         .map_err(|source| MinecraftAuthenticationError::Request {
             source,
-            step: MinecraftAuthStep::SisuAuthorize,
+            step: MinecraftAuthStep::XboxUserToken,
         })?;
 
     let json: serde_json::Value = serde_json::from_str(&text).map_err(|source| {
         MinecraftAuthenticationError::DeserializeResponse {
             source,
             raw: text.clone(),
-            step: MinecraftAuthStep::SisuAuthorize,
+            step: MinecraftAuthStep::XboxUserToken,
             status_code: status,
         }
     })?;
@@ -1451,7 +1718,7 @@ async fn xbox_authenticate_rps(access_token: &str) -> Result<String> {
                         "Missing Token field in Xbox authentication response",
                     )),
                     raw: text,
-                    step: MinecraftAuthStep::SisuAuthorize,
+                    step: MinecraftAuthStep::XboxUserToken,
                     status_code: status,
                 }
             )
@@ -2304,5 +2571,183 @@ mod oauth_server_tests {
         assert_eq!(body, "ok");
         assert_eq!(rx.await.unwrap().unwrap(), "good");
         handle.abort();
+    }
+}
+
+#[cfg(test)]
+mod device_route_tests {
+    use super::*;
+
+    async fn refused(step: MinecraftAuthStep) -> AppError {
+        let port = {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            listener.local_addr().unwrap().port()
+        };
+        let source = reqwest::Client::new()
+            .get(format!("http://127.0.0.1:{port}/"))
+            .send()
+            .await
+            .unwrap_err();
+        MinecraftAuthenticationError::Request { step, source }.into()
+    }
+
+    #[tokio::test]
+    async fn only_device_steps_switch_the_route() {
+        for step in [
+            MinecraftAuthStep::GetDeviceToken,
+            MinecraftAuthStep::SisuAuthenticate,
+            MinecraftAuthStep::SisuAuthorize,
+        ] {
+            assert!(device_route_failed(&refused(step).await), "{step:?}");
+        }
+        for step in [
+            MinecraftAuthStep::GetOAuthToken,
+            MinecraftAuthStep::RefreshOAuthToken,
+            MinecraftAuthStep::XboxUserToken,
+            MinecraftAuthStep::XstsAuthorize,
+            MinecraftAuthStep::MinecraftToken,
+        ] {
+            assert!(!device_route_failed(&refused(step).await), "{step:?}");
+        }
+        assert!(device_route_failed(&MinecraftAuthenticationError::NoSessionId.into()));
+        assert!(!device_route_failed(&MinecraftAuthenticationError::NoMinecraftLicense.into()));
+        assert!(!device_route_failed(&MinecraftAuthenticationError::XboxError("x".into()).into()));
+        assert!(!device_route_failed(&AppError::Other("x".into())));
+    }
+
+    #[test]
+    fn login_url_without_device_keeps_client_and_redirect() {
+        let url = url::Url::parse(&login_url_without_device("chal", "st").unwrap()).unwrap();
+        assert_eq!(url.host_str(), Some("login.live.com"));
+        let query: HashMap<_, _> = url.query_pairs().into_owned().collect();
+        assert_eq!(query["client_id"], MICROSOFT_CLIENT_ID);
+        assert_eq!(query["scope"], REQUESTED_SCOPE);
+        assert_eq!(query["redirect_uri"], AUTH_REPLY_URL);
+        assert_eq!(query["response_type"], "code");
+        assert_eq!(query["code_challenge"], "chal");
+        assert_eq!(query["code_challenge_method"], "S256");
+        assert_eq!(query["state"], "st");
+    }
+
+    /// Spielt einen Schulfilter nach, der die Xbox-Geräteanmeldung per DNS sperrt. Geht ins Netz
+    /// (Microsoft und Xbox, ohne Kontodaten), deshalb nur auf Abruf:
+    /// `cargo test device_route -- --ignored`
+    #[tokio::test]
+    #[ignore]
+    async fn blocked_device_login_falls_back() {
+        std::env::set_var(
+            "SALAMI_TEST_BLOCKED_HOSTS",
+            "device.auth.xboxlive.com,sisu.xboxlive.com",
+        );
+        let store = MinecraftAuthStore {
+            accounts: Arc::new(RwLock::new(Vec::new())),
+            store_path: std::env::temp_dir()
+                .join(format!("salami-device-route-{}.json", Uuid::new_v4())),
+            token: Arc::new(RwLock::new(None)),
+            save_lock: Arc::new(Mutex::new(())),
+        };
+
+        let flow = store.login_begin(None).await.unwrap();
+        assert!(flow.session_id.is_none());
+        assert!(flow.redirect_uri.starts_with(LIVE_AUTHORIZE_URL), "{}", flow.redirect_uri);
+        assert!(device_route_blocked());
+        assert!(!store.store_path.exists(), "nothing may be saved without a device token");
+
+        // Die Anmeldeseite im Launcher-Fenster lädt
+        let page = HTTP_CLIENT.get(&flow.redirect_uri).send().await.unwrap();
+        assert!(page.status().is_success(), "{}", page.status());
+        let html = page.text().await.unwrap();
+        assert!(html.contains("Sign in"), "unexpected login page");
+
+        // Und die Erneuerung bestehender Konten überspringt die Geräteanmeldung jetzt gleich
+        let err = live_token_to_xsts("not-a-token", None, None).await.unwrap_err();
+        assert!(!device_route_failed(&err), "{err}");
+        println!("without device, a bad token ends at: {err}");
+    }
+}
+
+#[cfg(test)]
+mod network_error_tests {
+    use super::*;
+
+    fn login_error(source: reqwest::Error) -> String {
+        AppError::MinecraftAuthenticationError(MinecraftAuthenticationError::Request {
+            step: MinecraftAuthStep::GetDeviceToken,
+            source,
+        })
+        .to_string()
+    }
+
+    #[test]
+    fn os_codes_from_windows() {
+        assert_eq!(os_code_in_text("tcp connect error: forbidden. (os error 10013)"), Some(10013));
+        assert_eq!(os_code_in_text("bad message (os error -2146893018)"), Some(-2146893018));
+        assert_eq!(os_code_in_text("no code here"), None);
+        assert_eq!(problem_from_os_code(10013), Some(NetworkProblem::Blocked));
+        assert_eq!(problem_from_os_code(11001), Some(NetworkProblem::Dns));
+        assert_eq!(problem_from_os_code(10060), Some(NetworkProblem::Timeout));
+        assert_eq!(problem_from_os_code(10054), Some(NetworkProblem::Refused));
+        // SEC_E_UNTRUSTED_ROOT, CRYPT_E_REVOCATION_OFFLINE, CERT_E_EXPIRED
+        assert_eq!(problem_from_os_code(0x80090325u32 as i32), Some(NetworkProblem::Certificate));
+        assert_eq!(problem_from_os_code(0x80092013u32 as i32), Some(NetworkProblem::Certificate));
+        assert_eq!(problem_from_os_code(0x800B0101u32 as i32), Some(NetworkProblem::Certificate));
+        assert_eq!(problem_from_os_code(0x80004005u32 as i32), None);
+    }
+
+    #[tokio::test]
+    async fn refused_connection_names_its_cause() {
+        let port = {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            listener.local_addr().unwrap().port()
+        };
+        let err = HTTP_CLIENT
+            .get(format!("https://127.0.0.1:{port}/device/authenticate"))
+            .send()
+            .await
+            .unwrap_err();
+        let (problem, host, cause) = request_error_summary(&err);
+        assert_eq!(problem, NetworkProblem::Refused, "{cause}");
+        assert_eq!(host, "127.0.0.1");
+        let message = login_error(err);
+        assert!(message.contains("error sending request"), "{message}");
+        assert!(message.contains(&cause), "cause missing in: {message}");
+        println!("refused: {message}");
+    }
+
+    #[tokio::test]
+    async fn unresolvable_host_is_a_dns_problem() {
+        // Gesperrte Hosts scheitern schon in der Namensauflösung, ohne dass etwas ins Netz geht
+        let err = HTTP_CLIENT.get("https://api.norisk.gg/").send().await.unwrap_err();
+        let (problem, host, cause) = request_error_summary(&err);
+        assert_eq!(problem, NetworkProblem::Dns, "{cause}");
+        assert_eq!(host, "api.norisk.gg");
+        assert!(cause.contains("blocked"), "{cause}");
+        println!("dns: {}", login_error(err));
+    }
+
+    #[tokio::test]
+    async fn broken_tls_is_a_certificate_problem() {
+        // Ein Server, der auf HTTPS mit Klartext antwortet – wie ein Proxy oder Netzwerkfilter
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = tokio::spawn(async move {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            if let Ok((mut socket, _)) = listener.accept().await {
+                let mut buf = [0u8; 1024];
+                let _ = socket.read(&mut buf).await;
+                let _ = socket.write_all(b"HTTP/1.1 400 Bad Request\r\n\r\n").await;
+            }
+        });
+        let err = HTTP_CLIENT
+            .get(format!("https://127.0.0.1:{port}/"))
+            .send()
+            .await
+            .unwrap_err();
+        let (problem, _, cause) = request_error_summary(&err);
+        if cfg!(windows) {
+            assert_eq!(problem, NetworkProblem::Certificate, "{cause}");
+        }
+        println!("tls: {}", login_error(err));
+        server.abort();
     }
 }

@@ -236,6 +236,21 @@ impl From<AppError> for CommandError {
                 args: Some(args.clone()),
                 status: Some(*status),
             },
+            // Salami: Netzwerkfehler beim Anmelden bekommen einen Übersetzungsschlüssel samt Server,
+            // Ursache und Schritt, damit die Oberfläche sagen kann, was zu tun ist.
+            AppError::MinecraftAuthenticationError(
+                crate::minecraft::minecraft_auth::MinecraftAuthenticationError::Request { step, source },
+            ) => {
+                let (problem, host, cause) =
+                    crate::minecraft::minecraft_auth::request_error_summary(source);
+                CommandError {
+                    message: error.to_string(),
+                    kind: "MinecraftAuthNetworkError".to_string(),
+                    translatable_key: Some(format!("auth.errors.network.{}", problem.key())),
+                    args: Some(vec![host, cause, format!("{:?}", step)]),
+                    status: None,
+                }
+            }
             _ => CommandError {
                 message: error.to_string(),
                 kind: format!("{:?}", error),

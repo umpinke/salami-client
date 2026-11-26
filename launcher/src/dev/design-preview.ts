@@ -420,6 +420,27 @@ mockIPC((cmd, args) => {
     case "get_app_version":
     case "get_launcher_version":
       return "1.0.0";
+    case "begin_login": {
+      // design-preview.html?signedout&loginerror=blocked|dns|…: Netzwerkfehler beim Anmelden
+      // nachstellen; loginerror=raw zeigt die rohe Backend-Meldung (ohne Übersetzungsschlüssel).
+      // &xbox: das Netz sperrt die ganze Xbox-Anmeldung (user.auth), nicht nur die Geräteanmeldung.
+      const params = new URLSearchParams(location.search);
+      const problem = params.get("loginerror");
+      if (!problem) return null;
+      const [host, step, path] = params.has("xbox")
+        ? ["user.auth.xboxlive.com", "XboxUserToken", "/user/authenticate"]
+        : ["device.auth.xboxlive.com", "GetDeviceToken", "/device/authenticate"];
+      const cause = "An attempt was made to access a socket in a way forbidden by its access permissions. (os error 10013)";
+      throw {
+        message:
+          `Minecraft authentication error: Request failed during step ${step}: error sending request for url ` +
+          `(https://${host}${path}): client error (Connect): tcp connect error: ${cause}`,
+        kind: "MinecraftAuthNetworkError",
+        ...(problem === "raw"
+          ? {}
+          : { translatable_key: `auth.errors.network.${problem}`, args: [host, cause, step] }),
+      };
+    }
     case "get_active_account":
       return SIGNED_OUT ? null : sampleAccount;
     case "get_accounts":
